@@ -236,9 +236,9 @@ window.game1LocationAssetWorkflow = (() => {
     const painterModel=model=>!model.managed&&model.parts.some(p=>p.painterCandidate===true);
     const painterModels=grouped.filter(painterModel);
     const hasManagedPending=parts.some(p=>p.managed&&!p.republishRequired&&!p.needsFbxInspection&&
-      (p.needsMesh||p.needsTexture||p.needsAlpha));
+      (p.needsMesh||p.needsTexture||p.needsAlpha||p.needsPhysics));
     const pendingKeys=model=>model.parts.filter(p=>p.managed&&!p.republishRequired&&!p.needsFbxInspection&&
-      (p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
+      (p.needsMesh||p.needsTexture||p.needsAlpha||p.needsPhysics)).map(p=>p.key);
     const inventory=selected?.inventory||[];
     const currentVersion=inventory.find(v=>v.modelAssetId===String(item.model_asset_id||''));
     const oldVersions=inventory.filter(v=>v!==currentVersion);
@@ -253,10 +253,17 @@ window.game1LocationAssetWorkflow = (() => {
       const meshStatus=p.meshCurrent?'✓ актуальный':'✕ устаревший';
       const textureStatus=p.textureCurrent?'✓ актуальный':'✕ устаревший';
       const appearanceLabel=item.appearanceMode==='material'?'Appearance':'Texture';
+      const physics=p.physics;
+      const physicsText=physics?`C/Q/T ${physics.canCollide?'1':'0'}/${physics.canQuery?'1':'0'}/${physics.canTouch?'1':'0'} → `+
+        `${physics.expectedCanCollide?'1':'0'}/${physics.expectedCanQuery?'1':'0'}/${physics.expectedCanTouch?'1':'0'} · `+
+        `DoubleSided ${physics.doubleSided?'1':'0'} → ${physics.expectedDoubleSided?'1':'0'} · `+
+        `Fidelity ${e(physics.collisionFidelity)} → ${e(physics.expectedCollisionFidelity)}`:'';
       return `<div class="la-sync-visual"><strong>${e(p.name)}</strong>`+
         (p.effectiveAppearanceMode?`<small>Studio expects: ${e(p.effectiveAppearanceMode)}${p.appearanceOverride?' · MeshPart override':''}</small>`:'')+
         `<div class="la-sync-part-status"><span class="${p.meshCurrent?'is-current':'is-stale'}">Mesh ${meshStatus}</span>`+
-        (p.textureApplicable?`<span class="${p.textureCurrent?'is-current':'is-stale'}">Texture ${textureStatus}</span>`:'')+`</div>`+
+        (p.textureApplicable?`<span class="${p.textureCurrent?'is-current':'is-stale'}">Texture ${textureStatus}</span>`:'')+
+        (p.textureApplicable?`<span class="${p.physicsCurrent?'is-current':'is-stale'}">Physics ${p.physicsCurrent?'✓ актуальна':'✕ требует Sync'}</span>`:'')+`</div>`+
+        (p.needsPhysics?`<small class="la-sync-external-note">${physicsText}</small>`:'')+
         `<small class="la-sync-ids">Mesh ID ${e(p.meshId||'—')}`+
         (p.textureApplicable?(item.appearanceMode==='material'?` · Material ${e(item.visualMaterial)} · Color ${e(item.visualColor)}`:
           ` · Texture ${e(p.textureId||'—')}`+(item.appearanceMode==='material_atlas'?` · Material ${e(item.visualMaterial)} · Color ${e(item.visualColor)}`:''))+
@@ -306,7 +313,8 @@ window.game1LocationAssetWorkflow = (() => {
         `Другие без привязки: ${grouped.filter(g=>!g.managed&&!painterModel(g)).length}</small>`+
         `<small>Геометрию обновить: ${Number(selected.geometryPending||0)} моделей · `+
         `${item.appearanceMode==='material'?'Внешний вид обновить':'Текстуру обновить'}: ${Number(selected.texturePending||0)} MeshPart · `+
-        `Alpha обновить: ${Number(selected.alphaPending||0)} MeshPart</small></div>`+
+        `Alpha обновить: ${Number(selected.alphaPending||0)} MeshPart · `+
+        `Physics обновить: ${Number(selected.physicsPending||0)} MeshPart</small></div>`+
         `<div class="la-sync-list">${grouped.map(modelLine).join('')||'<small>MeshPart не найдены.</small>'}</div>`:'')+
         `<div class="la-sync-controls"><div class="actions">`+
         `${button('select-all','Select All · Studio',busy||!grouped.length||reportStale)}`+
@@ -384,7 +392,7 @@ window.game1LocationAssetWorkflow = (() => {
         if(!part)return;
         const keys=(state.scan.studio.parts||[]).filter(p=>p.managed&&
           p.instanceId===part.instanceId&&!p.republishRequired&&!p.needsFbxInspection&&
-          (p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
+          (p.needsMesh||p.needsTexture||p.needsAlpha||p.needsPhysics)).map(p=>p.key);
         return syncSelected(keys);
       };
     });
@@ -737,7 +745,8 @@ window.game1LocationAssetWorkflow = (() => {
       if(!state.scan||state.scanStale)return;
     }
     const keys=(state.scan.studio.parts||[]).filter(p=>p.managed&&
-      !p.republishRequired&&!p.needsFbxInspection&&(p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>p.key);
+      !p.republishRequired&&!p.needsFbxInspection&&
+      (p.needsMesh||p.needsTexture||p.needsAlpha||p.needsPhysics)).map(p=>p.key);
     const painterModels=window.game1LocationSyncGrouping.models(state.scan.studio.parts||[]).filter(m=>
       !m.managed&&m.parts.some(p=>p.painterCandidate===true));
     if(!keys.length&&!painterModels.length){
@@ -810,14 +819,15 @@ window.game1LocationAssetWorkflow = (() => {
         throw Error('Отчёт Find устарел; повтори сканирование');
       }
       const pending=new Map((scan.studio.parts||[]).filter(p=>p.managed&&
-        !p.republishRequired&&!p.needsFbxInspection&&(p.needsMesh||p.needsTexture||p.needsAlpha)).map(p=>[p.key,p]));
+        !p.republishRequired&&!p.needsFbxInspection&&
+        (p.needsMesh||p.needsTexture||p.needsAlpha||p.needsPhysics)).map(p=>[p.key,p]));
       if(!Array.isArray(keys)||!keys.length||new Set(keys).size!==keys.length||
         keys.some(key=>!pending.has(key)))throw Error('Нет доступных для Sync MeshPart');
       const chosen=keys.map(key=>pending.get(key));
-      const mesh=chosen.some(p=>p.needsMesh),texture=chosen.some(p=>p.needsTexture),alpha=chosen.some(p=>p.needsAlpha);
-      const label=mesh&&texture?'Replace Texture + Mesh':mesh?'Replace Mesh':texture?'Replace Texture':alpha?'Sync Alpha':'Sync';
+      const mesh=chosen.some(p=>p.needsMesh),texture=chosen.some(p=>p.needsTexture),alpha=chosen.some(p=>p.needsAlpha),physics=chosen.some(p=>p.needsPhysics);
+      const label=mesh&&texture?'Replace Texture + Mesh':mesh?'Replace Mesh':texture?'Replace Texture':alpha?'Sync Alpha':physics?'Sync Physics':'Sync';
       if(typeof window.confirm!=='function')throw Error('Explicit confirmation is unavailable');
-      const scope=mesh?'Mesh: заменится весь rig соответствующей модели. ':texture?'Texture: обновятся выбранные визуальные MeshPart. ':'Alpha: изменится только SurfaceAppearance.AlphaMode. ';
+      const scope=mesh?'Mesh: заменится весь rig соответствующей модели. ':texture?'Texture: обновятся выбранные визуальные MeshPart. ':alpha?'Alpha: изменится только SurfaceAppearance.AlphaMode. ':'Physics: применятся зарегистрированные CanCollide / CanQuery / CanTouch / DoubleSided / CollisionFidelity. ';
       if(!window.confirm(`${label}: ${keys.length} MeshPart (${state.slug}). `+
         scope+'Сделай резервную копию Place. Продолжить?')){
         message('Sync отменён. Place не изменён.');return;

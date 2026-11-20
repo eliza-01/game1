@@ -565,6 +565,38 @@ function DecoAssetLoader:loadForMeshInventory(modelId: string, slug: string): Mo
     return model
 end
 
+function DecoAssetLoader:loadHistoricalRigForComparison(modelId: string, slug: string,
+    rigManifest: any): Model
+    -- A placed v2 rig was created from loadPublished(), where Roblox importer
+    -- scaffolding is removed on a detached clone. Compare against that same
+    -- representation, never raw RootPart hierarchy and never a newer version's
+    -- manifest. This path is read-only and performs no publication.
+    if type(rigManifest) ~= "table" then
+        error("historical rig manifest unavailable; no Place geometry modified")
+    end
+    local model = self:loadForMeshInventory(modelId, slug)
+    local good, problem = pcall(function()
+        sanitize(model)
+        PublishedRigNormalize.Apply(model, rigManifest)
+        RetiredCleanup.CleanLocation(model)
+        local carrier = Carrier.Validate(model, rigManifest, false)
+        if carrier then
+            Carrier.Prepare(carrier)
+            for _, part in ipairs(model:GetDescendants()) do
+                if part:IsA("MeshPart") and part ~= carrier then
+                    SkinConnection.Connect(model, carrier, part, "LocationSkinWeld")
+                end
+            end
+            model.PrimaryPart = carrier
+        end
+    end)
+    if not good then
+        model:Destroy()
+        error(tostring(problem))
+    end
+    return model
+end
+
 return DecoAssetLoader
 ]]></string>
         </Properties>
@@ -981,7 +1013,9 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
                 parent=part.Parent,frame=part:GetPivot(),size=part.Size,
                 surface=surface,alphaMode=if surface then surface.AlphaMode else nil,
                 material=part.Material,color=part.Color,
-                appearanceMode=part:GetAttribute("Game1DecoAppearanceMode")}
+                appearanceMode=part:GetAttribute("Game1DecoAppearanceMode"),
+                canCollide=part.CanCollide,canQuery=part.CanQuery,canTouch=part.CanTouch,
+                doubleSided=part.DoubleSided,collisionFidelity=part.CollisionFidelity}
         end
     end
     report.partStates=snap
@@ -994,6 +1028,7 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
         foundMeshParts=report.foundMeshParts,managedMeshParts=report.managedMeshParts,
         unmanagedMeshParts=report.unmanagedMeshParts,managedModels=report.managedModels,
         meshPending=report.meshPending,texturePending=report.texturePending,alphaPending=report.alphaPending,
+        physicsPending=report.physicsPending,
         geometryPending=report.geometryPending}
 end
 
@@ -1165,7 +1200,8 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
             if type(key)~="string" or seen[key] then error("duplicate or invalid MeshPart selection") end
             seen[key]=true
             local entry=scanned.partByKey[key]
-            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture or entry.row.needsAlpha) then
+            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture
+                or entry.row.needsAlpha or entry.row.needsPhysics) then
                 error("selected MeshPart is not a pending managed part; Find again")
             end
             table.insert(selected,key)
@@ -1173,7 +1209,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         end
         local allPending=true
         for _, entry in ipairs(scanned.parts) do
-            if entry.managed and (entry.needsMesh or entry.needsTexture or entry.needsAlpha)
+            if entry.managed and (entry.needsMesh or entry.needsTexture or entry.needsAlpha or entry.needsPhysics)
                 and not seen[entry.key] and not wholeRig[scanned.partByKey[entry.key].root] then
                 allPending=false
                 break
@@ -1213,6 +1249,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         replacedModels = 0, matchedModels = syncResult.matchedModels,
         modelReferences = syncResult.modelReferences, pendingGeometry = syncResult.pendingGeometry,
         geometryUpdated = syncResult.geometryUpdated, meshPartsUpdated = syncResult.meshPartsUpdated,
+        physicsUpdated = syncResult.physicsUpdated,
         changes = syncResult.changes, instances = syncResult.instances,
         fullySynced = syncResult.fullySynced == true,
         registryItems = #result.items }
@@ -1526,13 +1563,14 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     if not preview or type(preview.roots)~="table" or type(preview.geometryRoots)~="table" then
         error("Find Mesh IDs in Studio before replacing; no Place geometry modified")
     end
-    local chosenParts, chosenRoots, chosenGeometry={},{},{}
+    local chosenParts, chosenRoots, chosenGeometry,chosenPhysics={},{},{},{}
     for _, key in ipairs(selectedKeys) do
         local entry=preview.partByKey[key]
         if not entry or not entry.root then error("invalid selected managed MeshPart") end
         chosenParts[entry.part]=true
         chosenRoots[entry.root]=true
         if entry.row.needsMesh then chosenGeometry[entry.root]=true end
+        if entry.row.needsPhysics then chosenPhysics[entry.part]=true end
     end
     local live={}
     for _, root in ipairs(targets(workspace,slug,row.aliases)) do live[root]=true end
@@ -1566,7 +1604,10 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     for part, snap in pairs(preview.partStates or {}) do
         if part.Parent~=snap.parent or part:GetPivot()~=snap.frame or part.Size~=snap.size
             or History.Id(part.MeshId)~=snap.meshId or part.TextureID~=snap.texture or part.Material~=snap.material
-            or part.Color~=snap.color or part:GetAttribute("Game1DecoAppearanceMode")~=snap.appearanceMode then
+            or part.Color~=snap.color or part:GetAttribute("Game1DecoAppearanceMode")~=snap.appearanceMode
+            or part.CanCollide~=snap.canCollide or part.CanQuery~=snap.canQuery
+            or part.CanTouch~=snap.canTouch or part.DoubleSided~=snap.doubleSided
+            or part.CollisionFidelity~=snap.collisionFidelity then
             error("Mesh identity, transform or texture changed since Find; rescan")
         end
         local surface=part:FindFirstChildOfClass("SurfaceAppearance")
@@ -1584,6 +1625,11 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
         allowedNames = {}
         for _, entry in ipairs(inspected.meshes) do
             if typeof(entry.name) == "string" then allowedNames[entry.name] = true end
+        end
+    end
+    for part in pairs(chosenPhysics) do
+        if not allowedNames or allowedNames[part.Name] ~= true then
+            error("selected MeshPart is outside the SHA-bound physics report; no Place geometry modified")
         end
     end
     local needsGeometry = false
@@ -1636,7 +1682,15 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 end
                 if previousId=="" then error("old published Model ID unknown; no Place geometry modified") end
                 previousModelId=previousId
-                local previousPublished=loader:loadForMeshInventory(previousId,slug)
+                local previousVersion=nil
+                for _, version in ipairs(preview.inventory or {}) do
+                    if version.modelAssetId==previousId then previousVersion=version break end
+                end
+                if not previousVersion then
+                    error("historical Model evidence missing; no Place geometry modified")
+                end
+                local previousPublished=loader:loadHistoricalRigForComparison(
+                    previousId,slug,previousVersion.rigManifest)
                 local good,problem=pcall(function()
                     local previousChildren=rigChildren(model)
                     History.VerifyChildren(previousPublished,previousChildren)
@@ -1676,6 +1730,15 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     end
                 end
             end
+            local physicsNames=nil
+            if not geometry and allowedNames then
+                for _, part in ipairs(oldParts) do
+                    if chosenPhysics[part] and allowedNames[part.Name] == true then
+                        physicsNames=physicsNames or {}
+                        physicsNames[part.Name]=true
+                    end
+                end
+            end
             local events, eventIndex = {}, {}
             local function add(kind: string, oldValue: string, newValue: string, count: number)
                 local key = kind .. ":" .. oldValue .. ":" .. newValue
@@ -1706,6 +1769,11 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 -- contract used after Studio has already committed the edit.
                 add("alpha",if change.mode then change.mode.Name else "missing",
                     if row.alphaEnabled==true then "Transparency" else "Opaque",1)
+            end
+            if physicsNames then
+                local count=0
+                for _ in pairs(physicsNames) do count+=1 end
+                add("physics","previous","registered",count)
             end
             local beforeMeshes=if geometry then History.Describe(previousModelId,model).meshes else {}
             local afterMeshes=if geometry then History.Describe(modelId,stage).meshes else {}
@@ -1741,8 +1809,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 oldSlug = model:GetAttribute(SLUG), oldName = model.Name,
                 oldAnchorPath = model:GetAttribute("Game1DecoAuthoringAnchorPath"),
                 events = events, meshIdsBefore=beforeMeshes,meshIdsAfter=afterMeshes,
-                physicsBefore = if not geometry and allowedNames then
-                    Physics.CaptureLocationModel(model, allowedNames) else nil})
+                physicsNames=physicsNames,
+                physicsBefore = if physicsNames then
+                    Physics.CaptureLocationModel(model, physicsNames) else nil})
         end
     end)
     if not prepared then
@@ -1796,8 +1865,13 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     Visual.AssertCurrent(change.mesh, row)
                 end
             end
-            if item.physicsBefore and allowedNames then
-                physicsChecked += Physics.ApplyLocationModel(model, allowedNames, row.meshOptions)
+            if item.physicsBefore and item.physicsNames then
+                physicsChecked += Physics.ApplyLocationModel(model, item.physicsNames, row.meshOptions)
+                for _, part in ipairs(meshParts(model)) do
+                    if item.physicsNames[part.Name] and Physics.LocationNeedsPhysics(part,row.meshOptions) then
+                        error("Location physics Sync failed: "..part.Name)
+                    end
+                end
             end
             if item.historyJson then model:SetAttribute(HISTORY, item.historyJson) end
             if #item.events > 0 then changedModels += 1 end
@@ -1862,7 +1936,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     return {models = changedModels, parts = changedParts, matchedModels = #placed,
         modelReferences = changedReferences, geometryUpdated = geometryUpdated,
-        meshPartsUpdated = totalMeshes, physicsChecked = physicsChecked,
+        meshPartsUpdated = totalMeshes, physicsUpdated = physicsChecked,
         pendingGeometry = pending, replacedModels = 0,
         changes = summary, instances = instances}
 end
@@ -4232,12 +4306,12 @@ return function(config: any)
             local fields=if command.phase=="scan" then {
                 "scanToken","mode","inventory","foundMeshParts","managedMeshParts",
                 "unmanagedMeshParts","managedModels","texturePending","geometryPending",
-                "meshPending","alphaPending","parts","expectedMeshIds"
+                "meshPending","alphaPending","physicsPending","parts","expectedMeshIds"
             } elseif command.phase=="select" then {
                 "selectedName","selectedPath","selectedCount"
             } else {
                 "models","parts","replacedModels","matchedModels","modelReferences",
-                "pendingGeometry","geometryUpdated","meshPartsUpdated","registryItems",
+                "pendingGeometry","geometryUpdated","meshPartsUpdated","physicsUpdated","registryItems",
                 "changes","instances","fullySynced"
             }
             for _, field in ipairs(fields) do payload[field]=report[field] end
@@ -8208,6 +8282,36 @@ local function applyLocationModel(model: Model, allowedNames: {[string]: boolean
     return affected
 end
 
+-- Read-only description of the SAME settings written by ApplyLocationModel.
+-- Keep the actual/expected values together so Studio diagnostics cannot say
+-- "current" while hiding a stale CanCollide or CollisionFidelity value.
+function Core.LocationPhysicsStatus(mesh: MeshPart, meshOptions: any?): any
+    local raw = if typeof(meshOptions) == "table" then meshOptions[mesh.Name] else nil
+    local noCollide = if typeof(raw) == "table" and typeof(raw.noCollide) == "boolean"
+        then raw.noCollide else false
+    local doubleSided = if typeof(raw) == "table" and typeof(raw.doubleSided) == "boolean"
+        then raw.doubleSided else false
+    local fidelity = if typeof(raw) == "table" and typeof(raw.collisionFidelity) == "string"
+        then raw.collisionFidelity else "Box"
+    local expectedCanCollide = not noCollide
+    local expectedCanQuery = not noCollide
+    local current = mesh.CanCollide == expectedCanCollide
+        and mesh.CanQuery == expectedCanQuery and mesh.CanTouch == false
+        and mesh.DoubleSided == doubleSided
+        and mesh.CollisionFidelity == Core.Fidelity(fidelity)
+    return {current=current,
+        canCollide=mesh.CanCollide,expectedCanCollide=expectedCanCollide,
+        canQuery=mesh.CanQuery,expectedCanQuery=expectedCanQuery,
+        canTouch=mesh.CanTouch,expectedCanTouch=false,
+        doubleSided=mesh.DoubleSided,expectedDoubleSided=doubleSided,
+        collisionFidelity=mesh.CollisionFidelity.Name,
+        expectedCollisionFidelity=fidelity}
+end
+
+function Core.LocationNeedsPhysics(mesh: MeshPart, meshOptions: any?): boolean
+    return not Core.LocationPhysicsStatus(mesh, meshOptions).current
+end
+
 function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?): number
     return applyLocationModel(model, allowedNames, meshOptions, false)
 end
@@ -9161,6 +9265,7 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
                     source:Destroy()
                     if ok then
                         info=described
+                        info.rigManifest=version.rigManifest
                     else
                         table.insert(warnings,"Не считана история Mesh ID "..item.slug.." / "..version.modelAssetId)
                     end
@@ -9223,8 +9328,7 @@ local function closestPublishedRoot(part: MeshPart, entry: any): Model?
             if meshCount <= 512 then
                 for _, version in ipairs(entry.models) do
                     if History.MatchesInventory(candidate, version)
-                        or History.MatchesRetiredStaticInventory(candidate, version, entry)
-                        or History.MatchesRetiredSkinnedPhysics(candidate, version, entry) then
+                        or History.MatchesRetiredStaticInventory(candidate, version, entry) then
                         if not closest then closest = candidate end
                         if candidate:GetAttribute("Game1DecoAssetSlug") == entry.slug
                             and candidate:GetAttribute("Game1DecoInstanceId") ~= nil then
@@ -9422,11 +9526,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 local collisionPending=false
                 if safeEntry then
                     for _,child in ipairs(ownedVisuals) do
-                        local opts=if type(safeEntry.meshOptions)=="table" then
-                            safeEntry.meshOptions[child.Name] else nil
-                        local noCollide=type(opts)=="table" and opts.noCollide==true
-                        if child.CanCollide==noCollide or child.CanQuery==noCollide
-                            or child.CanTouch then
+                        if Physics.LocationNeedsPhysics(child,safeEntry.meshOptions) then
                             physicsPending=true
                             break
                         end
@@ -9463,7 +9563,22 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                             needsTexture=pending,needsCollision=collisionPending,
                             needsPhysics=physicsPending,needsOwnerCleanup=needsOwnerCleanup}}
                 end
+                -- Runtime accepts ONLY complete verified authored attachments.
+                -- Preserve Painter ownership: this evidence is not a Deco placement.
+                local runtimeHierarchy=nil
+                local runtimePivot=nil
+                if canAppearanceSync and not (pending or physicsPending or collisionPending
+                    or needsOwnerCleanup) then
+                    local described,truncated=hierarchy(external.model)
+                    if not truncated then
+                        runtimeHierarchy=described
+                        runtimePivot={external.model:GetPivot():GetComponents()}
+                    end
+                end
                 table.insert(protected,{
+                    runtimeCandidate=runtimeHierarchy~=nil,
+                    hierarchy=runtimeHierarchy,
+                    pivotEvidence=if runtimePivot then {modelPivot=runtimePivot} else nil,
                     key=if canAppearanceSync then externalKey else "",
                     canSync=canAppearanceSync and (pending or needsOwnerCleanup or physicsPending or collisionPending),
                     needsTexture=pending,needsCollision=canAppearanceSync and collisionPending,
@@ -9547,6 +9662,15 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
+        local needsPhysics=false
+        if eligible then
+            for _,candidatePart in ipairs(visualParts) do
+                if Physics.LocationNeedsPhysics(candidatePart,entry.meshOptions) then
+                    needsPhysics=true
+                    break
+                end
+            end
+        end
         local needsMaterial=false
         if eligible then
             for _, candidatePart in ipairs(root and root:GetDescendants() or {part}) do
@@ -9604,6 +9728,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             warn("Нет отдельной Model для этого экземпляра")
         end
         if needsRig and not needsMesh then warn("Новая версия модели отличается по составу MeshPart, хотя визуальный Mesh ID совпадает") end
+        if needsPhysics then warn("Физика MeshPart требует Sync: No Collide / CollisionFidelity") end
         if needsMaterial then warn("Звуковой материал требует Sync: "..entry.material) end
         if needsRecapture then
             warn("Collision Blueprint старого формата: повторите Validate / Capture авторских Parts перед Sync")
@@ -9692,6 +9817,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",
             needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,
+            needsPhysics=needsPhysics,
             needsCollision=needsCollision,needsRecapture=needsRecapture,
             collisionRevision=entry.collisionRevision,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug),
@@ -9709,7 +9835,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 and not requiresRepublish and not needsInspection and not needsRecapture
                 and (structuralState=="current" or (needsReplacement and oldId~=""))
                 and (not needsMesh and not needsRig or oldId~=""),
-            status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha or needsCollision
+            status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha or needsCollision or needsPhysics
                 or structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or oldClaim or foreignClaim
                 then "pending" else "current",
@@ -9998,6 +10124,12 @@ local function rigChildren(root: Model): {Instance}
     return result
 end
 
+local function namedVisuals(ref: any): {[string]: boolean}
+    local names={}
+    for _,visual in ipairs(ref.visuals) do names[visual.Name]=true end
+    return names
+end
+
 local function stageRig(ref: any, ctx: any): any
     local root=ref.root
     if not root or root.Parent==nil then error("Repair this placement first") end
@@ -10009,7 +10141,15 @@ local function stageRig(ref: any, ctx: any): any
         alphaEnabled=ref.entry.alphaEnabled,meshOptions=ref.entry.meshOptions,
         rigManifest=ref.entry.rigManifest}
     local stage=ctx.loader:loadPublished(publishedRow)
-    local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
+    local historicalManifest=nil
+    for _, version in ipairs(ref.entry.models or {}) do
+        if version.modelAssetId==ref.oldVersion then
+            historicalManifest=version.rigManifest
+            break
+        end
+    end
+    local previous=ctx.loader:loadHistoricalRigForComparison(
+        ref.oldVersion,ref.entry.slug,historicalManifest)
     local good,result=pcall(function()
         local oldParts=rigChildren(root)
         History.VerifyChildren(previous,oldParts)
@@ -10065,13 +10205,15 @@ function Sync.Apply(refs: {any}, ctx: any): any
             else
                 table.insert(blocked,ref.row.key..": "..tostring(stage):sub(1,180))
             end
-        elseif ref.row.needsTexture or ref.row.needsMaterial or ref.row.needsAlpha or ref.row.needsCollision then
+        elseif ref.row.needsTexture or ref.row.needsMaterial or ref.row.needsAlpha
+            or ref.row.needsCollision or ref.row.needsPhysics then
             local changes={}
             for _,part in ipairs(ref.visuals) do
                 table.insert(changes,Visual.Capture(part))
             end
             table.insert(plan,{ref=ref,appearance=changes,
                 priorSurface=Physics.CaptureLocationSurfaceMaterial(ref.root),
+                priorPhysics=if ref.row.needsPhysics then Physics.CaptureLocationModel(ref.root,namedVisuals(ref)) else nil,
                 priorHistory=ref.root:GetAttribute("Game1DecoSyncHistory")})
         end
     end
@@ -10133,11 +10275,7 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 if ref.row.needsPhysics then
                     Physics.ApplyLocationModel(root,item.physicsNames,ref.entry.meshOptions)
                     for _,visual in ipairs(ref.visuals) do
-                        local raw=if type(ref.entry.meshOptions)=="table" then
-                            ref.entry.meshOptions[visual.Name] else nil
-                        local noCollide=type(raw)=="table" and raw.noCollide==true
-                        if visual.CanCollide==noCollide or visual.CanQuery==noCollide
-                            or visual.CanTouch then
+                        if Physics.LocationNeedsPhysics(visual,ref.entry.meshOptions) then
                             error("LandscapePainter visual physics not applied: "..visual.Name)
                         end
                     end
@@ -10182,6 +10320,14 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     end
                 end
             end
+            if not item.external and ref.row.needsPhysics and not item.swap then
+                Physics.ApplyLocationModel(root,namedVisuals(ref),ref.entry.meshOptions)
+                for _,visual in ipairs(ref.visuals) do
+                    if Physics.LocationNeedsPhysics(visual,ref.entry.meshOptions) then
+                        error("Location physics Sync failed: "..visual.Name)
+                    end
+                end
+            end
             if item.collision then Collision.Commit(item.collision) end
             if item.external then
                 PainterIntegrity.AssertUnchanged(ref.integrity,
@@ -10217,6 +10363,10 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 table.insert(events,{kind="collision",oldId=tostring(item.collision.oldRevision or 0),
                     newId=tostring(ref.entry.collisionRevision),count=#item.collision.stage})
             end
+            if ref.row.needsPhysics then
+                table.insert(events,{kind="physics",oldId="previous",
+                    newId="registered",count=#ref.visuals})
+            end
             if ref.row.needsAlpha then
                 table.insert(events,{kind="alpha",oldId="previous",newId=if ref.entry.alphaEnabled then "Transparency" else "Opaque",count=#ref.visuals})
             end
@@ -10248,6 +10398,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     end
                     if item.priorSurface then
                         Physics.RestoreLocationSurfaceMaterial(item.priorSurface)
+                    end
+                    if item.priorPhysics then
+                        Physics.RestoreLocationModel(item.priorPhysics)
                     end
                 end
                 if item.collision then Collision.Rollback(item.collision) end
@@ -11041,63 +11194,6 @@ function Inventory.MatchesRetiredStaticInventory(placed: Model, version: any, en
     return actualCount>0 and actualCount==expectedCount
 end
 
--- Older skinned publications can retain one authored COL MeshPart which has
--- already been removed from the placed Model. The strict full-mesh check is
--- still authoritative everywhere else. This exception requires a real owned
--- instance, its exact published revision, a complete visual multiset, and the
--- matching authored rig_carrier. Never accept an extra/foreign MeshPart.
-function Inventory.MatchesRetiredSkinnedPhysics(placed: Model, version: any, entry: any): boolean
-    if not placed:IsA("Model") or type(version) ~= "table"
-        or type(version.meshes) ~= "table" or type(entry) ~= "table" then return false end
-    local manifest = entry.rigManifest
-    if type(manifest) ~= "table" or manifest.rigKind ~= "skinned"
-        or manifest.carrierName ~= "rig_carrier" then return false end
-    local slug = tostring(entry.slug or "")
-    local instanceId = tostring(placed:GetAttribute("Game1DecoInstanceId") or "")
-    if slug == "" or #instanceId < 8
-        or placed:GetAttribute("Game1DecoAssetSlug") ~= slug
-        or placed.Name ~= slug .. "__" .. instanceId:sub(1, 8)
-        or tostring(placed:GetAttribute("Game1DecoPublishedModelAssetId") or "")
-            ~= tostring(version.modelAssetId or "")
-        or Ownership.HasNestedPlacements(placed) then return false end
-    local expected = {}
-    local hasVisual = false
-    for _, record in ipairs(version.meshes) do
-        if type(record.meshId) ~= "string" or type(record.count) ~= "number"
-            or record.count < 1 or type(record.visualNames) ~= "table"
-            or expected[record.meshId] then return false end
-        expected[record.meshId] = record
-        if #record.visualNames > 0 then hasVisual = true end
-    end
-    if not hasVisual then return false end
-    local actual = {}
-    local carriers = 0
-    for _, part in ipairs(Inventory.Parts(placed)) do
-        local mid = Inventory.Id(part.MeshId)
-        local record = expected[mid]
-        if not record then return false end
-        actual[mid] = (actual[mid] or 0) + 1
-        if actual[mid] > record.count then return false end
-        if Carrier.IsCarrier(part) then
-            if #record.visualNames > 0 then return false end
-            carriers += 1
-        elseif not MeshPhysics.IsCollider(part.Name)
-            and part:GetAttribute("Game1DecoPhysicsOnly") ~= true
-            and #record.visualNames == 0 then return false end
-    end
-    if carriers ~= 1 then return false end
-    local missingNonvisual = 0
-    for mid, record in pairs(expected) do
-        local count = actual[mid] or 0
-        if #record.visualNames > 0 then
-            if count ~= record.count then return false end
-        else
-            missingNonvisual += record.count - count
-        end
-    end
-    return missingNonvisual == 1
-end
-
 function Inventory.Ids(model: Model): {[string]: boolean}
     local ids = {}
     for _, part in ipairs(Inventory.Parts(model)) do
@@ -11307,6 +11403,9 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             local published=loader:loadForMeshInventory(modelId,slug)
             desc=Inventory.Describe(modelId,published)
             published:Destroy()
+            -- Keep the immutable per-version authoring evidence even when
+            -- Studio had to refresh only the Mesh ID cache.
+            if cache[modelId] then desc.rigManifest=cache[modelId].rigManifest end
         end
         table.insert(inventory,desc)
         local bucket=if modelId==newModelId then currentIds else previousIds
@@ -11367,6 +11466,8 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     surface~=nil and surface.AlphaMode==Enum.AlphaMode.Transparency else surface==nil
                 local alphaCurrent=not textureApplicable or settings.appearanceMode=="material" or appearanceAlphaCurrent
                 local meshCurrent=currentIds[meshId]==true
+                local physics=if textureApplicable then
+                    MeshPhysics.LocationPhysicsStatus(part,row.meshOptions) else nil
                 -- Authored skeleton layout is validated independently of MeshId:
                 -- the visual Mesh ID may be unchanged across publications.
                 local rigState=if owner then Carrier.Diagnose(owner,row.rigManifest,row.legacyStaticPublication) else ""
@@ -11401,6 +11502,9 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
                     attachable=legacyRoot~=nil,historicalModelId=legacyModelId or "",
                     meshCurrent=meshCurrent,textureCurrent=textureCurrent,
                     needsMesh=false,needsTexture=not textureCurrent,needsAlpha=not alphaCurrent,
+                    needsPhysics=physics~=nil and not physics.current,
+                    physicsCurrent=physics==nil or physics.current,
+                    physics=physics,
                     alphaEnabled=alphaEnabled,alphaCurrent=alphaCurrent,
                     currentUnlinked=currentUnlinked,
                     rigState=rigState,republishRequired=republishRequired,
@@ -11431,7 +11535,7 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             end
         end
     end
-    local texturePending, meshPending, alphaPending, pending=0,0,0,0
+    local texturePending, meshPending, alphaPending, physicsPending, pending=0,0,0,0,0
     for _ in pairs(geometryRoots) do pending+=1 end
     for _, entry in ipairs(rows) do
         if entry.managed then
@@ -11440,18 +11544,20 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
             if entry.needsMesh then meshPending+=1 end
             if entry.needsTexture then texturePending+=1 end
             if entry.needsAlpha then alphaPending+=1 end
+            if entry.needsPhysics then physicsPending+=1 end
         end
     end
     -- Find is strictly read-only and never changes Studio Selection. The user
     -- explicitly selects a single row via the separate Select in Studio phase.
     local mode=if pending>0 and (texturePending>0 or alphaPending>0) then "texture_mesh"
         elseif pending>0 then "mesh" elseif texturePending>0 then "texture"
-        elseif alphaPending>0 then "alpha" else "current"
+        elseif alphaPending>0 then "alpha" elseif physicsPending>0 then "physics" else "current"
     return {inventory=inventory,expectedMeshIds=expectedMeshIds,parts=rows,
         partByKey=partByKey,legacyCandidates=legacyCandidates,
         foundMeshParts=#rows,managedMeshParts=managedCount,
         unmanagedMeshParts=unmatched,managedModels=#roots,
-        texturePending=texturePending,alphaPending=alphaPending,meshPending=meshPending,geometryPending=pending,mode=mode,
+        texturePending=texturePending,alphaPending=alphaPending,physicsPending=physicsPending,
+        meshPending=meshPending,geometryPending=pending,mode=mode,
         roots=roots,geometryRoots=geometryRoots,
         publishedModelId=newModelId,publishedAtlasId=atlasId}
 end

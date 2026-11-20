@@ -48,12 +48,12 @@ return function(config: any)
             local fields=if command.phase=="scan" then {
                 "scanToken","mode","inventory","foundMeshParts","managedMeshParts",
                 "unmanagedMeshParts","managedModels","texturePending","geometryPending",
-                "meshPending","alphaPending","parts","expectedMeshIds"
+                "meshPending","alphaPending","physicsPending","parts","expectedMeshIds"
             } elseif command.phase=="select" then {
                 "selectedName","selectedPath","selectedCount"
             } else {
                 "models","parts","replacedModels","matchedModels","modelReferences",
-                "pendingGeometry","geometryUpdated","meshPartsUpdated","registryItems",
+                "pendingGeometry","geometryUpdated","meshPartsUpdated","physicsUpdated","registryItems",
                 "changes","instances","fullySynced"
             }
             for _, field in ipairs(fields) do payload[field]=report[field] end

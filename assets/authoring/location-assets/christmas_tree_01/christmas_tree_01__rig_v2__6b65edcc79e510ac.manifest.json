@@ -1,0 +1,102 @@
+{
+  "boneHash": "5cd352dfffdf202098ad67c20419436a605f627797c7a339e5372b6201ab4e47",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone",
+      "parent": ""
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        2e-07,
+        0.0,
+        2e-07,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.9999999,
+        0.0,
+        4.7806559,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone.001",
+      "parent": "Bone"
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        2e-07,
+        0.0,
+        2e-07,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.9999999,
+        0.0,
+        8.7243443,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "Bone.002",
+      "parent": "Bone.001"
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "70ad219d524a688a63895960f94d446b27546501b9edb6367783ab7e0f614bd1",
+  "parts": [
+    {
+      "name": "christmas_tree_01",
+      "role": "visual",
+      "vertices": 1870
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 9
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 3,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 1,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "6b65edcc79e510ac36b597ea8db3b826b23365cb7eeb2a252bd52775017580d4",
+  "structuralHash": "4da643b424e37fad6e87621f37c9b6a88011ab137be76dac833d08b6363f7b37"
+}

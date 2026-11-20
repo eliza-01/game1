@@ -143,10 +143,28 @@ class StreamingManagerSettingsTests(unittest.TestCase):
         tree=ET.parse(result['runtimePath'])
         self.assertFalse(any(n.get('referent')=='RBX_SURFACE' for n in tree.iter('Item')))
 
-    def test_reject_rig_and_unsupported_attachment(self):
-        row=copy.deepcopy(self.rows[0]);row['hierarchy'].append({'class':'Bone','name':'Socket'})
-        self.assertIn('rig',placement_shape_problem(row))
-        row['hierarchy'].append({'class':'MeshPart','name':'rig_carrier'})
-        self.assertIn('exactly one',placement_shape_problem(row))
+    def test_composite_rig_and_bones_are_supported(self):
+        # M390 supports composite rigs; the old blanket rig prohibition is obsolete.
+        row = copy.deepcopy(self.rows[0])
+        row['hierarchy'].append({'class': 'Bone', 'name': 'Socket'})
+        self.assertEqual(placement_shape_problem(row), '')
+        row['hierarchy'].append({'class': 'MeshPart', 'name': 'rig_carrier'})
+        self.assertEqual(placement_shape_problem(row), '')
+
+    def test_composite_rejects_executable_descendants(self):
+        for klass in ('Script', 'LocalScript', 'ModuleScript'):
+            with self.subTest(klass=klass):
+                row = copy.deepcopy(self.rows[0])
+                row['hierarchy'].append({'class': 'Bone', 'name': 'Socket'})
+                row['hierarchy'].append({'class': klass, 'name': 'UnsafeChild'})
+                self.assertIn('executable scripts', placement_shape_problem(row))
+
+    def test_composite_rejects_unsafe_visual_collision(self):
+        row = copy.deepcopy(self.rows[0])
+        row['hierarchy'].append({'class': 'Bone', 'name': 'Socket'})
+        visual = next(node for node in row['hierarchy'] if node['class'] == 'MeshPart')
+        visual['canCollide'] = True
+        visual['collisionFidelity'] = 'Enum.CollisionFidelity.PreciseConvexDecomposition'
+        self.assertIn('Box fidelity', placement_shape_problem(row))
 
 if __name__ == '__main__':unittest.main()

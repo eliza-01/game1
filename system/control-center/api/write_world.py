@@ -254,7 +254,9 @@ def route(path, body, deps):
                           appearance_mode=str(row.get('appearanceMode') or 'atlas'),phase=phase)
             if phase == 'scan':
                 kwargs['model_history'] = location_assets.model_publication_ids(slug)
-                kwargs['model_mesh_inventory'] = location_assets.mesh_id_inventory(slug)
+                kwargs['model_mesh_inventory'] = (location_assets.model_history_inventory(slug)
+                                                  if hasattr(location_assets, 'model_history_inventory')
+                                                  else location_assets.mesh_id_inventory(slug))
             else:
                 kwargs['scan_token'] = str(payload.get('scanToken') or '')
                 if phase == 'select':

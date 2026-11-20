@@ -52,6 +52,7 @@ window.game1StudioSync=(()=>{
     return `Studio Sync ${slug} · placed instances ${Number(studio?.matchedModels||0)}`+
       ` · atlas IDs changed ${Number(studio?.parts||0)}`+
       ` · geometry updated ${Number(studio?.geometryUpdated||0)} instance(s) / ${Number(studio?.meshPartsUpdated||0)} MeshPart(s)`+
+      ` · physics updated ${Number(studio?.physicsUpdated||0)} MeshPart(s)`+
       ` · model references changed ${Number(studio?.modelReferences||0)}`+
       '. Original placed Models and transforms retained.';
   }

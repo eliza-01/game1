@@ -101,6 +101,9 @@ def validate_xml(model, row, *, name, cframe, vector3, mesh_id, near):
                              and n['name']==name(item)),None)
             if not collider or not near(cframe(item),collider.get('cframe') or ()) or not near(vector3(item,'Size'),collider.get('size') or ()):
                 raise ValueError(f"{row['path']}: collision geometry differs from Scan")
+            for prop, field in (('CanCollide','canCollide'),('CanQuery','canQuery')):
+                if bool_property(item,prop) != (collider.get(field) is True):
+                    raise ValueError(f"{row['path']}: collision flags differ from Scan")
         if item.get('class') != 'MeshPart' or name(item)=='rig_carrier': continue
         spec=expected_vis.pop(name(item),None)
         if not spec or mesh_id(item) != str(spec.get('meshId')):

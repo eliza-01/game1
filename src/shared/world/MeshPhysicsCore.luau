@@ -92,6 +92,36 @@ local function applyLocationModel(model: Model, allowedNames: {[string]: boolean
     return affected
 end
 
+-- Read-only description of the SAME settings written by ApplyLocationModel.
+-- Keep the actual/expected values together so Studio diagnostics cannot say
+-- "current" while hiding a stale CanCollide or CollisionFidelity value.
+function Core.LocationPhysicsStatus(mesh: MeshPart, meshOptions: any?): any
+    local raw = if typeof(meshOptions) == "table" then meshOptions[mesh.Name] else nil
+    local noCollide = if typeof(raw) == "table" and typeof(raw.noCollide) == "boolean"
+        then raw.noCollide else false
+    local doubleSided = if typeof(raw) == "table" and typeof(raw.doubleSided) == "boolean"
+        then raw.doubleSided else false
+    local fidelity = if typeof(raw) == "table" and typeof(raw.collisionFidelity) == "string"
+        then raw.collisionFidelity else "Box"
+    local expectedCanCollide = not noCollide
+    local expectedCanQuery = not noCollide
+    local current = mesh.CanCollide == expectedCanCollide
+        and mesh.CanQuery == expectedCanQuery and mesh.CanTouch == false
+        and mesh.DoubleSided == doubleSided
+        and mesh.CollisionFidelity == Core.Fidelity(fidelity)
+    return {current=current,
+        canCollide=mesh.CanCollide,expectedCanCollide=expectedCanCollide,
+        canQuery=mesh.CanQuery,expectedCanQuery=expectedCanQuery,
+        canTouch=mesh.CanTouch,expectedCanTouch=false,
+        doubleSided=mesh.DoubleSided,expectedDoubleSided=doubleSided,
+        collisionFidelity=mesh.CollisionFidelity.Name,
+        expectedCollisionFidelity=fidelity}
+end
+
+function Core.LocationNeedsPhysics(mesh: MeshPart, meshOptions: any?): boolean
+    return not Core.LocationPhysicsStatus(mesh, meshOptions).current
+end
+
 function Core.ApplyLocationModel(model: Model, allowedNames: {[string]: boolean}?, meshOptions: any?): number
     return applyLocationModel(model, allowedNames, meshOptions, false)
 end

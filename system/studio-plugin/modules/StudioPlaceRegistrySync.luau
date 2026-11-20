@@ -35,6 +35,12 @@ local function rigChildren(root: Model): {Instance}
     return result
 end
 
+local function namedVisuals(ref: any): {[string]: boolean}
+    local names={}
+    for _,visual in ipairs(ref.visuals) do names[visual.Name]=true end
+    return names
+end
+
 local function stageRig(ref: any, ctx: any): any
     local root=ref.root
     if not root or root.Parent==nil then error("Repair this placement first") end
@@ -46,7 +52,15 @@ local function stageRig(ref: any, ctx: any): any
         alphaEnabled=ref.entry.alphaEnabled,meshOptions=ref.entry.meshOptions,
         rigManifest=ref.entry.rigManifest}
     local stage=ctx.loader:loadPublished(publishedRow)
-    local previous=ctx.loader:loadForMeshInventory(ref.oldVersion,ref.entry.slug)
+    local historicalManifest=nil
+    for _, version in ipairs(ref.entry.models or {}) do
+        if version.modelAssetId==ref.oldVersion then
+            historicalManifest=version.rigManifest
+            break
+        end
+    end
+    local previous=ctx.loader:loadHistoricalRigForComparison(
+        ref.oldVersion,ref.entry.slug,historicalManifest)
     local good,result=pcall(function()
         local oldParts=rigChildren(root)
         History.VerifyChildren(previous,oldParts)
@@ -102,13 +116,15 @@ function Sync.Apply(refs: {any}, ctx: any): any
             else
                 table.insert(blocked,ref.row.key..": "..tostring(stage):sub(1,180))
             end
-        elseif ref.row.needsTexture or ref.row.needsMaterial or ref.row.needsAlpha or ref.row.needsCollision then
+        elseif ref.row.needsTexture or ref.row.needsMaterial or ref.row.needsAlpha
+            or ref.row.needsCollision or ref.row.needsPhysics then
             local changes={}
             for _,part in ipairs(ref.visuals) do
                 table.insert(changes,Visual.Capture(part))
             end
             table.insert(plan,{ref=ref,appearance=changes,
                 priorSurface=Physics.CaptureLocationSurfaceMaterial(ref.root),
+                priorPhysics=if ref.row.needsPhysics then Physics.CaptureLocationModel(ref.root,namedVisuals(ref)) else nil,
                 priorHistory=ref.root:GetAttribute("Game1DecoSyncHistory")})
         end
     end
@@ -170,11 +186,7 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 if ref.row.needsPhysics then
                     Physics.ApplyLocationModel(root,item.physicsNames,ref.entry.meshOptions)
                     for _,visual in ipairs(ref.visuals) do
-                        local raw=if type(ref.entry.meshOptions)=="table" then
-                            ref.entry.meshOptions[visual.Name] else nil
-                        local noCollide=type(raw)=="table" and raw.noCollide==true
-                        if visual.CanCollide==noCollide or visual.CanQuery==noCollide
-                            or visual.CanTouch then
+                        if Physics.LocationNeedsPhysics(visual,ref.entry.meshOptions) then
                             error("LandscapePainter visual physics not applied: "..visual.Name)
                         end
                     end
@@ -219,6 +231,14 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     end
                 end
             end
+            if not item.external and ref.row.needsPhysics and not item.swap then
+                Physics.ApplyLocationModel(root,namedVisuals(ref),ref.entry.meshOptions)
+                for _,visual in ipairs(ref.visuals) do
+                    if Physics.LocationNeedsPhysics(visual,ref.entry.meshOptions) then
+                        error("Location physics Sync failed: "..visual.Name)
+                    end
+                end
+            end
             if item.collision then Collision.Commit(item.collision) end
             if item.external then
                 PainterIntegrity.AssertUnchanged(ref.integrity,
@@ -254,6 +274,10 @@ function Sync.Apply(refs: {any}, ctx: any): any
                 table.insert(events,{kind="collision",oldId=tostring(item.collision.oldRevision or 0),
                     newId=tostring(ref.entry.collisionRevision),count=#item.collision.stage})
             end
+            if ref.row.needsPhysics then
+                table.insert(events,{kind="physics",oldId="previous",
+                    newId="registered",count=#ref.visuals})
+            end
             if ref.row.needsAlpha then
                 table.insert(events,{kind="alpha",oldId="previous",newId=if ref.entry.alphaEnabled then "Transparency" else "Opaque",count=#ref.visuals})
             end
@@ -285,6 +309,9 @@ function Sync.Apply(refs: {any}, ctx: any): any
                     end
                     if item.priorSurface then
                         Physics.RestoreLocationSurfaceMaterial(item.priorSurface)
+                    end
+                    if item.priorPhysics then
+                        Physics.RestoreLocationModel(item.priorPhysics)
                     end
                 end
                 if item.collision then Collision.Rollback(item.collision) end

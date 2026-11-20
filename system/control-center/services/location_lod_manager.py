@@ -12,7 +12,7 @@ from secrets import token_urlsafe
 from threading import RLock
 
 from .location_runtime_build import RuntimePlaceBuilder, build_rows, placement_shape_problem
-from .location_streaming_config import LocationStreamingConfig, settings_digest
+from .location_streaming_config import LocationStreamingConfig, settings_digest, runtime_mode
 
 from .place_registry.catalog import build_catalog
 
@@ -31,7 +31,7 @@ class LocationLodManager:
         self._build_lock = RLock()
 
     def save_settings(self, payload: dict) -> dict:
-        # Persistent selection only. Do not mutate Studio or the saved Place.
+        # Persistent runtime mode overrides only. Do not mutate Studio or the saved Place.
         with self._build_lock:
             known = [row['slug'] for row in self.assets.snapshot()['items']]
             self.streaming_config.save(payload, known)
@@ -70,7 +70,7 @@ class LocationLodManager:
                                settings_digest(settings), house_digest)
             return {'schemaVersion': 1, 'token': token, 'snapshotRevision': overview['snapshot']['revisionId'],
                     'catalogDigest': overview['snapshot']['catalogDigest'],
-                    'streamingModes': {slug: settings['modes'][slug] for slug in inspected['counts']},
+                    'streamingModes': {slug: runtime_mode(settings, slug) for slug in inspected['counts']},
                     'houseModes': {slug: data['profile']['mode'] for slug,data in selected_houses.items()},
                     'distances': settings['distances'], 'workspace': settings['workspace'],
                     **inspected, 'backupRequired': True, 'publishAllowed': False,
@@ -82,7 +82,7 @@ class LocationLodManager:
                         for item in overview['items']
                         if item['count'] and item['streamingMode'] == 'off'
                     ],
-                    'message': 'Only explicitly selected Location visuals and Real Estate houses are converted. Unselected Workspace objects remain unchanged.'}
+                    'message': 'All scanned registered Location Asset types stream by default; explicit Off overrides remain author-controlled.'}
 
     def prepare(self, payload: dict) -> dict:
         if not isinstance(payload, dict) or set(payload) != {'token', 'confirmation'}:
@@ -118,9 +118,10 @@ class LocationLodManager:
         return build_inputs(self.houses, self.house_placements)
 
     def location_rows(self, overview, settings):
-        # Real Estate may be the only selected Runtime domain. Do not force
-        # users to turn on Location streaming to prepare a house-only draft.
-        if not any(mode != 'off' for mode in settings['modes'].values()):
+        # Real Estate may be the only Runtime domain. Every registered
+        # placed Location Asset uses automatic FULL unless explicitly Off.
+        if not any((item['count'] or item['protectedCount']) and
+                   runtime_mode(settings, item['slug']) != 'off' for item in overview['items']):
             return []
         return build_rows(overview, self.registry, settings)
 
@@ -177,23 +178,26 @@ class LocationLodManager:
             problem_rows = [r for r in placements if (
                 not r.get('placementId') or r.get('duplicateId') is True
                 or r.get('ambiguous') is True or r.get('hasModel') is not True
-                or r.get('needsCollision') is True or r.get('needsRecapture') is True
+                or r.get('needsCollision') is True or r.get('needsPhysics') is True
+                or r.get('needsRecapture') is True
                 or r.get('issues'))]
             for name, count in issues.items():
                 counts[name] += count
-            mode = settings['modes'].get(slug, 'off')
+            mode = settings['modes'].get(slug, 'auto')
             structural_issues = [placement_shape_problem(r) for r in placements if placement_shape_problem(r)]
-            eligible = bool(asset and placements and asset.get('status') == 'PUBLISHED' and
-                asset.get('model_asset_id') and not external and not problem_rows and not structural_issues)
-            reason = ('Нет размещений' if not placements else
+            painter_ready = all(r.get('runtimeCandidate') is True for r in external)
+            eligible = bool(asset and (placements or external) and asset.get('status') == 'PUBLISHED' and
+                asset.get('model_asset_id') and painter_ready and not problem_rows and not structural_issues)
+            reason = ('Нет размещений' if not placements and not external else
                 'Не опубликован FULL' if not asset or asset.get('status') != 'PUBLISHED' or not asset.get('model_asset_id') else
-                'Есть защищённые чужой системой объекты' if external else
+                'LandscapePainter: нужен новый Scan/Sync для Runtime' if not painter_ready else
                 'Ошибки Place Registry' if problem_rows else
                 structural_issues[0] if structural_issues else '')
             items.append({
-                'streamingMode': mode, 'streamingEligible': eligible, 'streamingReason': reason,
+                'streamingMode': mode, 'resolvedStreamingMode': runtime_mode(settings, slug),
+                'streamingEligible': eligible, 'streamingReason': reason,
                 'slug': slug, 'category': (asset or {}).get('category') or '',
-                'count': len(placements), 'fullStatus': (asset or {}).get('status') or 'NOT_REGISTERED',
+                'count': len(placements), 'runtimePainterCount':sum(r.get('runtimeCandidate') is True for r in external), 'fullStatus': (asset or {}).get('status') or 'NOT_REGISTERED',
                 'fullModelId': str((asset or {}).get('model_asset_id') or ''),
                 'lod1Status': lod1.get('status') or 'NOT_REGISTERED',
                 'lod1ModelId': str(lod1.get('modelAssetId') or '') if lod1_active else '',
@@ -265,5 +269,5 @@ class LocationLodManager:
                       'sourceFile': str(self.builder.source),
                       'reason': 'Save current Studio Place as XML to the sourceFile; run Preflight. Draft is never publish-ready.',
                       'sourcePlaceMutated': False},
-            'scope': 'Published Location Mesh ID candidates only; author-owned LandscapePainter and PackageLink models are protected and never Deco placements; unknown/unpublished Workspace objects are not inventoried',
+            'scope': 'All scanned registered Location types default to FULL streaming. LandscapePainter author-owned roots require verified runtime evidence; unknown/unpublished Workspace objects are not treated as registered assets.',
         }

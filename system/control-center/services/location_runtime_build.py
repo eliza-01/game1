@@ -209,7 +209,12 @@ def _verify(source_tree, rows, targets):
     for path, models in index.items():
         if not path.startswith('Workspace.'):
             continue
+        # LandscapePainter stem attachments are named slug_<8 hex> rather
+        # than DecoManager's slug__<8 hex>. Both belong to the selected type;
+        # never silently leave unscanned copies in the compiled Runtime.
         if any(_name(model) == slug or _name(model).startswith(slug + '__')
+               or (path.startswith('Workspace.Game1LandscapeDecor.')
+                   and re.fullmatch(re.escape(slug) + r'_[0-9a-f]{8}', _name(model)))
                for slug in targets for model in models) and path not in selected_paths:
             raise ValueError('Uninventoried target Location Model in saved Place: ' + path)
     found = []
@@ -369,11 +374,10 @@ def _runtime_payload(rows, *, snapshot_id, catalog_digest, settings=None, houses
 
     This remains compiler-owned data. A runtime client never chooses cloud IDs.
     """
-    from .location_streaming_config import DEFAULT_SETTINGS, validate_settings
+    from .location_streaming_config import DEFAULT_SETTINGS, validate_settings, runtime_mode
     settings = validate_settings(settings or DEFAULT_SETTINGS)
-    modes = settings['modes']
     targets = sorted({row['slug'] for row in rows})
-    if (not targets and not houses) or len(targets) > 64 or any(modes.get(slug, 'off') == 'off' for slug in targets):
+    if (not targets and not houses) or len(targets) > 64 or any(runtime_mode(settings, slug) == 'off' for slug in targets):
         raise ValueError('No valid selected Runtime streaming types')
     placements = []
     compound_signatures = {}
@@ -414,7 +418,7 @@ def _runtime_payload(rows, *, snapshot_id, catalog_digest, settings=None, houses
         'schemaVersion': 3 if houses else 2, 'kind': RUNTIME_MANIFEST_KIND,
         'snapshotRevision': snapshot_id, 'catalogDigest': catalog_digest,
         'publishAllowed': False, 'targets': targets,
-        'modes': {slug: modes[slug] for slug in targets},
+        'modes': {slug: runtime_mode(settings, slug) for slug in targets},
         'distances': dict(settings['distances']),
         'placements': placements,
     }
@@ -492,13 +496,19 @@ def build_rows(overview, registry, settings=None):
     settings = validate_settings(settings or DEFAULT_SETTINGS)
     selected = []
     by_slug = {r['slug']:r for r in overview['items']}
-    active = sorted(slug for slug, mode in settings['modes'].items() if mode != 'off')
+    from .location_streaming_config import runtime_mode
+    # The immutable Scan, not a hand-authored slug allowlist, defines coverage.
+    # Disabled types are explicit author decisions, never the implicit default.
+    active = sorted({item['slug'] for item in overview['items']
+                     if (item.get('count') or item.get('protectedCount'))
+                     and runtime_mode(settings, item['slug']) != 'off'})
     if len(active) > 64:
-        raise ValueError('Select at most 64 Location Asset types')
+        raise ValueError('Runtime supports at most 64 scanned Location Asset types')
     for slug in active:
         asset = by_slug.get(slug)
-        mode = settings['modes'][slug]
-        if not asset or not asset.get('count'):
+        mode = runtime_mode(settings, slug)
+        externals = [r for r in report.get('protected', []) if r.get('slug') == slug]
+        if not asset or not (asset.get('count') or externals):
             raise ValueError(slug + ': no recognized placements; disable streaming for this type')
         if asset['fullStatus'] != 'PUBLISHED' or not asset['fullModelId']:
             raise ValueError(slug + ': published FULL model required')
@@ -506,8 +516,22 @@ def build_rows(overview, registry, settings=None):
             raise ValueError(slug + ': published LOD1 required for selected mode')
         if mode == 'lod2' and (asset['lod2Status'] != 'PUBLISHED' or not asset['lod2ModelId']):
             raise ValueError(slug + ': published LOD2 required for selected mode')
-        if asset.get('protectedCount'):
-            raise ValueError(slug + ': protected externally owned models must not be stripped')
+        # Painter is not a Deco placement. Only the complete published
+        # attachment + intact tether/rig may be compiled, with all owner
+        # attributes and nonvisual descendants preserved in the XML.
+        from .location_runtime_composite import is_composite
+        for external in externals:
+            if not external.get('runtimeCandidate') or external.get('review'):
+                raise ValueError(slug + ': LandscapePainter attachment not Runtime-verified: '
+                                 + str(external.get('path')))
+            if not is_composite(external):
+                raise ValueError(slug + ': LandscapePainter requires composite runtime structure')
+            selected.append({
+                **external, 'placementId': 'painter_' + hashlib.sha256(
+                    external['path'].encode('utf-8')).hexdigest()[:24],
+                'issues': [], 'ambiguous': False, 'duplicateId': False,
+                'needsRecapture': False, 'hasModel': True,
+            })
         selected.extend(r for r in report['placements'] if r['slug'] == slug)
     if not selected:
         raise ValueError('Select at least one eligible Location Asset for Runtime streaming')
@@ -515,7 +539,7 @@ def build_rows(overview, registry, settings=None):
         reason = placement_shape_problem(row)
         if reason:
             raise ValueError(str(row.get('path')) + ': ' + reason)
-        if row.get('issues') or row.get('needsCollision') or row.get('needsRecapture') or row.get('ambiguous') or row.get('duplicateId') or not row.get('placementId'):
+        if row.get('issues') or row.get('needsCollision') or row.get('needsPhysics') or row.get('needsRecapture') or row.get('ambiguous') or row.get('duplicateId') or not row.get('placementId'):
             raise ValueError(str(row.get('path')) + ': unresolved placement diagnostic')
     ids = [r['placementId'] for r in selected]
     if len(ids) != len(set(ids)) or len({r['path'] for r in selected}) != len(selected):

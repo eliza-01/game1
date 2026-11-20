@@ -51,6 +51,7 @@ local function ensureVersions(catalog: any, service: any): ({any}, {any}, {strin
                     source:Destroy()
                     if ok then
                         info=described
+                        info.rigManifest=version.rigManifest
                     else
                         table.insert(warnings,"Не считана история Mesh ID "..item.slug.." / "..version.modelAssetId)
                     end
@@ -113,8 +114,7 @@ local function closestPublishedRoot(part: MeshPart, entry: any): Model?
             if meshCount <= 512 then
                 for _, version in ipairs(entry.models) do
                     if History.MatchesInventory(candidate, version)
-                        or History.MatchesRetiredStaticInventory(candidate, version, entry)
-                        or History.MatchesRetiredSkinnedPhysics(candidate, version, entry) then
+                        or History.MatchesRetiredStaticInventory(candidate, version, entry) then
                         if not closest then closest = candidate end
                         if candidate:GetAttribute("Game1DecoAssetSlug") == entry.slug
                             and candidate:GetAttribute("Game1DecoInstanceId") ~= nil then
@@ -312,11 +312,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 local collisionPending=false
                 if safeEntry then
                     for _,child in ipairs(ownedVisuals) do
-                        local opts=if type(safeEntry.meshOptions)=="table" then
-                            safeEntry.meshOptions[child.Name] else nil
-                        local noCollide=type(opts)=="table" and opts.noCollide==true
-                        if child.CanCollide==noCollide or child.CanQuery==noCollide
-                            or child.CanTouch then
+                        if Physics.LocationNeedsPhysics(child,safeEntry.meshOptions) then
                             physicsPending=true
                             break
                         end
@@ -353,7 +349,22 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                             needsTexture=pending,needsCollision=collisionPending,
                             needsPhysics=physicsPending,needsOwnerCleanup=needsOwnerCleanup}}
                 end
+                -- Runtime accepts ONLY complete verified authored attachments.
+                -- Preserve Painter ownership: this evidence is not a Deco placement.
+                local runtimeHierarchy=nil
+                local runtimePivot=nil
+                if canAppearanceSync and not (pending or physicsPending or collisionPending
+                    or needsOwnerCleanup) then
+                    local described,truncated=hierarchy(external.model)
+                    if not truncated then
+                        runtimeHierarchy=described
+                        runtimePivot={external.model:GetPivot():GetComponents()}
+                    end
+                end
                 table.insert(protected,{
+                    runtimeCandidate=runtimeHierarchy~=nil,
+                    hierarchy=runtimeHierarchy,
+                    pivotEvidence=if runtimePivot then {modelPivot=runtimePivot} else nil,
                     key=if canAppearanceSync then externalKey else "",
                     canSync=canAppearanceSync and (pending or needsOwnerCleanup or physicsPending or collisionPending),
                     needsTexture=pending,needsCollision=canAppearanceSync and collisionPending,
@@ -437,6 +448,15 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 end
             end
         end
+        local needsPhysics=false
+        if eligible then
+            for _,candidatePart in ipairs(visualParts) do
+                if Physics.LocationNeedsPhysics(candidatePart,entry.meshOptions) then
+                    needsPhysics=true
+                    break
+                end
+            end
+        end
         local needsMaterial=false
         if eligible then
             for _, candidatePart in ipairs(root and root:GetDescendants() or {part}) do
@@ -494,6 +514,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             warn("Нет отдельной Model для этого экземпляра")
         end
         if needsRig and not needsMesh then warn("Новая версия модели отличается по составу MeshPart, хотя визуальный Mesh ID совпадает") end
+        if needsPhysics then warn("Физика MeshPart требует Sync: No Collide / CollisionFidelity") end
         if needsMaterial then warn("Звуковой материал требует Sync: "..entry.material) end
         if needsRecapture then
             warn("Collision Blueprint старого формата: повторите Validate / Capture авторских Parts перед Sync")
@@ -582,6 +603,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
             textureId=original.textureId,expectedMeshId=if eligible then entry.model else "",
             expectedTextureId=if eligible then entry.atlas else "",
             needsMesh=needsMesh,needsRig=needsRig,needsTexture=needsTexture,needsMaterial=needsMaterial,needsAlpha=needsAlpha,
+            needsPhysics=needsPhysics,
             needsCollision=needsCollision,needsRecapture=needsRecapture,
             collisionRevision=entry.collisionRevision,needsStructure=structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or (root and root:GetAttribute("Game1DecoAssetSlug")~=entry.slug),
@@ -599,7 +621,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 and not requiresRepublish and not needsInspection and not needsRecapture
                 and (structuralState=="current" or (needsReplacement and oldId~=""))
                 and (not needsMesh and not needsRig or oldId~=""),
-            status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha or needsCollision
+            status=if not eligible then "ambiguous" elseif needsMesh or needsRig or needsTexture or needsMaterial or needsAlpha or needsCollision or needsPhysics
                 or structuralState ~= "current" or not root or badName or meshNameMismatch or assigned==""
                 or oldClaim or foreignClaim
                 then "pending" else "current",

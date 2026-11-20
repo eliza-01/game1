@@ -1,0 +1,139 @@
+{
+  "boneHash": "9a12791c5b59e52d5af6a488f59304f745eadf7d0392578c59cae59653e93970",
+  "bones": [
+    {
+      "matrix": [
+        0.9263477,
+        0.00107,
+        0.3766678,
+        -4.015831,
+        -0.3766691,
+        0.0036583,
+        0.9263406,
+        -5.9489002,
+        -0.0003868,
+        -0.9999927,
+        0.0037919,
+        2.6815109,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "anvil_01_effect_01_socket",
+      "parent": ""
+    },
+    {
+      "matrix": [
+        0.9263477,
+        0.3766679,
+        -0.0010704,
+        -4.8345194,
+        -0.3766693,
+        0.9263406,
+        -0.0036581,
+        -5.4929314,
+        -0.0003863,
+        0.0037918,
+        0.9999927,
+        2.7873421,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "anvil_01_weapon_01_socket",
+      "parent": ""
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        6.2245436,
+        0.0,
+        0.0,
+        1.0,
+        5.1852093,
+        0.0,
+        -1.0,
+        0.0,
+        14.3452921,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "chimney_01_socket",
+      "parent": ""
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        2.7997396,
+        0.0,
+        1.0,
+        0.0,
+        4.9161024,
+        0.0,
+        0.0,
+        1.0,
+        1.6034694,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "fireplace_01_socket",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "bfcf0c60c07a3f0c80a86205c695cf500d1f80bc3be0f5232a254718f96da6b8",
+  "parts": [
+    {
+      "name": "metal",
+      "role": "visual",
+      "vertices": 134
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 12
+    },
+    {
+      "name": "roof",
+      "role": "visual",
+      "vertices": 24
+    },
+    {
+      "name": "stone",
+      "role": "visual",
+      "vertices": 194
+    },
+    {
+      "name": "wood",
+      "role": "visual",
+      "vertices": 204
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 4,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 232,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "812bf7dc7e8e6152500375226b62ab1c7c1b58db16cd6b54b6adf2ed1f3888bc",
+  "structuralHash": "659ffbf34f451720777619fcec93a90f80ce077d737cfa274e140b85a5087dd2"
+}

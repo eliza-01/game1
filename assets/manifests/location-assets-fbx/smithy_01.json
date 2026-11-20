@@ -1,0 +1,569 @@
+{
+  "schemaVersion": 1,
+  "slug": "smithy_01",
+  "sourceSha256": "23916002c7f87bcbac219d436e08986e975c0f927124c5e72546183d8864b803",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "metal",
+        "armature": "smithy_01_armature",
+        "vertices": 145,
+        "bones": [
+          {
+            "name": "anvil_01_effect_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.00107,
+              0.3766678,
+              -4.015831,
+              -0.3766691,
+              0.0036583,
+              0.9263406,
+              -5.9489002,
+              -0.0003868,
+              -0.9999927,
+              0.0037919,
+              2.6815109,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "anvil_01_weapon_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.3766679,
+              -0.0010704,
+              -4.8345194,
+              -0.3766693,
+              0.9263406,
+              -0.0036581,
+              -5.4929314,
+              -0.0003863,
+              0.0037918,
+              0.9999927,
+              2.7873421,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "chimney_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              6.2245436,
+              0.0,
+              0.0,
+              1.0,
+              5.1852093,
+              0.0,
+              -1.0,
+              0.0,
+              14.3452921,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "fireplace_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              2.7997396,
+              0.0,
+              1.0,
+              0.0,
+              4.9161024,
+              0.0,
+              0.0,
+              1.0,
+              1.6034694,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "anvil_01_effect_01_socket",
+          "anvil_01_weapon_01_socket",
+          "chimney_01_socket",
+          "fireplace_01_socket"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "smithy_01_armature",
+        "vertices": 12,
+        "bones": [
+          {
+            "name": "anvil_01_effect_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.00107,
+              0.3766678,
+              -4.015831,
+              -0.3766691,
+              0.0036583,
+              0.9263406,
+              -5.9489002,
+              -0.0003868,
+              -0.9999927,
+              0.0037919,
+              2.6815109,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "anvil_01_weapon_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.3766679,
+              -0.0010704,
+              -4.8345194,
+              -0.3766693,
+              0.9263406,
+              -0.0036581,
+              -5.4929314,
+              -0.0003863,
+              0.0037918,
+              0.9999927,
+              2.7873421,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "chimney_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              6.2245436,
+              0.0,
+              0.0,
+              1.0,
+              5.1852093,
+              0.0,
+              -1.0,
+              0.0,
+              14.3452921,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "fireplace_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              2.7997396,
+              0.0,
+              1.0,
+              0.0,
+              4.9161024,
+              0.0,
+              0.0,
+              1.0,
+              1.6034694,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "anvil_01_effect_01_socket",
+          "anvil_01_weapon_01_socket",
+          "chimney_01_socket",
+          "fireplace_01_socket"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": true
+        }
+      },
+      {
+        "name": "roof",
+        "armature": "smithy_01_armature",
+        "vertices": 24,
+        "bones": [
+          {
+            "name": "anvil_01_effect_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.00107,
+              0.3766678,
+              -4.015831,
+              -0.3766691,
+              0.0036583,
+              0.9263406,
+              -5.9489002,
+              -0.0003868,
+              -0.9999927,
+              0.0037919,
+              2.6815109,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "anvil_01_weapon_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.3766679,
+              -0.0010704,
+              -4.8345194,
+              -0.3766693,
+              0.9263406,
+              -0.0036581,
+              -5.4929314,
+              -0.0003863,
+              0.0037918,
+              0.9999927,
+              2.7873421,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "chimney_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              6.2245436,
+              0.0,
+              0.0,
+              1.0,
+              5.1852093,
+              0.0,
+              -1.0,
+              0.0,
+              14.3452921,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "fireplace_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              2.7997396,
+              0.0,
+              1.0,
+              0.0,
+              4.9161024,
+              0.0,
+              0.0,
+              1.0,
+              1.6034694,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "anvil_01_weapon_01_socket",
+          "chimney_01_socket",
+          "fireplace_01_socket"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "stone",
+        "armature": "smithy_01_armature",
+        "vertices": 198,
+        "bones": [
+          {
+            "name": "anvil_01_effect_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.00107,
+              0.3766678,
+              -4.015831,
+              -0.3766691,
+              0.0036583,
+              0.9263406,
+              -5.9489002,
+              -0.0003868,
+              -0.9999927,
+              0.0037919,
+              2.6815109,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "anvil_01_weapon_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.3766679,
+              -0.0010704,
+              -4.8345194,
+              -0.3766693,
+              0.9263406,
+              -0.0036581,
+              -5.4929314,
+              -0.0003863,
+              0.0037918,
+              0.9999927,
+              2.7873421,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "chimney_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              6.2245436,
+              0.0,
+              0.0,
+              1.0,
+              5.1852093,
+              0.0,
+              -1.0,
+              0.0,
+              14.3452921,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "fireplace_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              2.7997396,
+              0.0,
+              1.0,
+              0.0,
+              4.9161024,
+              0.0,
+              0.0,
+              1.0,
+              1.6034694,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "anvil_01_effect_01_socket",
+          "anvil_01_weapon_01_socket",
+          "chimney_01_socket",
+          "fireplace_01_socket"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "wood",
+        "armature": "smithy_01_armature",
+        "vertices": 204,
+        "bones": [
+          {
+            "name": "anvil_01_effect_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.00107,
+              0.3766678,
+              -4.015831,
+              -0.3766691,
+              0.0036583,
+              0.9263406,
+              -5.9489002,
+              -0.0003868,
+              -0.9999927,
+              0.0037919,
+              2.6815109,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "anvil_01_weapon_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              0.9263477,
+              0.3766679,
+              -0.0010704,
+              -4.8345194,
+              -0.3766693,
+              0.9263406,
+              -0.0036581,
+              -5.4929314,
+              -0.0003863,
+              0.0037918,
+              0.9999927,
+              2.7873421,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "chimney_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              6.2245436,
+              0.0,
+              0.0,
+              1.0,
+              5.1852093,
+              0.0,
+              -1.0,
+              0.0,
+              14.3452921,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "fireplace_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              2.7997396,
+              0.0,
+              1.0,
+              0.0,
+              4.9161024,
+              0.0,
+              0.0,
+              1.0,
+              1.6034694,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "anvil_01_effect_01_socket",
+          "anvil_01_weapon_01_socket",
+          "chimney_01_socket",
+          "fireplace_01_socket"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [
+      "smithy_01_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

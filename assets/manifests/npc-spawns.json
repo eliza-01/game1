@@ -8,25 +8,24 @@
       "mapKey": "main",
       "placeId": 0,
       "position": {
-        "x": 454.716,
+        "x": 455.567,
         "y": -54.0,
-        "z": -228.246
+        "z": -229.494
       },
-      "yawDegrees": 50.050000000000004,
+      "yawDegrees": 9.100000000000005,
       "respawnSeconds": 10.0,
-      "spawnRadius": 0.0,
-      "maxAlive": 1,
+      "homeRadiusStuds": 70.0,
       "enabled": true,
       "createdAtUtc": "2026-10-13T00:41:53.298802Z",
-      "updatedAtUtc": "2026-10-20T19:59:13.272186Z",
+      "updatedAtUtc": "2026-11-20T16:53:49.846746Z",
+      "placedAtUtc": "2026-11-20T16:53:41.368080Z",
       "studioSync": {
         "status": "synced",
-        "recordFingerprint": "14cdcfaf5fe1bd969288c1132eea7015ca58259e7293fa71b754c14590a1967b",
+        "recordFingerprint": "57ba11125eb41e87ac382bc8d2169374854f3b3d979dd905052c07bf563f1d44",
         "placeId": 0,
         "markerPath": "Workspace.Game1Authoring.NpcSpawns.Warsmith_6de4624d",
-        "syncedAtUtc": "2026-10-20T19:59:14.307851Z"
-      },
-      "homeRadiusStuds": 70.0
+        "syncedAtUtc": "2026-11-20T16:53:50.609288Z"
+      }
     },
     "spawn-7b6f92b8a5734282b50bde01ef420933": {
       "spawnId": "spawn-7b6f92b8a5734282b50bde01ef420933",

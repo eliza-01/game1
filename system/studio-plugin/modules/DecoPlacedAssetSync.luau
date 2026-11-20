@@ -139,13 +139,14 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     if not preview or type(preview.roots)~="table" or type(preview.geometryRoots)~="table" then
         error("Find Mesh IDs in Studio before replacing; no Place geometry modified")
     end
-    local chosenParts, chosenRoots, chosenGeometry={},{},{}
+    local chosenParts, chosenRoots, chosenGeometry,chosenPhysics={},{},{},{}
     for _, key in ipairs(selectedKeys) do
         local entry=preview.partByKey[key]
         if not entry or not entry.root then error("invalid selected managed MeshPart") end
         chosenParts[entry.part]=true
         chosenRoots[entry.root]=true
         if entry.row.needsMesh then chosenGeometry[entry.root]=true end
+        if entry.row.needsPhysics then chosenPhysics[entry.part]=true end
     end
     local live={}
     for _, root in ipairs(targets(workspace,slug,row.aliases)) do live[root]=true end
@@ -179,7 +180,10 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     for part, snap in pairs(preview.partStates or {}) do
         if part.Parent~=snap.parent or part:GetPivot()~=snap.frame or part.Size~=snap.size
             or History.Id(part.MeshId)~=snap.meshId or part.TextureID~=snap.texture or part.Material~=snap.material
-            or part.Color~=snap.color or part:GetAttribute("Game1DecoAppearanceMode")~=snap.appearanceMode then
+            or part.Color~=snap.color or part:GetAttribute("Game1DecoAppearanceMode")~=snap.appearanceMode
+            or part.CanCollide~=snap.canCollide or part.CanQuery~=snap.canQuery
+            or part.CanTouch~=snap.canTouch or part.DoubleSided~=snap.doubleSided
+            or part.CollisionFidelity~=snap.collisionFidelity then
             error("Mesh identity, transform or texture changed since Find; rescan")
         end
         local surface=part:FindFirstChildOfClass("SurfaceAppearance")
@@ -197,6 +201,11 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
         allowedNames = {}
         for _, entry in ipairs(inspected.meshes) do
             if typeof(entry.name) == "string" then allowedNames[entry.name] = true end
+        end
+    end
+    for part in pairs(chosenPhysics) do
+        if not allowedNames or allowedNames[part.Name] ~= true then
+            error("selected MeshPart is outside the SHA-bound physics report; no Place geometry modified")
         end
     end
     local needsGeometry = false
@@ -249,7 +258,15 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 end
                 if previousId=="" then error("old published Model ID unknown; no Place geometry modified") end
                 previousModelId=previousId
-                local previousPublished=loader:loadForMeshInventory(previousId,slug)
+                local previousVersion=nil
+                for _, version in ipairs(preview.inventory or {}) do
+                    if version.modelAssetId==previousId then previousVersion=version break end
+                end
+                if not previousVersion then
+                    error("historical Model evidence missing; no Place geometry modified")
+                end
+                local previousPublished=loader:loadHistoricalRigForComparison(
+                    previousId,slug,previousVersion.rigManifest)
                 local good,problem=pcall(function()
                     local previousChildren=rigChildren(model)
                     History.VerifyChildren(previousPublished,previousChildren)
@@ -289,6 +306,15 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     end
                 end
             end
+            local physicsNames=nil
+            if not geometry and allowedNames then
+                for _, part in ipairs(oldParts) do
+                    if chosenPhysics[part] and allowedNames[part.Name] == true then
+                        physicsNames=physicsNames or {}
+                        physicsNames[part.Name]=true
+                    end
+                end
+            end
             local events, eventIndex = {}, {}
             local function add(kind: string, oldValue: string, newValue: string, count: number)
                 local key = kind .. ":" .. oldValue .. ":" .. newValue
@@ -319,6 +345,11 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 -- contract used after Studio has already committed the edit.
                 add("alpha",if change.mode then change.mode.Name else "missing",
                     if row.alphaEnabled==true then "Transparency" else "Opaque",1)
+            end
+            if physicsNames then
+                local count=0
+                for _ in pairs(physicsNames) do count+=1 end
+                add("physics","previous","registered",count)
             end
             local beforeMeshes=if geometry then History.Describe(previousModelId,model).meshes else {}
             local afterMeshes=if geometry then History.Describe(modelId,stage).meshes else {}
@@ -354,8 +385,9 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 oldSlug = model:GetAttribute(SLUG), oldName = model.Name,
                 oldAnchorPath = model:GetAttribute("Game1DecoAuthoringAnchorPath"),
                 events = events, meshIdsBefore=beforeMeshes,meshIdsAfter=afterMeshes,
-                physicsBefore = if not geometry and allowedNames then
-                    Physics.CaptureLocationModel(model, allowedNames) else nil})
+                physicsNames=physicsNames,
+                physicsBefore = if physicsNames then
+                    Physics.CaptureLocationModel(model, physicsNames) else nil})
         end
     end)
     if not prepared then
@@ -409,8 +441,13 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                     Visual.AssertCurrent(change.mesh, row)
                 end
             end
-            if item.physicsBefore and allowedNames then
-                physicsChecked += Physics.ApplyLocationModel(model, allowedNames, row.meshOptions)
+            if item.physicsBefore and item.physicsNames then
+                physicsChecked += Physics.ApplyLocationModel(model, item.physicsNames, row.meshOptions)
+                for _, part in ipairs(meshParts(model)) do
+                    if item.physicsNames[part.Name] and Physics.LocationNeedsPhysics(part,row.meshOptions) then
+                        error("Location physics Sync failed: "..part.Name)
+                    end
+                end
             end
             if item.historyJson then model:SetAttribute(HISTORY, item.historyJson) end
             if #item.events > 0 then changedModels += 1 end
@@ -475,7 +512,7 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
     end
     return {models = changedModels, parts = changedParts, matchedModels = #placed,
         modelReferences = changedReferences, geometryUpdated = geometryUpdated,
-        meshPartsUpdated = totalMeshes, physicsChecked = physicsChecked,
+        meshPartsUpdated = totalMeshes, physicsUpdated = physicsChecked,
         pendingGeometry = pending, replacedModels = 0,
         changes = summary, instances = instances}
 end

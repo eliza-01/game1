@@ -2796,6 +2796,817 @@
   ],
   "items": [
     {
+      "slug": "smithy_01",
+      "name_en": "Smithy 01",
+      "category": "building",
+      "model_path": "assets/source/location-assets/building/smithy_01/model/smithy_01.fbx",
+      "model_sha256": "23916002c7f87bcbac219d436e08986e975c0f927124c5e72546183d8864b803",
+      "model_asset_id": "86150318961968",
+      "model_published_sha256": "23916002c7f87bcbac219d436e08986e975c0f927124c5e72546183d8864b803",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 8,
+      "created_at": 1795193385.5415175,
+      "updated_at": 1795201141.4519002,
+      "published_at": 1795198332.844682,
+      "surface_material": "brick",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": ""
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "metal",
+            "armature": "smithy_01_armature",
+            "vertices": 145,
+            "bones": [
+              {
+                "name": "anvil_01_effect_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.00107,
+                  0.3766678,
+                  -4.015831,
+                  -0.3766691,
+                  0.0036583,
+                  0.9263406,
+                  -5.9489002,
+                  -0.0003868,
+                  -0.9999927,
+                  0.0037919,
+                  2.6815109,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "anvil_01_weapon_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.3766679,
+                  -0.0010704,
+                  -4.8345194,
+                  -0.3766693,
+                  0.9263406,
+                  -0.0036581,
+                  -5.4929314,
+                  -0.0003863,
+                  0.0037918,
+                  0.9999927,
+                  2.7873421,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  6.2245436,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.1852093,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  14.3452921,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "fireplace_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7997396,
+                  0.0,
+                  1.0,
+                  0.0,
+                  4.9161024,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.6034694,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "anvil_01_effect_01_socket",
+              "anvil_01_weapon_01_socket",
+              "chimney_01_socket",
+              "fireplace_01_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "smithy_01_armature",
+            "vertices": 12,
+            "bones": [
+              {
+                "name": "anvil_01_effect_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.00107,
+                  0.3766678,
+                  -4.015831,
+                  -0.3766691,
+                  0.0036583,
+                  0.9263406,
+                  -5.9489002,
+                  -0.0003868,
+                  -0.9999927,
+                  0.0037919,
+                  2.6815109,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "anvil_01_weapon_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.3766679,
+                  -0.0010704,
+                  -4.8345194,
+                  -0.3766693,
+                  0.9263406,
+                  -0.0036581,
+                  -5.4929314,
+                  -0.0003863,
+                  0.0037918,
+                  0.9999927,
+                  2.7873421,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  6.2245436,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.1852093,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  14.3452921,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "fireplace_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7997396,
+                  0.0,
+                  1.0,
+                  0.0,
+                  4.9161024,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.6034694,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "anvil_01_effect_01_socket",
+              "anvil_01_weapon_01_socket",
+              "chimney_01_socket",
+              "fireplace_01_socket"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          },
+          {
+            "name": "roof",
+            "armature": "smithy_01_armature",
+            "vertices": 24,
+            "bones": [
+              {
+                "name": "anvil_01_effect_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.00107,
+                  0.3766678,
+                  -4.015831,
+                  -0.3766691,
+                  0.0036583,
+                  0.9263406,
+                  -5.9489002,
+                  -0.0003868,
+                  -0.9999927,
+                  0.0037919,
+                  2.6815109,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "anvil_01_weapon_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.3766679,
+                  -0.0010704,
+                  -4.8345194,
+                  -0.3766693,
+                  0.9263406,
+                  -0.0036581,
+                  -5.4929314,
+                  -0.0003863,
+                  0.0037918,
+                  0.9999927,
+                  2.7873421,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  6.2245436,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.1852093,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  14.3452921,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "fireplace_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7997396,
+                  0.0,
+                  1.0,
+                  0.0,
+                  4.9161024,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.6034694,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "anvil_01_weapon_01_socket",
+              "chimney_01_socket",
+              "fireplace_01_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "stone",
+            "armature": "smithy_01_armature",
+            "vertices": 198,
+            "bones": [
+              {
+                "name": "anvil_01_effect_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.00107,
+                  0.3766678,
+                  -4.015831,
+                  -0.3766691,
+                  0.0036583,
+                  0.9263406,
+                  -5.9489002,
+                  -0.0003868,
+                  -0.9999927,
+                  0.0037919,
+                  2.6815109,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "anvil_01_weapon_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.3766679,
+                  -0.0010704,
+                  -4.8345194,
+                  -0.3766693,
+                  0.9263406,
+                  -0.0036581,
+                  -5.4929314,
+                  -0.0003863,
+                  0.0037918,
+                  0.9999927,
+                  2.7873421,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  6.2245436,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.1852093,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  14.3452921,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "fireplace_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7997396,
+                  0.0,
+                  1.0,
+                  0.0,
+                  4.9161024,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.6034694,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "anvil_01_effect_01_socket",
+              "anvil_01_weapon_01_socket",
+              "chimney_01_socket",
+              "fireplace_01_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "wood",
+            "armature": "smithy_01_armature",
+            "vertices": 204,
+            "bones": [
+              {
+                "name": "anvil_01_effect_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.00107,
+                  0.3766678,
+                  -4.015831,
+                  -0.3766691,
+                  0.0036583,
+                  0.9263406,
+                  -5.9489002,
+                  -0.0003868,
+                  -0.9999927,
+                  0.0037919,
+                  2.6815109,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "anvil_01_weapon_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  0.9263477,
+                  0.3766679,
+                  -0.0010704,
+                  -4.8345194,
+                  -0.3766693,
+                  0.9263406,
+                  -0.0036581,
+                  -5.4929314,
+                  -0.0003863,
+                  0.0037918,
+                  0.9999927,
+                  2.7873421,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "chimney_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  6.2245436,
+                  0.0,
+                  0.0,
+                  1.0,
+                  5.1852093,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  14.3452921,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "fireplace_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7997396,
+                  0.0,
+                  1.0,
+                  0.0,
+                  4.9161024,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.6034694,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "anvil_01_effect_01_socket",
+              "anvil_01_weapon_01_socket",
+              "chimney_01_socket",
+              "fireplace_01_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [
+          "smithy_01_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "9a12791c5b59e52d5af6a488f59304f745eadf7d0392578c59cae59653e93970",
+        "bones": [
+          {
+            "matrix": [
+              0.9263477,
+              0.00107,
+              0.3766678,
+              -4.015831,
+              -0.3766691,
+              0.0036583,
+              0.9263406,
+              -5.9489002,
+              -0.0003868,
+              -0.9999927,
+              0.0037919,
+              2.6815109,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "anvil_01_effect_01_socket",
+            "parent": ""
+          },
+          {
+            "matrix": [
+              0.9263477,
+              0.3766679,
+              -0.0010704,
+              -4.8345194,
+              -0.3766693,
+              0.9263406,
+              -0.0036581,
+              -5.4929314,
+              -0.0003863,
+              0.0037918,
+              0.9999927,
+              2.7873421,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "anvil_01_weapon_01_socket",
+            "parent": ""
+          },
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              6.2245436,
+              0.0,
+              0.0,
+              1.0,
+              5.1852093,
+              0.0,
+              -1.0,
+              0.0,
+              14.3452921,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "chimney_01_socket",
+            "parent": ""
+          },
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              2.7997396,
+              0.0,
+              1.0,
+              0.0,
+              4.9161024,
+              0.0,
+              0.0,
+              1.0,
+              1.6034694,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "fireplace_01_socket",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "4ef71f85329e4285d67da47b9b8c2fe3920485ce99b7101714da204a5c784733",
+        "parts": [
+          {
+            "name": "metal",
+            "role": "visual",
+            "vertices": 145
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 12
+          },
+          {
+            "name": "roof",
+            "role": "visual",
+            "vertices": 24
+          },
+          {
+            "name": "stone",
+            "role": "visual",
+            "vertices": 198
+          },
+          {
+            "name": "wood",
+            "role": "visual",
+            "vertices": 204
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "c8a00619165e9773926b38738c05bffe3f66fc66fd935e02f37006ad170ef2d6"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "metal": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#393D51",
+          "visualMaterial": "Granite"
+        },
+        "roof": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FF9705",
+          "visualMaterial": "RoofShingles"
+        },
+        "stone": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Brick"
+        },
+        "wood": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#AB4E20",
+          "visualMaterial": "WoodPlanks"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "brick",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "brick",
+        "label": "Brick",
+        "robloxMaterial": "Brick",
+        "soundFamily": "stone"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 8,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Building",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "102541638658561",
+          "name": "roof"
+        },
+        {
+          "meshId": "135922279621163",
+          "name": "stone"
+        },
+        {
+          "meshId": "72766445703764",
+          "name": "wood"
+        },
+        {
+          "meshId": "78999719982694",
+          "name": "metal"
+        }
+      ],
+      "aliases": []
+    },
+    {
       "slug": "weapon_shop",
       "name_en": "Weapon Shop",
       "category": "building",
@@ -3776,11 +4587,65 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -0.104644775390625,
+            1.9659652709960938,
+            -0.073089599609375,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "meshId": "85890571174919",
+          "size": [
+            4.447850227355957,
+            3.9319310188293457,
+            5.220827579498291
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              -0.201263427734375,
+              0.40375518798828125,
+              -0.0731201171875,
+              -0.2123393565416336,
+              0.0,
+              0.9771959781646729,
+              0.0,
+              1.0,
+              0.0,
+              -0.9771959781646729,
+              0.0,
+              -0.2123393565416336
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.360321521759033,
+              0.7839952707290649,
+              2.0
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "3db8563863d4486ede60dd91f11042e3531a38e86d2c82425d36e31522697241",
       "surfaceMaterial": "glass",
       "appearanceMode": "material_atlas",
       "visualMaterial": "Plastic",
@@ -8635,11 +9500,65 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            0.0,
+            0.0,
+            0.0,
+            1.0000001192092896,
+            0.0,
+            0.0,
+            0.0,
+            1.000000238418579,
+            0.0,
+            0.0,
+            0.0,
+            1.0000001192092896
+          ],
+          "meshId": "99664944787392",
+          "size": [
+            3.770676612854004,
+            0.15528225898742676,
+            0.8774552345275879
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              -0.0048980712890625,
+              0.002620697021484375,
+              -0.00396728515625,
+              -0.9999188184738159,
+              0.0,
+              -0.012743175029754639,
+              0.0,
+              1.0000001192092896,
+              0.0,
+              0.012743175029754639,
+              0.0,
+              -0.9999188184738159
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              3.763336658477783,
+              0.13932335376739502,
+              0.8482231497764587
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "966f91200a797440428726b1f833ffc305ce05e08af84c5b3d7369bb7b992150",
       "surfaceMaterial": "default",
       "appearanceMode": "material_atlas",
       "visualMaterial": "Plastic",
@@ -11454,9 +12373,9 @@
       "model_published_sha256": "7b68cfb2b17dae5cf88845aeb989f01a8c520b4cda9330816df0fe26564793d5",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 1,
+      "revision": 6,
       "created_at": 1794709873.3937948,
-      "updated_at": 1794709888.3006494,
+      "updated_at": 1795204496.6469374,
       "published_at": 1794709888.3006494,
       "surface_material": "stone",
       "alpha_enabled": 0,
@@ -11607,7 +12526,7 @@
       "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
       "atlasVariantId": 0,
-      "bindingRevision": 1,
+      "bindingRevision": 6,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Pillar",
@@ -16658,15 +17577,15 @@
       "name_en": "Christmas Tree 01",
       "category": "tree",
       "model_path": "assets/source/location-assets/tree/christmas_tree_01/model/christmas_tree_01.fbx",
-      "model_sha256": "fb1c7635d8e8530cad006c28186855b63ccc5242b72371902c570bebaeb38b0a",
-      "model_asset_id": "119656116694676",
-      "model_published_sha256": "fb1c7635d8e8530cad006c28186855b63ccc5242b72371902c570bebaeb38b0a",
+      "model_sha256": "6b65edcc79e510ac36b597ea8db3b826b23365cb7eeb2a252bd52775017580d4",
+      "model_asset_id": "97517585346577",
+      "model_published_sha256": "6b65edcc79e510ac36b597ea8db3b826b23365cb7eeb2a252bd52775017580d4",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 12,
+      "revision": 14,
       "created_at": 1791465860.1735055,
-      "updated_at": 1795190414.1320393,
-      "published_at": 1794093776.9550889,
+      "updated_at": 1795192381.9345405,
+      "published_at": 1795192381.9345405,
       "surface_material": "wood",
       "alpha_enabled": 0,
       "appearance_mode": "material_atlas",
@@ -16939,17 +17858,12 @@
           }
         ],
         "carrierName": "rig_carrier",
-        "inventoryHash": "da81a9aa62e1a6ce3232a02fe867139f0b86f60d9d292ce5de355c5084512327",
+        "inventoryHash": "70ad219d524a688a63895960f94d446b27546501b9edb6367783ab7e0f614bd1",
         "parts": [
           {
             "name": "christmas_tree_01",
             "role": "visual",
             "vertices": 1870
-          },
-          {
-            "name": "col_mesh",
-            "role": "collider",
-            "vertices": 75
           },
           {
             "name": "rig_carrier",
@@ -16960,7 +17874,7 @@
         "rigKind": "skinned",
         "schemaVersion": 2,
         "sourceSha256": "",
-        "structuralHash": "41977f6f7bce55298b08eb163141a8a059544ef31e0eaa8a017b603b0553ce51"
+        "structuralHash": "4da643b424e37fad6e87621f37c9b6a88011ab137be76dac833d08b6363f7b37"
       },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
@@ -16979,11 +17893,65 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            0.0025634765625,
+            -0.3813133239746094,
+            0.0263671875,
+            1.0,
+            1.1641532182693481e-09,
+            0.0,
+            1.1641532182693481e-09,
+            1.0000001192092896,
+            0.0,
+            0.0,
+            0.0,
+            1.0000001192092896
+          ],
+          "meshId": "98989995672883",
+          "size": [
+            9.282806396484375,
+            16.3681640625,
+            9.652566909790039
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              -0.09979248046875,
+              -2.5790958404541016,
+              0.4254913330078125,
+              -0.9798950552940369,
+              0.03598528355360031,
+              0.19624166190624237,
+              0.03513920679688454,
+              0.9993520975112915,
+              -0.007792588323354721,
+              -0.1963949203491211,
+              -0.0007401430048048496,
+              -0.9805246591567993
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.5580098628997803,
+              11.15198802947998,
+              2.0
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "01a9177664e14b058740a69309d91abfa22e80afc8e8d2e68ca6e5eb42c3a3de",
       "surfaceMaterial": "wood",
       "appearanceMode": "material_atlas",
       "visualMaterial": "Plastic",
@@ -17076,8 +18044,8 @@
     }
   ],
   "summary": {
-    "registered": 38,
-    "published": 38,
+    "registered": 39,
+    "published": 39,
     "changed": 0
   }
 }

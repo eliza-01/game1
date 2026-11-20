@@ -25,7 +25,10 @@ def build_catalog(location_assets) -> dict:
         if mode == 'material':
             atlas = ''
         history = location_assets.model_publication_ids(slug)
-        inventory = {str(v['modelAssetId']): v for v in location_assets.mesh_id_inventory(slug)}
+        inventory_rows = (location_assets.model_history_inventory(slug)
+                          if hasattr(location_assets, 'model_history_inventory')
+                          else location_assets.mesh_id_inventory(slug))
+        inventory = {str(v['modelAssetId']): v for v in inventory_rows}
         if model not in history:
             history.insert(0, model)
         items.append({
@@ -48,7 +51,8 @@ def build_catalog(location_assets) -> dict:
             'legacyStaticPublication': bool(row.get('legacyStaticPublication')),
             'needsFbxInspection': bool(row.get('needsFbxInspection')),
             'models': [{'modelAssetId': identifier,
-                        'meshes': inventory.get(identifier, {}).get('meshes', [])}
+                        'meshes': inventory.get(identifier, {}).get('meshes', []),
+                        'rigManifest': inventory.get(identifier, {}).get('rigManifest')}
                        for identifier in history],
         })
     items.sort(key=lambda a: a['slug'])
@@ -61,6 +65,9 @@ def build_catalog(location_assets) -> dict:
                      'versions': [model['modelAssetId'] for model in item['models']],
                      'aliases': item['aliases'],
                      'rigHash': (item.get('rigManifest') or {}).get('structuralHash', ''),
+                     'versionRigHashes': [
+                         (model.get('rigManifest') or {}).get('structuralHash', '')
+                         for model in item['models']],
                      'legacyStatic': item['legacyStaticPublication'],
                      'inspectionNeeded': item['needsFbxInspection']}
                   for item in items]
@@ -113,6 +120,8 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
             raise ValueError('invalid scan flag: needsMaterial')
         if 'needsAlpha' in row and type(row['needsAlpha']) is not bool:
             raise ValueError('invalid scan flag: needsAlpha')
+        if 'needsPhysics' in row and type(row['needsPhysics']) is not bool:
+            raise ValueError('invalid scan flag: needsPhysics')
         if not isinstance(row.get('issues'), list) or len(row['issues']) > 12 or any(
                 not isinstance(s, str) or len(s) > 250 for s in row['issues']):
             raise ValueError('invalid diagnostic issues')
@@ -162,6 +171,19 @@ def validate_report(report: dict, catalog: dict) -> list[dict]:
         if can_sync and (not key or not (needs_texture or needs_cleanup or needs_physics or needs_collision) or item['kind'] != 'landscape_attachment'
                          or item['review'] or item['slug'] != item['authorSlug']):
             raise ValueError('unsafe external appearance Sync')
+        if 'runtimeCandidate' in item and type(item['runtimeCandidate']) is not bool:
+            raise ValueError('invalid Painter Runtime eligibility')
+        if item.get('runtimeCandidate'):
+            if (item['kind'] != 'landscape_attachment' or item['review']
+                    or item['authorSlug'] != item['slug']
+                    or any(item.get(flag) for flag in
+                           ('canSync','needsTexture','needsCollision','needsPhysics','needsOwnerCleanup'))
+                    or not isinstance(item.get('hierarchy'),list)
+                    or not 1 < len(item['hierarchy']) <= 512
+                    or not isinstance(item.get('pivotEvidence'),dict)
+                    or not isinstance(item['pivotEvidence'].get('modelPivot'),list)
+                    or len(item['pivotEvidence']['modelPivot']) != 12):
+                raise ValueError('unsafe Painter Runtime evidence')
         if (item['kind'] == 'landscape_attachment'
                 and (not item['authorSlug'] or item['authorSlug'] != item['slug'])
                 and item['review'] is not True):

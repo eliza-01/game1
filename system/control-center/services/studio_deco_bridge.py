@@ -172,7 +172,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
     if phase == 'scan':
         mode = result.get('mode')
         token = str(result.get('scanToken') or '')
-        if mode not in ('texture','mesh','texture_mesh','alpha','current') or not re.fullmatch(r'[0-9a-fA-F-]{32,36}', token):
+        if mode not in ('texture','mesh','texture_mesh','alpha','physics','current') or not re.fullmatch(r'[0-9a-fA-F-]{32,36}', token):
             raise StudioBridgeError('invalid Studio ID scan result')
         for key in ('foundMeshParts','managedMeshParts','unmanagedMeshParts',
                     'managedModels','texturePending','geometryPending'):
@@ -195,6 +195,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
         texture_pending=0
         mesh_pending=0
         alpha_pending=0
+        physics_pending=0
         for index, part in enumerate(parts, 1):
             if not isinstance(part, dict) or part.get('key') != f'p{index}':
                 raise StudioBridgeError('invalid Studio MeshPart report identity')
@@ -228,8 +229,39 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
             if ('needsAlpha' in part and 'alphaCurrent' in part
                     and part['needsAlpha'] == part['alphaCurrent']):
                 raise StudioBridgeError('inconsistent Studio MeshPart Alpha state')
+            physics_fields = ('needsPhysics', 'physicsCurrent', 'physics')
+            present_physics = [field in part for field in physics_fields]
+            if any(present_physics) and not all(present_physics):
+                raise StudioBridgeError('incomplete Studio MeshPart physics state')
+            if all(present_physics):
+                if (type(part['needsPhysics']) is not bool
+                        or type(part['physicsCurrent']) is not bool
+                        or part['needsPhysics'] == part['physicsCurrent']):
+                    raise StudioBridgeError('inconsistent Studio MeshPart physics state')
+                physics = part['physics']
+                if physics is not None:
+                    boolean_fields = ('current','canCollide','expectedCanCollide',
+                                      'canQuery','expectedCanQuery','canTouch','expectedCanTouch',
+                                      'doubleSided','expectedDoubleSided')
+                    if (not isinstance(physics,dict)
+                            or any(type(physics.get(field)) is not bool for field in boolean_fields)
+                            or physics['current'] != part['physicsCurrent']
+                            or physics.get('collisionFidelity') not in ('Box','Hull','Default','PreciseConvexDecomposition')
+                            or physics.get('expectedCollisionFidelity') not in ('Box','Hull','Default','PreciseConvexDecomposition')):
+                        raise StudioBridgeError('invalid Studio MeshPart physics details')
+                elif part['needsPhysics'] or not part['physicsCurrent']:
+                    raise StudioBridgeError('non-visual MeshPart cannot require physics Sync')
+            else:
+                # Protocol-9 compatibility: an older plugin cannot prove the
+                # expanded physics contract and therefore cannot acknowledge
+                # a placement as fully current.
+                part['needsPhysics'] = False
+                part['physicsCurrent'] = False
+                part['physics'] = None
             if not part['textureApplicable'] and part.get('needsAlpha', False):
                 raise StudioBridgeError('COL MeshPart must not require Alpha Sync')
+            if not part['textureApplicable'] and part.get('needsPhysics', False):
+                raise StudioBridgeError('COL MeshPart must not require visual physics Sync')
             if part['attachable'] and (part['managed'] or not re.fullmatch(r'[1-9][0-9]{0,19}',part['historicalModelId'])):
                 raise StudioBridgeError('invalid historical Model linking candidate')
             if part['isCollider'] and part['textureApplicable']:
@@ -242,6 +274,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                 if not part['textureCurrent']: texture_pending+=1
                 if part['needsMesh']: mesh_pending+=1
                 if part.get('needsAlpha', False): alpha_pending+=1
+                if part.get('needsPhysics', False): physics_pending+=1
             elif part['needsMesh']:
                 raise StudioBridgeError('unmanaged MeshPart must not be sync eligible')
         if managed!=values['managedMeshParts'] or texture_pending!=values['texturePending']:
@@ -255,18 +288,29 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                 f'Studio alpha count mismatch: reported={reported_alpha!r}, '
                 f'computed={alpha_pending}, managed={managed}'
             )
+        reported_physics = result.get('physicsPending', 0)
+        if (type(reported_physics) is not int or not 0 <= reported_physics <= 4096
+                or reported_physics != physics_pending):
+            raise StudioBridgeError(
+                f'Studio physics count mismatch: reported={reported_physics!r}, '
+                f'computed={physics_pending}, managed={managed}'
+            )
         if mode == 'alpha' and (alpha_pending == 0 or texture_pending or values['geometryPending']):
             raise StudioBridgeError('inconsistent Studio Alpha-only scan mode')
+        if mode == 'physics' and (physics_pending == 0 or texture_pending
+                                  or alpha_pending or values['geometryPending']):
+            raise StudioBridgeError('inconsistent Studio physics-only scan mode')
         values.update(mode=mode, scanToken=token, inventory=inventory,
                       expectedMeshIds=expected,parts=parts,meshPending=mesh_pending,
-                      alphaPending=alpha_pending)
+                      alphaPending=alpha_pending,physicsPending=physics_pending)
         return values
     if type(result.get('fullySynced')) is not bool:
         raise StudioBridgeError('invalid partial-sync acknowledgement')
     values['fullySynced'] = result['fullySynced']
     for field in ('models', 'parts', 'matchedModels', 'modelReferences',
-                  'pendingGeometry', 'geometryUpdated', 'meshPartsUpdated', 'registryItems', 'replacedModels'):
-        value = result.get(field)
+                  'pendingGeometry', 'geometryUpdated', 'meshPartsUpdated', 'physicsUpdated',
+                  'registryItems', 'replacedModels'):
+        value = result.get(field, 0) if field == 'physicsUpdated' else result.get(field)
         if type(value) is not int or value < 0:
             raise StudioBridgeError(f'invalid Studio deco-refresh result field: {field}')
         values[field] = value

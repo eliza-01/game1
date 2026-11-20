@@ -3,15 +3,7 @@
   "modes": {
     "stone_fence_02": "lod1",
     "stone_pillar_03": "lod1",
-    "stone_ladder_02": "lod1",
-    "wooden_fence_03": "full",
-    "blossom_tree_01": "full",
-    "bush_01": "full",
-    "bush_02": "full",
-    "ivy_02": "full",
-    "ivy_03": "full",
-    "ivy_05": "full",
-    "stone_pillar_02": "full"
+    "stone_ladder_02": "lod1"
   },
   "distances": {
     "lod1": 120,

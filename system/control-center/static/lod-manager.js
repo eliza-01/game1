@@ -120,7 +120,7 @@
         .map(([key,count]) => `${({missingId:'Нет ID',duplicateId:'Повтор ID',ambiguous:'Неоднозначно',noModel:'Нет Model',collisionReview:'Collision',truncated:'Иерархия обрезана'})[key]}: ${count}`);
       const lod1 = item.lod1Status === 'PUBLISHED' ? `LOD1 · ${escape(item.lod1ModelId)}` : `LOD1 · ${escape(item.lod1Status)}`;
       return `<tr><td><strong class="lm-slug">${escape(item.slug)}</strong><small>${escape(item.category||'Location Asset')}${!item.recognizedByCatalog ? ' · нет в актуальном опубликованном каталоге':''}</small></td>
-        <td class="lm-count">${compact(item.count)} <small>pcs</small>${item.protectedCount ? `<small class="lm-protected-count">+${compact(item.protectedCount)} protected</small>` : ''}</td>
+        <td class="lm-count">${compact(item.count)} <small>pcs</small>${item.protectedCount ? `<small class="lm-protected-count">+${compact(item.protectedCount)} Painter/other (${compact(item.runtimePainterCount||0)} ready)</small>` : ''}</td>
         <td><span class="lm-dot lm-${item.indicator}" title="${escape(indicators[item.indicator])}"></span>
           <span class="lm-quality">${escape(indicators[item.indicator])}</span><small>${lod1}</small></td>
         <td>${flags.length ? `<span class="lm-flag">${flags.map(escape).join(' · ')}</span>` : '<span class="lm-ok">—</span>'}
@@ -135,11 +135,11 @@
               <small>${escape(p.issues?.join(' · ') || (p.placementId ? 'Placement ID: ' + p.placementId : 'Нет Placement ID'))}</small></div>`).join('')}
             </details>` : ''}</td>
         <td><select class="lm-stream-mode" data-stream-slug="${escape(item.slug)}"
-          aria-label="Streaming mode ${escape(item.slug)}" ${state.busy || !item.streamingEligible && item.streamingMode==='off' ? 'disabled' : ''}>
-          ${[['off','Off · Workspace'],['full','FULL → Hide'],['lod1','FULL / LOD1'],['lod2','FULL / LOD1 / LOD2']]
+          aria-label="Streaming mode ${escape(item.slug)}" ${state.busy ? 'disabled' : ''}>
+          ${[['auto','Auto · FULL → Hide'],['off','Off · Workspace'],['full','FULL → Hide'],['lod1','FULL / LOD1'],['lod2','FULL / LOD1 / LOD2']]
             .map(([mode,label])=>`<option value="${mode}" ${item.streamingMode===mode?'selected':''}
-              ${(mode!=='off' && !item.streamingEligible) || (mode==='lod1' && item.lod1Status!=='PUBLISHED') || (mode==='lod2' && item.lod2Status!=='PUBLISHED')?'disabled':''}>${label}</option>`).join('')}
-          </select><div class="lm-stream-status">${escape(item.streamingReason || 'Выбор сохранён')}</div></td></tr>`;
+              ${(mode!=='off' && mode!=='auto' && !item.streamingEligible) || (mode==='lod1' && item.lod1Status!=='PUBLISHED') || (mode==='lod2' && item.lod2Status!=='PUBLISHED')?'disabled':''}>${label}</option>`).join('')}
+          </select><div class="lm-stream-status">${escape(item.streamingReason || (item.streamingMode==='auto' ? 'По умолчанию FULL; все размещения данного типа' : 'Выбор сохранён'))}</div></td></tr>`;
     }).join('') : '<tr><td colspan="5" class="lm-empty">Нет записей с такими условиями.</td></tr>';
     const houses=data.realEstate?.items || [];
     $('lod-house-count').textContent = `${data.realEstate?.selected||0} профилей · ${data.realEstate?.placements||0} зарегистрированных точек (не домов в Workspace)`;

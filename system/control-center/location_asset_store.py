@@ -888,6 +888,24 @@ class LocationAssetStore:
         return [{'modelAssetId': str(row['model_asset_id']), 'meshes': json.loads(row['meshes_json'])}
                 for row in records]
 
+    def model_history_inventory(self, slug: str) -> list[dict]:
+        """Bounded immutable Model history with its exact per-version rig manifest.
+
+        Mesh IDs are a Studio-observed cache.  The rig manifest is publication
+        evidence and must stay paired with the Model Asset ID that produced it;
+        using the current manifest to interpret an older importer RootPart can
+        reject a legitimate skeleton revision or authorize the wrong layout.
+        """
+        cached = {row['modelAssetId']: row for row in self.mesh_id_inventory(slug)}
+        return [
+            {
+                'modelAssetId': model_id,
+                'meshes': cached.get(model_id, {}).get('meshes', []),
+                'rigManifest': self.rig_manifest(slug, model_id),
+            }
+            for model_id in self.model_publication_ids(slug)
+        ]
+
     def snapshot(self) -> dict:
         items = self.list()
         with self.connect() as db:

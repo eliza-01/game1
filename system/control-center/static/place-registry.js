@@ -11,7 +11,7 @@
     (acc[row.slug] ||= []).push(row);return acc;
   }, {});
   const needsRepair = row => row.canRepair === true && !row.requiresRepublish && !row.ambiguous && (row.needsStructure || row.duplicateId);
-  const needsSync = row => row.canSync && (row.needsMesh || row.needsRig || row.needsTexture || row.needsMaterial || row.needsAlpha || row.needsCollision);
+  const needsSync = row => row.canSync && (row.needsMesh || row.needsRig || row.needsTexture || row.needsMaterial || row.needsAlpha || row.needsCollision || row.needsPhysics);
 
   function buttons() {
     for (const name of ['pr-scan','pr-select-all','pr-repair-all','pr-sync-all']) {
@@ -58,6 +58,7 @@
         ${row.needsRig?'<span class="pr-old">Rig ✕ отличается состав MeshPart</span>':''}
         ${row.needsMaterial?'<span class="pr-old">Материал ✕ требует Sync</span>':''}
         ${row.needsAlpha?'<span class="pr-old">Alpha ✕ требует Sync</span>':''}
+        ${row.needsPhysics?'<span class="pr-old">Physics ✕ требует Sync</span>':''}
         ${row.needsRecapture?'<span class="pr-old">Collision ✕ повторить Capture (старый формат)</span>':row.needsCollision?`<span class="pr-old">Collision ✕ требует Sync: отсутствует / повреждена (r${html(row.collisionRevision||0)})</span>`:row.collisionRevision>0?'<span class="pr-ok">Collision ✓ актуальна</span>':''}
         <small>Mesh ID ${html(row.meshId)} · Texture ID ${html(row.textureId||'—')}</small></div>
       ${issues?`<div class="pr-issues">${issues}</div>`:''}

@@ -372,7 +372,9 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
                 parent=part.Parent,frame=part:GetPivot(),size=part.Size,
                 surface=surface,alphaMode=if surface then surface.AlphaMode else nil,
                 material=part.Material,color=part.Color,
-                appearanceMode=part:GetAttribute("Game1DecoAppearanceMode")}
+                appearanceMode=part:GetAttribute("Game1DecoAppearanceMode"),
+                canCollide=part.CanCollide,canQuery=part.CanQuery,canTouch=part.CanTouch,
+                doubleSided=part.DoubleSided,collisionFidelity=part.CollisionFidelity}
         end
     end
     report.partStates=snap
@@ -385,6 +387,7 @@ function DecoManager:previewMeshSync(slug: string, modelId: string, atlasId: str
         foundMeshParts=report.foundMeshParts,managedMeshParts=report.managedMeshParts,
         unmanagedMeshParts=report.unmanagedMeshParts,managedModels=report.managedModels,
         meshPending=report.meshPending,texturePending=report.texturePending,alphaPending=report.alphaPending,
+        physicsPending=report.physicsPending,
         geometryPending=report.geometryPending}
 end
 
@@ -556,7 +559,8 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
             if type(key)~="string" or seen[key] then error("duplicate or invalid MeshPart selection") end
             seen[key]=true
             local entry=scanned.partByKey[key]
-            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture or entry.row.needsAlpha) then
+            if not entry or not entry.root or not (entry.row.needsMesh or entry.row.needsTexture
+                or entry.row.needsAlpha or entry.row.needsPhysics) then
                 error("selected MeshPart is not a pending managed part; Find again")
             end
             table.insert(selected,key)
@@ -564,7 +568,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         end
         local allPending=true
         for _, entry in ipairs(scanned.parts) do
-            if entry.managed and (entry.needsMesh or entry.needsTexture or entry.needsAlpha)
+            if entry.managed and (entry.needsMesh or entry.needsTexture or entry.needsAlpha or entry.needsPhysics)
                 and not seen[entry.key] and not wholeRig[scanned.partByKey[entry.key].root] then
                 allPending=false
                 break
@@ -604,6 +608,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         replacedModels = 0, matchedModels = syncResult.matchedModels,
         modelReferences = syncResult.modelReferences, pendingGeometry = syncResult.pendingGeometry,
         geometryUpdated = syncResult.geometryUpdated, meshPartsUpdated = syncResult.meshPartsUpdated,
+        physicsUpdated = syncResult.physicsUpdated,
         changes = syncResult.changes, instances = syncResult.instances,
         fullySynced = syncResult.fullySynced == true,
         registryItems = #result.items }

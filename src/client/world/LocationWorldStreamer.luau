@@ -246,6 +246,11 @@ function Streamer.Start()
                     changes += cost
                 end
             end
+            -- Effect visibility follows the committed visual state, not a
+            -- guessed range or an unavailable published template.
+            if record.components then
+                LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")
+            end
         end
         if houseAdapter and changes < MAX_CHANGES_PER_TICK then
             changes += houseAdapter:Step(MAX_CHANGES_PER_TICK - changes)

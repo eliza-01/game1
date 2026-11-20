@@ -152,4 +152,36 @@ function DecoAssetLoader:loadForMeshInventory(modelId: string, slug: string): Mo
     return model
 end
 
+function DecoAssetLoader:loadHistoricalRigForComparison(modelId: string, slug: string,
+    rigManifest: any): Model
+    -- A placed v2 rig was created from loadPublished(), where Roblox importer
+    -- scaffolding is removed on a detached clone. Compare against that same
+    -- representation, never raw RootPart hierarchy and never a newer version's
+    -- manifest. This path is read-only and performs no publication.
+    if type(rigManifest) ~= "table" then
+        error("historical rig manifest unavailable; no Place geometry modified")
+    end
+    local model = self:loadForMeshInventory(modelId, slug)
+    local good, problem = pcall(function()
+        sanitize(model)
+        PublishedRigNormalize.Apply(model, rigManifest)
+        RetiredCleanup.CleanLocation(model)
+        local carrier = Carrier.Validate(model, rigManifest, false)
+        if carrier then
+            Carrier.Prepare(carrier)
+            for _, part in ipairs(model:GetDescendants()) do
+                if part:IsA("MeshPart") and part ~= carrier then
+                    SkinConnection.Connect(model, carrier, part, "LocationSkinWeld")
+                end
+            end
+            model.PrimaryPart = carrier
+        end
+    end)
+    if not good then
+        model:Destroy()
+        error(tostring(problem))
+    end
+    return model
+end
+
 return DecoAssetLoader

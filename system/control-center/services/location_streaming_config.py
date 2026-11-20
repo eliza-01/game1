@@ -1,4 +1,4 @@
-"""Project-owned Location visual LOD selection and Roblox Workspace streaming profile.
+"""Project-owned Location visual LOD overrides and Roblox Workspace streaming profile.
 
 One configuration feeds the UI, offline Place compiler and runtime manifest.
 Changing it never edits the open Studio Place or publishes anything.
@@ -25,7 +25,15 @@ DEFAULT_SETTINGS = {
         'streamOutBehavior': 'Opportunistic',
     },
 }
-MODES = ('off', 'full', 'lod1', 'lod2')
+# Auto is the default for all registered Location Assets present in a Scan.
+# Explicit modes override the default, not a whitelist for Runtime coverage.
+MODES = ('auto', 'off', 'full', 'lod1', 'lod2')
+
+
+def runtime_mode(settings: dict, slug: str) -> str:
+    """Resolve published type policy; rig/effects never change selection rules."""
+    mode = settings['modes'].get(slug, 'auto')
+    return 'full' if mode == 'auto' else mode
 WORLD_ENUMS = {
     'modelStreamingBehavior': ('Default', 'Legacy', 'Improved'),
     'streamingIntegrityMode': ('Default', 'Disabled', 'MinimumRadiusPause', 'PauseOutsideLoadedArea'),

@@ -7,8 +7,11 @@ ROOT = Path(__file__).resolve().parents[2]
 class LodDistancePhase1(unittest.TestCase):
     def test_lod1_published_name_is_slug_not_display_label(self):
         text = (ROOT/'system/control-center/services/location_lod_resource.py').read_text()
-        self.assertIn("expected_name = f'{slug}_lod1.fbx'", text)
-        self.assertIn("display_name=f'{slug}_lod1'", text)
+        self.assertIn("inspect_fbx(source_path, f'{slug}_lod1.fbx')", text)
+        self.assertIn('publish_geometry(store.root, path, slug', text)
+        common = (ROOT/'system/control-center/services/model_lod_common.py').read_text()
+        self.assertIn('if source.name != expected_name:', common)
+        self.assertIn("display_name=f'{slug}_lod1'", common)
 
     def test_policy_has_separate_hysteresis_states(self):
         text = (ROOT/'src/shared/world/LocationLodDistancePolicy.luau').read_text()

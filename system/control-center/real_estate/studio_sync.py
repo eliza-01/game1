@@ -64,6 +64,11 @@ class RealEstateStudioSync:
             },
             # These offsets belong to the authored FBX revision. They are
             # omitted for legacy/standalone mesh revisions lacking a house frame.
+            'standaloneStaticParts': {
+                mesh['name']: True for mesh in row['skeleton']['meshes']
+                if (mesh['name'] in row.get('meshSources', {})
+                    and not mesh.get('armature') and not mesh.get('bones'))
+            },
             'authoredPlacements': {
                 mesh['name']: mesh['authoredPlacement']
                 for mesh in row['skeleton']['meshes']

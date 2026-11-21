@@ -107,6 +107,7 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
         error("Studio Sync requires published Model Asset IDs for every Real Estate mesh")
     end
     local authoredPlacements = typeof(metadata.authoredPlacements) == "table" and metadata.authoredPlacements or {}
+    local standaloneStaticParts = typeof(metadata.standaloneStaticParts) == "table" and metadata.standaloneStaticParts or {}
     local meshOptions = typeof(metadata.meshOptions) == 'table' and metadata.meshOptions or {}
     local movingParts = typeof(metadata.doorParts) == "table" and metadata.doorParts or {}
     local imageAssets = {}
@@ -177,7 +178,15 @@ function StudioRealEstateModel.Place(imported: Model, destination: Instance, slu
             local mesh, inspection = StudioRealEstateRigValidation.Verify(
                 rig, part, manifests[part], false)
             meshes[part] = mesh
-            PartPlacement.AlignSharedPivot(rig, mesh, authoredOrigin, part)
+            if standaloneStaticParts[part] == true then
+                -- A stand-alone static FBX does not share house_armature origin.
+                -- Restore its documented visual centre relative to the real
+                -- rig_carrier. Missing placement is an error, not a zero offset.
+                PartPlacement.AlignOrigin(rig, mesh, authoredOrigin,
+                    authoredPlacements[part], part)
+            else
+                PartPlacement.AlignSharedPivot(rig, mesh, authoredOrigin, part)
+            end
             bones += inspection.boneCount
             socketCount += inspection.socketCount
             for _, name in inspection.missingSockets do

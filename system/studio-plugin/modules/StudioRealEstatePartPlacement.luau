@@ -58,43 +58,59 @@ local function close(a: number, b: number, tolerance: number): boolean
     return math.abs(a - b) <= tolerance
 end
 
--- New authoring version: every centre is measured from house_armature pivot,
--- not from a special visual mesh or mesh bounding-box centre.
-function Placement.AlignOrigin(rig: Model, mesh: MeshPart, originalPivot: CFrame,
+-- v3 geometry-centre metadata describes the Blender-authored bounds, NOT
+-- the imported MeshPart.Position. Roblox may retain an offset inside the
+-- published mesh while its part pivot is already the common house origin.
+-- Never compare those two positions or recenter by an AABB: both can move
+-- correctly authored walls away from the house. This stage changes ONLY
+-- PivotOffset metadata, not MeshPart.CFrame or the authored vertices.
+function Placement.AlignOrigin(rig: Model, mesh: MeshPart, housePivot: CFrame,
     authored: any, part: string): boolean
-    if typeof(authored)~="table" or authored.version~=3 then
-        error("Real Estate "..part..": new origin placement manifest missing")
+    if typeof(authored) ~= "table" or authored.version ~= 3 then
+        error("Real Estate " .. part .. ": verified shared-house placement is required")
     end
-    local center=triple(authored.centerInPivot,part.." centre in author pivot")
-    local size=triple(authored.size,part.." size")
-    if size.X<=0 or size.Y<=0 or size.Z<=0 then error("invalid authored size") end
-    -- Roblox import can recenter a MeshPart while preserving root Bone rest
-    -- positions. Rebase its root attachments when that happens, as in M184.
-    local target=originalPivot:PointToWorldSpace(center)
-    local delta=target-mesh.Position
-    if delta.Magnitude<=0.025 then return false end
-    local roots={}
-    local boneCount=0
-    for _,item in rig:GetDescendants() do
-        if item:IsA("Bone") then boneCount+=1
-        elseif item:IsA("BasePart") and item~=mesh then
-            error("Cannot rebase multi-mesh Real Estate rig "..part)
+    -- Preserve strict contract validation but do not enforce an unchanged
+    -- bounding-box centre/size on a deliberately revised static FBX.
+    triple(authored.centerInPivot, part .. " centre in house pivot")
+    local declaredSize = triple(authored.size, part .. " size")
+    if declaredSize.X <= 0 or declaredSize.Y <= 0 or declaredSize.Z <= 0 then
+        error("Real Estate " .. part .. ": invalid authored size")
+    end
+    if mesh.Parent == nil or not mesh:IsDescendantOf(rig) then
+        error("Real Estate " .. part .. ": source MeshPart is outside the published Model")
+    end
+    local count = 0
+    for _, descendant in rig:GetDescendants() do
+        if descendant:IsA("BasePart") then count += 1 end
+        if descendant:IsA("Bone") then
+            error("Real Estate " .. part .. ": static source unexpectedly contains Bone")
         end
     end
-    for _,child in mesh:GetChildren() do
-        if child:IsA("Attachment") then
-            table.insert(roots,{bone=child,world=child.WorldCFrame})
+    if count ~= 1 then
+        error("Real Estate " .. part .. ": standalone static Model must contain exactly one BasePart")
+    end
+    for _, axis in {"X", "Y", "Z"} do
+        local actual = mesh.Size[axis]
+        if actual ~= actual or actual == math.huge or actual <= 0 then
+            error("Real Estate " .. part .. ": imported MeshPart has invalid dimensions")
         end
     end
-    if boneCount>0 then
-        if #roots==0 then error(part..": skinned mesh has no root attachments") end
-        mesh.CFrame=CFrame.new(delta)*mesh.CFrame
-        for _,entry in roots do
-            entry.bone.CFrame=mesh.CFrame:ToObjectSpace(entry.world)
-        end
-    else
-        rig:PivotTo(CFrame.new(delta)*rig:GetPivot())
+    local originalFrame = mesh.CFrame
+    -- Shared pivot is metadata: setting it must not translate the wall or
+    -- move sockets/attachments/vertices (including mesh-local offsets).
+    mesh.PivotOffset = originalFrame:ToObjectSpace(housePivot)
+    if not Placement.SamePivot(mesh:GetPivot(), housePivot) then
+        error("Real Estate " .. part .. ": MeshPart and rig_carrier pivots differ")
     end
+    rig.PrimaryPart = mesh
+    if not Placement.SamePivot(rig:GetPivot(), housePivot) then
+        error("Real Estate " .. part .. ": Model and rig_carrier pivots differ")
+    end
+    if not Placement.SamePivot(mesh.CFrame, originalFrame) then
+        error("Real Estate " .. part .. ": unexpected change to imported mesh transform")
+    end
+    rig:SetAttribute("Game1AuthoredPlacementMode", "static-shared-pivot")
+    rig:SetAttribute("Game1AuthoredPlacementVersion", 3)
     return true
 end
 

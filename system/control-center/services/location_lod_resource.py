@@ -1,23 +1,21 @@
-"""Independent Location Asset LOD1 authoring and Open Cloud publication.
+"""Location Asset LOD1: own FBX publication or reuse of a published Model ID.
 
-No Studio/Place mutation, no implicit FULL publication, and no additional
-client payload until a future World Streaming implementation consumes the ID.
+No Studio/Place mutation and no implicit FULL publication. The existing
+Runtime Builder / LocationWorldStreamer consumes the pinned published ID.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
 import re
-import shutil
 import time
 
-from model_publication_service import staged_model
-from opencloud_assets import create_model_asset, wait_for_operation
+from services.model_lod_common import (inspect_fbx, preserve_source, publish_geometry,
+    check_revision, describe_resource, verified_source, reuse_values)
 from sqlite_connection import connect as connect_sqlite
 
 _SLUG = re.compile(r'[a-z0-9][a-z0-9_]{0,63}\Z')
 _KIND = 'lod1'
-_MAX_FBX_BYTES = 200 * 1024 * 1024
 
 
 def _identity(slug: str) -> str:
@@ -30,7 +28,9 @@ def ensure_schema(store) -> None:
     """Additive schema; pre-upgrade snapshot if the table does not exist."""
     with store.connect() as db:
         found = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='location_asset_lod_resources'").fetchone()
-        if not found:
+        columns = ({r[1] for r in db.execute('PRAGMA table_info(location_asset_lod_resources)')}
+                   if found else set())
+        if not found or not {'reuse_domain','reuse_slug','reuse_revision'}.issubset(columns):
             backup_dir = store.runtime / 'backups'
             backup_dir.mkdir(parents=True, exist_ok=True)
             backup = backup_dir / ('location_lod_before_' +
@@ -50,6 +50,12 @@ def ensure_schema(store) -> None:
             published_at REAL,
             PRIMARY KEY(asset_slug,kind)
         )''')
+        for name, definition in (('reuse_domain', "TEXT NOT NULL DEFAULT ''"),
+                                 ('reuse_slug', "TEXT NOT NULL DEFAULT ''"),
+                                 ('reuse_revision', 'INTEGER NOT NULL DEFAULT 0')):
+            existing = {r[1] for r in db.execute('PRAGMA table_info(location_asset_lod_resources)')}
+            if name not in existing:
+                db.execute(f'ALTER TABLE location_asset_lod_resources ADD COLUMN {name} {definition}')
 
 
 def describe(store, slug: str) -> dict:
@@ -57,20 +63,7 @@ def describe(store, slug: str) -> dict:
     with store.connect() as db:
         row = db.execute('SELECT * FROM location_asset_lod_resources WHERE asset_slug=? AND kind=?',
                          (slug, _KIND)).fetchone()
-    if row is None:
-        return {'kind': _KIND, 'revision': 0, 'status': 'NOT_REGISTERED',
-                'sourcePath': '', 'sourceSha256': '', 'publishedSha256': '',
-                'modelAssetId': '', 'moderationState': ''}
-    row = dict(row)
-    source = (store.root / row['source_path']).resolve()
-    available = source.is_file() and source.is_relative_to(store.root)
-    status = ('SOURCE_MISSING' if not available else
-              'PUBLISHED' if row['asset_id'] and row['source_sha256'] == row['published_sha256'] else
-              'UPDATE_AVAILABLE' if row['asset_id'] else 'STAGED')
-    return {'kind': _KIND, 'revision': int(row['revision']), 'status': status,
-            'sourcePath': row['source_path'], 'sourceSha256': row['source_sha256'],
-            'publishedSha256': row['published_sha256'], 'modelAssetId': row['asset_id'],
-            'moderationState': row['moderation_state']}
+    return describe_resource(row, store.root, kind=_KIND)
 
 
 def history(store, slug: str, limit: int = 20) -> list[dict]:
@@ -92,45 +85,17 @@ def stage(store, slug: str, source_path: str, expected_revision: int) -> dict:
     full = store._raw_get(slug)
     if not full:
         raise ValueError('unknown Location Asset')
-    source = Path(str(source_path or '')).expanduser().resolve()
-    if not source.is_file() or source.suffix.lower() != '.fbx':
-        raise ValueError('choose a valid LOD1 FBX source')
-    expected_name = f'{slug}_lod1.fbx'
-    if source.name != expected_name:
-        raise ValueError(f'LOD1 filename must be {expected_name}; rename the source FBX before registration')
-    if not 0 < source.stat().st_size <= _MAX_FBX_BYTES:
-        raise ValueError('LOD1 FBX file is empty or exceeds 200 MB')
-    # File picker can return renamed files. Reject non-FBX payloads before
-    # recording a new authoring revision (deep geometry checks occur on publish).
-    with source.open('rb') as stream:
-        header = stream.read(4096)
-    if not (header.startswith(b'Kaydara FBX Binary') or b'FBXHeaderExtension' in header):
-        raise ValueError('LOD1 source is not a recognizable binary or ASCII FBX')
-    sha = store._sha256(source)
+    source, sha = inspect_fbx(source_path, f'{slug}_lod1.fbx')
     current = describe(store, slug)
-    if current['revision'] != expected_revision:
-        raise ValueError('LOD1 changed since editor opened; refresh')
-    if current['sourceSha256'] == sha and current['status'] != 'SOURCE_MISSING':
+    check_revision(expected_revision, current['revision'])
+    if current['sourceSha256'] == sha and current['status'] != 'SOURCE_MISSING' and not current['reuse']:
         return current  # Idempotent: keep publication and revision.
     # The source is immutable per authoring revision and never shares the FULL FBX.
     target = (store.root / 'assets/source/location-assets' /
               str(full['category']) / slug / 'lod' / 'lod1.fbx')
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if source != target.resolve():
-        if target.is_file():
-            archive = (store.root / 'assets/reimported/location-assets' / slug /
-                       f'lod1_r{expected_revision:04d}' / 'lod1.fbx')
-            archive.parent.mkdir(parents=True, exist_ok=True)
-            if not archive.exists():
-                shutil.copy2(target, archive)
-        staged = target.with_name(target.name + '.tmp')
-        try:
-            shutil.copy2(source, staged)
-            if store._sha256(staged) != sha:
-                raise RuntimeError('LOD1 copy checksum mismatch')
-            staged.replace(target)
-        finally:
-            staged.unlink(missing_ok=True)
+    archive = (store.root / 'assets/reimported/location-assets' / slug /
+               f'lod1_r{expected_revision:04d}' / 'lod1.fbx')
+    preserve_source(source, target, archive, sha)
     relative = target.relative_to(store.root).as_posix()
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
@@ -142,7 +107,8 @@ def stage(store, slug: str, source_path: str, expected_revision: int) -> dict:
             asset_slug,kind,source_path,source_sha256,revision,updated_at)
             VALUES(?,?,?,?,?,?) ON CONFLICT(asset_slug,kind) DO UPDATE SET
             source_path=excluded.source_path,source_sha256=excluded.source_sha256,
-            revision=excluded.revision,updated_at=excluded.updated_at''',
+            revision=excluded.revision,updated_at=excluded.updated_at,
+            reuse_domain='',reuse_slug='',reuse_revision=0''',
             (slug, _KIND, relative, sha, expected_revision + 1, time.time()))
     store.export()
     return describe(store, slug)
@@ -156,23 +122,14 @@ def publish(store, slug: str, expected_revision: int, credentials: dict) -> dict
     if not full:
         raise ValueError('unknown Location Asset')
     data = describe(store, slug)
-    if data['revision'] != expected_revision:
-        raise ValueError('LOD1 revision changed; refresh')
+    check_revision(expected_revision, data['revision'])
     if data['status'] == 'PUBLISHED':
         return data  # Never republish identical bytes implicitly.
     if data['status'] not in {'STAGED', 'UPDATE_AVAILABLE'}:
         raise ValueError('stage a valid LOD1 FBX before publication')
-    path = (store.root / data['sourcePath']).resolve()
-    if not path.is_relative_to(store.root) or store._sha256(path) != data['sourceSha256']:
-        raise ValueError('LOD1 source changed; stage it again')
-    api_key = str(credentials.get('apiKey') or '')
-    with staged_model(store.root, path, texture_mode='geometry_only') as publication:
-        operation = create_model_asset(
-            publication, display_name=f'{slug}_lod1',
-            description=str(credentials.get('description') or 'game1 location LOD1'),
-            creator_type=str(credentials.get('creatorType') or ''),
-            creator_id=str(credentials.get('creatorId') or ''), api_key=api_key)
-    result = wait_for_operation(operation, api_key=api_key)
+    path = verified_source(store.root, data, digest=store._sha256)
+    result = publish_geometry(store.root, path, slug, credentials,
+                              description='game1 location LOD1')
     now = time.time()
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
@@ -193,3 +150,30 @@ def publish(store, slug: str, expected_revision: int, credentials: dict) -> dict
              data['sourceSha256'], result.moderation_state or '', now))
     store.export()
     return describe(store, slug)
+
+
+def reuse(store, slug: str, source: dict, expected_revision: int) -> dict:
+    # Pin an existing verified Open Cloud LOD1, not a mutable source record.
+    slug = _identity(slug)
+    if not store._raw_get(slug):
+        raise ValueError('unknown Location Asset')
+    with store.connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        old = db.execute('SELECT revision FROM location_asset_lod_resources WHERE asset_slug=? AND kind=?',
+                         (slug, _KIND)).fetchone()
+        pinned = reuse_values(source, 'location', slug, expected_revision, old['revision'] if old else 0)
+        db.execute('''INSERT INTO location_asset_lod_resources (
+            asset_slug,kind,source_path,source_sha256,published_sha256,asset_id,
+            moderation_state,revision,updated_at,published_at,reuse_domain,reuse_slug,reuse_revision)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(asset_slug,kind) DO UPDATE SET
+            source_path=excluded.source_path,source_sha256=excluded.source_sha256,
+            published_sha256=excluded.published_sha256,asset_id=excluded.asset_id,
+            moderation_state=excluded.moderation_state,revision=excluded.revision,
+            updated_at=excluded.updated_at,published_at=excluded.published_at,
+            reuse_domain=excluded.reuse_domain,reuse_slug=excluded.reuse_slug,
+            reuse_revision=excluded.reuse_revision''',
+            (slug,_KIND,'',pinned['source_sha256'],pinned['published_sha256'],
+             pinned['asset_id'],pinned['moderation_state'],pinned['revision'],
+             time.time(),time.time(),pinned['reuse_domain'],pinned['reuse_slug'],pinned['reuse_revision']))
+    store.export()
+    return describe(store,slug)

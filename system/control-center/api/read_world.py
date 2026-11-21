@@ -5,6 +5,15 @@ from services.shared_asset_retirement import SharedAssetRetirement
 
 def route(parsed, sources, info):
     path = parsed.path
+    if path == '/api/lod1-library':
+        try:
+            from services.lod_reuse_catalog import library
+            return 200, {'items': library({'location': sources['location_assets'],
+                                           'house': sources['real_estate'],
+                                           'house_part': sources['real_estate']})}
+        except (ValueError, OSError) as error:
+            return 400, {'error': str(error)}
+
     if path == "/api/lod-manager":
         try:
             return 200, sources["lod_manager"].overview()

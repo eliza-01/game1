@@ -1,5 +1,7 @@
 # M387 · Real Estate Runtime authoring (contract, not runtime activation)
 
+> **Исторический документ (M387).** Начиная с M414 этот контракт расстояний заменён: все `LOD1 from` / `Unloaded from` для отдельных MeshPart дома находятся только в `LOD Manager → 02 · LOD readiness → Real Estate`. Общих LOD-порогов дома и дистанций в редакторе Real Estate больше нет. См. `HOUSE_PART_DISTANCE_M414_RU.md`. Описания единого House LOD в документе ниже также устарели с M412.
+
 ## Ownership and status
 
 - `RealEstateStore` is authoritative for `house_levelN_variant`, its FULL mesh publications, independent per-MeshPart `distanceStreaming`/`loadDistanceStuds`, and appearance. These authoring settings were introduced before M387.

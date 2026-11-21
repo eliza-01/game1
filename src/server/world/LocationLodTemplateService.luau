@@ -158,17 +158,27 @@ function Service.Start()
             end
         end
         if manifest.houses then
-            -- Only one compact LOD1 template per house TYPE is replicated.
-            -- FULL house geometry is never staged in ReplicatedStorage.
+            local partIdsAttempted = {}
+            -- Each house part owns its visual geometry and appearance. Shared
+            -- source Model IDs can be reused without baking per-player colors.
             for slug, profile in manifest.houses.types do
                 if profile.mode == "lod1" then
-                    expected += 1
-                    local name = slug .. "__HOUSE_LOD1"
-                    local template = loadPrototype(tonumber(profile.lod1ModelAssetId), name)
-                    if template then
-                        template.Parent = cache
-                        count += 1
-                        cache:SetAttribute("Loaded", count)
+                    for _, spec in ipairs(profile.parts) do
+                        if spec.lod1ModelAssetId == "" then continue end
+                        local name = "__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId)
+                        -- One server prototype per immutable Model ID. Reused
+                        -- geometry is replicated once; owner color is applied
+                        -- only to each local client clone.
+                        if not partIdsAttempted[name] then
+                            partIdsAttempted[name] = true
+                            expected += 1
+                            local template = loadPrototype(tonumber(spec.lod1ModelAssetId), name)
+                            if template then
+                                template.Parent = cache
+                                count += 1
+                                cache:SetAttribute("Loaded", count)
+                            end
+                        end
                     end
                 end
             end

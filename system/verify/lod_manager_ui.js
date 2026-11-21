@@ -15,7 +15,8 @@ assert(html.includes('lod-prepare" type="button" disabled'), 'unsafe Prepare but
 const elements = new Map();
 const get = id => {
   if (!elements.has(id)) elements.set(id, {innerHTML:'', textContent:'', disabled:false, value:'',
-    addEventListener(type, handler) {this[`on_${type}`] = handler;}});
+    addEventListener(type, handler) {this[`on_${type}`] = handler;},
+    setAttribute(name,value) {this[name]=value;}});
   return elements.get(id);
 };
 const response = {

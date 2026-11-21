@@ -250,9 +250,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": true,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         }
       },
       "lod1": {
@@ -262,14 +260,32 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
+      },
+      "partLod1": {
+        "house": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        }
       },
       "runtimeProfile": {
         "mode": "full",
-        "lod1": 150,
-        "hide": 400,
-        "hysteresis": 10,
         "revision": 1
+      },
+      "partStreaming": {
+        "house": {
+          "part_name": "house",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        }
       },
       "textures": {
         "house": {
@@ -1480,9 +1496,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": true,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "door": {
           "appearanceMode": "atlas",
@@ -1493,9 +1507,7 @@
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
           "doubleSided": true,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
@@ -1506,9 +1518,7 @@
           "noCollide": false,
           "collisionFidelity": "PreciseConvexDecomposition",
           "doubleSided": true,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 50
+          "destructible": false
         }
       },
       "lod1": {
@@ -1518,14 +1528,64 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
+      },
+      "partLod1": {
+        "house": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "door": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "window_frames_glass": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        }
       },
       "runtimeProfile": {
         "mode": "off",
-        "lod1": 150,
-        "hide": 400,
-        "hysteresis": 10,
         "revision": 0
+      },
+      "partStreaming": {
+        "house": {
+          "part_name": "house",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "door": {
+          "part_name": "door",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "window_frames_glass": {
+          "part_name": "window_frames_glass",
+          "lod1": 50,
+          "hide": 400,
+          "revision": 1
+        }
       },
       "textures": {
         "door": {
@@ -3374,9 +3434,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "door": {
           "appearanceMode": "atlas",
@@ -3387,9 +3445,7 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "restoration": {
           "appearanceMode": "atlas",
@@ -3400,9 +3456,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
@@ -3413,9 +3467,7 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 50
+          "destructible": false
         }
       },
       "lod1": {
@@ -3425,14 +3477,80 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
+      },
+      "partLod1": {
+        "house": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "door": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "restoration": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "window_frames_glass": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        }
       },
       "runtimeProfile": {
         "mode": "off",
-        "lod1": 150,
-        "hide": 400,
-        "hysteresis": 10,
         "revision": 0
+      },
+      "partStreaming": {
+        "house": {
+          "part_name": "house",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "door": {
+          "part_name": "door",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "restoration": {
+          "part_name": "restoration",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "window_frames_glass": {
+          "part_name": "window_frames_glass",
+          "lod1": 50,
+          "hide": 400,
+          "revision": 1
+        }
       },
       "textures": {
         "door": {
@@ -5623,9 +5741,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "door": {
           "appearanceMode": "atlas",
@@ -5636,9 +5752,7 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "restoration": {
           "appearanceMode": "atlas",
@@ -5649,9 +5763,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
@@ -5662,9 +5774,7 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 50
+          "destructible": false
         }
       },
       "lod1": {
@@ -5674,14 +5784,80 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
+      },
+      "partLod1": {
+        "house": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "door": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "restoration": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "window_frames_glass": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        }
       },
       "runtimeProfile": {
         "mode": "off",
-        "lod1": 150,
-        "hide": 400,
-        "hysteresis": 10,
         "revision": 0
+      },
+      "partStreaming": {
+        "house": {
+          "part_name": "house",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "door": {
+          "part_name": "door",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "restoration": {
+          "part_name": "restoration",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "window_frames_glass": {
+          "part_name": "window_frames_glass",
+          "lod1": 50,
+          "hide": 400,
+          "revision": 1
+        }
       },
       "textures": {
         "door": {
@@ -6352,9 +6528,9 @@
       "model_asset_id": "94882722542367",
       "model_published_hash": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
       "model_moderation": "Approved",
-      "revision": 27,
+      "revision": 35,
       "created_at": 1795087964.5584087,
-      "updated_at": 1795274267.4897075,
+      "updated_at": 1795281650.0315607,
       "skeleton": {
         "schemaVersion": 1,
         "meshes": [
@@ -14190,626 +14366,9 @@
           },
           {
             "name": "walls_outside",
-            "armature": "house_armature",
-            "vertices": 117,
-            "bones": [
-              {
-                "name": "chest_01_socket",
-                "parent": "",
-                "matrixLocal": [
-                  -0.9999838,
-                  0.0056925,
-                  4e-07,
-                  11.8586454,
-                  -0.0056925,
-                  -0.9999838,
-                  0.0,
-                  -5.0847425,
-                  4e-07,
-                  0.0,
-                  1.0,
-                  15.4599781,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "chimney_01_socket",
-                "parent": "",
-                "matrixLocal": [
-                  -2e-07,
-                  0.0,
-                  1.0,
-                  -7.7430139,
-                  -1.0,
-                  0.0,
-                  -2e-07,
-                  -4.3261986,
-                  0.0,
-                  -0.9999999,
-                  0.0,
-                  36.3581352,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "door_01_handle_inside_socket",
-                "parent": "door_01_hinge_socket",
-                "matrixLocal": [
-                  -2e-07,
-                  1.0,
-                  -0.0,
-                  9.9857435,
-                  -1.0,
-                  -2e-07,
-                  -5e-07,
-                  -1.7686105,
-                  -5e-07,
-                  0.0,
-                  1.0,
-                  7.8873286,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "door_01_handle_outside_socket",
-                "parent": "door_01_hinge_socket",
-                "matrixLocal": [
-                  -0.0,
-                  -0.9999999,
-                  -2e-07,
-                  10.6015425,
-                  -1.2e-06,
-                  2e-07,
-                  -1.0,
-                  -1.7816439,
-                  1.0,
-                  0.0,
-                  -1.2e-06,
-                  7.8442736,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "door_01_hinge_socket",
-                "parent": "",
-                "matrixLocal": [
-                  3e-07,
-                  0.0,
-                  1.0,
-                  10.3042297,
-                  1.0,
-                  0.0,
-                  -3e-07,
-                  3.032764,
-                  0.0,
-                  1.0,
-                  0.0,
-                  8.1631947,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "door_01_padlock_01_inside_socket",
-                "parent": "door_01_hinge_socket",
-                "matrixLocal": [
-                  0.0698972,
-                  0.8012637,
-                  0.594215,
-                  10.0082703,
-                  -0.9967198,
-                  0.0804562,
-                  0.0087534,
-                  -2.6853237,
-                  -0.0407944,
-                  -0.592878,
-                  0.8042592,
-                  7.739336,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "door_01_padlock_01_outside_socket",
-                "parent": "door_01_hinge_socket",
-                "matrixLocal": [
-                  -0.0698966,
-                  -0.8012633,
-                  -0.5942159,
-                  10.6140795,
-                  0.9967197,
-                  -0.0804562,
-                  -0.0087521,
-                  -2.6372418,
-                  -0.0407956,
-                  -0.5928778,
-                  0.8042586,
-                  7.7110653,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "elevator_01_socket",
-                "parent": "",
-                "matrixLocal": [
-                  0.5013476,
-                  -0.865246,
-                  -1e-07,
-                  -8.1960087,
-                  0.865246,
-                  0.5013477,
-                  -2e-07,
-                  11.3920679,
-                  2e-07,
-                  0.0,
-                  1.0,
-                  12.0593195,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "elevator_02_socket",
-                "parent": "",
-                "matrixLocal": [
-                  3e-07,
-                  0.0,
-                  1.0,
-                  -3.7563641,
-                  1.0,
-                  0.0,
-                  -3e-07,
-                  10.4720802,
-                  0.0,
-                  1.0,
-                  0.0,
-                  15.9028645,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "fireplace_01_socket",
-                "parent": "",
-                "matrixLocal": [
-                  -0.7509882,
-                  -0.6602836,
-                  -0.0065374,
-                  -7.0018525,
-                  0.6603053,
-                  -0.7509951,
-                  -0.0017786,
-                  -3.3113842,
-                  -0.0037352,
-                  -0.0056524,
-                  0.9999771,
-                  4.7449961,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "house_floor_01_spawn_socket",
-                "parent": "",
-                "matrixLocal": [
-                  -0.1917388,
-                  0.981446,
-                  0.0,
-                  3.4470458,
-                  -0.981446,
-                  -0.1917388,
-                  0.0,
-                  2.1228006,
-                  0.0,
-                  0.0,
-                  1.0,
-                  3.7623057,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "house_floor_02_spawn_socket",
-                "parent": "",
-                "matrixLocal": [
-                  0.7571232,
-                  0.1626849,
-                  -0.6326911,
-                  3.84307,
-                  -0.1248356,
-                  0.9866781,
-                  0.104319,
-                  10.7186193,
-                  0.6412336,
-                  0.0,
-                  0.7673458,
-                  15.4784203,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_01",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  -3.7750564,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -15.0000286,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  17.0502262,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_010",
-                "parent": "",
-                "matrixLocal": [
-                  0.0,
-                  -1.0,
-                  0.0,
-                  11.3826141,
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  7.739881,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  7.3221364,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_011",
-                "parent": "",
-                "matrixLocal": [
-                  0.0,
-                  -1.0,
-                  0.0,
-                  11.3826141,
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  10.2734833,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  7.3221364,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_012",
-                "parent": "",
-                "matrixLocal": [
-                  0.0,
-                  -1.0,
-                  0.0,
-                  11.3826141,
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  12.5041485,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  7.3221364,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_013",
-                "parent": "",
-                "matrixLocal": [
-                  0.0,
-                  -1.0,
-                  0.0,
-                  19.0518589,
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  2.000248,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  23.4020042,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_014",
-                "parent": "",
-                "matrixLocal": [
-                  0.0,
-                  -1.0,
-                  0.0,
-                  19.0518589,
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  3.2333255,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  23.4020042,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_015",
-                "parent": "",
-                "matrixLocal": [
-                  -0.9996721,
-                  0.0,
-                  0.0256092,
-                  2.8980086,
-                  0.0,
-                  -1.0,
-                  0.0,
-                  19.5633335,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  5.7985511,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_02",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  -2.002552,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -15.0000286,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  17.0502262,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_03",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  -0.1250969,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -15.0000286,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  17.0502262,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_04",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  6.0651908,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -15.0000286,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  17.0502262,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_05",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  8.123271,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -15.0000286,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  17.0502262,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_06",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  10.0262156,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -15.0000286,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  17.0502262,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_07",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  -1.6862068,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -8.6664934,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  7.2375703,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_08",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  1.0763035,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -8.6664934,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  7.2375703,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "houseplant_09",
-                "parent": "",
-                "matrixLocal": [
-                  0.9996721,
-                  0.0,
-                  -0.0256092,
-                  3.8437562,
-                  0.0,
-                  1.0,
-                  0.0,
-                  -8.6664934,
-                  0.0256092,
-                  0.0,
-                  0.9996721,
-                  7.2375703,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "land_spawn_01_socket",
-                "parent": "",
-                "matrixLocal": [
-                  0.0259335,
-                  0.9996638,
-                  0.0,
-                  30.8049507,
-                  -0.0,
-                  -0.0,
-                  1.0,
-                  -8.4463863,
-                  0.9996638,
-                  -0.0259336,
-                  0.0,
-                  0.0961208,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              }
-            ],
+            "armature": "",
+            "vertices": 118,
+            "bones": [],
             "influencedBones": [],
             "authoredPlacement": {
               "version": 3,
@@ -17284,7 +16843,12 @@
         "window_frames_glass",
         "wooden_structures"
       ],
-      "meshSources": {},
+      "meshSources": {
+        "walls_outside": {
+          "path": "assets/source/real-estate/house_level5_01/mesh-revisions/walls_outside/8eea28abb074787e43aac4cde09f5b3ffdb9ad455e706fb093fc6c00a63dd5c0.fbx",
+          "sha256": "8eea28abb074787e43aac4cde09f5b3ffdb9ad455e706fb093fc6c00a63dd5c0"
+        }
+      },
       "rigSourceHashes": {
         "chimney": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
         "door": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
@@ -17298,7 +16862,7 @@
         "roof": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
         "stone_structures": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
         "walls_inside": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
-        "walls_outside": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
+        "walls_outside": "8eea28abb074787e43aac4cde09f5b3ffdb9ad455e706fb093fc6c00a63dd5c0",
         "window_frames": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
         "window_frames_glass": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
         "wooden_structures": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1"
@@ -17316,7 +16880,7 @@
         "roof": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300",
         "stone_structures": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300",
         "walls_inside": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300",
-        "walls_outside": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300",
+        "walls_outside": "f3397dc63ffa7490f0e0b9a65692c105f64456cdebe97dc202fb566a56960517",
         "window_frames": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300",
         "window_frames_glass": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300",
         "wooden_structures": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300",
@@ -17332,9 +16896,7 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "door": {
           "appearanceMode": "material",
@@ -17345,9 +16907,7 @@
           "noCollide": false,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "door_handles": {
           "appearanceMode": "material",
@@ -17358,9 +16918,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 40
+          "destructible": false
         },
         "fireplace": {
           "appearanceMode": "material",
@@ -17371,9 +16929,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 40
+          "destructible": false
         },
         "floors": {
           "appearanceMode": "material",
@@ -17384,9 +16940,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "flowerbed": {
           "appearanceMode": "material",
@@ -17397,9 +16951,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "foundation": {
           "appearanceMode": "material",
@@ -17410,9 +16962,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "ground": {
           "appearanceMode": "material",
@@ -17423,9 +16973,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 30
+          "destructible": false
         },
         "plants": {
           "appearanceMode": "atlas",
@@ -17436,9 +16984,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "roof": {
           "appearanceMode": "material",
@@ -17449,9 +16995,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "stone_structures": {
           "appearanceMode": "material",
@@ -17462,9 +17006,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "walls_inside": {
           "appearanceMode": "material",
@@ -17475,9 +17017,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 40
+          "destructible": false
         },
         "walls_outside": {
           "appearanceMode": "material",
@@ -17488,9 +17028,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "window_frames": {
           "appearanceMode": "material",
@@ -17501,9 +17039,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "window_frames_glass": {
           "appearanceMode": "material_atlas",
@@ -17514,9 +17050,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": true,
-          "destructible": false,
-          "distanceStreaming": true,
-          "loadDistanceStuds": 50
+          "destructible": false
         },
         "wooden_structures": {
           "appearanceMode": "material",
@@ -17527,9 +17061,7 @@
           "noCollide": true,
           "collisionFidelity": "Box",
           "doubleSided": false,
-          "destructible": false,
-          "distanceStreaming": false,
-          "loadDistanceStuds": 50
+          "destructible": false
         }
       },
       "lod1": {
@@ -17539,14 +17071,272 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
+      },
+      "partLod1": {
+        "chimney": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "door": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "door_handles": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "fireplace": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "floors": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "flowerbed": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "foundation": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "ground": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "plants": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "roof": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "stone_structures": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "walls_inside": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "walls_outside": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "window_frames": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "window_frames_glass": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        },
+        "wooden_structures": {
+          "revision": 0,
+          "status": "NOT_REGISTERED",
+          "sourcePath": "",
+          "sourceSha256": "",
+          "publishedSha256": "",
+          "modelAssetId": "",
+          "moderationState": "",
+          "reuse": null
+        }
       },
       "runtimeProfile": {
         "mode": "full",
-        "lod1": 150,
-        "hide": 400,
-        "hysteresis": 10,
         "revision": 1
+      },
+      "partStreaming": {
+        "chimney": {
+          "part_name": "chimney",
+          "lod1": 50,
+          "hide": 400,
+          "revision": 1
+        },
+        "door": {
+          "part_name": "door",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "door_handles": {
+          "part_name": "door_handles",
+          "lod1": 40,
+          "hide": 400,
+          "revision": 1
+        },
+        "fireplace": {
+          "part_name": "fireplace",
+          "lod1": 40,
+          "hide": 400,
+          "revision": 1
+        },
+        "floors": {
+          "part_name": "floors",
+          "lod1": 50,
+          "hide": 400,
+          "revision": 1
+        },
+        "flowerbed": {
+          "part_name": "flowerbed",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "foundation": {
+          "part_name": "foundation",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "ground": {
+          "part_name": "ground",
+          "lod1": 30,
+          "hide": 400,
+          "revision": 1
+        },
+        "plants": {
+          "part_name": "plants",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "roof": {
+          "part_name": "roof",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "stone_structures": {
+          "part_name": "stone_structures",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "walls_inside": {
+          "part_name": "walls_inside",
+          "lod1": 40,
+          "hide": 400,
+          "revision": 1
+        },
+        "walls_outside": {
+          "part_name": "walls_outside",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "window_frames": {
+          "part_name": "window_frames",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        },
+        "window_frames_glass": {
+          "part_name": "window_frames_glass",
+          "lod1": 50,
+          "hide": 400,
+          "revision": 1
+        },
+        "wooden_structures": {
+          "part_name": "wooden_structures",
+          "lod1": 150,
+          "hide": 400,
+          "revision": 1
+        }
       },
       "textures": {
         "chimney": {
@@ -18081,12 +17871,12 @@
           "publishedSha256": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300"
         },
         "walls_inside": {
-          "assetId": "127716865198879",
+          "assetId": "126584379151517",
           "publishedSha256": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300"
         },
         "walls_outside": {
-          "assetId": "76514050293314",
-          "publishedSha256": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300"
+          "assetId": "88736228304446",
+          "publishedSha256": "f3397dc63ffa7490f0e0b9a65692c105f64456cdebe97dc202fb566a56960517"
         },
         "window_frames": {
           "assetId": "106488781873900",

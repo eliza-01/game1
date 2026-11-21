@@ -59,7 +59,8 @@ class HouseRuntimeAuthoringM387(unittest.TestCase):
             row=store.get(SLUG)
             self.assertEqual(row['lod1']['status'],'NOT_REGISTERED')
             self.assertEqual(row['runtimeProfile']['mode'],'off')
-            self.assertEqual(row['meshOptions']['window_frames_glass']['loadDistanceStuds'],50)
+            self.assertEqual(row['partStreaming']['window_frames_glass']['lod1'],150)
+            self.assertNotIn('loadDistanceStuds',row['meshOptions']['window_frames_glass'])
 
     def test_lod_stage_publish_profile_and_full_republication_guard(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -68,7 +69,7 @@ class HouseRuntimeAuthoringM387(unittest.TestCase):
             house(store)
             fbx=root/(SLUG+'_lod1.fbx')
             fbx.write_bytes(b'Kaydara FBX Binary  \x00\x1a\x00' + b'x'*40)
-            with self.assertRaisesRegex(ValueError,'Publish House LOD1'):
+            with self.assertRaisesRegex(ValueError,'per-part LOD1'):
                 store.save_runtime_profile(SLUG,{**DEFAULT,'mode':'lod1'},0)
             lod=store.stage_lod1(SLUG,str(fbx),0)
             self.assertEqual(lod['status'],'STAGED')
@@ -89,13 +90,25 @@ class HouseRuntimeAuthoringM387(unittest.TestCase):
             self.assertEqual(lod['status'],'PUBLISHED')
             self.assertEqual(lod['modelAssetId'],'900123')
             self.assertEqual(store.lod1_history(SLUG)[0]['asset_id'],'900123')
-            with store.connect() as db:
-                db.execute('UPDATE real_estate SET mesh_options_json=? WHERE slug=?',
-                           (json.dumps({'window_frames_glass':{'distanceStreaming':True,'loadDistanceStuds':160}}),SLUG))
-            with self.assertRaisesRegex(ValueError,'window_frames_glass'):
+            # Legacy whole-house LOD1 does NOT enable color-preserving runtime.
+            with self.assertRaisesRegex(ValueError,'per-part LOD1'):
                 store.save_runtime_profile(SLUG,{**DEFAULT,'mode':'lod1'},0)
-            with store.connect() as db:
-                db.execute('UPDATE real_estate SET mesh_options_json=? WHERE slug=?', ('{}',SLUG))
+            part_file=root/(SLUG+'_window_frames_glass_lod1.fbx')
+            part_file.write_bytes(b'Kaydara FBX Binary  \x00\x1a\x00' + b'p'*40)
+            part_lod=store.stage_part_lod1(SLUG,'window_frames_glass',str(part_file),0)
+            with patch('services.house_part_lod_resource.publish_geometry',
+                       return_value=SimpleNamespace(asset_id='900456',moderation_state='APPROVED')):
+                part_lod=store.publish_part_lod1(SLUG,'window_frames_glass',part_lod['revision'],{})
+            self.assertEqual(part_lod['status'],'PUBLISHED')
+            # Per-part cutoff is owned only by LOD Manager, independent
+            # of the Real Estate mesh appearance JSON.
+            part_settings=store.get(SLUG)['partStreaming']['window_frames_glass']
+            with self.assertRaisesRegex(ValueError,'room for shared hysteresis'):
+                store.save_part_distances(SLUG,'window_frames_glass',
+                                          {'lod1':160,'hide':175},part_settings['revision'])
+            saved=store.save_part_distances(SLUG,'window_frames_glass',
+                                            {'lod1':160,'hide':400},part_settings['revision'])
+            self.assertEqual(saved['lod1'],160)
             settings=store.save_runtime_profile(SLUG,{**DEFAULT,'mode':'lod1'},0)
             self.assertEqual(settings['revision'],1)
             with self.assertRaisesRegex(ValueError,'changed'):
@@ -133,10 +146,13 @@ class HouseRuntimeAuthoringM387(unittest.TestCase):
         html=(ROOT/'system/control-center/static/index.html').read_text()
         client=(ROOT/'src/client/world/LocationWorldStreamer.luau').read_text()
         self.assertIn('id="real-estate-runtime-panel"',html)
-        self.assertIn('real-estate.js?v=385a&visual=386',html)
-        self.assertIn('distanceStreaming:realEstateState.distance[part]?.enabled===true',js)
-        self.assertIn('/lod1-publish',js)
-        self.assertIn('FULL mesh distance must be below LOD1:',js)
+        self.assertRegex(html,r'real-estate\.js\?v=385a&visual=\d+')
+        self.assertNotIn('realEstateState.distance',js)
+        self.assertIn('data-part-distance=\"lod1\"', (ROOT/'system/control-center/static/lod-manager.js').read_text())
+        self.assertIn('/lod1-publish',(ROOT/'system/control-center/static/lod-manager.js').read_text())
+        self.assertIn('LOD Manager → 02 · LOD readiness',js)
+        self.assertNotIn('id="re-runtime-save"',js)
+        self.assertIn('async function savePartDistances', (ROOT/'system/control-center/static/lod-manager.js').read_text())
         self.assertEqual(client.count('RunService.Heartbeat:Connect'),1)
 
 if __name__=='__main__':unittest.main()

@@ -41,14 +41,19 @@ function realEstateMeshWorkflowRender(){
   const rig=row.rigAssets?.[part]||{};
   const texture=row.textures?.[part]||{};
   const published=Boolean(rig.assetId);
-  const current=published && rig.publishedSha256===row.rigSourceHashes?.[part];
+  // Model publication hashes are fingerprints, not the raw source FBX SHA.
+  // Compare to the same canonical value used by RealEstateStore and Studio Sync.
+  const current=published && rig.publishedSha256===row.rigPublicationHashes?.[part];
+  const syncReady=current && row.status==='PUBLISHED';
+  const authored=row.meshSources?.[part];
   const busy=realEstateMeshWorkflow.busy||realEstateMeshWorkflow.atlas.busy||
     realEstatePublicationBusy(row.slug)||realEstateState.atlasBusy;
   const tabs=[{id:'model',label:'Model · FBX'},{id:'texture',label:'Texture · atlas'}];
   const model=window.game1AssetWorkflowDialog.step('Model · FBX',
     'Replace the FBX of this mesh only. Other models and images stay unchanged.',
     `<small class="deco-manage-value">${esc(row.meshSources?.[part]?'Independent FBX revision':'Original house FBX')}</small>`+
-    `<div class="shared-model-state"><small>Roblox Model ID: <strong>${esc(rig.assetId||'Not published')}</strong></small></div>`+
+    `<div class="shared-model-state"><small>Roblox Model ID: <strong>${esc(rig.assetId||'Not published')}</strong></small>`+
+    `<small> · Source: ${esc(authored?.path?'Independent mesh FBX':'Original house FBX')}</small></div>`+
     `<div class="actions"><button type="button" data-mw-replace ${busy?'disabled':''}>Choose replacement FBX</button>`+
     `<button type="button" data-mw-publish ${busy||!realEstateState.data?.publication?.configured||current?'disabled':''}>Publish changed Model</button></div>`,
     current?'Published':'Publication required',current?'ready':'pending');
@@ -58,8 +63,9 @@ function realEstateMeshWorkflowRender(){
     catalog:realEstateState.data?.atlasCatalog||[],busy});
   const footer=window.game1AssetWorkflowDialog.step('Studio Sync',
     'Explicitly synchronize this mesh Model and Atlas to ServerStorage and managed placed houses. This action is independent of the editor tab.',
-    `<div class="actions"><button type="button" data-mw-sync ${busy||!current?'disabled':''}>Sync Model + Atlas · Studio</button></div>`,
-    current?'Ready':'Publish Model first',current?'ready':'pending');
+    `<div class="actions"><button type="button" data-mw-sync ${busy||!syncReady?'disabled':''}>Sync Model + Atlas · Studio</button></div>`,
+    !current?'Publish Model first':syncReady?'Ready':'Finish publishing remaining house assets',
+    syncReady?'ready':'pending');
   dialog.innerHTML=`<div class="real-estate-mesh-dialog-head"><div><small class="eyebrow">${esc(row.slug)} · mesh</small>`+
     `<h3>${esc(part)}</h3></div><button type="button" data-mw-close aria-label="Close">✕</button></div>`+
     `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">`+
@@ -73,20 +79,32 @@ function realEstateMeshWorkflowRender(){
   const bind=(key,handler)=>{const button=dialog.querySelector(`[data-mw-${key}]`);if(button)button.onclick=handler;};
   bind('replace',()=>realEstateMeshWorkflowRun('Replacing FBX',async()=>{
     const saved=await realEstateReplaceMesh(row,part);
-    realEstateMeshWorkflowMessage(saved?'FBX revision saved. Publish changed Model before Studio Sync.':
+    realEstateMeshWorkflowMessage(saved?'FBX revision saved for '+part+'. Publish this Model before Studio Sync.':
       'No FBX revision was saved. Check the source selection.');
   }));
   bind('publish',()=>realEstateMeshWorkflowRun('Starting Model publication',async()=>{
-    realEstateForm(realEstateRows().find(item=>item.slug===row.slug));
+    const fresh=realEstateMeshWorkflowCurrent().row;
+    if(!fresh || !fresh.meshParts?.includes(part))throw new Error('Mesh selection changed; refresh the house');
+    if(fresh.rigAssets?.[part]?.publishedSha256===fresh.rigPublicationHashes?.[part]){
+      realEstateMeshWorkflowMessage('This mesh publication is already current. Studio Sync is available.');
+      return;
+    }
+    if(realEstateState.selected!==row.slug)throw new Error('Selected house changed; reopen Manage Mesh');
     const result=await realEstatePublish('model:'+part);
-    realEstateMeshWorkflowMessage(result?'Model publication started. Review publication status before Studio Sync.':
+    realEstateMeshWorkflowMessage(result?'Publishing '+part+' · Studio Sync unlocks after the new Model ID is confirmed.':
       'Model publication did not start. Inspect the publication panel.',!result);
   }));
   bind('sync',()=>realEstateMeshWorkflowRun('Synchronizing Model and Atlas',async()=>{
     const result=await realEstateSync(row.slug,part,{throwOnError:true});
     const stats=result?.studio?.realEstateStats||{};
-    realEstateMeshWorkflowMessage(`Studio Sync complete · placed houses ${Number(stats.workspaceModelsUpdated||0)}/${Number(stats.workspaceModelsFound||0)}`+
-      ((stats.rigWarnings||[]).length?` · ${stats.rigWarnings.join(' | ')}`:''),Boolean((stats.rigWarnings||[]).length));
+    const found=Number(stats.workspaceModelsFound||0);
+    const updated=Number(stats.workspaceModelsUpdated||0);
+    const warnings=stats.rigWarnings||[];
+    const incomplete=found===0||updated<found||warnings.length>0;
+    realEstateMeshWorkflowMessage((incomplete?'Studio template updated; placed-house Sync incomplete':'Studio Sync complete')+
+      ` · placed houses ${updated}/${found}`+
+      (found===0?' · no managed house instances found':'')+
+      (warnings.length?` · ${warnings.join(' | ')}`:''),incomplete);
   }));
   if(realEstateMeshWorkflow.tab==='texture'){
     window.game1ConsumerAtlasEditor.wire(dialog,realEstateMeshWorkflow.atlas,{

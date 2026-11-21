@@ -17,6 +17,7 @@ from xml.etree import ElementTree as ET
 
 from .location_runtime_build import _name, _mesh_id, _cframe, _vector3
 from .house_runtime_profile import validate as validate_profile, readiness
+from .house_part_distances import validate as validate_part
 
 # Only a qualified, separately published house type can enter the runtime.
 MAX_HOUSES = 500
@@ -45,7 +46,7 @@ def build_inputs(houses, placements):
         profile = house.get('runtimeProfile') or {'mode':'off'}
         if profile.get('mode') == 'off':
             continue
-        values = validate_profile(slug, {k:profile[k] for k in ('mode','lod1','hide','hysteresis')})
+        values = validate_profile(slug, {'mode':profile['mode']})
         # Saved Plot pivots describe future spawn slots, not live instances.
         # Validate publication only for a type actually present in the XML.
         if len(plots[slug]) > 50:
@@ -189,7 +190,7 @@ def inspect(tree, selected):
         # The authoring XML is a snapshot of actual instances. A registered
         # Plot pivot is independent of whether a house currently occupies it.
         if rows:
-            blockers = readiness(house, item['profile'], house['lod1'])['warnings']
+            blockers = readiness(house, item['profile'], house.get('partLod1', {}))['warnings']
             if blockers:
                 raise ValueError(f'{slug}: ' + '; '.join(blockers))
         seen_plots=set()
@@ -238,20 +239,25 @@ def inspect(tree, selected):
                 cf=list(_cframe(mesh));size=list(_vector3(mesh,'Size'))
                 if not _numbers(cf,12) or not _numbers(size,3) or min(size)<=0:
                     raise ValueError(f'{slug}/{name}: invalid mesh geometry')
-                limit=opts.get('loadDistanceStuds',50) if opts.get('distanceStreaming') else item['profile']['lod1']
-                if type(limit) not in (float,int) or not math.isfinite(limit):
-                    raise ValueError(f'{slug}/{name}: invalid streaming distance')
-                # In FULL-only mode parts not explicitly bounded exist until
-                # house hide threshold; LOD1 forces ALL full meshes away.
-                if opts.get('distanceStreaming') is not True:
-                    limit=item['profile']['lod1'] if item['profile']['mode']=='lod1' else item['profile']['hide']
+                distances = (house.get('partStreaming') or {}).get(name)
+                if not distances:
+                    raise ValueError(f'{slug}/{name}: missing saved LOD Manager distances')
+                thresholds=validate_part({'lod1':distances['lod1'],'hide':distances['hide']})
+                lod = house.get('partLod1', {}).get(name) or {}
+                lod_status = lod.get('status', 'NOT_REGISTERED')
+                if item['profile']['mode'] == 'lod1' and lod_status not in ('NOT_REGISTERED', 'PUBLISHED'):
+                    raise ValueError(f'{slug}/{name}: unfinished LOD1 slot {lod_status}')
+                lod_id = (_asset_id(lod.get('modelAssetId'), slug+'/'+name+' LOD1')
+                    if lod_status == 'PUBLISHED' else '')
                 visual={'name':name,'meshId':mesh_id,'textureId':atlas,'mode':opts['appearanceMode'],
-                    'material':opts.get('visualMaterial') or 'SmoothPlastic',
+                    'material':opts.get('visualMaterial') or 'Plastic',
                     'color':opts.get('visualColor') or '#FFFFFF',
                     'doubleSided':opts.get('doubleSided') is True,
                     'alpha':opts.get('alphaEnabled') is True,
-                    'distance':int(limit), 'cframe':cf,'size':size,'path':list(local_path),
-                    'moving':local_path[0]=='DoorAssembly'}
+                    'lod1From':thresholds['lod1'], 'hideFrom':thresholds['hide'],
+                    'cframe':cf,'size':size,'path':list(local_path),
+                    'moving':local_path[0]=='DoorAssembly',
+                    'lod1ModelAssetId':str(lod_id)}
                 if visual['alpha'] and not atlas:
                     raise ValueError(f'{slug}/{name}: alpha needs published atlas')
                 visuals.append(visual)
@@ -303,10 +309,7 @@ def payload(rows, selected):
         if slug not in active_slugs:
             continue
         profile=entry['profile']
-        types[slug] = {'mode':profile['mode'],'lod1':profile['lod1'],
-            'hide':profile['hide'],'hysteresis':profile['hysteresis'],
-            'lod1ModelAssetId':str(entry['house']['lod1'].get('modelAssetId') or ''),
-            'parts':[]}
+        types[slug] = {'mode':profile['mode'], 'parts':[]}
     assigned={}
     placements=[]
     for row in rows:
@@ -348,9 +351,9 @@ def fingerprint(selected):
         records.append({
             'slug':slug, 'profile':item['profile'], 'revision':h['revision'],
             'modelSha':h.get('model_sha256'), 'meshParts':h['meshParts'],
-            'meshOptions':h.get('meshOptions'),
+            'meshOptions':h.get('meshOptions'), 'partStreaming':h.get('partStreaming'),
             'textures':{k:v.get('assetId') for k,v in h.get('textures',{}).items()},
-            'rigAssets':h.get('rigAssets'), 'lod1':h.get('lod1'),
+            'rigAssets':h.get('rigAssets'), 'partLod1':h.get('partLod1'),
             'placements':[{k:r.get(k) for k in ('plotIndex','worldCFrame','houseAnchorLocalCFrame','scale','revision')}
                 for r in item['placements']],
         })

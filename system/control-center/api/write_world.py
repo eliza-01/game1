@@ -422,6 +422,18 @@ def route(path, body, deps):
 
     # LOD1 is an optional, independently versioned Location Asset resource.
     # Neither staging nor publication mutates FULL, Atlas, placements or Studio.
+    if path.startswith('/api/location-assets/') and path.endswith('/lod1-reuse'):
+        slug = unquote(path[len('/api/location-assets/'):-len('/lod1-reuse')].strip('/'))
+        try:
+            from services.lod_reuse_catalog import selection, confirmed_source
+            payload = selection(body())
+            source = confirmed_source({'location': location_assets, 'house': deps['real_estate'], 'house_part': deps['real_estate']},
+                                      payload['sourceDomain'], payload['sourceSlug'],
+                                      payload['sourceRevision'], payload['sourceModelAssetId'])
+            return out(200, location_assets.reuse_lod1(slug, source, payload['expectedRevision']))
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return out(400, {'error': str(error)})
+
     if path.startswith('/api/location-assets/') and path.endswith('/lod1-stage'):
         slug = unquote(path[len('/api/location-assets/'):-len('/lod1-stage')].strip('/'))
         try:

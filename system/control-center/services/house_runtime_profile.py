@@ -1,42 +1,43 @@
-"""Per-house visual-streaming authoring contract.
+"""House-level streaming switch; per-MeshPart distances belong to LOD Manager.
 
-This is configuration, not a second streamer. The common LocationWorldStreamer
-will eventually consume the compiled house rows. Server collision/socket/door
-ownership is unaffected by these visual-only distances.
+The old SQLite lod1/hide/hysteresis columns are legacy migration inputs only.
+The shared LocationWorldStreamer owns all runtime state changes.
 """
 from __future__ import annotations
-
 from real_estate.contracts import HOUSE_NAME
-DEFAULT = {'mode': 'off', 'lod1': 150, 'hide': 400, 'hysteresis': 10}
-MODES = ('off', 'full', 'lod1')
+from services.house_part_distances import validate as validate_part
+
+DEFAULT={'mode':'off'}
+MODES=('off','full','lod1')
 
 
 def validate(slug: str, value: dict) -> dict:
-    if not isinstance(slug, str) or not HOUSE_NAME.fullmatch(slug):
+    if not isinstance(slug,str) or not HOUSE_NAME.fullmatch(slug):
         raise ValueError('invalid house type')
-    if not isinstance(value, dict) or set(value) != set(DEFAULT):
-        raise ValueError('expected house mode / lod1 / hide / hysteresis')
-    if value['mode'] not in MODES:
-        raise ValueError('invalid house streaming mode')
-    a, b, h = (value[name] for name in ('lod1', 'hide', 'hysteresis'))
-    if any(type(v) is not int for v in (a,b,h)) or not (20 <= a < b <= 10000 and 0 <= h <= 100
-        and a > h and b - a > 2 * h):
-        raise ValueError('House LOD1 / Hide distances need valid hysteresis (20 <= LOD1 < Hide <= 10000)')
-    return {key: value[key] for key in DEFAULT}
+    if not isinstance(value,dict) or set(value) != {'mode'} or value['mode'] not in MODES:
+        raise ValueError('expected house streaming mode')
+    return {'mode':value['mode']}
 
 
-def readiness(house: dict, settings: dict, lod1: dict) -> dict:
-    """Report authoring blockers without claiming unsupported runtime readiness."""
-    warnings = []
-    if house['status'] != 'PUBLISHED':
+def readiness(house:dict, settings:dict, part_lods:dict) -> dict:
+    warnings=[]
+    if house['status']!='PUBLISHED':
         warnings.append('Publish all house meshes and atlases before Runtime build')
-    for part in house.get('meshParts', []):
-        options = house.get('meshOptions', {}).get(part, {})
-        if options.get('distanceStreaming') is True and options.get('loadDistanceStuds', 50) >= settings['lod1'] and settings['mode'] == 'lod1':
-            warnings.append(f'{part}: FULL distance must be below house LOD1 ({settings["lod1"]} studs)')
-    if settings['mode'] == 'lod1' and lod1.get('status') != 'PUBLISHED':
-        warnings.append('Publish House LOD1 before selecting FULL / LOD1')
-    # A source Place must be compiled and Studio-verified before the profile is
-    # capable of freeing instances; saved metadata is never a publish approval.
-    return {'readyForCompilation': not warnings and settings['mode'] != 'off',
+    mode=settings['mode']
+    active=0
+    for part in house.get('meshParts',[]):
+        slot=(house.get('partStreaming') or {}).get(part)
+        if not slot:
+            warnings.append(f'{part}: missing LOD Manager distances')
+        else:
+            try: validate_part({'lod1':slot['lod1'],'hide':slot['hide']})
+            except (ValueError,KeyError) as exc: warnings.append(f'{part}: {exc}')
+        if mode=='lod1':
+            status=(part_lods.get(part) or {}).get('status','NOT_REGISTERED')
+            if status=='PUBLISHED': active+=1
+            elif status!='NOT_REGISTERED':
+                warnings.append(f'{part}: LOD1 is {status}; publish it or reset the stale slot')
+    if mode=='lod1' and active==0:
+        warnings.append('Publish or reuse a per-part LOD1 model for at least one house part')
+    return {'readyForCompilation': not warnings and mode!='off',
             'runtimeVerified': False, 'warnings': warnings}

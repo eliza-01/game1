@@ -78,8 +78,10 @@ def selected():
                     'noCollide':False,'collisionFidelity':'Box','alphaEnabled':False,
                     'doubleSided':False,'destructible':False,'distanceStreaming':False}},
             'textures':{'window_frames_glass':{'assetId':'999'},'door':{'assetId':''}},
-            'lod1':{'status':'PUBLISHED','modelAssetId':'990'}},
-        'profile':{'mode':'lod1','lod1':150,'hide':400,'hysteresis':10},
+            'partLod1':{part:{'status':'PUBLISHED','modelAssetId':'990'} for part in ('window_frames_glass','door')},
+            'partStreaming':{'window_frames_glass':{'lod1':50,'hide':400,'revision':1},
+                            'door':{'lod1':150,'hide':400,'revision':1}}},
+        'profile':{'mode':'lod1'},
         'placements':[{'plotIndex':1,'worldCFrame':FRAME,'scale':1.0,'revision':7}]
     }}
 
@@ -119,7 +121,9 @@ class HouseRuntimeIntegration(unittest.TestCase):
         self.assertEqual(manifest['schemaVersion'],3)
         self.assertFalse(manifest['publishAllowed'])
         self.assertEqual(manifest['houses']['types']['house_level5_01']['parts'][0]['meshId'],'902')
-        self.assertEqual(manifest['houses']['types']['house_level5_01']['parts'][1]['distance'],50)
+        self.assertEqual(manifest['houses']['types']['house_level5_01']['parts'][1]['lod1From'],50)
+        self.assertEqual(manifest['houses']['types']['house_level5_01']['parts'][1]['hideFrom'],400)
+        self.assertNotIn('lod1',manifest['houses']['types']['house_level5_01'])
         self.assertNotIn('parts',manifest['houses']['placements'][0])
 
     def test_plot_registration_does_not_rewrite_saved_house_or_relax_mesh_validation(self):
@@ -130,6 +134,8 @@ class HouseRuntimeIntegration(unittest.TestCase):
         self.assertEqual(found[0]['pivot'],FRAME)
         inputs=copy.deepcopy(self.inputs)
         inputs['house_level5_01']['house']['meshParts'].append('floor')
+        inputs['house_level5_01']['house']['partStreaming']['floor']={'lod1':150,'hide':400,'revision':0}
+        inputs['house_level5_01']['house']['partLod1']['floor']={'status':'PUBLISHED','modelAssetId':'990'}
         with self.assertRaisesRegex(ValueError,'mismatch'):
             inspect(tree,inputs)
 

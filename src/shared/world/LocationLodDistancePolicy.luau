@@ -3,6 +3,7 @@
 local Policy = {}
 Policy.States = table.freeze({FULL = "FULL", LOD1 = "LOD1", LOD2 = "LOD2", UNLOADED = "UNLOADED"})
 Policy.Defaults = table.freeze({lod1 = 120, lod2 = 260, hide = 400, hysteresis = 12})
+Policy.HouseHysteresis = 10 -- shared technical hysteresis for every house MeshPart
 
 function Policy.Valid(config)
     if type(config) ~= "table" then return false end
@@ -49,8 +50,8 @@ function Policy.Resolve(distance, previousState, config, mode)
     return resolveBands(distance, previousState, states, cutoffs, config.hysteresis)
 end
 
--- Real Estate uses the SAME hysteresis resolver but one HOUSE LOD boundary.
--- House profiles are validated by the compiler; no fabricated LOD2 threshold.
+-- Real Estate reuses the same hysteresis resolver independently per MeshPart.
+-- Distances are authored exclusively in LOD Manager; no whole-house boundary.
 function Policy.ResolveHouse(distance, previousState, config)
     assert(type(config) == "table" and (config.mode == "full" or config.mode == "lod1"),
         "invalid house streaming mode")

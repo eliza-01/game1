@@ -58,7 +58,8 @@ class HouseRepublicationPlacedSync(unittest.TestCase):
         self.assertIn('entry.rig:SetAttribute("Game1RealEstateManagedRig", true)', studio)
         self.assertIn('assembly:SetAttribute("Game1RealEstateManagedRig", true)', studio)
         self.assertIn('StudioRealEstatePlacedVisualSync.Update(wrapper, slug, placedTargets)', studio)
-        self.assertNotIn('PartPlacement.AlignOrigin(', studio)
+        self.assertIn('if standaloneStaticParts[part] == true then', studio)
+        self.assertIn('PartPlacement.AlignOrigin(', studio)
         self.assertIn("'houseAuthoringVersion': 4", (ROOT / 'system/control-center/real_estate/studio_sync.py').read_text(encoding='utf-8'))
 
     def test_plugin_install_catches_old_real_estate_module(self):

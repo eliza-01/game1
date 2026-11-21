@@ -50,14 +50,27 @@ def main(source, output, texture_config, selected_part=None):
                                'remove legacy independent armatures in Blender')
     house_rigs = [obj for obj in bpy.context.scene.objects if
                   obj.type == 'ARMATURE' and obj.name.casefold() == 'house_armature']
-    if len(house_rigs) != 1:
-        raise RuntimeError('House publication requires exactly one house_armature')
-    house_rig = house_rigs[0]
-    policy = publication_analysis({'meshes': source_manifests,
-        'houseArmatureBones': [{'name': b.name, 'parent': b.parent.name if b.parent else ''}
-                               for b in house_rig.data.bones]})
-    validate_visual_weights(policy)
-    by_name = {entry['name']:entry for entry in policy['meshes']}
+    # Complete houses and the technical carrier still require their authored
+    # pivot and socket hierarchy. A *selected, unskinned* visual part can be
+    # published from its own FBX without a house armature: its position is
+    # recovered by Studio from the registered house-space placement contract.
+    static_revision = (selected_part not in (None, 'rig_carrier')
+                       and not house_rigs
+                       and not find_rig(bpy, find_mesh(bpy, selected_part), selected_part))
+    if len(house_rigs) != 1 and not static_revision:
+        raise RuntimeError('House/rig_carrier publication requires exactly one house_armature; '
+                           'only an independent static visual mesh may omit it')
+    house_rig = house_rigs[0] if house_rigs else None
+    if house_rig:
+        policy = publication_analysis({'meshes': source_manifests,
+            'houseArmatureBones': [{'name': b.name, 'parent': b.parent.name if b.parent else ''}
+                                   for b in house_rig.data.bones]})
+        validate_visual_weights(policy)
+        by_name = {entry['name']: entry for entry in policy['meshes']}
+    else:
+        by_name = {selected_part: {**next(row for row in source_manifests
+                                         if row['name'] == selected_part),
+                                   'publicationBones': []}}
     for part in parts:
         if part == 'rig_carrier':
             # Publish the ONLY static socket hierarchy in its own Model Asset.
@@ -88,9 +101,12 @@ def main(source, output, texture_config, selected_part=None):
         authored_world = source_mesh.matrix_world.copy()
         mesh.parent = None
         mesh.matrix_world = authored_world
-        source_to_house = house_rig.matrix_world.inverted() @ authored_world
-        mesh.data.transform(source_to_house)
-        mesh.matrix_world = house_rig.matrix_world.copy()
+        if house_rig is not None:
+            source_to_house = house_rig.matrix_world.inverted() @ authored_world
+            mesh.data.transform(source_to_house)
+            mesh.matrix_world = house_rig.matrix_world.copy()
+        # Standalone static FBX has no house frame. Never fabricate one here;
+        # Studio will restore the verified original part centre in house space.
         if part != mesh.name:
             raise RuntimeError('Publication changed visual MeshPart identity')
         try:

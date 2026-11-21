@@ -189,6 +189,7 @@ window.game1LocationAssetWorkflow = (() => {
       `Если один этап завершится ошибкой, успешный ID сохранится, повторятся только незавершённые этапы.</small>`,
       publication.count?`${publication.count} ожидает публикации`:'Готово',publication.count?'pending':'ready');
     const lod=item.lod1||{revision:0,status:'NOT_REGISTERED',modelAssetId:'',sourcePath:''};
+    const reused=lod.reuse;
     const lodStatus={NOT_REGISTERED:'Не зарегистрирован',STAGED:'FBX сохранён · ожидает публикации',
       UPDATE_AVAILABLE:'Новая ревизия · ожидает публикации',PUBLISHED:'Опубликован',
       SOURCE_MISSING:'Исходный FBX не найден'}[lod.status]||lod.status;
@@ -197,12 +198,13 @@ window.game1LocationAssetWorkflow = (() => {
       `<div class="deco-manage-fields"><small>Статус: <strong>${e(lodStatus)}</strong> · ревизия ${Number(lod.revision||0)}</small>`+
       `<small>LOD1 Model ID: <strong>${e(lod.modelAssetId||'—')}</strong></small>`+
       `<small>Имя FBX и Roblox Model: <strong>${e(state.slug+'_lod1')}</strong> · файл ${e(state.slug+'_lod1.fbx')}</small>`+
-      `<small>FBX: ${e(lod.sourcePath||'—')}</small>`+
+      `<small>${reused?'Используется опубликованный LOD1: '+e(reused.domain+' / '+reused.slug)+' · ревизия '+Number(reused.revision):'FBX: '+e(lod.sourcePath||'—')}</small>`+
       (state.pendingLod1?`<small>Выбрано: ${e(state.pendingLod1)}</small>`:'')+
       `<div class="actions">${button('choose-lod1','Choose LOD1 FBX',busy)}`+
+      `${button('reuse-lod1','Use published LOD1',busy)}`+
       `${button('stage-lod1','Register LOD1',busy||!state.pendingLod1,'asset-apply-ready')}`+
       `${button('publish-lod1','Publish LOD1',busy||!configured||!['STAGED','UPDATE_AVAILABLE'].includes(lod.status),'la-publish-primary')}</div>`+
-      `<small>Каждая публикация создаёт новый Model ID. Размещение и LOD-переключение в Studio пока не включены.</small></div>`,
+      `<small>Собственная публикация создаёт новый Model ID; повторное использование не публикует ничего. Runtime Draft использует выбранный ID.</small></div>`,
       lodStatus,lod.status==='PUBLISHED'?'ready':'pending');
     const errorStatus=state.error&&state.result?`<div class="real-estate-workflow-result issue la-operation-error" role="alert">${e(state.result)}</div>`:'';
     const busyStatus=busy&&state.tab!=='publish'?`<div class="la-operation-status" role="status" aria-live="polite"><span class="la-publish-spinner" aria-hidden="true"></span>${e(state.operationLabel||state.result||'Подготовка ресурса…')}</div>`:'';
@@ -517,6 +519,16 @@ window.game1LocationAssetWorkflow = (() => {
       const result=await request(`/api/texture-atlases/variants/${variantId}/publish`,{method:'POST'});
       await decoAssetLoad();
       message(`Atlas published · Image ID ${result.published_id||'see Atlas Registry'}. Sync Studio after saving changes.`);
+    });
+    if(action==='reuse-lod1')return run('Повторное использование LOD1',async()=>{
+      const chosen=await window.game1LodReusePicker.pick('location',state.slug);
+      if(!chosen){message('Выбор LOD1 отменён.');return;}
+      await request(`/api/location-assets/${encodeURIComponent(state.slug)}/lod1-reuse`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(window.game1LodReusePicker.payload(chosen,Number(row()?.lod1?.revision||0))),
+      });
+      state.pendingLod1='';await decoAssetLoad();
+      message(`Подключён LOD1 из ${chosen.domain} / ${chosen.slug} · Model ID ${chosen.modelAssetId}. Публикация не требуется.`);
     });
     if(action==='choose-lod1')return run('Выбор LOD1 FBX',async()=>{
       const chosen=await request('/api/files/choose-location-asset-model',{method:'POST'});

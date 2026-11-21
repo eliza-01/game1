@@ -31,7 +31,9 @@ from services.atlas_identity import display_identity
 from services import mesh_visual_appearance as appearance
 from services import location_collision_blueprint as collision_blueprints
 from services import house_lod_resource as house_lod
+from services import house_part_lod_resource as part_lod
 from services import house_runtime_profile as house_policy
+from services import house_part_distances as part_distances
 
 
 def glass_default(part: str) -> bool:
@@ -53,13 +55,6 @@ def mesh_options(parts, raw: dict | None, legacy_atlases=()) -> dict:
         glass = entry.get('glass')
         no_collide = entry.get('noCollide')
         destructible = entry.get('destructible')
-        distance_streaming = entry.get('distanceStreaming', part == 'window_frames_glass')
-        if type(distance_streaming) is not bool:
-            raise ValueError(f'{part}: distanceStreaming must be boolean')
-        load_distance = entry.get('loadDistanceStuds', 50)
-        if (type(load_distance) not in (float, int) or not 20 <= load_distance <= 1000
-                or not float(load_distance).is_integer()):
-            raise ValueError(f'{part}: loadDistanceStuds must be an integer from 20 to 1000')
         effective_no_collide = no_collide if type(no_collide) is bool else default_no_collide(part)
         mode = entry.get('appearanceMode', 'atlas' if part in legacy_atlases else 'material')
         # One shared Material + Color validator for Real Estate and Location Assets.
@@ -86,8 +81,6 @@ def mesh_options(parts, raw: dict | None, legacy_atlases=()) -> dict:
             ),
             'doubleSided': entry['doubleSided'] if type(entry.get('doubleSided')) is bool else False,
             'destructible': destructible if type(destructible) is bool else False,
-            'distanceStreaming': distance_streaming,
-            'loadDistanceStuds': int(load_distance),
         }
     return result
 
@@ -148,6 +141,8 @@ class RealEstateStore:
                            "WHERE model_asset_id != '' AND model_published_hash != ''")
                 db.execute('PRAGMA user_version = 2')
         house_lod.ensure_schema(self)
+        part_lod.ensure_schema(self)
+        part_distances.ensure_schema(self)
         self._index_legacy_texture_publications()
         # One-way ownership upgrade. Fail closed on unresolved source data:
         # never admit new owner-based writes in an incompletely migrated DB.
@@ -306,7 +301,9 @@ class RealEstateStore:
                 or (old_textures.get(part) or {}).get('assetId')}
             row['meshOptions'] = mesh_options(active, raw_options, bound_parts)
             row['lod1'] = house_lod.describe(self, row['slug'])
+            row['partLod1'] = part_lod.describe_all(self, row['slug'], active, row['rigSourceHashes'])
             row['runtimeProfile'] = house_lod.profile(self, row['slug'])
+            row['partStreaming'] = part_distances.describe_all(self, row['slug'], active)
             # Legacy records may still store door assets after the FBX is
             # replaced with a doorless house; they are publication history,
             # not active resources for the current template.
@@ -330,7 +327,7 @@ class RealEstateStore:
                              'LOCAL_ONLY' if not any(row['rigAssets'].get(p,{}).get('assetId') for p in (*active, 'rig_carrier'))
                              and not any(row['textures'][part].get('assetId') for part in active)
                              else 'UPDATE_AVAILABLE')
-            row['runtimeReadiness'] = house_policy.readiness(row, row['runtimeProfile'], row['lod1'])
+            row['runtimeReadiness'] = house_policy.readiness(row, row['runtimeProfile'], row['partLod1'])
             result.append(row)
         return result
 
@@ -343,8 +340,23 @@ class RealEstateStore:
     def save_runtime_profile(self, slug: str, profile: dict, expected_revision: int) -> dict:
         return house_lod.save_profile(self, slug, profile, expected_revision)
 
+    def save_part_distances(self, slug: str, part: str, values: dict, expected_revision: int) -> dict:
+        return part_distances.save(self, slug, part, values, expected_revision)
+
+    def reuse_lod1(self, slug: str, source: dict, expected_revision: int) -> dict:
+        return house_lod.reuse(self, slug, source, expected_revision)
+
     def lod1_history(self, slug: str) -> list[dict]:
         return house_lod.history(self, slug)
+
+    def stage_part_lod1(self, slug: str, part: str, path: str, revision: int) -> dict:
+        return part_lod.stage(self, slug, part, path, revision)
+
+    def publish_part_lod1(self, slug: str, part: str, revision: int, credentials: dict) -> dict:
+        return part_lod.publish(self, slug, part, revision, credentials)
+
+    def reuse_part_lod1(self, slug: str, part: str, source: dict, revision: int) -> dict:
+        return part_lod.reuse(self, slug, part, source, revision)
 
     def collision_blueprint(self, slug: str) -> dict | None:
         return collision_blueprints.latest(self, slug, domain='house')
@@ -549,6 +561,14 @@ class RealEstateStore:
         new_mesh = inspect_revision(self.root, source, part)
         snapshot = save_immutable(self.root, slug, part, source)
         new_skeleton = dict(row['skeleton'])
+        old_mesh = next(mesh for mesh in row['skeleton']['meshes'] if mesh['name'] == part)
+        if not new_mesh.get('armature') and not new_mesh.get('bones'):
+            # A separately authored static FBX cannot supply the house pivot.
+            # Retain the last verified part position, never infer a new one
+            # from the standalone file's arbitrary object origin.
+            placement = old_mesh.get('authoredPlacement')
+            if isinstance(placement, dict) and placement.get('version') == 3:
+                new_mesh['authoredPlacement'] = placement
         new_skeleton['meshes'] = [new_mesh if old['name'] == part else old
                                    for old in row['skeleton']['meshes']]
         new_sources = dict(row['meshSources'])
@@ -562,6 +582,26 @@ class RealEstateStore:
                 raise ValueError('concurrent house revision change; refresh and retry')
         self.export()
         return self.get(slug)
+
+    def _original_part_placement(self, row: dict, part: str) -> dict:
+        """Recover the authored house-space centre for a static FBX revision.
+
+        This is a publication-time fallback for pre-M415 replacements which
+        lost the old part's placement on save. It never guesses a centre from
+        the standalone mesh, and never modifies the source or other parts.
+        """
+        original = _source(self.root, row['model_path'])
+        if not original.is_file() or _sha(original) != row['model_sha256']:
+            raise ValueError(f'{part}: original house FBX unavailable; cannot restore '
+                             'static part position in the house frame')
+        from .fbx import inspect_selected
+        mesh = next((item for item in inspect_selected(self.root, original, part).get('meshes', [])
+                     if item.get('name') == part), None)
+        placement = mesh.get('authoredPlacement') if mesh else None
+        if not isinstance(placement, dict) or placement.get('version') != 3:
+            raise ValueError(f'{part}: original house has no verified authored pivot '
+                             'for this static revision; refusing an unsafe placement')
+        return placement
 
     def _pending_publication_for_house(self, slug: str) -> bool:
         with self.connect() as db:
@@ -673,6 +713,16 @@ class RealEstateStore:
                     pinned_source = _source(self.root, pinned['path'])
                     if not pinned_source.is_file() or _sha(pinned_source) != source_hash:
                         raise ValueError(f'{part}: immutable FBX revision source is missing or changed; refusing publication')
+                    placement_update = None
+                    current_mesh = next((mesh for mesh in row['skeleton']['meshes']
+                                         if mesh['name'] == part), None)
+                    if part != 'rig_carrier' and current_mesh and not current_mesh.get('armature'):
+                        if current_mesh.get('influencedBones') or current_mesh.get('bones'):
+                            raise ValueError(f'{part}: detached FBX has skin data without an authored rig')
+                        placement = current_mesh.get('authoredPlacement')
+                        if not isinstance(placement, dict) or placement.get('version') != 3:
+                            placement = self._original_part_placement(row, part)
+                            placement_update = placement
                     progress(f'Preparing only {part} from its authoring FBX source')
                     texture = row['textures'].get(part, {})
                     images = ({part: str(prepare_texture(self.root, part,
@@ -694,6 +744,14 @@ class RealEstateStore:
                     rigs_data = self.get(slug)['rigAssets']
                     rigs_data[part] = {'assetId':str(result.asset_id), 'publishedSha256':fingerprint}
                     with self.connect() as db:
+                        if placement_update is not None:
+                            # Publication and recovery are committed together.
+                            skeleton = row['skeleton']
+                            for mesh in skeleton['meshes']:
+                                if mesh['name'] == part:
+                                    mesh['authoredPlacement'] = placement_update
+                            db.execute('UPDATE real_estate SET skeleton_json=? WHERE slug=?',
+                                       (json.dumps(skeleton, ensure_ascii=False), slug))
                         db.execute('UPDATE real_estate SET model_rigs_json=?,model_asset_id=?,model_moderation=?,updated_at=? WHERE slug=?',
                             (json.dumps(rigs_data), rigs_data.get('rig_carrier',{}).get('assetId') or row['model_asset_id'],
                              result.moderation_state or '', time.time(), slug))

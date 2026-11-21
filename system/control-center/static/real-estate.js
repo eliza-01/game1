@@ -1,5 +1,5 @@
 /* Real Estate registry view. Global request(), toast(), esc(), $ provided by Character Assets. */
-const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, meshOptions:{}, appearance:{}, distance:{}, acceptWarnings:false, atlasBusy:false, registrationTarget:null};
+const realEstateState = {data:null, selected:null, inspect:null, textures:{}, textureRefs:{}, reuseEnabled:{}, reuseFilters:{}, meshOptions:{}, appearance:{}, acceptWarnings:false, atlasBusy:false, registrationTarget:null};
 const REAL_ESTATE_SELECTED = 'game1.realEstate.selected';
 let realEstatePublicationPoll = null;
 function realEstatePublicationBusy(slug){
@@ -17,8 +17,17 @@ async function realEstateWatchPublication(slug, notify=false){
     realEstatePublicationPoll=setTimeout(()=>realEstateWatchPublication(slug,true).catch(e=>toast(e.message,true)),2000);
   }else if(notify && job){
     if(job.status==='failed')toast(`Real Estate publish failed at ${job.step}: ${job.error}`,true);
-    else if(job.status==='succeeded')toast(`${slug} · publication completed`);
     await realEstateLoad();
+    if(job.status==='succeeded'){
+      const latest=realEstateRows().find(item=>item.slug===slug);
+      const part=job.scope?.startsWith('model:')?job.scope.slice(6):null;
+      const modelsReady=part
+        ?Boolean(latest?.rigAssets?.[part]?.assetId &&
+          latest.rigAssets[part].publishedSha256===latest.rigPublicationHashes?.[part])
+        :Boolean(latest?.publicationCurrent?.model);
+      if(!modelsReady)toast(`${slug} · Model publication finished, but current mesh revisions are not confirmed. Refresh and inspect status.`,true);
+      else toast(`${slug} · Model publication verified. ${latest.status==='PUBLISHED'?'Studio Sync ready':'Other house resources still need publication.'}`);
+    }
   }
 }
 
@@ -57,10 +66,6 @@ function realEstateForm(row){
     noCollide:row?.meshOptions?.[part]?.noCollide ?? realEstateMeshDefaults(part).noCollide,
     collisionFidelity:row?.meshOptions?.[part]?.collisionFidelity ?? realEstateMeshDefaults(part).collisionFidelity,
     doubleSided:row?.meshOptions?.[part]?.doubleSided ?? realEstateMeshDefaults(part).doubleSided
-  }]));
-  realEstateState.distance=Object.fromEntries(meshNames.map(part=>[part,{
-    enabled:row?.meshOptions?.[part]?.distanceStreaming ?? (part==='window_frames_glass'),
-    studs:row?.meshOptions?.[part]?.loadDistanceStuds ?? 50
   }]));
   realEstateState.appearance=Object.fromEntries(meshNames.map(part=>[part,{
     appearanceMode:window.game1MeshAuthoring.displayAppearanceMode(row?.meshOptions?.[part]?.appearanceMode||'material'),
@@ -103,81 +108,19 @@ function realEstateForm(row){
   realEstateRuntimeRender(row);
   realEstateRender();
 }
-// House LOD is a single independent published Model. Only one shared world
-// streamer owns runtime distances; this panel stores authoring metadata.
+// Real Estate owns house and per-MeshPart FULL authoring. All LOD1 geometry
+// authoring now lives in the shared LOD Manager readiness surface.
 function realEstateRuntimeRender(row){
   const target=$('real-estate-runtime-content');
-  if(!row){
-    target.innerHTML='<small class="muted">Register a house to configure whole-house LOD1.</small>';
-    return;
-  }
-  const lod=row.lod1||{};
-  const profile=row.runtimeProfile||{mode:'off',lod1:150,hide:400,hysteresis:10,revision:0};
+  if(!row){target.innerHTML='<small class="muted">Register a house first.</small>';return;}
+  const profile=row.runtimeProfile||{mode:'off'};
+  const count=(row.meshParts||[]).filter(part=>row.partLod1?.[part]?.status==='PUBLISHED').length;
   const warnings=row.runtimeReadiness?.warnings||[];
   target.innerHTML=`<div class="real-estate-runtime-info">
-    <small>House type: <strong>${esc(row.slug)}</strong> · Plot pivots remain independent.</small>
-    <small>LOD1: <strong>${esc(lod.status||'NOT_REGISTERED')}</strong> · Model ID ${esc(lod.modelAssetId||'—')}</small>
-    <small>Source: ${esc(lod.sourcePath||'Not staged')}</small>
-    <small>Revision: ${Number(lod.revision||0)}</small>
-    <div class="actions"><button type="button" id="re-lod-choose">Choose LOD1 FBX</button>
-      <button type="button" id="re-lod-stage">Register LOD1</button>
-      <button type="button" id="re-lod-publish" ${!['STAGED','UPDATE_AVAILABLE'].includes(lod.status)||!realEstateState.data?.publication?.configured?'disabled':''}>Publish LOD1</button></div>
-    <small id="re-lod-pending">${esc(realEstateState.pendingLod1||'File: '+row.slug+'_lod1.fbx')}</small>
-    <div class="real-estate-identity-fields">
-      <label>Streaming mode<select id="re-runtime-mode">
-        ${[['off','Off · current Workspace'],['full','FULL → unloaded'],['lod1','FULL → House LOD1 → unloaded']].map(([mode,label])=>`<option value="${mode}" ${profile.mode===mode?'selected':''}>${label}</option>`).join('')}
-      </select></label>
-      <label>House LOD1 threshold · studs<input id="re-runtime-lod1" type="number" min="20" max="9999" step="1" value="${Number(profile.lod1)}"></label>
-      <label>Unload distance · studs<input id="re-runtime-hide" type="number" min="21" max="10000" step="1" value="${Number(profile.hide)}"></label>
-      <label>Hysteresis · studs<input id="re-runtime-hysteresis" type="number" min="0" max="100" step="1" value="${Number(profile.hysteresis)}"></label>
-    </div>
-    <div class="actions"><button type="button" id="re-runtime-save">Save streaming profile</button></div>
-    <small class="hint">Per-mesh FULL distances: inside each MeshPart spoiler. Beyond the House LOD1 threshold the complete FULL visual must be absent. These settings alone do not change the authoring Place or make the Runtime Draft publishable.</small>
-    <div id="re-runtime-status" class="status-box">${warnings.length?warnings.map(esc).join(' · '):'Authoring settings valid. Runtime compiler and Studio validation are still required.'}</div>
+    <small>${esc(row.slug)} · ${count}/${(row.meshParts||[]).length} parts published · ${esc(profile.mode)}</small>
+    <p class="hint">Streaming mode and all per-MeshPart FULL / LOD1 / Unloaded distances: LOD Manager → 02 · LOD readiness → Real Estate.</p>
+    <div class="status-box">${warnings.length?warnings.map(esc).join(' · '):'Studio Runtime validation pending'}</div>
   </div>`;
-  const setStatus=(message,failed=false)=>{const elem=$('re-runtime-status');elem.textContent=message;elem.classList.toggle('error',failed);};
-  const current=()=>realEstateSelected();
-  $('re-lod-choose').onclick=async()=>{
-    try{
-      const chosen=await request('/api/files/choose-real-estate-model',{method:'POST'});
-      if(!chosen.path)return;
-      const expected=`${row.slug}_lod1.fbx`;
-      if(chosen.path.replace(/\\/g,'/').split('/').pop()!==expected)throw Error(`LOD1 filename must be ${expected}`);
-      realEstateState.pendingLod1=chosen.path;
-      $('re-lod-pending').textContent=chosen.path;
-      setStatus('LOD1 selected. Click Register LOD1 to stage this revision.');
-    }catch(error){setStatus(error.message,true);}
-  };
-  $('re-lod-stage').onclick=async()=>{
-    try{
-      if(!realEstateState.pendingLod1)throw Error('Choose LOD1 FBX first');
-      await request(`/api/real-estate/${encodeURIComponent(row.slug)}/lod1-stage`,{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourcePath:realEstateState.pendingLod1,expectedRevision:current()?.lod1?.revision||0})});
-      realEstateState.pendingLod1='';await realEstateLoad();
-      toast('House LOD1 staged · no Place changes');
-    }catch(error){setStatus(error.message,true);}
-  };
-  $('re-lod-publish').onclick=async()=>{
-    try{
-      setStatus('Publishing House LOD1…');
-      await request(`/api/real-estate/${encodeURIComponent(row.slug)}/lod1-publish`,{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:current()?.lod1?.revision||0,description:`Game1 ${row.slug} LOD1`})});
-      await realEstateLoad();toast('House LOD1 published');
-    }catch(error){setStatus(error.message,true);}
-  };
-  $('re-runtime-save').onclick=async()=>{
-    try{
-      const integer=id=>{const text=$(id).value;const n=Number(text);if(!text.trim()||!Number.isSafeInteger(n))throw Error(`${id}: integer studs required`);return n;};
-      const settings={mode:$('re-runtime-mode').value,lod1:integer('re-runtime-lod1'),hide:integer('re-runtime-hide'),hysteresis:integer('re-runtime-hysteresis')};
-      if(settings.mode==='lod1'){
-        const tooFar=Object.entries(current()?.meshOptions||{}).filter(([,v])=>v.distanceStreaming&&v.loadDistanceStuds>=settings.lod1);
-        if(tooFar.length)throw Error('FULL mesh distance must be below LOD1: '+tooFar.map(([n])=>n).join(', '));
-      }
-      await request(`/api/real-estate/${encodeURIComponent(row.slug)}/runtime-profile`,{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile:settings,expectedRevision:current()?.runtimeProfile?.revision||0})});
-      await realEstateLoad();toast('House Runtime profile saved');
-    }catch(error){setStatus(error.message,true);}
-  };
 }
 
 // Inspect reports the *authored* shared FBX armature for each mesh, while
@@ -340,7 +283,6 @@ function realEstateRenderTextures(row){
   for(const part of parts){
     realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
     realEstateState.appearance[part] ||= {appearanceMode:'material',visualMaterial:'Plastic',visualColor:'#FFFFFF',alphaEnabled:false};
-    realEstateState.distance[part] ||= {enabled:part==='window_frames_glass',studs:50};
   }
   const options=realEstateOptions();
   host.innerHTML='<small class="real-estate-physics-caution">Static house collision will use a separately authored Roblox Parts blueprint. Visual meshes default to No Collide.</small>'+parts.map(part=>{
@@ -372,8 +314,6 @@ function realEstateRenderTextures(row){
         <input type="color" id="real-estate-color-${esc(part)}" aria-label="${esc(part)} color" value="${esc(appearance.visualColor)}"></span>
         <label id="real-estate-alpha-controls-${esc(part)}" ${!atlas?'hidden':''}><input type="checkbox" id="real-estate-alpha-${esc(part)}" ${appearance.alphaEnabled?'checked':''}> Alpha transparency</label>
         <label class="real-estate-glass-toggle" title="Studio MeshPart Transparency = 0.02 (if checked)"><input type="checkbox" id="real-estate-glass-${esc(part)}" ${flags.glass?'checked':''}> Glass · 0.02</label>
-        <label title="Render this MeshPart only near the camera; uses the shared LOD client updater"><input type="checkbox" id="real-estate-distance-${esc(part)}" ${realEstateState.distance[part]?.enabled?'checked':''}> Distance visibility</label>
-        <label>Range <input type="number" id="real-estate-distance-studs-${esc(part)}" min="20" max="1000" step="1" style="width:6em" value="${esc(realEstateState.distance[part]?.studs??50)}" ${!realEstateState.distance[part]?.enabled?'disabled':''}> studs</label>
         <label class="real-estate-physics-toggle" title="Disable physics collisions, touch events, and spatial queries for this mesh"><input type="checkbox" id="real-estate-nocollide-${esc(part)}" ${flags.noCollide?'checked':''}> No Collide</label>
         <label class="real-estate-reuse-toggle" title="Bind this mesh to an existing published Atlas Registry variant. Reuse never uploads another Roblox Image Asset."><input type="checkbox" id="real-estate-reuse-${esc(part)}" ${reuse?'checked':''}> Reuse atlas</label>
       </div>
@@ -406,19 +346,6 @@ function realEstateRenderTextures(row){
     };
     $(`real-estate-alpha-${part}`).onchange=event=>{
       realEstateState.appearance[part].alphaEnabled=event.target.checked;
-    };
-    $(`real-estate-distance-${part}`).onchange=event=>{
-      realEstateState.distance[part].enabled=event.target.checked;
-      $(`real-estate-distance-studs-${part}`).disabled=!event.target.checked;
-    };
-    $(`real-estate-distance-studs-${part}`).onchange=event=>{
-      const n=Number(event.target.value);
-      if(!Number.isInteger(n)||n<20||n>1000){
-        event.target.value=realEstateState.distance[part].studs;
-        toast('Distance must be 20–1000 studs',true);
-        return;
-      }
-      realEstateState.distance[part].studs=n;
     };
     $(`real-estate-nocollide-${part}`).onchange=event=>{
       const flags=realEstateState.meshOptions[part];
@@ -524,7 +451,7 @@ async function realEstateChooseFbx(){
     realEstateRenderRigs(inspection.analysis, warnings);
     // Existing mesh textures remain selected while FBX is replaced independently.
     if(!realEstateState.selected){
-      realEstateState.textures={};realEstateState.textureRefs={};realEstateState.reuseEnabled={};realEstateState.meshOptions={};realEstateState.appearance={};realEstateState.distance={};
+      realEstateState.textures={};realEstateState.textureRefs={};realEstateState.reuseEnabled={};realEstateState.meshOptions={};realEstateState.appearance={};
       // New visual meshes default to native Roblox Material + Color. Atlas is
       // an explicitly selected mode, not a registration requirement.
     }
@@ -556,8 +483,6 @@ function realEstatePayload(){
         noCollide:flags.noCollide===true,
         collisionFidelity:flags.collisionFidelity,
         doubleSided:flags.doubleSided,
-        distanceStreaming:realEstateState.distance[part]?.enabled===true,
-        loadDistanceStuds:realEstateState.distance[part]?.studs??50,
         ...realEstateState.appearance[part]
       }];
     })),
@@ -614,11 +539,12 @@ async function realEstateSync(slug, part=null, {throwOnError=false}={}){
       box.hidden=false;
       box.innerHTML=`<strong>Studio Sync diagnostics</strong><ul>${[...warnings,...missing.map(name=>'Missing socket: '+name)].map(w=>`<li>${esc(w)}</li>`).join('')}</ul><small>Workspace models with the matching Game1RealEstateSlug are updated regardless of folder or a copied template flag. Missing instances need a managed slug.</small>`;
     }
+    await realEstateLoad();
     return result;
   }catch(error){if(throwOnError)throw error;toast(`Studio Sync: ${error.message}`,true);return null;}
 }
 async function realEstatePublish(scope='all'){
-  const row=realEstateSelected(); if(!row)return;
+  const row=realEstateSelected(); if(!row)return null;
   const button=$('real-estate-publish');
   try{
     button.disabled=true;
@@ -626,6 +552,9 @@ async function realEstatePublish(scope='all'){
     const result=await request('/api/real-estate/'+encodeURIComponent(row.slug)+'/publish-async',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({description:$('real-estate-description').value,scope})});
+    if(!result?.job || result.job.scope!==scope){
+      throw Error('A different Real Estate publication is running; selected mesh was not published');
+    }
     realEstateState.publicationJob=result.job;
     realEstateRender();
     await realEstateWatchPublication(row.slug,true);
@@ -656,8 +585,14 @@ ${preview.sourcePath}
 
 `+
       `Other meshes, images and their Roblox IDs will NOT change. Continue?`))return;
-    await request(endpoint+'/mesh-source',{method:'POST',headers:{'Content-Type':'application/json'},
+    const saved=await request(endpoint+'/mesh-source',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({part,sourcePath:preview.sourcePath,expectedRevision:row.revision})});
+    // A file picker success is not a registered revision. Verify the server persisted
+    // precisely the selected part and SHA before offering publication/Studio Sync.
+    if(saved?.meshSources?.[part]?.sha256!==preview.sourceSha256 ||
+       saved?.rigSourceHashes?.[part]!==preview.sourceSha256){
+      throw Error(part+': chosen FBX was not committed as this mesh revision');
+    }
     await realEstateLoad();
     toast(`${part} · FBX revision saved. Next: Publish model.`);
     return true;
@@ -762,7 +697,7 @@ function realEstateRender(){
       </div>
       <small class="real-estate-mesh-source-label">${item.meshSources?.[part]?'Independent FBX revision':'Original house FBX'}</small>
       </div>`).join('');
-    return `<tr class="${item.slug===realEstateState.selected?'active':''}" data-house="${esc(item.slug)}"><td class="real-estate-house-cell"><b>${esc(item.slug)}</b><small>level ${esc(item.house_level)} · variant ${esc(item.variant)}</small><small class="real-estate-house-economy">buy ${esc(item.purchase_price)} · sell ${esc(item.sale_price)}</small><small class="real-estate-house-economy">level required ${esc(item.min_level)}</small></td><td><small>${textureLines}</small></td><td class="real-estate-assets-cell">${assetLines}</td><td><div class="real-estate-row-actions"><button type="button" data-re-edit>Edit house</button><button type="button" data-re-fbx title="Replace whole-house FBX; changed parts require new Model Asset IDs">Replace full FBX</button><button type="button" data-re-publish ${!canPublish||isBusy||item.status==='PUBLISHED'?'disabled':''}>Publish all changes</button><button type="button" data-re-sync ${isBusy||item.status!=='PUBLISHED'?'disabled':''}>Sync entire house</button><button type="button" data-re-collision>Collision Blueprint</button><button type="button" class="real-estate-delete" data-re-delete ${isBusy?'disabled':''}>Delete house</button></div></td></tr>`;
+    return `<tr class="${item.slug===realEstateState.selected?'active':''}" data-house="${esc(item.slug)}"><td class="real-estate-house-cell"><b>${esc(item.slug)}</b><small>level ${esc(item.house_level)} · variant ${esc(item.variant)}</small><small class="real-estate-house-economy">buy ${esc(item.purchase_price)} · sell ${esc(item.sale_price)}</small><small class="real-estate-house-economy">level required ${esc(item.min_level)}</small></td><td><small>${textureLines}</small></td><td class="real-estate-assets-cell">${assetLines}</td><td><div class="real-estate-row-actions"><button type="button" data-re-edit>Edit house</button><button type="button" data-re-fbx title="Replace whole-house FBX; changed parts require new Model Asset IDs">Replace full FBX</button><button type="button" data-re-publish ${!canPublish||isBusy||item.status==='PUBLISHED'?'disabled':''}>Publish all changes</button><button type="button" data-re-sync ${isBusy||item.status!=='PUBLISHED'?'disabled':''} title="${esc(item.status==='PUBLISHED'?'Sync all published house parts':'Publish every changed house Model and required atlas before full Sync')}">Sync entire house</button><button type="button" data-re-collision>Collision Blueprint</button><button type="button" class="real-estate-delete" data-re-delete ${isBusy?'disabled':''}>Delete house</button></div></td></tr>`;
   }).join('')||'<tr><td colspan="4" class="muted">No registered houses yet.</td></tr>';
   for(const tr of tbody.querySelectorAll('[data-house]')){
     const row=rows.find(item=>item.slug===tr.dataset.house);

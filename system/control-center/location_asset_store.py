@@ -828,6 +828,9 @@ class LocationAssetStore:
     def publish_lod1(self, slug: str, expected_revision: int, credentials: dict) -> dict:
         return location_lod_resource.publish(self, slug, expected_revision, credentials)
 
+    def reuse_lod1(self, slug: str, source: dict, expected_revision: int) -> dict:
+        return location_lod_resource.reuse(self, slug, source, expected_revision)
+
     def lod1_history(self, slug: str) -> list[dict]:
         return location_lod_resource.history(self, slug)
 

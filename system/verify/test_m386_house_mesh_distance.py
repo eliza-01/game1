@@ -22,42 +22,31 @@ class M386HouseMeshDistance(unittest.TestCase):
         cls.model = (ROOT / 'system/studio-plugin/modules/StudioRealEstateModel.luau').read_text(encoding='utf-8')
         cls.estate = (ROOT / 'system/studio-plugin/modules/StudioRealEstateAppearance.luau').read_text(encoding='utf-8')
 
-    def test_backend_default_only_glass_and_opt_in_other_meshes(self):
-        parts = ('window_frames_glass', 'roof', 'door')
-        options = mesh_options(parts, {})
-        self.assertEqual(options['window_frames_glass']['loadDistanceStuds'], 50)
-        self.assertTrue(options['window_frames_glass']['distanceStreaming'])
-        self.assertFalse(options['roof']['distanceStreaming'])
-        custom = mesh_options(parts, {'window_frames_glass': {'distanceStreaming': False},
-                                    'roof': {'distanceStreaming': True, 'loadDistanceStuds': 95}})
-        self.assertFalse(custom['window_frames_glass']['distanceStreaming'])
-        self.assertEqual(custom['roof']['loadDistanceStuds'], 95)
-        self.assertTrue(custom['roof']['distanceStreaming'])
+    def test_real_estate_no_longer_owns_visual_distances(self):
+        parts=('window_frames_glass','roof','door')
+        for values in ({},{'roof': {'distanceStreaming': True, 'loadDistanceStuds': 95}}):
+            options=mesh_options(parts,values)
+            for row in options.values():
+                self.assertNotIn('distanceStreaming',row)
+                self.assertNotIn('loadDistanceStuds',row)
 
-    def test_backend_rejects_bad_values_and_does_not_corrupt_existing_mode(self):
-        for invalid in (True, 19, 1001, 35.5, '50', float('nan'), None):
-            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
-                mesh_options(('window_frames_glass',), {'window_frames_glass': {'loadDistanceStuds': invalid}})
-        for invalid in (0, 'yes', None):
-            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
-                mesh_options(('window_frames_glass',), {'window_frames_glass': {'distanceStreaming': invalid}})
-        row = mesh_options(('window_frames_glass',), {'window_frames_glass': {
-            'appearanceMode': 'material_atlas', 'visualMaterial': 'ForceField',
-            'visualColor': '#AABBCC', 'alphaEnabled': False,
-            'loadDistanceStuds': 50, 'distanceStreaming': True}})['window_frames_glass']
-        self.assertEqual((row['appearanceMode'], row['visualMaterial'], row['visualColor']),
-                         ('material_atlas', 'ForceField', '#AABBCC'))
+    def test_existing_material_authoring_is_unaffected(self):
+        row=mesh_options(('window_frames_glass',),{'window_frames_glass':{
+            'appearanceMode':'material_atlas','visualMaterial':'ForceField',
+            'visualColor':'#AABBCC','alphaEnabled':False,
+            'distanceStreaming':True,'loadDistanceStuds':50}})['window_frames_glass']
+        self.assertEqual((row['appearanceMode'],row['visualMaterial'],row['visualColor']),
+            ('material_atlas','ForceField','#AABBCC'))
+        self.assertNotIn('loadDistanceStuds',row)
 
-    def test_ui_options_are_per_part_and_survive_save(self):
-        for needle in ('realEstateState.distance=Object.fromEntries(meshNames',
-                       'realEstateState.distance[part] ||= ',
-                       'id="real-estate-distance-${esc(part)}"',
-                       'id="real-estate-distance-studs-${esc(part)}"',
-                       'distanceStreaming:realEstateState.distance[part]?.enabled===true',
-                       'loadDistanceStuds:realEstateState.distance[part]?.studs??50',
-                       "enabled:part==='window_frames_glass',studs:50"):
-            self.assertIn(needle, self.ui)
-        self.assertIn('real-estate.js?v=385a&visual=386', self.page)
+    def test_ui_distance_inputs_moved_out_of_real_estate(self):
+        for old in ('realEstateState.distance', 'real-estate-distance-${esc(part)}',
+                    'real-estate-distance-studs-${esc(part)}', 'loadDistanceStuds:'):
+            self.assertNotIn(old,self.ui)
+        lod=(ROOT/'system/control-center/static/lod-manager.js').read_text(encoding='utf-8')
+        self.assertIn('data-part-distance="lod1"',lod)
+        self.assertIn('data-part-distance="hide"',lod)
+        self.assertIn('/distances',lod)
 
     def test_studio_applies_tag_to_same_mesh_as_existing_visual_contract(self):
         self.assertIn('function StudioTextureAppearance.ApplyDistance(mesh: MeshPart, settings: any)', self.studio)

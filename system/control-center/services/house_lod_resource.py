@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 import time
 
-from services.model_lod_common import inspect_fbx, preserve_source, publish_geometry, sha256
+from services.model_lod_common import (inspect_fbx, preserve_source, publish_geometry, sha256,
+    check_revision, describe_resource, verified_source, reuse_values)
 from sqlite_connection import connect as connect_sqlite
 from services.house_runtime_profile import validate, readiness, DEFAULT
 
@@ -22,7 +23,10 @@ _sha = sha256
 def ensure_schema(store):
     with store.connect() as db:
         existing = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        if not {'real_estate_lod1', 'real_estate_streaming_profiles'}.issubset(existing):
+        current_cols = ({r[1] for r in db.execute('PRAGMA table_info(real_estate_lod1)')}
+                        if 'real_estate_lod1' in existing else set())
+        if (not {'real_estate_lod1', 'real_estate_streaming_profiles'}.issubset(existing)
+                or not {'reuse_domain','reuse_slug','reuse_revision'}.issubset(current_cols)):
             backup_dir = store.root / '.control-center' / 'backups'
             backup_dir.mkdir(parents=True, exist_ok=True)
             target = backup_dir / ('real_estate_runtime_pre_m387_' +
@@ -34,6 +38,12 @@ def ensure_schema(store):
             published_sha256 TEXT NOT NULL DEFAULT '', asset_id TEXT NOT NULL DEFAULT '',
             moderation_state TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL,
             published_at REAL, updated_at REAL NOT NULL)''')
+        for name, definition in (('reuse_domain', "TEXT NOT NULL DEFAULT ''"),
+                                 ('reuse_slug', "TEXT NOT NULL DEFAULT ''"),
+                                 ('reuse_revision', 'INTEGER NOT NULL DEFAULT 0')):
+            cols = {r[1] for r in db.execute('PRAGMA table_info(real_estate_lod1)')}
+            if name not in cols:
+                db.execute(f'ALTER TABLE real_estate_lod1 ADD COLUMN {name} {definition}')
         db.execute('''CREATE TABLE IF NOT EXISTS real_estate_lod1_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT, house_slug TEXT NOT NULL, revision INTEGER NOT NULL,
             asset_id TEXT NOT NULL, source_sha256 TEXT NOT NULL, published_at REAL NOT NULL)''')
@@ -45,7 +55,7 @@ def ensure_schema(store):
 def profile(store, slug):
     validate(slug, DEFAULT)
     with store.connect() as db:
-        row = db.execute('SELECT mode,lod1,hide,hysteresis,revision FROM real_estate_streaming_profiles WHERE house_slug=?', (slug,)).fetchone()
+        row = db.execute('SELECT mode,revision FROM real_estate_streaming_profiles WHERE house_slug=?', (slug,)).fetchone()
     return dict(row) if row else {**DEFAULT, 'revision': 0}
 
 
@@ -55,9 +65,8 @@ def save_profile(store, slug, values, expected_revision):
     values = validate(slug, values)
     if type(expected_revision) is not int or expected_revision < 0:
         raise ValueError('expected profile revision is required')
-    lod = describe(store, slug)
     house = store.get(slug)
-    result = readiness(house, values, lod)
+    result = readiness(house, values, house.get('partLod1', {}))
     if values['mode'] == 'lod1':
         blockers = [warning for warning in result['warnings'] if not warning.startswith('Publish all house meshes')]
         if blockers:
@@ -69,9 +78,8 @@ def save_profile(store, slug, values, expected_revision):
             raise ValueError('house runtime profile changed; reload before saving')
         db.execute('''INSERT INTO real_estate_streaming_profiles
             (house_slug,mode,lod1,hide,hysteresis,revision) VALUES(?,?,?,?,?,?)
-            ON CONFLICT(house_slug) DO UPDATE SET mode=excluded.mode,lod1=excluded.lod1,
-            hide=excluded.hide,hysteresis=excluded.hysteresis,revision=excluded.revision''',
-            (slug, values['mode'], values['lod1'], values['hide'], values['hysteresis'], expected_revision+1))
+            ON CONFLICT(house_slug) DO UPDATE SET mode=excluded.mode,revision=excluded.revision''',
+            (slug, values['mode'], 150, 400, 10, expected_revision+1))
     store.export()
     return profile(store, slug)
 
@@ -80,22 +88,12 @@ def describe(store, slug):
     validate(slug, DEFAULT)
     with store.connect() as db:
         value = db.execute('SELECT * FROM real_estate_lod1 WHERE house_slug=?', (slug,)).fetchone()
-    if not value:
-        return {'revision': 0, 'status': 'NOT_REGISTERED', 'sourcePath': '',
-                'sourceSha256': '', 'publishedSha256': '', 'modelAssetId': '', 'moderationState': ''}
-    row = dict(value)
-    path = (store.root / row['source_path']).resolve()
-    available = path.is_relative_to(store.root) and path.is_file() and _sha(path) == row['source_sha256']
     current_full = store._raw_get(slug) if hasattr(store, '_raw_get') else None
     if current_full is None:
         with store.connect() as db:
             current_full = db.execute('SELECT model_sha256 FROM real_estate WHERE slug=?', (slug,)).fetchone()
-    full_changed = bool(current_full and current_full['model_sha256'] != row['full_source_sha256'])
-    status = ('SOURCE_MISSING' if not available else 'FULL_CHANGED' if full_changed else 'PUBLISHED' if row['asset_id'] and row['source_sha256'] == row['published_sha256']
-              else 'UPDATE_AVAILABLE' if row['asset_id'] else 'STAGED')
-    return {'revision': row['revision'], 'status': status, 'sourcePath': row['source_path'],
-            'sourceSha256': row['source_sha256'], 'publishedSha256': row['published_sha256'],
-            'modelAssetId': row['asset_id'], 'moderationState': row['moderation_state']}
+    full_changed = bool(value and current_full and current_full['model_sha256'] != value['full_source_sha256'])
+    return describe_resource(value, store.root, full_changed=full_changed)
 
 
 def history(store, slug):
@@ -113,9 +111,8 @@ def stage(store, slug, source_path, expected_revision):
         raise ValueError('expected LOD1 revision is required')
     source, digest = inspect_fbx(source_path, f'{slug}_lod1.fbx')
     current = describe(store, slug)
-    if current['revision'] != expected_revision:
-        raise ValueError('house LOD1 revision changed; refresh')
-    if current['sourceSha256'] == digest and current['status'] != 'SOURCE_MISSING':
+    check_revision(expected_revision, current['revision'], label='house LOD1')
+    if current['sourceSha256'] == digest and current['status'] != 'SOURCE_MISSING' and not current['reuse']:
         return current
     # Content-addressed source revisions: a stale UI request must never
     # overwrite the bytes of a previously published LOD1 revision.
@@ -134,7 +131,8 @@ def stage(store, slug, source_path, expected_revision):
         db.execute('''INSERT INTO real_estate_lod1(house_slug,source_path,source_sha256,full_source_sha256,revision,updated_at)
             VALUES(?,?,?,?,?,?) ON CONFLICT(house_slug) DO UPDATE SET source_path=excluded.source_path,
             source_sha256=excluded.source_sha256,full_source_sha256=excluded.full_source_sha256,
-            revision=excluded.revision,updated_at=excluded.updated_at''',
+            revision=excluded.revision,updated_at=excluded.updated_at,
+            reuse_domain='',reuse_slug='',reuse_revision=0''',
             (slug,target.relative_to(store.root).as_posix(),digest,full_sha,expected_revision+1,time.time()))
     store.export()
     return describe(store, slug)
@@ -145,15 +143,12 @@ def publish(store, slug, expected_revision, credentials):
     if not store.get(slug):
         raise ValueError('unknown house type')
     lod = describe(store, slug)
-    if type(expected_revision) is not int or lod['revision'] != expected_revision:
-        raise ValueError('LOD1 revision changed; reload')
+    check_revision(expected_revision, lod['revision'])
     if lod['status'] == 'PUBLISHED':
         return lod
     if lod['status'] not in {'STAGED', 'UPDATE_AVAILABLE'}:
         raise ValueError('register a current LOD1 FBX first')
-    path = (store.root / lod['sourcePath']).resolve()
-    if not path.is_relative_to(store.root) or _sha(path) != lod['sourceSha256']:
-        raise ValueError('LOD1 file changed; register again')
+    path = verified_source(store.root, lod)
     result = publish_geometry(store.root, path, slug, credentials, description='game1 house LOD1')
     with store.connect() as db:
         db.execute('BEGIN IMMEDIATE')
@@ -167,5 +162,33 @@ def publish(store, slug, expected_revision, credentials):
             WHERE house_slug=?''', (str(result.asset_id),lod['sourceSha256'],result.moderation_state or '',time.time(),slug))
         db.execute('INSERT INTO real_estate_lod1_history(house_slug,revision,asset_id,source_sha256,published_at) VALUES(?,?,?,?,?)',
             (slug,expected_revision,str(result.asset_id),lod['sourceSha256'],time.time()))
+    store.export()
+    return describe(store, slug)
+
+
+def reuse(store, slug: str, source: dict, expected_revision: int) -> dict:
+    validate(slug, DEFAULT)
+    if not store.get(slug):
+        raise ValueError('unknown house type')
+    full_sha = store.get(slug)['model_sha256']
+    with store.connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        old = db.execute('SELECT revision FROM real_estate_lod1 WHERE house_slug=?', (slug,)).fetchone()
+        pinned = reuse_values(source, 'house', slug, expected_revision, old['revision'] if old else 0)
+        db.execute('''INSERT INTO real_estate_lod1 (
+            house_slug,source_path,source_sha256,full_source_sha256,published_sha256,
+            asset_id,moderation_state,revision,published_at,updated_at,
+            reuse_domain,reuse_slug,reuse_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(house_slug) DO UPDATE SET
+            source_path=excluded.source_path,source_sha256=excluded.source_sha256,
+            full_source_sha256=excluded.full_source_sha256,
+            published_sha256=excluded.published_sha256,asset_id=excluded.asset_id,
+            moderation_state=excluded.moderation_state,revision=excluded.revision,
+            updated_at=excluded.updated_at,published_at=excluded.published_at,
+            reuse_domain=excluded.reuse_domain,reuse_slug=excluded.reuse_slug,
+            reuse_revision=excluded.reuse_revision''',
+            (slug,'',pinned['source_sha256'],full_sha,pinned['published_sha256'],
+             pinned['asset_id'],pinned['moderation_state'],pinned['revision'],
+             time.time(),time.time(),pinned['reuse_domain'],pinned['reuse_slug'],pinned['reuse_revision']))
     store.export()
     return describe(store, slug)

@@ -229,9 +229,17 @@ class LocationLodManager:
                 house_summaries.append({
                     'slug':house['slug'], 'count':placed_counts.get(house['slug'],0),
                     'mode':runtime.get('mode','off'),
-                    'profile': {k:runtime.get(k) for k in ('mode','lod1','hide','hysteresis','revision')},
+                    'profile': {k:runtime.get(k) for k in ('mode','revision')},
                     'fullStatus': house.get('status','NOT_REGISTERED'),
-                    'lod1Status':(house.get('lod1') or {}).get('status','NOT_REGISTERED'),
+                    'lod1Status': ('PUBLISHED' if house.get('meshParts') and all(
+                        (house.get('partLod1') or {}).get(part,{}).get('status') == 'PUBLISHED'
+                        for part in house['meshParts']) else 'PARTIAL'),
+                    'partLod1': house.get('partLod1') or {},
+                    'partStreaming': house.get('partStreaming') or {},
+                    'parts': [{'name':part,
+                        'appearance':(house.get('meshOptions') or {}).get(part,{}).get('appearanceMode','material'),
+                        'color':(house.get('meshOptions') or {}).get(part,{}).get('visualColor','#FFFFFF')}
+                        for part in house.get('meshParts',[])],
                     'ready':(house.get('runtimeReadiness') or {}).get('readyForCompilation',False),
                     'warnings':(house.get('runtimeReadiness') or {}).get('warnings',[]),
                 })

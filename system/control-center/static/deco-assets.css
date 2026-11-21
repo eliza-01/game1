@@ -287,3 +287,15 @@
 #location-asset-edit-dialog .la-model-appearance [data-la-model-visual-fields] {display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
 #location-asset-edit-dialog .la-model-appearance .shared-atlas-editor {min-width:0;}
 #location-asset-edit-dialog [hidden] {display:none!important;}
+
+/* M411 shared published LOD1 picker (Location Assets + Real Estate). */
+.lod-reuse-dialog {width:min(620px,95vw);max-height:80vh;overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);padding:20px;box-shadow:0 24px 56px #0005;}
+.lod-reuse-dialog::backdrop {background:#0008;}
+.lod-reuse-dialog p {font-size:12px;color:var(--muted);}
+.lod-reuse-filters {display:flex;gap:8px;margin:12px 0;}
+.lod-reuse-filters input {flex:1;min-width:0;}
+.lod-reuse-list {display:grid;gap:6px;max-height:50vh;overflow:auto;margin:12px 0;}
+.lod-reuse-row {display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px;border:1px solid var(--line);border-radius:8px;}
+.lod-reuse-row>div {display:grid;gap:4px;min-width:0;}
+.lod-reuse-row strong {overflow-wrap:anywhere;}
+.lod-reuse-row small {color:var(--muted);overflow-wrap:anywhere;}

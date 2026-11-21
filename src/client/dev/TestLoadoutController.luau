@@ -12,13 +12,14 @@ local MeleeArcGeometry = require(CombatShared:WaitForChild("MeleeArcGeometry"))
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local HouseSocketDebugController = require(script.Parent:WaitForChild("HouseSocketDebugController"))
 local MeleeArcPreview = require(script.Parent:WaitForChild("MeleeArcPreview"))
+local DebugRangeCylinder = require(script.Parent:WaitForChild("DebugRangeCylinder"))
 
 local TestLoadoutController = {}
 local started = false
 local player = Players.LocalPlayer
 
 local PANEL_WIDTH = 320
-local PANEL_EXPANDED_HEIGHT = 574
+local PANEL_EXPANDED_HEIGHT = 688
 local PANEL_COLLAPSED_SIZE = 44
 local CONTENT_WIDTH = PANEL_WIDTH - 32
 local DEBUG_PANEL_OPEN_ATTRIBUTE = "Game1DebugPanelOpen"
@@ -524,21 +525,44 @@ local function createGui()
     targetHitboxToggle.TextSize = 10
     targetHitboxToggle.Font = Enum.Font.GothamSemibold
 
+    -- Independent world-range ruler. Unlike attack radius it never changes gameplay.
+    sectionCaption(body, "World range · studs · height 200", 362)
+    local rangeSteps = {-50, -10, -5, 5, 10, 50}
+    local rangeControls = {}
+    for index, step in ipairs(rangeSteps) do
+        local rangeStep = button(body, (step > 0 and "+" or "") .. tostring(step))
+        rangeStep.Position = UDim2.fromOffset((index <= 3 and (index - 1) * 37 or 182 + (index - 4) * 37), 380)
+        rangeStep.Size = UDim2.fromOffset(32, 32)
+        rangeStep.TextSize = 10
+        rangeStep:SetAttribute("DeltaStuds", step)
+        rangeControls[index] = rangeStep
+    end
+    local rangeBox = numericBox(body, "50")
+    rangeBox.Position = UDim2.fromOffset(111, 380)
+    rangeBox.Size = UDim2.fromOffset(66, 32)
+    rangeBox.TextXAlignment = Enum.TextXAlignment.Center
+    rangeBox.Text = "50"
+    local rangeToggle = button(body, "WORLD RANGE: OFF")
+    rangeToggle.Position = UDim2.fromOffset(0, 418)
+    rangeToggle.Size = UDim2.new(1, 0, 0, 28)
+    rangeToggle.TextSize = 10
+    rangeToggle.Font = Enum.Font.GothamSemibold
+
     local statusDot = Instance.new("Frame")
     statusDot.BackgroundColor3 = COLORS.muted
     statusDot.BorderSizePixel = 0
-    statusDot.Position = UDim2.fromOffset(2, 365)
+    statusDot.Position = UDim2.fromOffset(2, 477)
     statusDot.Size = UDim2.fromOffset(6, 6)
     statusDot.Parent = body
     corner(statusDot, 3)
 
     local status = textLabel(body, "Loading catalog…", 9, false)
     status.TextColor3 = COLORS.muted
-    status.Position = UDim2.fromOffset(14, 358)
+    status.Position = UDim2.fromOffset(14, 470)
     status.Size = UDim2.new(1, -14, 0, 20)
 
     local apply = button(body, "LOADING…")
-    apply.Position = UDim2.fromOffset(0, 384)
+    apply.Position = UDim2.fromOffset(0, 496)
     apply.Size = UDim2.new(1, 0, 0, 34)
     apply.BackgroundColor3 = COLORS.disabled
     apply.TextColor3 = COLORS.muted
@@ -546,10 +570,10 @@ local function createGui()
     apply.TextSize = 10
     apply.Active = false
 
-    HouseSocketDebugController.AttachLauncher(body, 428)
+    HouseSocketDebugController.AttachLauncher(body, 540)
     local runtimeStats = textLabel(body, "", 10, false)
     runtimeStats.Name = "ActualRuntimeStats"
-    runtimeStats.Position = UDim2.fromOffset(1, 470)
+    runtimeStats.Position = UDim2.fromOffset(1, 582)
     runtimeStats.Size = UDim2.new(1, -2, 0, 28)
     runtimeStats.TextWrapped = true
     runtimeStats.TextYAlignment = Enum.TextYAlignment.Top
@@ -582,7 +606,7 @@ local function createGui()
     end)
     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
 
-    return gui, character, category, weapon, meta, runtimeStats, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, apply, status, statusDot
+    return gui, character, category, weapon, meta, runtimeStats, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, rangeBox, rangeControls, rangeToggle, apply, status, statusDot
 end
 
 function TestLoadoutController.Start()
@@ -603,7 +627,7 @@ function TestLoadoutController.Start()
             return
         end
 
-        local gui, characterDropdown, categorySelector, weaponDropdown, meta, runtimeStats, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, applyButton, status, statusDot = createGui()
+        local gui, characterDropdown, categorySelector, weaponDropdown, meta, runtimeStats, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, rangeBox, rangeControls, rangeToggle, applyButton, status, statusDot = createGui()
         local playerGui = player:WaitForChild("PlayerGui")
         local catalog = catalogRemote:InvokeServer()
         local weaponRows = catalog.weapons or {}
@@ -658,6 +682,33 @@ function TestLoadoutController.Start()
         end
         setRingVisible(false)
         radiusToggle.Activated:Connect(function() setRingVisible(not ringVisible) end)
+
+        local rangePreview = DebugRangeCylinder.new()
+        local rangeVisible = false
+        local function updateRangeControls()
+            rangeBox.Text = string.format("%g", rangePreview:GetRange())
+            rangeToggle.Text = rangeVisible and "WORLD RANGE: ON" or "WORLD RANGE: OFF"
+            rangeToggle.BackgroundColor3 = rangeVisible and COLORS.controlSelected or COLORS.control
+            rangeToggle.TextColor3 = rangeVisible and COLORS.accent or COLORS.text
+        end
+        for _, rangeStep in ipairs(rangeControls) do
+            rangeStep.Activated:Connect(function()
+                local step = tonumber(rangeStep:GetAttribute("DeltaStuds")) or 0
+                rangePreview:SetRange(rangePreview:GetRange() + step)
+                updateRangeControls()
+            end)
+        end
+        rangeBox.FocusLost:Connect(function()
+            local value = tonumber(rangeBox.Text)
+            if value then rangePreview:SetRange(value) end
+            updateRangeControls()
+        end)
+        rangeToggle.Activated:Connect(function()
+            rangeVisible = not rangeVisible
+            rangePreview:SetVisible(rangeVisible)
+            updateRangeControls()
+        end)
+        updateRangeControls()
 
         local rayParams = RaycastParams.new()
         rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -995,6 +1046,7 @@ function TestLoadoutController.Start()
             panelOpenedConnection:Disconnect()
             for _, connection in ipairs(characterConnections) do connection:Disconnect() end
             ringPreview:Destroy()
+            rangePreview:Destroy()
             if hitboxConnection then hitboxConnection:Disconnect() end
             targetPreview.folder:Destroy()
         end)

@@ -2822,7 +2822,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -3633,7 +3634,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": null,
       "rigManifest": null,
@@ -3736,7 +3738,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": null,
       "rigManifest": null,
@@ -3839,7 +3842,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -4014,7 +4018,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -4189,7 +4194,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -4364,7 +4370,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -4548,7 +4555,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -4786,7 +4794,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": null,
       "rigManifest": null,
@@ -4914,7 +4923,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -8288,7 +8298,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -8576,7 +8587,8 @@
         "sourceSha256": "d57033740769db1dfa04613144d776215f9cefa65adcb55c4cff896f3ab0cbe1",
         "publishedSha256": "d57033740769db1dfa04613144d776215f9cefa65adcb55c4cff896f3ab0cbe1",
         "modelAssetId": "91896785734146",
-        "moderationState": "Approved"
+        "moderationState": "Approved",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -8751,7 +8763,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -8931,7 +8944,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -9106,7 +9120,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -9286,7 +9301,8 @@
         "sourceSha256": "5746b884c7c3a7373220fd8f50678903b163c91c8f404abe64ea5187974a846f",
         "publishedSha256": "5746b884c7c3a7373220fd8f50678903b163c91c8f404abe64ea5187974a846f",
         "modelAssetId": "138953598549622",
-        "moderationState": "Approved"
+        "moderationState": "Approved",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -9461,7 +9477,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -9701,7 +9718,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -10097,7 +10115,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -10375,7 +10394,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -10652,7 +10672,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -10929,7 +10950,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -11209,7 +11231,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -11484,7 +11507,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -11790,7 +11814,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": null,
       "rigManifest": null,
@@ -11893,7 +11918,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": null,
       "rigManifest": null,
@@ -11996,7 +12022,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": null,
       "rigManifest": null,
@@ -12099,7 +12126,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -12285,7 +12313,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -12466,7 +12495,8 @@
         "sourceSha256": "6e2f189aac6c5eda992e1c180be7757caf748d4ca0219d87e6255cedfbaac036",
         "publishedSha256": "6e2f189aac6c5eda992e1c180be7757caf748d4ca0219d87e6255cedfbaac036",
         "modelAssetId": "99666277072546",
-        "moderationState": "Approved"
+        "moderationState": "Approved",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -12641,7 +12671,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -12823,7 +12854,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -13104,7 +13136,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": null,
       "rigManifest": null,
@@ -13236,7 +13269,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -16655,7 +16689,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -16864,7 +16899,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -17413,7 +17449,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": null,
       "rigManifest": null,
@@ -17516,7 +17553,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,
@@ -17675,7 +17713,8 @@
         "sourceSha256": "",
         "publishedSha256": "",
         "modelAssetId": "",
-        "moderationState": ""
+        "moderationState": "",
+        "reuse": null
       },
       "fbxAnalysis": {
         "schemaVersion": 1,

@@ -52,9 +52,9 @@ class LodAuthoring(unittest.TestCase):
             self.assertEqual(kwargs['texture_mode'], 'geometry_only')
             yield source
         output = SimpleNamespace(asset_id='34567890', operation_path='operations/lod1', moderation_state='Approved')
-        with patch('services.location_lod_resource.staged_model', fake_staged), \
-             patch('services.location_lod_resource.create_model_asset', return_value='operations/lod1') as creator, \
-             patch('services.location_lod_resource.wait_for_operation', return_value=output):
+        with patch('services.model_lod_common.staged_model', fake_staged), \
+             patch('services.model_lod_common.create_model_asset', return_value='operations/lod1') as creator, \
+             patch('services.model_lod_common.wait_for_operation', return_value=output):
             published = self.store.publish_lod1(self.slug, 1,
                 {'apiKey':'example','creatorId':'123','creatorType':'User'})
             self.assertEqual(published['status'], 'PUBLISHED')
@@ -62,7 +62,7 @@ class LodAuthoring(unittest.TestCase):
             self.assertEqual(creator.call_args.kwargs['display_name'], 'test_fence_lod1')
         lua = (self.root / 'src/shared/world/LocationAssetRegistry.luau').read_text()
         self.assertIn('lod1ModelAssetId = "34567890"', lua)
-        with patch('services.location_lod_resource.create_model_asset') as creator:
+        with patch('services.model_lod_common.create_model_asset') as creator:
             self.assertEqual(self.store.publish_lod1(self.slug, 1, {})['status'], 'PUBLISHED')
             creator.assert_not_called()
         self.lod.write_bytes(b'; FBX 7.4.0\nFBXHeaderExtension: {}\nLOD1 edited')

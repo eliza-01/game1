@@ -116,26 +116,25 @@ local function validHouseData(houses)
         if count > Contract.MaxTargets or type(slug) ~= "string"
             or not slug:match("^house_level%d+_%d%d$") or type(profile) ~= "table"
             or not (profile.mode == "full" or profile.mode == "lod1")
-            or type(profile.lod1) ~= "number" or type(profile.hide) ~= "number"
-            or type(profile.hysteresis) ~= "number" or profile.lod1 < 20
-            or profile.lod1 >= profile.hide or profile.hide > 10000
-            or profile.hysteresis < 0 or profile.hysteresis > 100
-            or profile.lod1 <= profile.hysteresis
-            or profile.hide - profile.lod1 <= 2 * profile.hysteresis
-            or (profile.mode == "lod1" and
-                (not tonumber(profile.lod1ModelAssetId) or tonumber(profile.lod1ModelAssetId) <= 0))
             or type(profile.parts) ~= "table" or #profile.parts < 1 or #profile.parts > 100 then
             return false, "invalid house streaming profile: " .. tostring(slug)
         end
         local names = {}
+        local lodParts = 0
         for _, part in ipairs(profile.parts) do
             if type(part) ~= "table" or type(part.name) ~= "string" or names[part.name]
                 or not paths(part.path, 12) or not numbers(part.cframe, 12, false)
                 or not numbers(part.size, 3, true) or not tonumber(part.meshId)
-                or type(part.distance) ~= "number" or part.distance < 20
-                or part.distance > 10000 or part.distance ~= math.floor(part.distance)
+                or type(part.lod1From) ~= "number" or part.lod1From < 20
+                or part.lod1From ~= math.floor(part.lod1From)
+                or type(part.hideFrom) ~= "number" or part.hideFrom > 10000
+                or part.hideFrom ~= math.floor(part.hideFrom)
+                or part.hideFrom - part.lod1From <= 20
                 or type(part.moving) ~= "boolean" or type(part.alpha) ~= "boolean"
                 or type(part.doubleSided) ~= "boolean"
+                or type(part.lod1ModelAssetId) ~= "string"
+                or (part.lod1ModelAssetId ~= "" and (not tonumber(part.lod1ModelAssetId)
+                    or tonumber(part.lod1ModelAssetId) <= 0))
                 or not (part.mode == "material" or part.mode == "atlas"
                     or part.mode == "material_atlas")
                 or type(part.material) ~= "string" or type(part.color) ~= "string"
@@ -143,6 +142,10 @@ local function validHouseData(houses)
                 return false, "invalid house visual descriptor"
             end
             names[part.name] = true
+            if part.lod1ModelAssetId ~= "" then lodParts += 1 end
+        end
+        if profile.mode == "lod1" and lodParts == 0 then
+            return false, "house has no published LOD1 parts: " .. tostring(slug)
         end
         profiles[slug] = true
     end

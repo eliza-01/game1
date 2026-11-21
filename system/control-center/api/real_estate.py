@@ -62,12 +62,60 @@ def write(path, body, deps):
         return None
     store = deps['real_estate']
     try:
+        # This is a thin domain adapter. Shared LOD publishing and provenance
+        # remain in model_lod_common / lod_reuse_catalog.
+        if '/parts/' in path and path.endswith(('/lod1-reuse','/lod1-stage','/lod1-publish')):
+            prefix, tail = path.split('/parts/', 1)
+            slug = unquote(prefix[len('/api/real-estate/'):].strip('/'))
+            part, action = tail.rsplit('/', 1)
+            part = unquote(part)
+            payload = body()
+            if not HOUSE_NAME.fullmatch(slug) or not isinstance(payload, dict):
+                raise ValueError('invalid house part LOD request')
+            if action == 'lod1-reuse':
+                from services.lod_reuse_catalog import selection, confirmed_source
+                parsed = selection(payload)
+                source = confirmed_source({'location': deps['location_assets'],
+                                           'house': store, 'house_part': store},
+                    parsed['sourceDomain'], parsed['sourceSlug'],
+                    parsed['sourceRevision'], parsed['sourceModelAssetId'])
+                result = store.reuse_part_lod1(slug, part, source, parsed['expectedRevision'])
+            elif action == 'lod1-stage':
+                if set(payload) != {'sourcePath','expectedRevision'}:
+                    raise ValueError('invalid part LOD stage request')
+                result = store.stage_part_lod1(slug, part, payload['sourcePath'], payload['expectedRevision'])
+            else:
+                if set(payload) != {'expectedRevision','description'}:
+                    raise ValueError('invalid part LOD publish request')
+                credentials = deps['publication_credentials'](str(payload['description']))
+                result = store.publish_part_lod1(slug, part, payload['expectedRevision'], credentials)
+            return 200, {'lod1': result}
+        if '/parts/' in path and path.endswith('/distances'):
+            prefix, tail = path.split('/parts/', 1)
+            slug = unquote(prefix[len('/api/real-estate/'):].strip('/'))
+            part = unquote(tail[:-len('/distances')].strip('/'))
+            payload=body()
+            if (not HOUSE_NAME.fullmatch(slug) or not isinstance(payload,dict)
+                    or set(payload) != {'distances','expectedRevision'}):
+                raise ValueError('invalid house part distances request')
+            return 200, {'distances':store.save_part_distances(
+                slug,part,payload['distances'],payload['expectedRevision'])}
         if path.startswith('/api/real-estate/') and path.endswith('/runtime-profile'):
             slug = unquote(path[len('/api/real-estate/'):-len('/runtime-profile')].strip('/'))
             payload = body()
             if not HOUSE_NAME.fullmatch(slug) or not isinstance(payload, dict) or set(payload) != {'profile','expectedRevision'}:
                 raise ValueError('invalid house runtime profile request')
             return 200, {'profile': store.save_runtime_profile(slug, payload['profile'], payload['expectedRevision'])}
+        if path.startswith('/api/real-estate/') and path.endswith('/lod1-reuse'):
+            from services.lod_reuse_catalog import selection, confirmed_source
+            slug = unquote(path[len('/api/real-estate/'):-len('/lod1-reuse')].strip('/'))
+            if not HOUSE_NAME.fullmatch(slug):
+                raise ValueError('invalid house type')
+            payload = selection(body())
+            source = confirmed_source({'location': deps['location_assets'], 'house': store, 'house_part': store},
+                                      payload['sourceDomain'], payload['sourceSlug'],
+                                      payload['sourceRevision'], payload['sourceModelAssetId'])
+            return 200, {'lod1': store.reuse_lod1(slug, source, payload['expectedRevision'])}
         if path.startswith('/api/real-estate/') and path.endswith('/lod1-stage'):
             slug = unquote(path[len('/api/real-estate/'):-len('/lod1-stage')].strip('/'))
             payload = body()

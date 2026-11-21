@@ -10,6 +10,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+
+from services.model_lod_common import distances_valid
 import re
 import tempfile
 
@@ -56,7 +58,7 @@ def validate_settings(settings):
     if any(type(distances[k]) is not int or not (0 <= distances[k] <= 10000) for k in distances):
         raise ValueError('LOD distances must be integer studs, between 0 and 10000')
     first, second, hide, h = (distances[k] for k in ('lod1', 'lod2', 'hide', 'hysteresis'))
-    if not (16 <= first < second < hide <= 10000 and h <= 100 and first > h and second-first > 2*h and hide-second > 2*h):
+    if not distances_valid((first, second), hide, h, minimum=16):
         raise ValueError('Require 16 <= LOD1 < LOD2 < Hide, with enough space for hysteresis')
     world = settings['workspace']
     if not isinstance(world, dict) or set(world) != set(DEFAULT_SETTINGS['workspace']):

@@ -62,3 +62,18 @@
 #lod-manager-view .lm-stream-mode{min-width:118px;width:100%;font-size:12px}
 #lod-manager-view .lm-stream-status{margin-top:4px;color:var(--muted);font-size:11px}
 #lod-manager-view .lm-table table{min-width:900px}
+
+/* One LOD readiness surface, two domain authoring presentations. */
+#lod-manager-view .lm-domain-tabs{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+#lod-manager-view .lm-domain-tabs button{font:inherit;font-size:12px;padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--text)}
+#lod-manager-view .lm-domain-tabs button[aria-selected="true"]{border-color:var(--mint);background:var(--panel);font-weight:700}
+#lod-manager-view [hidden]{display:none!important}
+#lod-manager-view .lm-house-parts{margin-top:8px}
+#lod-manager-view .lm-house-parts summary{cursor:pointer;font-weight:600}
+#lod-manager-view .lm-house-part{padding:9px 2px;border-bottom:1px solid var(--line)}
+#lod-manager-view .lm-house-part .actions{margin-top:5px;flex-wrap:wrap}
+#lod-manager-view .lm-house-part small{display:block;color:var(--muted)}
+#lod-manager-view .lm-house-profile{margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:8px}
+#lod-manager-view .lm-house-profile-fields{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 8px}
+#lod-manager-view .lm-house-profile-fields label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+#lod-manager-view .lm-house-profile-fields input{max-width:115px}

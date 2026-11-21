@@ -16,14 +16,15 @@ local MAX_PENDING = 4
 local RETRY_SECONDS = 15
 
 type Visual = {
-    spec: any, desired: boolean, part: MeshPart?, fetching: boolean,
+    spec: any, desired: string?, part: MeshPart?, lodPart: MeshPart?,
+    templateName: string, fetching: boolean,
     generation: number, retryAt: number, proxy: BasePart?,
     worldFrame: CFrame, worldSize: Vector3,
 }
 type House = {
     slug: string, plotIndex: number, path: {string}, pivot: CFrame,
-    mode: string, config: any, desired: string?, state: string, scale: number,
-    visual: {Visual}, lod: MeshPart?, distance: number, root: Model?,
+    mode: string, config: any, state: string, scale: number,
+    visual: {Visual}, distance: number, root: Model?,
 }
 
 local function fromComponents(values): CFrame
@@ -63,7 +64,8 @@ function Adapter.new(houses: any, cache: Instance)
             local localFrame = fromComponents(spec.cframe)
             local worldFrame = pivot * CFrame.new(localFrame.Position * row.scale)
                 * localFrame.Rotation
-            table.insert(entries, {spec = spec, desired = false, part = nil,
+            table.insert(entries, {spec = spec, desired = nil, part = nil,
+                lodPart = nil, templateName = "__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId),
                 fetching = false, generation = 0, retryAt = 0, proxy = nil,
                 worldFrame = worldFrame,
                 worldSize = Vector3.new(table.unpack(spec.size)) * row.scale})
@@ -72,8 +74,8 @@ function Adapter.new(houses: any, cache: Instance)
             slug = row.slug, plotIndex = row.plotIndex, path = row.path,
             pivot = fromComponents(row.pivot), scale = row.scale,
             mode = config.mode, config = config,
-            desired = nil, state = "UNLOADED", visual = entries,
-            lod = nil, distance = math.huge, root = nil,
+            state = "UNLOADED", visual = entries,
+            distance = math.huge, root = nil,
         })
     end
     return self
@@ -105,18 +107,21 @@ end
 
 function Adapter:Resolve(cameraPosition: Vector3)
     for _, house: House in ipairs(self.records) do
-        local origin = house.pivot.Position
-        -- House group LOD has priority over EVERY individual mesh radius.
-        house.distance = (cameraPosition - origin).Magnitude
-        house.desired = Policy.ResolveHouse(house.distance, house.desired, house.config)
+        house.distance = math.huge
         for _, visual: Visual in ipairs(house.visual) do
             local spec = visual.spec
-            local distance = surfaceDistance(cameraPosition, visual.worldFrame,
-                visual.worldSize)
-            local wanted = house.desired == "FULL" and
-                Policy.WithinRange(distance, visual.desired, spec.distance, 10)
-            if wanted ~= visual.desired then
-                visual.desired = wanted
+            local distance = surfaceDistance(cameraPosition, visual.worldFrame, visual.worldSize)
+            house.distance = math.min(house.distance, distance)
+            -- No published per-part LOD1: FULL stays until THIS part's unload
+            -- distance. Never create a visibility gap before a group LOD switch.
+            local mode = if house.mode == "lod1" and spec.lod1ModelAssetId ~= ""
+                then "lod1" else "full"
+            local nextState = Policy.ResolveHouse(distance, visual.desired, {
+                mode = mode, lod1 = spec.lod1From, hide = spec.hideFrom,
+                hysteresis = Policy.HouseHysteresis,
+            })
+            if nextState ~= visual.desired then
+                visual.desired = nextState
                 visual.generation += 1
             end
         end
@@ -165,6 +170,12 @@ function Adapter:_startVisual(house: House, visual: Visual)
                     color = visual.spec.color, textureId = visual.spec.textureId,
                     alpha = visual.spec.alpha,
                 }) then error("unsupported visual appearance") end
+                -- Custom colors belong to the player's house proxy, not to
+                -- the potentially shared published LOD geometry.
+                if proxy and visual.spec.mode ~= "atlas" then
+                    part.Color = proxy.Color
+                    part.Material = proxy.Material
+                end
             end)
             if not success then
                 warn("[game1][HouseLOD] appearance rejected " .. tostring(reason))
@@ -174,7 +185,7 @@ function Adapter:_startVisual(house: House, visual: Visual)
         end
         visual.fetching = false
         self.pending -= 1
-        if part and visual.desired and house.desired == "FULL"
+        if part and visual.desired == "FULL"
             and visual.generation == ticket
             and (not visual.spec.moving or (proxy ~= nil and proxy:IsDescendantOf(Workspace))) then
             visual.part = part
@@ -193,66 +204,81 @@ function Adapter:_startVisual(house: House, visual: Visual)
     return true
 end
 
--- Caller allocates the very same budget used for Location FULL/LOD updates.
+-- The existing LocationWorldStreamer grants this adapter its shared budget.
+-- Every part transitions independently; no group-wide render gate.
 function Adapter:Step(budget: number): number
     local operations = 0
     table.sort(self.records, function(a: House, b: House)
-        local unloadA = a.desired ~= "FULL" and a.state == "FULL"
-        local unloadB = b.desired ~= "FULL" and b.state == "FULL"
-        if unloadA ~= unloadB then return unloadA end
         return a.distance < b.distance
     end)
     for _, house: House in ipairs(self.records) do
         if operations >= budget then break end
-        if house.desired ~= "FULL" then
-            for _, visual: Visual in ipairs(house.visual) do
-                if operations >= budget then break end
-                if self:_removeVisual(visual) then operations += 1 end
+        local hasFull, hasLod = false, false
+        for _, visual: Visual in ipairs(house.visual) do
+            if operations >= budget then break end
+            local desired = visual.desired
+            if desired ~= "FULL" and self:_removeVisual(visual) then
+                operations += 1
             end
-        end
-        if house.desired ~= "LOD1" and house.lod and operations < budget then
-            house.lod:Destroy()
-            house.lod = nil
-            operations += 1
-        end
-        if house.desired == "LOD1" and not house.lod and operations < budget then
-            local anyFull = false
-            for _, visual: Visual in ipairs(house.visual) do
-                if visual.part or visual.fetching then anyFull = true break end
+            if desired ~= "LOD1" and visual.lodPart then
+                visual.lodPart:Destroy()
+                visual.lodPart = nil
+                operations += 1
             end
-            if not anyFull then
-                local prototype = self.cache:FindFirstChild(house.slug .. "__HOUSE_LOD1")
+            -- Never show FULL and LOD together, including under low budget.
+            if operations < budget and desired == "LOD1"
+                and not visual.part and not visual.fetching and not visual.lodPart then
+                local prototype = self.cache:FindFirstChild(visual.templateName)
                 if prototype and prototype:IsA("MeshPart") then
                     local lod = prototype:Clone()
+                    lod.Name = visual.spec.name .. "__LOD1"
                     lod.Anchored = true
                     lod.CanCollide = false
                     lod.CanTouch = false
                     lod.CanQuery = false
-                    lod:PivotTo(house.pivot)
-                    if house.scale ~= 1 then lod.Size *= house.scale end
-                    lod.Parent = self.folder
-                    house.lod = lod
-                    operations += 1
+                    lod.Size = visual.worldSize
+                    lod.CFrame = visual.worldFrame
+                    local ok = Appearance.Apply(lod, {
+                        mode = visual.spec.mode, material = visual.spec.material,
+                        color = visual.spec.color, textureId = visual.spec.textureId,
+                        alpha = visual.spec.alpha,
+                    })
+                    if ok then
+                        local proxy = self:_proxy(house, visual)
+                        if proxy and visual.spec.mode ~= "atlas" then
+                            lod.Color = proxy.Color
+                            lod.Material = proxy.Material
+                        end
+                        lod.Parent = self.folder
+                        visual.lodPart = lod
+                        operations += 1
+                    else
+                        lod:Destroy()
+                    end
                 end
             end
-        end
-        if house.desired == "FULL" and not house.lod then
-            for _, visual: Visual in ipairs(house.visual) do
-                if operations >= budget then break end
-                if not visual.desired then
-                    if self:_removeVisual(visual) then operations += 1 end
-                elseif not visual.part and self:_startVisual(house, visual) then
-                    operations += 1
+            if operations < budget and desired == "FULL" and not visual.lodPart
+                and not visual.part and self:_startVisual(house, visual) then
+                operations += 1
+            end
+            -- Preserve player-specific material/color on both representations.
+            if visual.part or visual.lodPart then
+                local proxy = self:_proxy(house, visual)
+                if proxy and visual.spec.mode ~= "atlas" then
+                    if visual.part and (visual.part.Color ~= proxy.Color or visual.part.Material ~= proxy.Material) then
+                        visual.part.Color = proxy.Color
+                        visual.part.Material = proxy.Material
+                    end
+                    if visual.lodPart and (visual.lodPart.Color ~= proxy.Color or visual.lodPart.Material ~= proxy.Material) then
+                        visual.lodPart.Color = proxy.Color
+                        visual.lodPart.Material = proxy.Material
+                    end
                 end
             end
+            if desired == "FULL" then hasFull = true
+            elseif desired == "LOD1" then hasLod = true end
         end
-        if house.desired == "UNLOADED" then
-            house.state = "UNLOADED"
-        elseif house.lod then
-            house.state = "LOD1"
-        else
-            house.state = "FULL"
-        end
+        house.state = if hasFull then "FULL" elseif hasLod then "LOD1" else "UNLOADED"
     end
     return operations
 end
@@ -261,13 +287,11 @@ function Adapter:FollowMoving()
     -- No independent RenderStepped or Heartbeat subscription. Only the few
     -- nearby animated door visuals need a transform while their server proxies move.
     for _, house: House in ipairs(self.records) do
-        if house.desired == "FULL" then
-            for _, visual: Visual in ipairs(house.visual) do
-                if visual.spec.moving and visual.part and visual.proxy and
-                   visual.proxy:IsDescendantOf(Workspace) then
-                    if visual.part.CFrame ~= visual.proxy.CFrame then
-                        visual.part.CFrame = visual.proxy.CFrame
-                    end
+        for _, visual: Visual in ipairs(house.visual) do
+            if visual.desired == "FULL" and visual.spec.moving and visual.part and visual.proxy and
+               visual.proxy:IsDescendantOf(Workspace) then
+                if visual.part.CFrame ~= visual.proxy.CFrame then
+                    visual.part.CFrame = visual.proxy.CFrame
                 end
             end
         end

@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="character-armor.css?v=1">
 <link rel="stylesheet" href="location-category-picker.css?v=249">
 <link rel="stylesheet" href="location-alpha.css?v=250">
-<link rel="stylesheet" href="deco-assets.css?v=400">
+<link rel="stylesheet" href="deco-assets.css?v=411">
 <link rel="stylesheet" href="real-estate.css?v=385a&physics=205">
 <link rel="stylesheet" href="kanban.css?v=339">
 <style>#location-asset-editor-panel [hidden],#location-asset-edit-dialog [hidden]{display:none!important}</style>
@@ -655,17 +655,32 @@
     <div id="lod-metrics" class="lm-metrics"></div>
     <p id="lod-warnings" class="lm-flag" role="status"></p>
   </section>
-  <section class="panel lm-panel">
-    <div class="lm-list-head"><div><span class="eyebrow">02 · LOD readiness</span><h3>Location Assets <small id="lod-count" class="lm-note"></small></h3></div>
-      <div class="lm-filters"><input id="lod-search" type="search" placeholder="Search asset slug" aria-label="Search Location Asset">
-        <select id="lod-filter" aria-label="LOD readiness filter"><option value="all">All statuses</option>
-          <option value="red">Missing LOD1</option><option value="yellow">LOD1 · no LOD2</option><option value="green">LOD1 + LOD2</option></select></div></div>
-    <div class="actions lm-bulk"><button id="lod-enable-ready" type="button">Включить все готовые</button>
-      <button id="lod-disable-all" type="button">Выключить все</button></div>
-    <div class="lm-table"><table><thead><tr><th>Location Asset</th><th>Placed</th><th>LOD models</th><th>Placement diagnostics</th><th>Streaming</th></tr></thead>
-      <tbody id="lod-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
-    <p class="lm-note">Streaming Off оставляет ассет в Workspace. Full only = FULL → UNLOADED без LOD1; режимы LOD1/LOD2 доступны только при опубликованных моделях. Preflight проверяет отдельную коллизию и точный состав Model.</p>
-    <p class="lm-note">Точки: красная — нет опубликованного LOD1; жёлтая — LOD1 опубликован, LOD2 отсутствует; зелёная — оба опубликованы. Регистрация LOD2 пока не реализована. Совпадение Mesh ID не означает Deco-размещение: владельцы LandscapePainter и PackageLink отображаются отдельно и защищены от Runtime-очистки.</p>
+  <section class="panel lm-panel" id="lod-readiness-section">
+    <div class="lm-list-head">
+      <div><span class="eyebrow">02 · LOD readiness</span><h3 id="lod-active-domain-title">Location Assets</h3></div>
+      <div class="lm-domain-tabs" role="tablist" aria-label="LOD readiness sections">
+        <button id="lod-tab-location" type="button" role="tab" aria-selected="true" aria-controls="lod-location-panel">Location Assets</button>
+        <button id="lod-tab-house" type="button" role="tab" aria-selected="false" aria-controls="lod-house-panel">Real Estate</button>
+      </div>
+    </div>
+    <div id="lod-location-panel" role="tabpanel" aria-labelledby="lod-tab-location">
+      <div class="lm-list-head"><h4>Location Assets <small id="lod-count" class="lm-note"></small></h4>
+        <div class="lm-filters"><input id="lod-search" type="search" placeholder="Search asset slug" aria-label="Search Location Asset">
+          <select id="lod-filter" aria-label="LOD readiness filter"><option value="all">All statuses</option>
+            <option value="red">Missing LOD1</option><option value="yellow">LOD1 · no LOD2</option><option value="green">LOD1 + LOD2</option></select></div></div>
+      <div class="actions lm-bulk"><button id="lod-enable-ready" type="button">Включить все готовые</button>
+        <button id="lod-disable-all" type="button">Выключить все</button></div>
+      <div class="lm-table"><table><thead><tr><th>Location Asset</th><th>Placed</th><th>LOD models</th><th>Placement diagnostics</th><th>Streaming</th></tr></thead>
+        <tbody id="lod-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+      <p class="lm-note">Auto включает все зарегистрированные Location Assets. FULL → LOD1 → UNLOADED работает только с опубликованным LOD1; без него доступен FULL → UNLOADED.</p>
+    </div>
+    <div id="lod-house-panel" role="tabpanel" aria-labelledby="lod-tab-house" hidden>
+      <div class="lm-list-head"><h4>Real Estate <small id="lod-house-count" class="lm-note"></small></h4></div>
+      <p class="lm-note">Здесь настраиваются режим и дистанции House Streaming, а LOD1 назначается выборочно: например, стенам, крыше и трубе. Части без LOD1 исчезнут при дальнем переходе. Материал, цвет, атлас и прозрачность сохраняются от соответствующей FULL-части. Для LOD FBX проверь pivot, размеры и UV. Индивидуальные дистанции FULL редактируются в Real Estate.</p>
+      <div class="lm-table"><table><thead><tr><th>House type / parts</th><th>Plots</th><th>Runtime mode</th><th>Part LOD1</th><th>Readiness</th></tr></thead>
+        <tbody id="lod-house-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+      <p id="lod-house-message" class="lm-note" role="status"></p>
+    </div>
   </section>
   <section class="panel lm-panel" id="lod-settings-section">
     <div class="lm-toolbar"><div><span class="eyebrow">03 · Streaming settings</span><h3>Visual LOD · Workspace</h3></div>
@@ -694,13 +709,6 @@
   <section class="panel lm-panel"><div><span class="eyebrow">04 · History</span><h3>Snapshot revisions</h3></div>
     <div id="lod-revisions" class="lm-revisions"></div>
     <p class="lm-note">JSON включает полные трансформации и иерархию размещений. Он не заменяет резервную копию Place (.rbxl).</p>
-  </section>
-  <section class="panel lm-panel" id="lod-real-estate-section">
-    <div class="lm-toolbar"><div><span class="eyebrow">04b · Real Estate</span><h3>House Streaming · Runtime readiness</h3></div>
-      <span id="lod-house-count" class="lm-note">Загрузка…</span></div>
-    <p class="lm-note">Профиль дома настраивается в Real Estate → House LOD1. FULL MeshPart загружаются по индивидуальным дистанциям; порог LOD1 применяется ко всему дому. Все дальние визуальные MeshPart заменяются техническими Parts только в Runtime-копии.</p>
-    <div class="lm-table"><table><thead><tr><th>House type</th><th>Plots</th><th>Mode</th><th>LOD1</th><th>Readiness</th></tr></thead>
-      <tbody id="lod-house-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
   </section>
   <section class="panel lm-panel lm-build"><div><span class="eyebrow">05 · Runtime preparation</span><h3>Preflight → Verified backup → Runtime draft</h3></div>
     <p class="lm-note">Отмеченные выше ассеты обрабатываются только если проходят проверку структуры и принадлежности. Отключённые остаются обычными объектами Workspace.</p>
@@ -1038,7 +1046,8 @@
 <script src="lod-manager.js?v=405"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
-<script src="location-asset-workflow.js?v=400"></script>
+<script src="lod-reuse-picker.js?v=411"></script>
+<script src="location-asset-workflow.js?v=411"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=2"></script>
 <script src="options.js?v=337"></script>
@@ -1049,7 +1058,7 @@
 <script src="monster-assets.js?v=338"></script>
 <script src="npc-assets.js?v=370"></script>
 <script src="npc-spawns.js?v=337"></script>
-<script src="real-estate.js?v=385a&visual=400&runtime=387&rig=186&atlas=202&physics=232"></script>
+<script src="real-estate.js?v=385a&visual=400&runtime=387&rig=186&atlas=202&physics=232&reuse=411"></script>
 <script src="real-estate-mesh-workflow.js?v=234"></script>
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=338"></script>

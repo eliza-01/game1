@@ -29,7 +29,7 @@ class Bow3DAimContracts(unittest.TestCase):
         self.assertNotIn('if bowEquipped then', movement)
         self.assertIn('controllerManager.FacingDirection = moveDirection', movement)
         self.assertIn('moveDirection = backwardActive and backwardRelativeDirection(', movement)
-        self.assertIn('if liveBowAim then', movement)
+        self.assertIn('if liveAttackAim then', movement)
         self.assertIn('BeginAimFacingCompensation', movement)
         self.assertIn('BeginAttackMovement', movement)
         self.assertIn('WeaponAttackMovement.Resolve(weaponType)', movement)

@@ -22,11 +22,11 @@ class BowDrawFacing(unittest.TestCase):
     def test_draw_turns_before_capture_without_per_frame_target_scan(self):
         attack=src('src/client/combat/AttackController.luau')
         self.assertLess(attack.index('movementController.BeginAimFacingCompensation('),attack.index('bowAimRemote:FireServer({'))
-        self.assertIn('bowAimOrigin + bowAimDirection.Unit * AttackConfig.MaxAimDistance',attack)
+        self.assertIn('initialAimOrigin + initialAimDirection.Unit * AttackConfig.MaxAimDistance',attack)
         self.assertIn('aimPoseController.BeginAttack(presentationTarget, attackDuration)',attack)
         self.assertNotIn('aimPoseController.UpdateTarget(point)',attack)
         self.assertEqual(attack.count('bowAimRemote:FireServer({'),1)
-        render=attack.split('RunService.RenderStepped:Connect(function(deltaTime)',1)[1].split('local function attemptAttack()',1)[0]
+        render=attack.split('RunService.RenderStepped:Connect(function(_deltaTime)',1)[1].split('local function attemptAttack()',1)[0]
         self.assertNotIn('GetAimPosition',render)
         self.assertNotIn('bowAimRemote',render)
 
@@ -63,8 +63,8 @@ class RearCollisionRegression(unittest.TestCase):
         self.assertIn('localContact = if part',server)
         self.assertIn('DamageService.Apply(character, target',server)
         self.assertNotIn('capturedEntity:PivotTo',server)
-        self.assertIn('if isBow then nil else CharacterAttackWindow.Resolve(timing)',melee)
-        self.assertIn('applyDamageInVolume(',melee)
+        self.assertIn('if isBow then nil else CharacterAttackHitEnd.Resolve(timing)',melee)
+        self.assertIn('scheduleMeleeArc(player, character, root, serial, clientAttackId, clipId, hitEndEvent)',melee)
         self.assertNotIn('RunService.Heartbeat:Connect',server)
 
 if __name__ == '__main__':

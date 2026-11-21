@@ -44,7 +44,7 @@ end
 
 -- M358: server sector contact without weapon volume or client box transforms.
 -- Sway proxies are immutable authoring output and queried with a bounded radius.
-function Service.MeleeArc(root: BasePart, reach: number, arcAngle: number)
+function Service.MeleeArc(root: BasePart, reach: number, arcAngle: number, facingDirection: Vector3?)
     if not remote or not root or not root.Parent then return end
     local decor = Workspace:FindFirstChild(ROOT)
     if not decor then return end
@@ -52,7 +52,8 @@ function Service.MeleeArc(root: BasePart, reach: number, arcAngle: number)
     params.FilterType = Enum.RaycastFilterType.Include
     params.FilterDescendantsInstances = {decor}
     params.MaxParts = 24
-    local forward = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+    local chosen = facingDirection or root.CFrame.LookVector
+    local forward = Vector3.new(chosen.X, 0, chosen.Z)
     if forward.Magnitude <= 1e-6 then return end
     local threshold = math.cos(math.rad(math.clamp(arcAngle, 1, 360)) * 0.5)
     for _, part in ipairs(Workspace:GetPartBoundsInRadius(root.Position, reach, params)) do

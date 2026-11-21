@@ -109,11 +109,17 @@ end
 
 local function baseMoveSpeedForCurrentState(targetCharacter: Model): number
 	if attackMovementRunning() then
-		return CharacterMovementConfig.RobloxSpeedAtRunMultiplier(
+		local speed = CharacterMovementConfig.RobloxSpeedAtRunMultiplier(
 			targetCharacter:GetAttribute("CharacterArchetype"),
 			targetCharacter:GetAttribute("RunSpeed"),
 			attackMovementRunSpeedMultiplier
 		)
+		if movementMode == "Walk" then
+			return math.min(speed, CharacterMovementConfig.RobloxSpeed(
+				targetCharacter:GetAttribute("CharacterArchetype"),
+				targetCharacter:GetAttribute("RunSpeed"), "Walk"))
+		end
+		return speed
 	end
 	return CharacterMovementConfig.RobloxSpeed(
 		targetCharacter:GetAttribute("CharacterArchetype"),
@@ -261,7 +267,7 @@ end
 
 local function isBackwardAxis(axis: Vector2): boolean
 	-- S / Down selects backpedal, but only while no touch locomotion is
-	-- active or a bow attack explicitly holds the facing direction.
+	-- active or a live bow/melee attack explicitly owns the facing direction.
 	return axis.Y < -0.001
 end
 
@@ -364,9 +370,8 @@ local function applyAimFacingCompensation(now: number, deltaTime: number, moving
 			clearAimFacingCompensation()
 			return
 		end
-		-- While moving, ControllerManager owns physical yaw to match the gait.
-		-- Bow's upper-body bridge independently follows the camera. Writing the
-		-- NavigationRoot CFrame here made pelvis and legs spin with the reticle.
+		-- All moving attacks leave physical yaw and pelvis to ControllerManager;
+		-- only the shared spine bridge follows the saved camera reticle.
 		if moving then return end
 		local current = flatUnit(navigationRoot.CFrame.LookVector)
 		if not current then return end
@@ -386,6 +391,14 @@ local function applyAimFacingCompensation(now: number, deltaTime: number, moving
 		facing = flatUnit(rotateYaw(startDirection, delta * alpha))
 	end
 	if not facing then return end
+	if moving then
+		-- ControllerManager owns locomotion and physical yaw during melee runs.
+		-- Rewriting NavigationRoot.CFrame every frame resets the moving assembly's
+		-- physics pose and fights the controller. The facing request remains active
+		-- until HitEnd, but movement velocity is never overwritten by aiming.
+		controllerManager.FacingDirection = facing
+		return
+	end
 	-- Avoid unnecessary writes to the physical assembly when the root already
 	-- faces the cached sector-safe direction (the common attack case).
 	local currentFacing = flatUnit(navigationRoot.CFrame.LookVector)
@@ -407,15 +420,18 @@ local function applyMovementMode(walkModifierActive: boolean, backwardActive: bo
 	-- the legs unless the player actually stops moving.
 	local attackActive = attackMovementRunning()
 	local walkActive = walkModifierActive or backwardActive
-	local nextMode = if attackActive then attackMovementMode else (walkActive and "Walk" or "Run")
+	local nextMode = if walkActive then "Walk" else (attackActive and attackMovementMode or "Run")
 	local nextDirectionMode = backwardActive and "Backward" or "Forward"
 	if controllerManager and character then
 		if attackActive then
-			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeedAtRunMultiplier(
+			local attackSpeed = CharacterMovementConfig.RobloxSpeedAtRunMultiplier(
 				character:GetAttribute("CharacterArchetype"),
 				character:GetAttribute("RunSpeed"),
 				attackMovementRunSpeedMultiplier
 			)
+			controllerManager.BaseMoveSpeed = if walkActive then math.min(attackSpeed,
+				CharacterMovementConfig.RobloxSpeed(character:GetAttribute("CharacterArchetype"),
+					character:GetAttribute("RunSpeed"), "Walk")) else attackSpeed
 		else
 			controllerManager.BaseMoveSpeed = CharacterMovementConfig.RobloxSpeed(
 				character:GetAttribute("CharacterArchetype"),
@@ -511,24 +527,26 @@ local function updateMovement(deltaTime: number)
 
 	local now = os.clock()
 	local axis = inputAxis()
-	-- Movement remains camera-relative while the bow is firing. Lower-body
-	-- facing follows travel, except on S / downward stick where it backpedals.
-	local liveBowAim = aimFacingActive and aimFacingLive
+	-- All attacks use camera-relative travel. Lower-body facing follows the
+	-- travel vector, except S / downward stick where the legs backpedal.
+	local liveAttackAim = aimFacingActive and aimFacingLive
 	local backwardActive = backwardLocomotion(axis)
-	local backwardCameraSteering = backwardActive and (rightMouseDown() or liveBowAim)
-	applyMovementMode(forcedWalk or walkModifierDown(), backwardActive)
+	local backwardCameraSteering = backwardActive and (rightMouseDown() or liveAttackAim)
 	local movementLocked = now < movementLockUntil
 	local moveDirection = Vector3.zero
 	if not movementLocked then
-		-- Keep both keyboard and analog bow movement camera-relative, with
-		-- diagonals intact. The existing one-axis S rule applies outside Bow.
-		if liveBowAim then
+		-- Both keyboard and analog movement keep diagonal input while attacking;
+		-- the existing one-axis backpedal rule applies outside active attacks.
+		if liveAttackAim then
 			moveDirection = cameraRelativeDirection(axis)
 		else
 			moveDirection = backwardActive and backwardRelativeDirection(axis, backwardCameraSteering) or cameraRelativeDirection(axis)
 		end
 	end
 	controllerManager.MovingDirection = moveDirection
+	-- Derive the leg animation from THIS frame's input, not the previous
+	-- ControllerManager.MovingDirection (which caused a one-frame planted step).
+	applyMovementMode(forcedWalk or walkModifierDown(), backwardActive)
 	if movementLocked then
 		jumpRequested = false
 		-- Stop horizontal carry immediately and keep the attack planted in place.
@@ -537,18 +555,16 @@ local function updateMovement(deltaTime: number)
 		navigationRoot.AssemblyLinearVelocity = Vector3.new(0, velocity.Y, 0)
 	end
 
-	if liveBowAim and moveDirection.Magnitude > 0.001 then
-		-- The navigation root drives pelvis + feet: never aim it at the
-		-- reticle while travelling. Strafing uses the actual travel direction.
-		-- Backpedal keeps the feet forward and plays the authored gait in
-		-- reverse while travelling backwards (including touch diagonals).
+	if liveAttackAim and moveDirection.Magnitude > 0.001 then
+		-- Bow and melee use the SAME lower-body authority while moving.
+		-- Strafe/diagonal tracks face travel; backward movement keeps the
+		-- feet facing camera-forward with the existing reversed gait.
 		local lowerBodyFacing = if backwardActive then cameraForwardDirection() else moveDirection
 		if lowerBodyFacing.Magnitude > 0.001 then
 			controllerManager.FacingDirection = lowerBodyFacing
 		end
 	elseif aimFacingActive and not aimFacingLive and aimFacingTargetDirection then
-		-- Preserve the one-shot melee facing through HitEnd even when running.
-		-- MovingDirection still follows input; only physical yaw is compensated.
+		-- Non-live facing remains for stationary/explicit locked-facing callers.
 		controllerManager.FacingDirection = aimFacingTargetDirection
 	elseif facingLockDirection and now < facingLockUntil then
 		-- Original melee facing lock. Camera orbit remains owned
@@ -573,8 +589,7 @@ local function updateMovement(deltaTime: number)
 			-- Without RMB, backpedal preserves the current facing.
 		end
 	end
-	-- The one-shot melee correction runs until its scheduled contact;
-	-- moving direction is independent of the root's facing direction.
+	-- Live aim only rotates the stationary root; moving yaw belongs to travel.
 	applyAimFacingCompensation(now, deltaTime, moveDirection.Magnitude > 0.001)
 
 	if now >= airLockUntil then
@@ -632,7 +647,7 @@ function MovementController.BeginAttackMovement(weaponType: any, duration: numbe
 	end
 	if controllerManager and character then
 		local axis = inputAxis()
-		applyMovementMode(walkModifierDown(), backwardLocomotion(axis))
+		applyMovementMode(forcedWalk or walkModifierDown(), backwardLocomotion(axis))
 	end
 	return resolved
 end

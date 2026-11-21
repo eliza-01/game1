@@ -81,6 +81,9 @@ function ServiceCatalog.Build(root: Instance)
         {name = "MonsterDebugService", critical = false, start = function()
             require(dev:WaitForChild("MonsterDebugService")).Start()
         end},
+        {name = "NpcGroundComparisonService", critical = false, dependsOn = {"NpcSpawnerService"}, start = function()
+            require(dev:WaitForChild("NpcGroundComparisonService")).Start()
+        end},
         {name = "WeaponSelectionService", critical = false, dependsOn = {"CharacterService"}, start = function()
             require(root:WaitForChild("weapon"):WaitForChild("WeaponSelectionService")).Start()
         end},

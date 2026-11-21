@@ -22,6 +22,13 @@ local activeMeleeAimId = 0
 local bowCaptureSequence = 0
 local bowPresentationUntil = 0
 local bowPresentationCharacter: Model? = nil
+local meleePresentationSequence = 0
+local meleePresentationUntil = 0
+local meleePresentationCharacter: Model? = nil
+local meleeHitEndAt = 0
+local nextMeleeAimAt = 0
+-- Gameplay aim packets are bounded; visual camera tracking remains every frame.
+local MELEE_AIM_SEND_INTERVAL = 0.10
 local meleeAimRemote: RemoteEvent? = nil
 local bowAimRemote: RemoteEvent? = nil
 
@@ -60,6 +67,14 @@ local function finishPresentation(sequence: number)
     bowCaptureSequence = 0
     bowPresentationUntil = 0
     bowPresentationCharacter = nil
+    meleePresentationSequence = 0
+    meleePresentationUntil = 0
+    meleePresentationCharacter = nil
+    meleeHitEndAt = 0
+    nextMeleeAimAt = 0
+    if activeMeleeAimId == sequence then
+        activeMeleeAimId = 0
+    end
     if aimPoseController and aimPoseController.EndAttack then
         aimPoseController.EndAttack()
     end
@@ -88,28 +103,39 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     meleeAimRemote = remotes:WaitForChild("MeleeAimUpdate") :: RemoteEvent
     bowAimRemote = remotes:WaitForChild("BowAimUpdate") :: RemoteEvent
 
-    RunService.RenderStepped:Connect(function(deltaTime)
-        -- Bow is VISUALLY aimed continuously through the complete authored clip,
-        -- including after Release. This never does an extra hit raycast, changes
-        -- the frozen server snapshot or sends additional network packets.
-        if bowCaptureSequence > 0 then
-            local playerCharacter = Players.LocalPlayer.Character
-            if playerCharacter ~= bowPresentationCharacter
-                or not playerCharacter or playerCharacter:GetAttribute("LifeState") ~= "Alive"
-                or os.clock() > bowPresentationUntil then
-                finishPresentation(bowCaptureSequence)
-            elseif aimPoseController and movementController then
-                local origin, direction = aimPoseController.GetAimRay()
-                if typeof(origin) == "Vector3" and typeof(direction) == "Vector3"
-                    and direction.Magnitude > 1e-6 then
-                    local target = origin + direction.Unit * AttackConfig.MaxAimDistance
-                    aimPoseController.UpdateTarget(target, direction)
-                    local root = playerCharacter:FindFirstChild("RootCollider")
-                    if root and root:IsA("BasePart") then
-                        movementController.UpdateAimFacingCompensation(target - root.Position)
-                    end
-                end
-            end
+    RunService.RenderStepped:Connect(function(_deltaTime)
+        -- Both weapon types track the live camera through the COMPLETE clip.
+        -- Bow still captures one authoritative Release snapshot; melee updates
+        -- bounded camera AIM packets until HitEnd, never hitboxes or damage.
+        local isBowPresentation = bowCaptureSequence > 0
+        local sequence = if isBowPresentation then bowCaptureSequence else meleePresentationSequence
+        if sequence <= 0 then return end
+        local expectedCharacter = if isBowPresentation then bowPresentationCharacter else meleePresentationCharacter
+        local presentationUntil = if isBowPresentation then bowPresentationUntil else meleePresentationUntil
+        local playerCharacter = Players.LocalPlayer.Character
+        local now = os.clock()
+        if playerCharacter ~= expectedCharacter
+            or not playerCharacter or playerCharacter:GetAttribute("LifeState") ~= "Alive"
+            or now > presentationUntil then
+            finishPresentation(sequence)
+            return
+        end
+        if not aimPoseController or not movementController then return end
+        local origin, direction = aimPoseController.GetAimRay()
+        if typeof(origin) ~= "Vector3" or typeof(direction) ~= "Vector3"
+            or direction.Magnitude <= 1e-6 then return end
+        local target = origin + direction.Unit * AttackConfig.MaxAimDistance
+        aimPoseController.UpdateTarget(target, direction)
+        local root = playerCharacter:FindFirstChild("RootCollider")
+        if root and root:IsA("BasePart") then
+            movementController.UpdateAimFacingCompensation(target - root.Position)
+        end
+        -- The server still resolves a SINGLE contact at authored HitEnd.
+        -- Send only a recent heading, not a client-selected hit result.
+        if not isBowPresentation and activeMeleeAimId == sequence
+            and now <= meleeHitEndAt and now >= nextMeleeAimAt then
+            publishMeleeAim()
+            nextMeleeAimAt = now + MELEE_AIM_SEND_INTERVAL
         end
     end)
     local function attemptAttack()
@@ -132,9 +158,15 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             if typeof(bowAimOrigin) ~= "Vector3" or typeof(bowAimDirection) ~= "Vector3"
                 or bowAimDirection.Magnitude <= 1e-6 then return end
         end
-        local target = if isBow then nil else
-            (aimPoseController and aimPoseController.GetAimPosition and aimPoseController.GetAimPosition() or nil)
-        if not isBow and typeof(target) ~= "Vector3" then return end
+        -- Every attack begins from the actual reticle RAY, not a near hit point.
+        -- This avoids turning the torso away when a close target crosses camera.
+        local initialAimOrigin, initialAimDirection = bowAimOrigin, bowAimDirection
+        if not isBow then
+            if not aimPoseController or not aimPoseController.GetAimRay then return end
+            initialAimOrigin, initialAimDirection = aimPoseController.GetAimRay()
+            if typeof(initialAimOrigin) ~= "Vector3" or typeof(initialAimDirection) ~= "Vector3"
+                or initialAimDirection.Magnitude <= 1e-6 then return end
+        end
 
         -- PlayAction owns the complete attack interval. It returns nil while the
         -- previous attack animation is still inside its configured timeline, so
@@ -168,8 +200,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         -- Face the reticle immediately for Bow and Melee alike. Bow uses its
         -- initial camera direction only to drive presentation; the authoritative
         -- target is still captured just once close to Release.
-        local presentationTarget = if isBow then
-            bowAimOrigin + bowAimDirection.Unit * AttackConfig.MaxAimDistance else target
+        local presentationTarget = initialAimOrigin + initialAimDirection.Unit * AttackConfig.MaxAimDistance
         if root and root:IsA("BasePart") then
             local direction = Vector3.new(presentationTarget.X - root.Position.X, 0,
                 presentationTarget.Z - root.Position.Z)
@@ -178,22 +209,22 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
                 -- individual playback multiplier.
                 if isBow and movementController and movementController.BeginAimFacingCompensation then
                     -- Bow tracks the reticle while idle, moving and backpedalling.
-                    -- The root follows full camera yaw; the spine absorbs the turn.
+                    -- Moving feet follow travel; only the spine follows the aim.
+                    -- A planted root rotates by the residual outside torso yaw.
                     movementController.BeginAimFacingCompensation(
                         attackDuration, AttackConfig.TorsoYawLimit, true
                     )
                     movementController.UpdateAimFacingCompensation(direction.Unit)
                 elseif not isBow and movementController then
-                    -- Complete the minimum required root turn BEFORE the
-                    -- server's sole HitEnd snapshot, including while moving.
-                    local facingTurnDuration = math.min(
-                        AttackConfig.FacingTurnSeconds,
-                        math.max(0.05, hitEndEvent.time * 0.8)
-                    )
+                    -- During a sword swing the lower body stays on the same
+                    -- travel-facing path as Bow. At rest only the residual yaw
+                    -- beyond the upper-body allowance turns the physical root.
+                    -- The server independently clamps the saved camera heading
+                    -- before its one authoritative HitEnd contact query.
                     if movementController.BeginAimFacingCompensation then
                         movementController.BeginAimFacingCompensation(
-                            facingTurnDuration,
-                            movementController.MeleeMaxResidualYaw()
+                            attackDuration,
+                            movementController.MeleeMaxResidualYaw(), true
                         )
                         movementController.UpdateAimFacingCompensation(direction.Unit)
                     else
@@ -246,8 +277,13 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
-        -- One optional late camera snapshot. No melee tracking or per-frame remote.
-        -- Server contact at HitEnd does NOT depend on its arrival.
+        -- Visual tracking persists until the final attack frame. Gameplay
+        -- updates are limited to the pre-HitEnd interval and rate capped.
+        meleePresentationSequence = sequence
+        meleePresentationUntil = os.clock() + attackDuration
+        meleePresentationCharacter = character
+        meleeHitEndAt = os.clock() + hitEndEvent.time
+        nextMeleeAimAt = 0
         activeMeleeAimId = sequence
         local lead = math.min(AttackConfig.MeleeAimCaptureLeadSeconds, hitEndEvent.time * 0.5)
         task.delay(math.max(0, hitEndEvent.time - lead), function()
@@ -256,15 +292,11 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             publishMeleeAim()
             activeMeleeAimId = 0
         end)
-        local meleeAimOrigin, meleeAimDirection = nil, nil
-        if aimPoseController and aimPoseController.GetAimRay then
-            meleeAimOrigin, meleeAimDirection = aimPoseController.GetAimRay()
-        end
         attack:FireServer({
             clipId = action.clipId,
             clientAttackId = sequence,
-            aimOrigin = meleeAimOrigin,
-            aimDirection = meleeAimDirection,
+            aimOrigin = initialAimOrigin,
+            aimDirection = initialAimDirection,
         })
     end
 

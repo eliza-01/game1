@@ -28,10 +28,11 @@ function MeleeTargetQuery.IsUnobstructed(character: Model, model: Model, root: B
     return hit == nil or hit.Instance:IsDescendantOf(model)
 end
 
-function MeleeTargetQuery.Find(character: Model, root: BasePart, reach: number, angle: number, padding: number): {any}
+function MeleeTargetQuery.Find(character: Model, root: BasePart, reach: number, angle: number,
+        padding: number, facingDirection: Vector3?): {any}
     local minY, maxY = MeleeTargetQuery.Height(root, padding)
-    local candidates = EntityHitboxService.QueryDamageablesInArc(character, root.Position, root.CFrame.LookVector,
-        reach, angle, minY, maxY, Geometry)
+    local candidates = EntityHitboxService.QueryDamageablesInArc(character, root.Position,
+        facingDirection or root.CFrame.LookVector, reach, angle, minY, maxY, Geometry)
     local results = {}
     if #candidates == 0 then return results end
     -- One filter allocation per attack snapshot, not per eligible victim.

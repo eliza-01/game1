@@ -55,13 +55,14 @@ class MeleeArcFacingM364(unittest.TestCase):
     def test_stationary_and_moving_melee_keep_turn_until_hitend(self):
         self.assertIn('elseif not isBow and movementController then', ATTACK)
         self.assertIn('movementController.MeleeMaxResidualYaw()', ATTACK)
-        self.assertIn('math.max(0.05, hitEndEvent.time * 0.8)', ATTACK)
-        self.assertNotIn('not movingAtAttackStart', ATTACK)
-        self.assertIn('aimFacingActive and not aimFacingLive and aimFacingTargetDirection', MOVEMENT)
-        self.assertIn('controllerManager.FacingDirection = aimFacingTargetDirection', MOVEMENT)
-        self.assertNotIn('if not aimFacingLive then\n\t\t\tclearAimFacingCompensation()', MOVEMENT)
-        self.assertIn('local rootYaw = fullYaw - torsoYaw', MOVEMENT)
-        self.assertIn('root.CFrame.LookVector', SERVER)
+        self.assertIn('attackDuration,', ATTACK)
+        self.assertIn('movementController.MeleeMaxResidualYaw(), true', ATTACK)
+        self.assertIn('if liveAttackAim and moveDirection.Magnitude > 0.001 then', MOVEMENT)
+        self.assertIn('controllerManager.FacingDirection = lowerBodyFacing', MOVEMENT)
+        self.assertIn('if moving then return end', MOVEMENT)
+        self.assertIn('yaw - math.clamp(yaw, -aimFacingMaxResidualYaw, aimFacingMaxResidualYaw)', MOVEMENT)
+        self.assertIn('facingDirection or root.CFrame.LookVector', SERVER)
+        self.assertIn('MeleeMovingFacing.Resolve(root.CFrame.LookVector', read('src/server/combat/AttackService.luau'))
 
     def test_bow_and_server_contact_are_unchanged(self):
         self.assertIn('attackDuration, AttackConfig.TorsoYawLimit, true', ATTACK)

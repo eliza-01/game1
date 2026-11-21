@@ -107,7 +107,7 @@ class HitEndActionM360(unittest.TestCase):
         runtime = src('src/shared/combat/AttackTimelineData.luau')
         self.assertNotIn('HitStart = table.freeze', runtime)
 
-    def test_debug_preview_and_melee_aim_are_not_continuous(self):
+    def test_debug_preview_is_bounded_and_melee_aim_updates_stop_at_hitend(self):
         overlay = src('src/client/dev/TestLoadoutController.luau')
         client = src('src/client/combat/AttackController.luau')
         hitboxes = src('src/server/combat/EntityHitboxService.luau')
@@ -124,8 +124,9 @@ class HitEndActionM360(unittest.TestCase):
         self.assertIn('CollectionService:AddTag(entity, "Game1CombatHitbox")', hitboxes)
         self.assertIn('CollectionService:RemoveTag(entity, "Game1CombatHitbox")', hitboxes)
         self.assertIn('task.delay(math.max(0, hitEndEvent.time - lead)', client)
-        self.assertNotIn('MeleeAimSendInterval', client)
-        self.assertEqual(client.count('publishMeleeAim()'), 2)  # definition + one scheduled call
+        self.assertIn('MELEE_AIM_SEND_INTERVAL = 0.10', client)
+        self.assertIn('now <= meleeHitEndAt and now >= nextMeleeAimAt', client)
+        self.assertEqual(client.count('publishMeleeAim()'), 3)  # definition, bounded refresh, late capture
 
 
 if __name__ == '__main__':

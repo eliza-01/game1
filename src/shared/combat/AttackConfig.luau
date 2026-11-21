@@ -22,7 +22,12 @@ return table.freeze({
     -- Bow strafing keeps the lower body aligned with travel while the upper
     -- bridge turns toward the camera (up to ~90 degrees for a sideways strafe).
     -- Planted shots continue to use the normal 70-degree limit + root overflow.
-    MovingBowTorsoYawLimit = math.rad(100),
+    MovingAttackTorsoYawLimit = math.rad(100),
+    -- Sword torso tracks the cursor even when the player strafes or pivots
+    -- quickly past the moving feet; bow's original limit is unchanged.
+    MovingMeleeTorsoYawLimit = math.pi,
+    -- Server melee orientation follows the most recent validated camera aim
+    -- even on an attack started before the physical root has finished turning.
     TorsoAimResponse = 26,
     -- Local pitch is applied to the spine bridge after authored source poses.
     TorsoPitchUpLimit = math.rad(65),

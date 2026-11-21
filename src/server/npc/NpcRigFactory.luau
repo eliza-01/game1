@@ -103,6 +103,12 @@ function NpcRigFactory.Create(model: Model, surface: Vector3, yawDegrees: number
     humanoid.JumpHeight = 0
     humanoid.MaxSlopeAngle = 89
     humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+    -- The NPC is a welded visual shell, not a jointed Roblox ragdoll.
+    -- FallingDown suppresses HipHeight and lowers the navigation root to its
+    -- collision half-height on unanchor (the 1.8-stud sink seen in M421).
+    -- Death is owned by DeathLifecycleService, not Humanoid ragdoll states.
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
     humanoid.WalkSpeed = 0
     -- Gameplay health is owned exclusively by DamageService, not Humanoid.
     humanoid.MaxHealth = 1

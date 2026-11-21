@@ -11,6 +11,7 @@ export type Session = {
     hitResolved: boolean,
     lastAimOrigin: Vector3?,
     lastAimDirection: Vector3?,
+    attackFacingDirection: Vector3?,
     environmentBlocked: boolean,
 }
 
@@ -41,6 +42,7 @@ function AttackSessionStore.Begin(
         hitResolved = false,
         lastAimOrigin = nil,
         lastAimDirection = nil,
+        attackFacingDirection = nil,
         environmentBlocked = false,
     }
     byPlayer[player] = session
@@ -63,6 +65,9 @@ function AttackSessionStore.SetAim(
         and typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
         session.lastAimOrigin = origin
         session.lastAimDirection = direction
+        -- The last validated pre-HitEnd camera heading owns the attack sector.
+        -- Locking this to the first packet made later swings strike behind cursor.
+        session.attackFacingDirection = direction
     end
 end
 

@@ -153,7 +153,7 @@ def check_environment_bounce(root: Path, report_error: Callable[[str], None], *,
     attack_service_text = (root / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
     attack_session_text = (root / "src/server/combat/AttackSessionStore.luau").read_text(encoding="utf-8")
     for required in [
-        'MeleeEnvironmentContact.Query(root, reach, arcAngle)',
+        'MeleeEnvironmentContact.Query(root, reach, arcAngle, facing)',
         'AttackSessionStore.BlockForBounce(',
         'WeaponBounceService.Publish(player, {',
         'LastAttackBounced',
@@ -163,7 +163,7 @@ def check_environment_bounce(root: Path, report_error: Callable[[str], None], *,
     for required in ['session.environmentBlocked = true', 'session.untilTime = untilTime']:
         if required not in attack_session_text:
             report_error(f"m50 AttackSessionStore bounce invalidation missing {required}")
-    if attack_service_text.find('MeleeEnvironmentContact.Query(root, reach, arcAngle)') > attack_service_text.find('AttackDamageResolver.Apply({'):
+    if attack_service_text.find('MeleeEnvironmentContact.Query(root, reach, arcAngle, facing)') > attack_service_text.find('AttackDamageResolver.Apply({'):
         report_error("M358 environment bounce must resolve before arc damage")
 
     upper_composer_text = (root / "src/client/character/animation/AttackUpperBodyComposer.luau").read_text(encoding="utf-8")

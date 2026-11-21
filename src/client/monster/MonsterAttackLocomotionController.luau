@@ -47,15 +47,14 @@ local function resolveRootMotionBones(visual: Model): { Bone }
 	return result
 end
 
-local function suppressHorizontalAttackRootMotion(entry)
-	-- The attack clip may contain authored forward/back root translation. During
-	-- server-owned pursuit that displacement stacks on top of physical motion and
-	-- looks like short teleports. Keep the authored rotation and vertical motion,
-	-- but let the navigation Humanoid own all horizontal world displacement.
+local function suppressCombatRootTranslation(entry)
+	-- Navigation Humanoid is the sole owner of world displacement during aggro,
+	-- chase and attack. RootBone translation (including vertical motion) from
+	-- authored clips can pull the visual waist below the terrain while its
+	-- collision shell stays grounded. Preserve the animated rotation and limbs.
 	for _, bone in entry.rootMotionBones do
 		if bone.Parent then
-			local transform = bone.Transform
-			bone.Transform = CFrame.new(0, transform.Position.Y, 0) * transform.Rotation
+			bone.Transform = bone.Transform.Rotation
 		end
 	end
 end
@@ -68,7 +67,7 @@ local function samplerBaseKey(model: Model): string
 end
 
 local function setEntryActive(entry, active: boolean)
-	if active and not entry.disabled then
+	if active then
 		activeEntries[entry] = true
 	else
 		activeEntries[entry] = nil
@@ -177,11 +176,12 @@ local function bindMonster(model: Model)
 			disabled = false,
 		}
 		entries[model] = entry
-		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitActive"):Connect(function()
-			if model:GetAttribute("MonsterAttackPursuitActive") == true then
-				setEntryActive(entry, true)
-			end
-		end))
+		local function refreshActive()
+			setEntryActive(entry, model:GetAttribute("MonsterCombatActive") == true
+				or model:GetAttribute("MonsterAttackPursuitActive") == true)
+		end
+		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitActive"):Connect(refreshActive))
+		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterCombatActive"):Connect(refreshActive))
 		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitPlaybackSpeed"):Connect(function()
 			if entry.sampler then
 				entry.sampler:SetPlaybackSpeed(tonumber(model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1)
@@ -193,9 +193,7 @@ local function bindMonster(model: Model)
 		table.insert(entry.connections, model.Destroying:Connect(function()
 			unbind(model)
 		end))
-		if model:GetAttribute("MonsterAttackPursuitActive") == true then
-			setEntryActive(entry, true)
-		end
+		refreshActive()
 	end)
 end
 
@@ -241,13 +239,17 @@ local function step(deltaTime: number)
 		end
 		local cameraDelta = entry.root.Position - camera.CFrame.Position
 		local distanceSquared = cameraDelta:Dot(cameraDelta)
-		local pursuitActive = model:GetAttribute("MonsterAttackPursuitActive") == true
-			and tostring(model:GetAttribute("LifeState")) == "Alive"
-		if pursuitActive then
-			suppressHorizontalAttackRootMotion(entry)
+		local alive = tostring(model:GetAttribute("LifeState")) == "Alive"
+		local pursuitActive = model:GetAttribute("MonsterAttackPursuitActive") == true and alive
+		local combatActive = model:GetAttribute("MonsterCombatActive") == true and alive
+		-- Combat activates the same existing PreSimulation loop during Chase as
+		-- well as Attack. Never stack imported RootBone translation on movement.
+		if (combatActive or pursuitActive) and distanceSquared <= maxDistanceSquared then
+			suppressCombatRootTranslation(entry)
 		end
 		local wantsComposition = pursuitActive and distanceSquared <= maxDistanceSquared
-		if wantsComposition and not entry.sampler and activeCount < Config.MaxComposedMonsters then
+		if wantsComposition and not entry.sampler and not entry.disabled
+			and activeCount < Config.MaxComposedMonsters then
 			acquireSampler(entry)
 		end
 		if entry.sampler then
@@ -269,11 +271,11 @@ local function step(deltaTime: number)
 			end
 			if entry.weight <= 0 and not wantsComposition then
 				releaseSampler(entry)
-				if not pursuitActive then
+				if not pursuitActive and not combatActive then
 					setEntryActive(entry, false)
 				end
 			end
-		elseif not pursuitActive then
+		elseif not pursuitActive and not combatActive then
 			setEntryActive(entry, false)
 		end
 	end

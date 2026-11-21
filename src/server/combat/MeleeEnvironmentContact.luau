@@ -5,13 +5,15 @@ local RealEstateEnvironmentTargets = require(script.Parent:WaitForChild("RealEst
 
 local MeleeEnvironmentContact = {}
 
-function MeleeEnvironmentContact.Query(root: BasePart, reach: number, angle: number): any?
+function MeleeEnvironmentContact.Query(root: BasePart, reach: number, angle: number,
+        facingDirection: Vector3?): any?
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = {root.Parent}
     params.RespectCanCollide = true
     params.IgnoreWater = true
-    local facing = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z)
+    local chosen = facingDirection or root.CFrame.LookVector
+    local facing = Vector3.new(chosen.X, 0, chosen.Z)
     if facing.Magnitude < 1e-5 then return nil end
     local origin = root.Position
     local halfAngle = math.rad(math.min(angle, 180) * 0.5)

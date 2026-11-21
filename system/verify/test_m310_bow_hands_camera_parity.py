@@ -35,7 +35,7 @@ class HandsBowCameraParity(unittest.TestCase):
         self.assertIn("movementController.UpdateAimFacingCompensation(direction.Unit)", attack)
         self.assertIn('if root and root:IsA("BasePart") then', attack)
         self.assertIn('aimPoseController.BeginAttack(presentationTarget, attackDuration)', attack)
-        self.assertIn('bowAimOrigin + bowAimDirection.Unit * AttackConfig.MaxAimDistance', attack)
+        self.assertIn('initialAimOrigin + initialAimDirection.Unit * AttackConfig.MaxAimDistance', attack)
         self.assertIn("function MovementController.EndAimFacingCompensation()", movement)
         self.assertIn("clearAimFacingCompensation()", movement)
         self.assertIn("aimFacingActive and not aimFacingLive and aimFacingTargetDirection", movement)

@@ -28,7 +28,7 @@ class HouseMeshRangeM413(unittest.TestCase):
         self.assertIn('Enum.PartType.Cylinder', source)
         for term in ['CanCollide = false', 'CanTouch = false', 'CanQuery = false',
                      'RunService.RenderStepped:Connect', 'CFrame.Angles(0, 0, math.rad(90))',
-                     'self._part.Parent = nil']:
+                     'self._model.Parent = nil']:
             self.assertIn(term, source)
         for forbidden in ['InvokeServer', 'FireServer', 'GetDescendants()', 'RemoteEvent']:
             self.assertNotIn(forbidden, source)

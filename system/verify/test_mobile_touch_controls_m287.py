@@ -49,7 +49,7 @@ class MobileTouchControlsM287(unittest.TestCase):
         self.assertIn('if touchMovementActive then\n\t\treturn touchAxis', MOVEMENT)
         self.assertIn('not touchMovementActive or (aimFacingActive and aimFacingLive)', MOVEMENT)
         self.assertIn('backwardActive and backwardRelativeDirection(axis, backwardCameraSteering) or cameraRelativeDirection(axis)', MOVEMENT)
-        self.assertIn('if liveBowAim then', MOVEMENT)
+        self.assertIn('if liveAttackAim then', MOVEMENT)
         self.assertIn('moveDirection = cameraRelativeDirection(axis)', MOVEMENT)
 
     def test_jump_and_attack_share_desktop_rules(self):

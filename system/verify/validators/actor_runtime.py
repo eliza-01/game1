@@ -150,7 +150,7 @@ def check_actor_runtime_contracts(
     for required in ['SetPlaybackSpeed', 'AdjustSpeed(speed)']:
         if required not in monster_sampler_m25:
             report_error(f"monster pursuit sampler live-speed contract missing {required}")
-    for required in ['suppressHorizontalAttackRootMotion', 'Game1RuntimeAnimationRoot', 'transform.Position.Y', 'entry.sampler:SetPlaybackSpeed']:
+    for required in ['suppressCombatRootTranslation', 'Game1RuntimeAnimationRoot', 'bone.Transform = bone.Transform.Rotation', 'GetAttributeChangedSignal("MonsterCombatActive")', 'entry.sampler:SetPlaybackSpeed']:
         if required not in monster_compositor_m25:
             report_error(f"monster pursuit visual stabilization missing {required}")
     if 'releaseSampler(entry)\n\t\t\tif model:GetAttribute("MonsterAttackPursuitActive")' in monster_compositor_m25:

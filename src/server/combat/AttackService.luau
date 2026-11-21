@@ -11,6 +11,7 @@ local CharacterAttackHitEnd = require(CombatShared:WaitForChild("CharacterAttack
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
+local MeleeMovingFacing = require(CombatShared:WaitForChild("MeleeMovingFacing"))
 local BowAimGeometry = require(CombatShared:WaitForChild("BowAimGeometry"))
 local BowProjectileConfig = require(CombatShared:WaitForChild("BowProjectileConfig"))
 local BowHitscanService = require(script.Parent:WaitForChild("BowHitscanService"))
@@ -74,12 +75,13 @@ local function applyMeleeArc(player: Player, character: Model, root: BasePart,
     local reach = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range, 1, Config.MaxAimDistance)
     local arcAngle = math.clamp(tonumber(character:GetAttribute("MeleeArcAngle")) or Config.MeleeDefaultArcAngle, 1, 360)
     local padding = Config.MeleeVerticalPadding
+    local facing = MeleeMovingFacing.Resolve(root.CFrame.LookVector, session.attackFacingDirection)
 
-    if LandscapeSwayService then LandscapeSwayService.MeleeArc(root, reach, arcAngle) end
+    if LandscapeSwayService then LandscapeSwayService.MeleeArc(root, reach, arcAngle, facing) end
     -- Environment queries are meaningful only when Bounce is eligible.
     -- In combat, never spend up to five rays looking for contact to suppress.
     if character:GetAttribute("InCombat") ~= true and HostilePursuitRegistry.Count(character) == 0 then
-        local contact = MeleeEnvironmentContact.Query(root, reach, arcAngle)
+        local contact = MeleeEnvironmentContact.Query(root, reach, arcAngle, facing)
         if contact and triggerWeaponBounce(player, character, serial, clientAttackId, clipId, elapsed, contact) then
             return true
         end
@@ -90,6 +92,7 @@ local function applyMeleeArc(player: Player, character: Model, root: BasePart,
         aimOrigin=session.lastAimOrigin,
         aimDirection=session.lastAimDirection, attackRange=reach,
         arcAngleDegrees=arcAngle, verticalPadding=padding,
+        facingDirection=facing,
     })
     if damaged > 0 then AttackSessionStore.MarkDamage(player, character, serial) end
     return false

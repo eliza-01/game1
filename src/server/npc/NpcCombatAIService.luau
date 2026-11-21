@@ -72,7 +72,13 @@ local function pinAtRest(agent: any, pin: boolean)
         agent.root.AssemblyAngularVelocity = Vector3.zero
     end
     agent.root.Anchored = pin
-    if not pin then pcall(function() agent.root:SetNetworkOwner(nil) end) end
+    if not pin then
+        pcall(function() agent.root:SetNetworkOwner(nil) end)
+        -- A Humanoid can remain in FallingDown while its root was anchored.
+        -- Explicitly resume grounded navigation before pursuit/attack movement;
+        -- changing CFrame or HipHeight here would shift the authored spawn.
+        agent.humanoid:ChangeState(Enum.HumanoidStateType.Running)
+    end
 end
 
 local function clearTarget(agent: any)

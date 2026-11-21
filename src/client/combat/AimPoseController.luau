@@ -154,9 +154,8 @@ local function desiredTorsoAngles(now: number): (number, number, boolean)
     if not currentRoot or not currentRoot.Parent then return 0, 0, false end
     local activeAttack = targetPosition ~= nil and now <= activeUntil
     local target = if activeAttack then targetPosition else nil
-    -- Melee retains its attack-start target. During a bow clip the presentation
-    -- target follows the camera ray until the final frame; this is independent
-    -- of the ONE server-side pre-Release hit snapshot.
+    -- Bow and melee both receive a live camera-ray target through the entire
+    -- attack. This cosmetic pose never determines server hit timing.
     if not target then return 0, 0, false end
 
     local direction = target - currentRoot.Position
@@ -173,13 +172,17 @@ local function desiredTorsoAngles(now: number): (number, number, boolean)
         presentationAimDirection, direction,
         AttackConfig.CloseAimPitchNeutralStuds, AttackConfig.CloseAimPitchFullStuds
     )
-    -- NavigationRoot/pelvis face the walking direction during Bow. The same
-    -- world-space spine bridge compensates up to a full lateral strafe; the
+    -- During any attack the pelvis/feet face travel. The same spine bridge
+    -- keeps bow and melee swings aligned to the camera while strafing; the
     -- stationary character retains the authored 70-degree limit.
-    local movingBow = activeAttack and character ~= nil
-        and string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
+    local movingAttack = activeAttack and character ~= nil
         and tostring(character:GetAttribute("MovementState") or "Idle") ~= "Idle"
-    local yawLimit = if movingBow then AttackConfig.MovingBowTorsoYawLimit else AttackConfig.TorsoYawLimit
+    -- Preserve bow's authored envelope. Melee may turn its upper body across
+    -- the complete cursor arc while its lower body continues following travel.
+    local melee = character ~= nil and tostring(character:GetAttribute("EquippedWeaponType") or "") ~= "bow"
+    local yawLimit = if movingAttack then
+        (if melee then AttackConfig.MovingMeleeTorsoYawLimit else AttackConfig.MovingAttackTorsoYawLimit)
+        else AttackConfig.TorsoYawLimit
     return math.clamp(yaw, -yawLimit, yawLimit),
         math.clamp(pitch, -AttackConfig.TorsoPitchDownLimit, AttackConfig.TorsoPitchUpLimit), true
 end
@@ -293,8 +296,8 @@ function AimPoseController.BeginAttack(target: Vector3, duration: number)
     if typeof(target) ~= "Vector3" then
         return
     end
-    -- Melee holds the attack-start reticle direction, just like its fixed yaw
-    -- target. Bow refreshes this direction each frame via UpdateTarget.
+    -- Both melee and bow receive continuous updates from AttackController.
+    -- BeginAttack only seeds the first frame of the animation.
     local _, direction = CameraController.GetAimRay()
     presentationAimDirection = if typeof(direction) == "Vector3" and direction.Magnitude > 1e-6
         then direction.Unit else nil

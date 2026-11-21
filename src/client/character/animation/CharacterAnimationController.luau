@@ -133,6 +133,9 @@ local function movementSlot(): string
 		if state == "idle" then
 			return "combat_idle"
 		end
+		-- A walk modifier/backpedal still drives the feet at Walk speed even
+		-- when the equipped melee weapon normally permits Run during a swing.
+		if state == "walk" then return "walk" end
 		local configuredMode = string.lower(tostring(character:GetAttribute("AttackMovementLocomotionMode") or "run"))
 		return if configuredMode == "walk" then "walk" else "run"
 	end

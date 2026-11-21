@@ -59,11 +59,11 @@ class BowMovementM319(unittest.TestCase):
     def test_upper_body_covers_strafe_without_relaxing_hitscan_validation(self):
         attack = source('src/shared/combat/AttackConfig.luau')
         bow = source('src/shared/combat/BowProjectileConfig.luau')
-        self.assertIn('MovingBowTorsoYawLimit = math.rad(100)', attack)
+        self.assertIn('MovingAttackTorsoYawLimit = math.rad(100)', attack)
         self.assertIn('TorsoYawLimit = math.rad(70)', attack)
         self.assertIn('MaxAimYaw = math.rad(145)', bow)
         pose = source('src/client/combat/AimPoseController.luau')
-        self.assertIn('local yawLimit = if movingBow then AttackConfig.MovingBowTorsoYawLimit else AttackConfig.TorsoYawLimit', pose)
+        self.assertIn('if melee then AttackConfig.MovingMeleeTorsoYawLimit else AttackConfig.MovingAttackTorsoYawLimit', pose)
         self.assertIn('pitchRotation * yawRotation * animatedRotation', pose)
         self.assertIn('math.atan2(math.sin(desiredYaw - renderedYaw), math.cos(desiredYaw - renderedYaw))', pose)
         self.assertIn('CharacterUpperBodyRig.ResolveBridge(visual)', pose)
@@ -72,10 +72,10 @@ class BowMovementM319(unittest.TestCase):
 
     def test_root_transform_is_not_aim_written_while_walking(self):
         movement = source('src/client/character/MovementController.luau')
-        self.assertIn('if liveBowAim and moveDirection.Magnitude > 0.001 then', movement)
+        self.assertIn('if liveAttackAim and moveDirection.Magnitude > 0.001 then', movement)
         self.assertIn('local lowerBodyFacing = if backwardActive then cameraForwardDirection() else moveDirection', movement)
         self.assertIn('controllerManager.FacingDirection = lowerBodyFacing', movement)
-        self.assertLess(movement.index('if liveBowAim and moveDirection.Magnitude > 0.001 then'), movement.index('elseif aimFacingActive and not aimFacingLive and aimFacingTargetDirection'))
+        self.assertLess(movement.index('if liveAttackAim and moveDirection.Magnitude > 0.001 then'), movement.index('elseif aimFacingActive and not aimFacingLive and aimFacingTargetDirection'))
         self.assertIn('if moving then return end', movement)
         comp = movement.split('local function applyAimFacingCompensation(', 1)[1].split('local function applyMovementMode(', 1)[0]
         self.assertLess(comp.index('if moving then return end'), comp.index('navigationRoot.CFrame = CFrame.lookAt('))
@@ -84,12 +84,12 @@ class BowMovementM319(unittest.TestCase):
 
     def test_no_new_bow_damage_or_camera_writer(self):
         movement = source('src/client/character/MovementController.luau')
-        self.assertIn('if liveBowAim then\n\t\t\tmoveDirection = cameraRelativeDirection(axis)', movement)
+        self.assertIn('if liveAttackAim then\n\t\t\tmoveDirection = cameraRelativeDirection(axis)', movement)
         self.assertIn('local backwardActive = backwardLocomotion(axis)', movement)
         attack = source('src/client/combat/AttackController.luau')
         self.assertEqual(attack.count('bowAimRemote:FireServer({'), 1)
         self.assertIn('bowPresentationUntil = os.clock() + attackDuration', attack)
-        self.assertIn('finishPresentation(bowCaptureSequence)', attack)
+        self.assertIn('finishPresentation(sequence)', attack)
         self.assertIn('aimPoseController.UpdateTarget(target, direction)', attack)
         self.assertNotIn('CameraController.SetTouchLookAxis(', movement)
 

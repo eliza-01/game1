@@ -21,12 +21,13 @@ export type DamageQuery = {
     attackRange: number,
     arcAngleDegrees: number,
     verticalPadding: number,
+    facingDirection: Vector3?,
 }
 
 function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number)
     local character, root = query.character, query.root
     local targets = MeleeTargetQuery.Find(character, root, query.attackRange,
-        query.arcAngleDegrees, query.verticalPadding)
+        query.arcAngleDegrees, query.verticalPadding, query.facingDirection)
     local aimedHead = nil
     -- A completely empty arc cannot produce a headshot. Do not run the
     -- global bone-raycast/occlusion checks when there is no eligible victim.

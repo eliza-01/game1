@@ -423,13 +423,20 @@ class AtlasRegistry:
         with self.connect() as db:
             rows = db.execute('''SELECT variant_id,consumer_type,consumer_id
                 FROM texture_atlas_bindings ORDER BY consumer_type,consumer_id''').fetchall()
+            scopes = db.execute('''SELECT variant_id,scope FROM texture_atlas_scopes
+                ORDER BY variant_id,scope''').fetchall()
         for variant in variants.values():
             variant['consumers'] = []
+            variant['scopes'] = []
         for row in rows:
             variant = variants.get(row['variant_id'])
             if variant is not None:
                 variant['consumers'].append({'consumer_type': row['consumer_type'],
                                              'consumer_id': row['consumer_id']})
+        for row in scopes:
+            variant = variants.get(row['variant_id'])
+            if variant is not None:
+                variant['scopes'].append(row['scope'])
         return families
 
     def binding(self, consumer_type: str, consumer_id: str) -> dict | None:

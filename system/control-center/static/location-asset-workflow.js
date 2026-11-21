@@ -3,28 +3,31 @@
  */
 window.game1LocationAssetWorkflow = (() => {
   const state={slug:'',tab:'model',busy:false,result:'',error:false,manualSlug:false,identityDraft:null,modelAppearanceDraft:null,
-    pendingModel:'',pendingLod1:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,alphaDraft:null,publication:null,
+    pendingModel:'',pendingLod1:'',inspection:null,meshOptions:{},physicsDirty:false,scan:null,scanStale:false,publication:null,
     atlas:window.game1ConsumerAtlasEditor.newState()};
   const shell=window.game1AssetWorkflowDialog;
   const e=value=>esc(String(value??''));
   const row=()=>decoAssetRow(state.slug);
+  // Authoring moved from Identity to Model in M400. Studio must not
+  // Sync unsaved default Appearance, per-MeshPart physics or new FBX.
+  const hasUnsavedModelChanges=()=>Boolean(
+    state.modelAppearanceDraft||state.physicsDirty||state.pendingModel);
+  const ensureSavedModelForSync=()=>{
+    if(!hasUnsavedModelChanges())return true;
+    message('Сначала сохрани изменения в Model · FBX → Apply Changes, затем повтори Find Mesh IDs · Studio.',true);
+    render();
+    return false;
+  };
   // A binding revision/Atlas ID alone cannot identify an Appearance revision:
   // switching Atlas -> Material + Color can preserve both Model and Mesh IDs.
   const appearanceSignature=item=>JSON.stringify([
-    item?.appearanceMode||'atlas', item?.visualMaterial||'SmoothPlastic',
+    item?.appearanceMode||'material', item?.visualMaterial||'Plastic',
     item?.visualColor||'#FFFFFF', item?.meshOptions||{},
   ]);
-  const hasUnsavedIdentity=()=>{
-    const current=row(),draft=state.identityDraft;
-    return Boolean(current&&draft&&(
-      draft.appearanceMode!==current.appearanceMode||
-      draft.visualMaterial!==current.visualMaterial||
-      draft.visualColor!==current.visualColor));
-  };
   const button=(action,label,disabled=false,css='')=>
     `<button type="button" class="${css}" data-la-action="${action}" ${disabled?'disabled':''}>${label}</button>`;
   const dialog=()=>shell.ensure('location-asset-edit-dialog','Manage Location Asset',()=>{
-    state.slug='';state.pendingModel='';state.pendingLod1='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.modelAppearanceDraft=null;state.alphaDraft=null;state.publication=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
+    state.slug='';state.pendingModel='';state.pendingLod1='';state.scan=null;state.scanStale=false;state.identityDraft=null;state.modelAppearanceDraft=null;state.publication=null;state.atlas=window.game1ConsumerAtlasEditor.newState();
   });
   const close=()=>{const d=document.getElementById('location-asset-edit-dialog');if(d?.open)d.close();};
   function open(slug,initialTab='identity'){
@@ -32,8 +35,8 @@ window.game1LocationAssetWorkflow = (() => {
     if(!item)return toast('Location Asset no longer exists; refresh.',true);
     if(state.busy)return toast('Finish the current operation first.',true);
     const d=dialog();if(d.open && state.slug!==slug)d.close();
-    state.slug=slug;state.tab=initialTab;state.busy=false;state.scan=null;state.scanStale=false;state.pendingModel='';state.pendingLod1='';state.manualSlug=false;state.identityDraft=null;state.modelAppearanceDraft=null;
-    state.alphaDraft=null;state.publication=null;state.inspection=item.fbxAnalysis||null;
+    state.slug=slug;state.tab=initialTab==='atlas'?'model':initialTab;state.busy=false;state.scan=null;state.scanStale=false;state.pendingModel='';state.pendingLod1='';state.manualSlug=false;state.identityDraft=null;state.modelAppearanceDraft=null;
+    state.publication=null;state.inspection=item.fbxAnalysis||null;
     state.meshOptions=window.game1MeshAuthoring.seeded(state.inspection,item.meshOptions||{});
     state.physicsDirty=false;state.atlas=window.game1ConsumerAtlasEditor.newState();
     message('');render();if(!d.open)d.showModal();
@@ -46,8 +49,8 @@ window.game1LocationAssetWorkflow = (() => {
     decoAssetState.studioVerifications[item.slug]={
       modelId:String(item.model_asset_id||''),atlasId:String(item.texture_asset_id||''),
       bindingRevision:Number(item.bindingRevision||0),authoringRevision:Number(item.revision||0),
-      alphaEnabled:Boolean(item.alphaEnabled),appearanceMode:item.appearanceMode||'atlas',
-      visualMaterial:item.visualMaterial||'SmoothPlastic',visualColor:item.visualColor||'#FFFFFF',
+      alphaEnabled:Boolean(item.alphaEnabled),appearanceMode:window.game1MeshAuthoring.displayAppearanceMode(item.appearanceMode||'material'),
+      visualMaterial:item.visualMaterial||'Plastic',visualColor:item.visualColor||'#FFFFFF',
       surfaceMaterial:item.surfaceMaterial||'default',
       verification:studio.verification||'review_required',
     };
@@ -92,19 +95,16 @@ window.game1LocationAssetWorkflow = (() => {
     const modelCurrent=Boolean(item.model_asset_id&&item.model_sha256===item.model_published_sha256);
     const changed=Boolean(state.pendingModel||state.physicsDirty);
     const publication=window.game1LocationPublication.plan(item,
-      decoAssetState.data?.atlases||[],Boolean(state.pendingModel));
+      decoAssetAtlasCatalog(),Boolean(state.pendingModel));
     const needsPublication=publication.modelNeeded;
     const publicationReady=Boolean(configured&&(state.pendingModel||item.model_path));
     const showPublish=publication.count>0||state.tab==='publish'||Boolean(state.publication);
     const tabs=[{id:'identity',label:'Identity'},{id:'model',label:'Model · FBX'},
       {id:'lod1',label:'LOD1'},
-      {id:'atlas',label:'Texture · atlas'},
       ...(showPublish?[{id:'publish',label:`Publish${publication.count?' · '+publication.count:''}`}]:[])];
     const card=(name,description,content,status='',css='ready')=>shell.step(name,description,content,status,css);
     const identityData=state.identityDraft||{nameEn:item.name_en,slug:item.slug,
-      category:item.category,surfaceMaterial:item.surfaceMaterial||'default',destructible:Boolean(item.destructible),
-      appearanceMode:item.appearanceMode||'atlas',visualMaterial:item.visualMaterial||'SmoothPlastic',
-      visualColor:item.visualColor||'#FFFFFF'};
+      category:item.category,surfaceMaterial:item.surfaceMaterial||'default',destructible:Boolean(item.destructible)};
     const identity=card('Registration details','Metadata changes never publish assets or modify Studio.',
       `<div class="deco-manage-fields"><label>Name<input data-la-name maxlength="120" value="${e(identityData.nameEn)}"></label>`+
       `<label>Slug<input data-la-slug maxlength="64" pattern="[a-z0-9_]+" value="${e(identityData.slug)}"></label>`+
@@ -121,29 +121,35 @@ window.game1LocationAssetWorkflow = (() => {
     // Shared default is edited alongside per-MeshPart overrides, never in Identity.
     // Every visual MeshPart inherits this default unless explicitly overridden.
     const modelAppearance=state.modelAppearanceDraft||{
-      appearanceMode:item.appearanceMode||'atlas',
-      visualMaterial:item.visualMaterial||'SmoothPlastic',
-      visualColor:item.visualColor||'#FFFFFF'};
+      appearanceMode:window.game1MeshAuthoring.displayAppearanceMode(item.appearanceMode||'material'),
+      visualMaterial:item.visualMaterial||'Plastic',
+      visualColor:item.visualColor||'#FFFFFF',alphaEnabled:Boolean(item.alphaEnabled)};
+    const modelUsesAtlas=modelAppearance.appearanceMode==='material_atlas';
     const modelAppearanceEditor=`<section class="la-model-appearance">`+
       `<strong>Default MeshPart appearance</strong>`+
-      `<small>Used only by MeshParts without an individual override below.</small>`+
-      `<label>Appearance source<select data-la-model-appearance-mode>`+
-      `<option value="atlas" ${modelAppearance.appearanceMode==='atlas'?'selected':''}>Texture Atlas</option>`+
-      `<option value="material" ${modelAppearance.appearanceMode==='material'?'selected':''}>Roblox Material + Color</option>`+
-      `<option value="material_atlas" ${modelAppearance.appearanceMode==='material_atlas'?'selected':''}>Roblox Material + Color + Atlas</option>`+
+      `<small>Applied to every visual MeshPart without an override. Saving changes does not Sync Studio.</small>`+
+      `<label>Appearance<select data-la-model-appearance-mode>`+
+      `<option value="material" ${!modelUsesAtlas?'selected':''}>Material + Color</option>`+
+      `<option value="material_atlas" ${modelUsesAtlas?'selected':''}>Material + Color + Atlas</option>`+
       `</select></label>`+
-      `<div data-la-model-visual-fields ${modelAppearance.appearanceMode==='atlas'?'hidden':''}>`+
-      `<label>Visual material<select data-la-model-visual-material>${(decoAssetState.data?.options?.visualMaterials||[]).map(m=>
-        `<option value="${e(m.id)}" ${m.id===modelAppearance.visualMaterial?'selected':''} ${m.requiresTexture&&modelAppearance.appearanceMode==='material'?'disabled':''}>${e(m.label)}${m.requiresTexture?' · requires texture':''}</option>`).join('')}</select></label>`+
+      `<div data-la-model-visual-fields>`+
+      `<label>Roblox Material<select data-la-model-visual-material>${(decoAssetState.data?.options?.visualMaterials||[]).map(m=>
+        `<option value="${e(m.id)}" ${m.id===modelAppearance.visualMaterial?'selected':''} ${m.requiresTexture&&!modelUsesAtlas?'disabled':''}>${e(m.label)}${m.requiresTexture?' · requires texture':''}</option>`).join('')}</select></label>`+
       `<label>Color<input type="color" data-la-model-visual-color value="${e(modelAppearance.visualColor)}"></label>`+
-      `</div></section>`;
+      `</div>`+
+      `<label class="deco-policy-toggle" ${modelUsesAtlas?'':'hidden'}><input type="checkbox" data-la-model-alpha ${modelAppearance.alphaEnabled?'checked':''}> Alpha transparency</label>`+
+      `${modelUsesAtlas?window.game1ConsumerAtlasEditor.render(state.atlas,{
+        currentId:item.atlasVariantId||0,linked:item.atlasVariants||[],
+        catalog:decoAssetAtlasCatalog(),busy,openPublish:publication.atlasNeeded,offerPublication:true}):''}`+
+      `<small>${modelUsesAtlas?'Select an atlas from the shared registry, then Apply Changes for Material / Color / Alpha.':'No Image ID is required. Existing atlas bindings and publication history remain intact.'}</small>`+
+      `</section>`;
     const model=card('Model · FBX',
       'Review mesh names, skeleton and collision settings. A changed FBX is published as a NEW Model ID; physics-only changes do not publish.',
       `<small class="deco-manage-value">${e(state.pendingModel||item.model_path||'No FBX selected')}</small>`+
       modelAppearanceEditor+
       window.game1MeshAuthoring.inspectionView(inspection,state.meshOptions,'location-mesh',{
         materials:decoAssetState.data?.options?.visualMaterials||[],
-        atlases:decoAssetState.data?.atlases||[],alphaEnabled:Boolean(item.alphaEnabled)})+
+        atlases:decoAssetAtlasCatalog(),alphaEnabled:Boolean(modelAppearance.alphaEnabled),defaultUsesAtlas:modelUsesAtlas})+
       (Object.entries(item.meshOptions||{}).filter(([name,settings])=>
         settings?.appearanceMode&&settings.atlasVariantId&&!settings.texture_asset_id)
         .map(([name,settings])=>`<div class="la-publication-resource"><span>${e(name)} · Atlas not published</span>`+
@@ -157,24 +163,6 @@ window.game1LocationAssetWorkflow = (() => {
         busy||(!changed&&!needsPublication)||(needsPublication&&!publicationReady),
         changed||needsPublication?'asset-apply-ready':'')}</div>`,
       modelCurrent?'Published':'Changes pending',modelCurrent?'ready':'pending');
-    const activeAlpha=Boolean(item.alphaEnabled);
-    const selectedAlpha=state.alphaDraft===null?activeAlpha:state.alphaDraft;
-    const alphaDirty=selectedAlpha!==activeAlpha;
-    const alphaEditor=`<section class="la-alpha-settings"><label class="deco-policy-toggle">`+
-      `<input type="checkbox" data-la-alpha ${selectedAlpha?'checked':''} ${busy?'disabled':''}> Alpha transparency</label>`+
-      `<small>${selectedAlpha?'Вкл. · Transparency':'Выкл. · Opaque'} · независимо от альфа-канала общего атласа; Физические Parts настраиваются отдельно.</small>`+
-      `<div class="actions">${button('apply-alpha','Apply Changes',busy||!alphaDirty,alphaDirty?'asset-apply-ready':'')}</div></section>`;
-    const atlas=(item.appearanceMode==='material'
-      ? '<small class="hint">Material + Color active: no Image ID is required. To switch to Atlas, choose a registered variant below. This changes the appearance mode but does not modify Studio until Sync.</small>'+
-        `<label>Existing atlas variant<select data-la-switch-atlas>`+
-        `<option value="">Choose a variant…</option>`+
-        (decoAssetState.data?.atlases||[]).flatMap(f=>f.variants||[]).filter(v=>!v.retired)
-          .map(v=>`<option value="${Number(v.id)}">${e(v.filename)}${v.published_id?' · published':' · publish required'}</option>`).join('')+
-        `</select></label><div class="actions">${button('activate-atlas','Use selected atlas',busy)}</div>`
-      : alphaEditor+window.game1ConsumerAtlasEditor.render(state.atlas,{
-      currentId:item.atlasVariantId||0,linked:item.atlasVariants||[],
-      catalog:decoAssetState.data?.atlases||[],busy,openPublish:publication.atlasNeeded,
-      offerPublication:true}));
     // Publication is a separate operation from source registration and Studio Sync.
     // Busy stages show the actual awaited network operation, not a fabricated %.
     const publicationStatus=(key,label,pending)=>{
@@ -190,7 +178,7 @@ window.game1LocationAssetWorkflow = (() => {
       (item.appearanceMode==='material'?'':publicationStatus('atlas',`Atlas · ${e(publication.variant?.filename||'не выбран')}`,publication.atlasNeeded))+
       publicationStatus('model','Model · FBX',publication.modelNeeded)+`</div>`+
       (state.physicsDirty&&!publication.modelNeeded?'<p class="la-publication-warning">Есть изменения физических настроек MeshPart. Сохрани их через Model · FBX → Apply Changes.</p>':'')+
-      (publication.reviewRequired?'<p class="la-publication-warning">Атлас уже имеет Image ID, но изменён. Для замены общего атласа открой Texture · atlas и подтверди замену после просмотра.</p>':'')+
+      (publication.reviewRequired?'<p class="la-publication-warning">Атлас изменён. Проверь его в Model · FBX → Default MeshPart appearance перед публикацией.</p>':'')+
       `<div class="la-publication-stage" role="status" aria-live="polite">`+
       (state.publication?.active?`<span class="${state.publication.running?'la-publish-spinner':''}" aria-hidden="true"></span><span>${e(state.publication.active)}</span>`:
         publication.count?'Готово к публикации · Place не будет изменён.':'Все выбранные ресурсы опубликованы.')+
@@ -328,7 +316,7 @@ window.game1LocationAssetWorkflow = (() => {
     d.innerHTML=`<div class="real-estate-mesh-dialog-head"><div><small class="eyebrow">Location Asset · ${e(item.slug)}</small>`+
       `<h3>Manage ${e(item.name_en)}</h3></div><button type="button" data-la-close aria-label="Close">✕</button></div>`+
       `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">${shell.tabs(tabs,state.tab,'data-la-tab')}${errorStatus}${busyStatus}`+
-      `${state.tab==='identity'?identity:state.tab==='model'?model:state.tab==='lod1'?lodPanel:state.tab==='atlas'?atlas:publishPanel}${['publish','lod1'].includes(state.tab)?'':footer}`+
+      `${state.tab==='identity'?identity:state.tab==='model'?model:state.tab==='lod1'?lodPanel:publishPanel}${['publish','lod1'].includes(state.tab)?'':footer}`+
       `${state.error?'':`<div class="real-estate-workflow-result" role="status" ${state.result?'':'hidden'}>${e(state.result)}</div>`}</div>`;
     d.querySelector('.real-estate-mesh-dialog-body').scrollTop=state.error?0:scrollBody;
     const newList=d.querySelector('.la-sync-list');if(newList)newList.scrollTop=scrollList;
@@ -338,13 +326,15 @@ window.game1LocationAssetWorkflow = (() => {
         state.modelAppearanceDraft={
           appearanceMode:d.querySelector('[data-la-model-appearance-mode]').value,
           visualMaterial:d.querySelector('[data-la-model-visual-material]').value,
-          visualColor:d.querySelector('[data-la-model-visual-color]').value};
+          visualColor:d.querySelector('[data-la-model-visual-color]').value,
+          alphaEnabled:d.querySelector('[data-la-model-appearance-mode]').value==='material_atlas'
+            &&(d.querySelector('[data-la-model-alpha]')?.checked??false)};
         state.physicsDirty=true;
         const apply=d.querySelector('[data-la-action="apply-model"]');
         if(apply){apply.disabled=false;apply.classList.add('asset-apply-ready');}
       };
       for(const selector of ['[data-la-model-appearance-mode]',
-          '[data-la-model-visual-material]','[data-la-model-visual-color]']){
+          '[data-la-model-visual-material]','[data-la-model-visual-color]','[data-la-model-alpha]']){
         const field=d.querySelector(selector);
         if(field)field.onchange=()=>{
           readModelAppearance();
@@ -357,7 +347,7 @@ window.game1LocationAssetWorkflow = (() => {
       if(apply){apply.disabled=false;apply.classList.add('asset-apply-ready');}
     },Boolean(inspection?.hasCollider),{
       materials:decoAssetState.data?.options?.visualMaterials||[],
-      atlases:decoAssetState.data?.atlases||[],alphaEnabled:Boolean(item.alphaEnabled)});
+      atlases:decoAssetAtlasCatalog(),alphaEnabled:Boolean(modelAppearance.alphaEnabled),defaultUsesAtlas:modelUsesAtlas});
     }
     d.querySelector('[data-la-close]').onclick=()=>{if(!busy)d.close();};
     d.querySelectorAll('[data-la-tab]').forEach(b=>b.onclick=()=>{if(!busy){state.tab=b.dataset.laTab;render();}});
@@ -396,13 +386,11 @@ window.game1LocationAssetWorkflow = (() => {
         return syncSelected(keys);
       };
     });
-    const alphaInput=d.querySelector('[data-la-alpha]');
-    if(alphaInput)alphaInput.onchange=()=>{state.alphaDraft=alphaInput.checked;render();};
-    if(state.tab==='atlas'&&item.appearanceMode!=='material')window.game1ConsumerAtlasEditor.wire(d,state.atlas,{
+    if(state.tab==='model'&&modelUsesAtlas)window.game1ConsumerAtlasEditor.wire(d,state.atlas,{
       consumerType:'location_asset',slug:state.slug,
       revision:item.bindingRevision||0,busy:state.busy,
       getRevision:()=>row()?.bindingRevision||0,getCurrentId:()=>row()?.atlasVariantId||0,
-      catalog:decoAssetState.data?.atlases||[],
+      catalog:decoAssetAtlasCatalog(),
       filePicker:'/api/files/choose-location-asset-texture',
       onOpenPublish:()=>{state.tab='publish';render();},
       onPublishAtlas:variantId=>run('Публикация выбранного атласа',async()=>{
@@ -412,7 +400,7 @@ window.game1LocationAssetWorkflow = (() => {
           'Активная привязка и Studio не изменены.'+(warnings?` Предупреждение: ${warnings}`:''),Boolean(warnings));
         return true;
       }),
-      onMessage:message,onRender:render,onRefresh:decoAssetLoad,
+      onMessage:message,onRender:render,onRefresh:async()=>{await decoAssetLoad();state.scanStale=true;},
     });
   }
   // Shared first-publication operation: used both by Publish ready and by an
@@ -433,30 +421,8 @@ window.game1LocationAssetWorkflow = (() => {
   }
   async function execute(action){
     const item=row();if(!item)return;
-    if(action==='activate-atlas')return run('Подключение атласа',async()=>{
-      const chosen=Number(dialog()?.querySelector('[data-la-switch-atlas]')?.value||0);
-      if(!Number.isInteger(chosen)||chosen<1)throw Error('Выбери вариант атласа');
-      await request(`/api/location-assets/${encodeURIComponent(state.slug)}/atlas-binding`,{
-        method:'PUT',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({variantId:chosen,expectedRevision:Number(item.revision)}),
-      });
-      await decoAssetLoad();state.scanStale=true;state.identityDraft=null;
-      message('Режим Atlas включён. При необходимости опубликуй Image ID и выполни Studio Sync.');
-    });
-    if(action==='apply-alpha')return run('Сохранение Alpha',async()=>{
-      const current=row();if(!current)throw Error('Location Asset не найден');
-      const value=state.alphaDraft===null?Boolean(current.alphaEnabled):state.alphaDraft;
-      if(value===Boolean(current.alphaEnabled))return;
-      const saved=await request(`/api/location-assets/${encodeURIComponent(state.slug)}/appearance`,{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({alphaEnabled:value,expectedRevision:Number(current.revision)}),
-      });
-      await decoAssetLoad();
-      state.alphaDraft=null;state.scanStale=true;
-      message(`Alpha ${saved.alphaEnabled?'включён':'выключен'}. Model/Atlas ID не изменены. Нужен Sync размещённых моделей.`);
-    });
     if(action==='publish-ready')return run('Publishing new resources',async()=>{
-      const initial=window.game1LocationPublication.plan(row(),decoAssetState.data?.atlases||[],Boolean(state.pendingModel));
+      const initial=window.game1LocationPublication.plan(row(),decoAssetAtlasCatalog(),Boolean(state.pendingModel));
       if(!initial.count){message('Все выбранные ресурсы уже опубликованы.');return;}
       state.tab='publish';
       state.publication={atlas:initial.atlasNeeded?'waiting':'',
@@ -663,6 +629,7 @@ window.game1LocationAssetWorkflow = (() => {
     });
   }
   async function syncPainter(models){
+    if(!ensureSavedModelForSync())return;
     return run('Проверка и обновление подвесов LandscapePainter',async()=>{
       const item=row(),current=state.scan;
       if(!item||!current||state.scanStale||current.modelId!==String(item.model_asset_id||'')||
@@ -730,10 +697,7 @@ window.game1LocationAssetWorkflow = (() => {
 
   async function syncAll(){
     const item=row();if(!item||state.busy)return;
-    if(hasUnsavedIdentity()){
-      message('Сначала нажми Apply Changes в Identity: выбранный Material/Color ещё не сохранён.',true);
-      return render();
-    }
+    if(!ensureSavedModelForSync())return;
     const valid=state.scan&&state.scan.modelId===String(item.model_asset_id||'')&&
       state.scan.atlasId===String(item.texture_asset_id||'')&&
       state.scan.revision===Number(item.bindingRevision||0)&&
@@ -808,7 +772,61 @@ window.game1LocationAssetWorkflow = (() => {
     state.scanStale=false;
     rememberStudioVerification(row(),refreshed.studio);
   }
+  // M409: one explicit choice per selected geometry row. An old static FBX
+  // may predate the authored rig-manifest contract. No answer skips Mesh ID,
+  // ownership or structural checks in Studio; Esc/Cancel makes no changes.
+  function askHistoricalRigChoices(parts){
+    if(!parts.length)return Promise.resolve({});
+    return new Promise((resolve,reject)=>{
+      const dialog=document.createElement('dialog');
+      dialog.style.cssText='max-width:min(640px,92vw);max-height:85vh;overflow:auto;padding:22px;border:1px solid #777;border-radius:12px;background:var(--panel,#23262b);color:var(--text,#f5f5f5);box-shadow:0 12px 48px #0009';
+      const heading=document.createElement('h3');
+      heading.textContent='У старой модели есть скелетный риг?';
+      const explain=document.createElement('p');
+      explain.textContent='Выбери для каждой модели. «Нет» пропускает только проверку костей и исторического риг-манифеста. Mesh ID, принадлежность и структура проверяются всегда. Сохраните копию Place.';
+      explain.style.cssText='font-size:13px;line-height:1.5';
+      dialog.append(heading,explain);
+      const inputs=[];
+      for(const part of parts){
+        const label=document.createElement('label');
+        label.style.cssText='display:flex;gap:12px;justify-content:space-between;align-items:center;margin:10px 0;font-size:13px';
+        const name=document.createElement('span');
+        name.textContent=`${part.modelName||part.name||'Model'} · ${part.key} · ${part.modelPath||part.path||''}`;
+        name.style.cssText='overflow-wrap:anywhere;min-width:0';
+        const select=document.createElement('select');
+        select.style.cssText='min-width:124px;padding:6px';
+        for(const [value,caption] of [['','Выберите'],['rig','Да, есть'],['static','Нет']]){
+          const option=document.createElement('option');option.value=value;option.textContent=caption;
+          select.appendChild(option);
+        }
+        label.append(name,select);dialog.appendChild(label);
+        inputs.push([part.key,select]);
+      }
+      const actions=document.createElement('div');
+      actions.style.cssText='display:flex;gap:10px;justify-content:flex-end;margin-top:18px';
+      const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Отмена';
+      const proceed=document.createElement('button');proceed.type='button';proceed.textContent='Продолжить Sync';
+      actions.append(cancel,proceed);dialog.appendChild(actions);
+      let settled=false;
+      const finish=value=>{
+        if(settled)return;settled=true;
+        if(dialog.open)dialog.close();dialog.remove();resolve(value);
+      };
+      cancel.addEventListener('click',()=>finish(null));
+      dialog.addEventListener('cancel',event=>{event.preventDefault();finish(null)});
+      dialog.addEventListener('close',()=>finish(null));
+      proceed.addEventListener('click',()=>{
+        if(inputs.some(([,select])=>!select.value)){
+          message('Выбери Да или Нет для каждой модели.',true);return;
+        }
+        finish(Object.fromEntries(inputs.map(([key,select])=>[key,select.value])));
+      });
+      document.body.appendChild(dialog);
+      try{dialog.showModal()}catch(error){dialog.remove();reject(error)}
+    });
+  }
   async function syncSelected(keys){
+    if(!ensureSavedModelForSync())return;
     return run('Синхронизация моделей',async()=>{
       const item=row(),scan=state.scan;
       if(!item||!scan||state.scanStale||scan.modelId!==String(item.model_asset_id||'')||
@@ -826,18 +844,25 @@ window.game1LocationAssetWorkflow = (() => {
       const chosen=keys.map(key=>pending.get(key));
       const mesh=chosen.some(p=>p.needsMesh),texture=chosen.some(p=>p.needsTexture),alpha=chosen.some(p=>p.needsAlpha),physics=chosen.some(p=>p.needsPhysics);
       const label=mesh&&texture?'Replace Texture + Mesh':mesh?'Replace Mesh':texture?'Replace Texture':alpha?'Sync Alpha':physics?'Sync Physics':'Sync';
-      if(typeof window.confirm!=='function')throw Error('Explicit confirmation is unavailable');
-      const scope=mesh?'Mesh: заменится весь rig соответствующей модели. ':texture?'Texture: обновятся выбранные визуальные MeshPart. ':alpha?'Alpha: изменится только SurfaceAppearance.AlphaMode. ':'Physics: применятся зарегистрированные CanCollide / CanQuery / CanTouch / DoubleSided / CollisionFidelity. ';
-      if(!window.confirm(`${label}: ${keys.length} MeshPart (${state.slug}). `+
-        scope+'Сделай резервную копию Place. Продолжить?')){
-        message('Sync отменён. Place не изменён.');return;
+      let rigChoices={};
+      if(mesh){
+        const answer=await askHistoricalRigChoices(chosen.filter(p=>p.needsMesh));
+        if(!answer){message('Sync отменён. Place не изменён.');return;}
+        rigChoices=answer;
+      }else{
+        if(typeof window.confirm!=='function')throw Error('Explicit confirmation is unavailable');
+        const scope=texture?'Texture: обновятся выбранные визуальные MeshPart. ':alpha?'Alpha: изменится только SurfaceAppearance.AlphaMode. ':'Physics: применятся зарегистрированные настройки коллизии. ';
+        if(!window.confirm(`${label}: ${keys.length} MeshPart (${state.slug}). `+
+          scope+'Сохраните копию Place. Продолжить?')){
+          message('Sync отменён. Place не изменён.');return;
+        }
       }
       // The token is single use, but keep the displayed snapshot while Studio
       // works. If Sync fails, the last report is still readable (stale/locked).
       state.scanStale=true;
       let result;
       try{
-        result=await window.game1StudioSync.replaceLocation(state.slug,scan.studio.scanToken,keys);
+        result=await window.game1StudioSync.replaceLocation(state.slug,scan.studio.scanToken,keys,rigChoices);
       }catch(error){
         try{await refreshSyncReport();}
         catch(_refreshError){state.scanStale=true;}

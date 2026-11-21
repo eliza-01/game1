@@ -36,7 +36,7 @@ class LocationSyncActionAvailableM254(TestCase):
         assets = _Assets({'status': 'UPDATE_AVAILABLE', 'bindingRevision': 4,
                           'model_asset_id': '12345', 'texture_asset_id': '67890'})
         transport = mock.Mock(return_value={
-            'inventory': [{'modelAssetId': '12345', 'meshes': []}],
+            'inventory': [{'modelAssetId': '12345', 'meshes': [{'meshId': '55555', 'count': 1, 'visualNames': ['visual']}]}],
             'parts': [], 'scanToken': 'a' * 32,
         })
         deps = defaultdict(lambda: None, {

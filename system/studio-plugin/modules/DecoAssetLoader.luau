@@ -153,17 +153,34 @@ function DecoAssetLoader:loadForMeshInventory(modelId: string, slug: string): Mo
 end
 
 function DecoAssetLoader:loadHistoricalRigForComparison(modelId: string, slug: string,
-    rigManifest: any): Model
+    rigManifest: any, rigChoice: string?): Model
     -- A placed v2 rig was created from loadPublished(), where Roblox importer
     -- scaffolding is removed on a detached clone. Compare against that same
     -- representation, never raw RootPart hierarchy and never a newer version's
     -- manifest. This path is read-only and performs no publication.
-    if type(rigManifest) ~= "table" then
-        error("historical rig manifest unavailable; no Place geometry modified")
+    if rigChoice~="rig" and rigChoice~="static" and rigChoice~=nil then
+        error("invalid historical rig choice; no Place geometry modified")
+    end
+    local static=rigChoice=="static"
+    if not static and type(rigManifest)~="table" then
+        error("historical rig manifest unavailable; no Place geometry modified (skinned rig selected)")
     end
     local model = self:loadForMeshInventory(modelId, slug)
     local good, problem = pcall(function()
         sanitize(model)
+        if static then
+            -- Explicit operator choice bypasses ONLY historical skeleton checks.
+            -- We still compare all immutable Mesh IDs and the entire managed
+            -- child hierarchy against Studio before replacing anything.
+            for _, item in ipairs(model:GetDescendants()) do
+                if item:IsA("Bone") or item.Name=="rig_carrier" or item:IsA("WrapLayer")
+                    or item:IsA("WrapTarget") or item:IsA("Motor6D") then
+                    error("historical publication contains a rig; choose Yes and use its manifest")
+                end
+            end
+            RetiredCleanup.CleanLocation(model)
+            return
+        end
         PublishedRigNormalize.Apply(model, rigManifest)
         RetiredCleanup.CleanLocation(model)
         local carrier = Carrier.Validate(model, rigManifest, false)

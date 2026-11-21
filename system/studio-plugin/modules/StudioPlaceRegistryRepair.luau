@@ -8,8 +8,17 @@ local ATTRIBUTES = {
     "Game1DecoPublishedModelAssetId", "Game1DecoPublishedModelSha256",
 }
 
-local function assignedId(http: any): string
-    return http:GenerateGUID(false)
+-- Newly issued identities must not collide with any scanned placement, even
+-- when a Studio/plugin GUID provider unexpectedly repeats a value.
+local function assignedId(http: any, occupied: {[string]: number}): string
+    for _ = 1, 16 do
+        local candidate = http:GenerateGUID(false)
+        if type(candidate) == "string" and candidate ~= "" and not occupied[candidate] then
+            occupied[candidate] = 1
+            return candidate
+        end
+    end
+    error("Cannot issue a unique Location Placement ID; Place unchanged")
 end
 
 local function originalState(model: Model): any
@@ -34,16 +43,21 @@ local function restore(model: Model, state: any)
 end
 
 function Repair.Apply(refs: {any}, ctx: any): any
-    local blocked, eligible, allIds, kept = {}, {}, {}, {}
+    local blocked, eligible, allIds, selectedIds, retained = {}, {}, {}, {}, {}
     local originals = ctx.allRefs or refs
     for _, ref in ipairs(originals) do
-        local pid = ref.row.placementId
-        if pid ~= "" then
-            allIds[pid] = (allIds[pid] or 0) + 1
-            if not kept[pid] then kept[pid] = ref end
+        if not ref.external then
+            if type(ref.row) ~= "table" or type(ref.row.placementId) ~= "string" then
+                error("Incomplete Deco Placement ID evidence; rescan before Repair")
+            end
+            local pid = ref.row.placementId
+            if pid ~= "" then allIds[pid] = (allIds[pid] or 0) + 1 end
         end
     end
     for _, ref in ipairs(refs) do
+        if ref.external then
+            error("LandscapePainter does not support Place Registry Repair")
+        end
         if ref.row.ambiguous then
             table.insert(blocked, ref.row.key .. ": неоднозначное происхождение")
         elseif ref.structuralState == "legacy_import_root" then
@@ -65,6 +79,13 @@ function Repair.Apply(refs: {any}, ctx: any): any
         return {changed = 0, skipped = blocked,
             note = "Repair не изменил Place; для RootPart требуется перепубликация FBX"}
     end
+    for _, ref in ipairs(eligible) do
+        local pid = ref.row.placementId
+        if ref.row.duplicateId and (allIds[pid] or 0) < 2 then
+            error("Duplicate Placement ID evidence changed; rescan before Repair")
+        end
+        if pid ~= "" then selectedIds[pid] = (selectedIds[pid] or 0) + 1 end
+    end
     local recording = ctx.history:TryBeginRecording(ctx.recordingName, "Repair Location Placement Identity")
     if not recording then error("Studio Undo unavailable; Place unchanged") end
     local undo = {}
@@ -78,8 +99,19 @@ function Repair.Apply(refs: {any}, ctx: any): any
             end
             table.insert(undo, function() restore(model, before) end)
             local pid = ref.row.placementId
-            if pid == "" or ((allIds[pid] or 0) > 1 and kept[pid] ~= ref) then
-                pid = assignedId(ctx.http)
+            if pid == "" then
+                pid = assignedId(ctx.http, allIds)
+            elseif (allIds[pid] or 0) > 1 then
+                -- A single-item Repair must fix THE selected duplicate, even
+                -- if it happens to be the first scanned member of the group.
+                -- For a complete group Repair retain one original identity,
+                -- and re-key all remaining members. Partial selection always
+                -- re-keys selected members and never silently returns zero.
+                if selectedIds[pid] == allIds[pid] and not retained[pid] then
+                    retained[pid] = true
+                else
+                    pid = assignedId(ctx.http, allIds)
+                end
             end
             local updates = {
                 Game1DecoInstanceId = pid,

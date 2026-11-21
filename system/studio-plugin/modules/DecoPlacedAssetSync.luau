@@ -90,6 +90,72 @@ local function rigChildren(model: Model): {Instance}
     return result
 end
 
+-- A placed rig can already be the CURRENT immutable publication while its
+-- legacy Model ID / SHA attributes are stale. Verify the entire managed rig,
+-- not one visual MeshId or an untrusted attribute, before reconciling metadata.
+-- Alignment is tested only on detached clones: no placed geometry is touched.
+local function matchesCurrentPublishedRig(model: Model, published: Model, row: any): boolean
+    if Carrier.Diagnose(model, row.rigManifest, row.legacyStaticPublication) ~= "current" then
+        return false
+    end
+    if not History.MatchesInventory(model, History.Describe(tostring(row.model_asset_id), published)) then
+        return false
+    end
+    local good = pcall(History.VerifyChildren, published, rigChildren(model))
+    if not good then return false end
+    local probe = published:Clone()
+    local reference = published:Clone()
+    local aligned = pcall(Geometry.Align, probe, reference, model)
+    reference:Destroy()
+    if not aligned then probe:Destroy(); return false end
+
+    -- The same Mesh IDs can be republished with changed local part or Bone
+    -- transforms. Only reconcile metadata when the actual authored geometry
+    -- agrees too. Duplicated Mesh IDs cannot establish a unique correspondence.
+    local sources, actuals = {}, {}
+    for _, pair in ipairs({{probe, sources}, {model, actuals}}) do
+        for _, part in ipairs(meshParts(pair[1])) do
+            local meshId = History.Id(part.MeshId)
+            if meshId == "" or pair[2][meshId] then
+                probe:Destroy()
+                return false
+            end
+            pair[2][meshId] = part
+        end
+    end
+    for meshId, source in pairs(sources) do
+        local target = actuals[meshId]
+        if not target or (source.Size - target.Size).Magnitude > 0.025
+            or (source.CFrame.Position - target.CFrame.Position).Magnitude > 0.04
+            or source.CFrame.LookVector:Dot(target.CFrame.LookVector) < 0.9995
+            or source.CFrame.UpVector:Dot(target.CFrame.UpVector) < 0.9995 then
+            probe:Destroy()
+            return false
+        end
+    end
+    local authoredBones = {}
+    for _, item in ipairs(probe:GetDescendants()) do
+        if item:IsA("Bone") then authoredBones[item.Name] = item.CFrame end
+    end
+    local boneCount = 0
+    for _, item in ipairs(model:GetDescendants()) do
+        if item:IsA("Bone") then
+            local authored = authoredBones[item.Name]
+            if not authored or (authored.Position - item.CFrame.Position).Magnitude > 0.025
+                or authored.LookVector:Dot(item.CFrame.LookVector) < 0.9995
+                or authored.UpVector:Dot(item.CFrame.UpVector) < 0.9995 then
+                probe:Destroy()
+                return false
+            end
+            boneCount += 1
+        end
+    end
+    local expectedBoneCount = 0
+    for _ in pairs(authoredBones) do expectedBoneCount += 1 end
+    probe:Destroy()
+    return boneCount == expectedBoneCount
+end
+
 -- Read-only eligibility check for explicitly linking an old, manually placed
 -- publication. Do not grant ownership if its hierarchy was edited by hand.
 function DecoPlacedAssetSync.VerifyLegacyModel(model: Model, oldPublished: Model)
@@ -124,7 +190,8 @@ local function textureId(uri: string): string
 end
 
 function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slug: string, http: any,
-    expectedModelId: string, expectedAtlasId: string, loader: any, preview: any, selectedKeys: {string}): any
+    expectedModelId: string, expectedAtlasId: string, loader: any, preview: any,
+    selectedKeys: {string}, rigChoices: {[string]: string}?): any
     if type(slug) ~= "string" or slug == "" then
         error("one explicitly selected Location Asset slug is required")
     end
@@ -140,12 +207,24 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
         error("Find Mesh IDs in Studio before replacing; no Place geometry modified")
     end
     local chosenParts, chosenRoots, chosenGeometry,chosenPhysics={},{},{},{}
+    local historicalRigChoices={}
     for _, key in ipairs(selectedKeys) do
         local entry=preview.partByKey[key]
         if not entry or not entry.root then error("invalid selected managed MeshPart") end
         chosenParts[entry.part]=true
         chosenRoots[entry.root]=true
-        if entry.row.needsMesh then chosenGeometry[entry.root]=true end
+        if entry.row.needsMesh then
+            chosenGeometry[entry.root]=true
+            local choice=if rigChoices then rigChoices[key] else nil
+            if choice~=nil and choice~="rig" and choice~="static" then
+                error("invalid historical rig choice; no Place geometry modified")
+            end
+            local previous=historicalRigChoices[entry.root]
+            if previous and choice and previous~=choice then
+                error("contradictory rig answers for one placed Model; no Place geometry modified")
+            end
+            historicalRigChoices[entry.root]=choice or previous or "rig"
+        end
         if entry.row.needsPhysics then chosenPhysics[entry.part]=true end
     end
     local live={}
@@ -232,55 +311,86 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             local oldId = tostring(model:GetAttribute("Game1DecoPublishedModelAssetId") or "")
             local previousModelId=oldId
             local oldRef = tostring(model:GetAttribute(REFERENCE) or oldId)
-            local changeRef = geometry and oldRef ~= modelId
+            local changeRef = false
+            local metadataCurrent = false
             local stage, transaction = nil, nil
             local oldParts = meshParts(model)
             if geometry then
                 if Ownership.HasNestedPlacements(model) then
                     error("nested Location placements must be synced separately; no Place geometry modified")
                 end
-                stage = (published :: Model):Clone()
-                table.insert(staging, stage)
-                -- Same shared managed-rig transaction as Real Estate.
-                -- The previous immutable published Model is the authoring
-                -- reference. We identify it by MeshPart.MeshId history,
-                -- never by old/new names, hierarchy or importer order.
-                local previousId=oldId
-                if previousId=="" or previousId==modelId then
-                    local matchId=nil
-                    for _, entry in ipairs(preview.inventory or {}) do
-                        if entry.modelAssetId~=modelId and History.MatchesInventory(model,entry) then
-                            if matchId then error("ambiguous historical Model version; no Place geometry modified") end
-                            matchId=entry.modelAssetId
+                -- If Studio already contains the exact current rig, a swap
+                -- would destroy and recreate unchanged geometry. Reconcile
+                -- publication metadata only after whole-rig and transform
+                -- verification against the LOADED current Model.
+                metadataCurrent = matchesCurrentPublishedRig(model, published :: Model, row)
+                if metadataCurrent then
+                    geometry = false
+                else
+                    stage = (published :: Model):Clone()
+                    table.insert(staging, stage)
+                    -- A genuinely old rig still requires an immutable prior
+                    -- publication. Never guess from one shared Mesh ID.
+                    local previousId=oldId
+                    if previousId=="" or previousId==modelId then
+                        local matchId=nil
+                        for _, entry in ipairs(preview.inventory or {}) do
+                            if entry.modelAssetId~=modelId and History.MatchesInventory(model,entry) then
+                                if matchId then error("ambiguous historical Model version; no Place geometry modified") end
+                                matchId=entry.modelAssetId
+                            end
+                        end
+                        previousId=matchId or ""
+                    end
+                    if previousId=="" then
+                        local ids = {}
+                        for _, part in ipairs(oldParts) do
+                            table.insert(ids, part.Name .. "=" .. History.Id(part.MeshId))
+                        end
+                        table.sort(ids)
+                        error("published Model source unverified for " .. model:GetFullName()
+                            .. "; stamped Model ID=" .. oldId .. "; placed Mesh IDs="
+                            .. table.concat(ids, ", "):sub(1, 450)
+                            .. "; neither current rig nor unique historical publication matches; "
+                            .. "no Place geometry modified")
+                    end
+                    previousModelId=previousId
+                    local previousVersion=nil
+                    for _, version in ipairs(preview.inventory or {}) do
+                        if version.modelAssetId==previousId then previousVersion=version break end
+                    end
+                    if not previousVersion then
+                        error("historical Model evidence missing for "..previousId
+                            .."; no Place geometry modified")
+                    end
+                    if historicalRigChoices[model]=="static" then
+                        for _, item in ipairs(model:GetDescendants()) do
+                            if item:IsA("Bone") or item.Name=="rig_carrier"
+                                or item:IsA("WrapLayer") or item:IsA("WrapTarget")
+                                or item:IsA("Motor6D") then
+                                error("placed Model contains a rig; choose Yes before Sync; no Place geometry modified")
+                            end
                         end
                     end
-                    previousId=matchId or ""
+                    local previousPublished=loader:loadHistoricalRigForComparison(
+                        previousId,slug,previousVersion.rigManifest,
+                        historicalRigChoices[model])
+                    local good,problem=pcall(function()
+                        local previousChildren=rigChildren(model)
+                        History.VerifyChildren(previousPublished,previousChildren)
+                        local anchor=Geometry.Align(stage,previousPublished,model)
+                        Placement.PrepareSynced(stage,row.meshOptions,row.surfaceMaterial,nil)
+                        BoneEffects.CopyToIncoming(previousChildren, rigChildren(stage))
+                        transaction = RigSwap.Prepare(model, previousChildren, rigChildren(stage),
+                            {preferredPrimary=anchor})
+                    end)
+                    previousPublished:Destroy()
+                    if not good then error(tostring(problem)) end
+                    totalMeshes += #meshParts(stage)
+                    if totalMeshes > 4096 then error("more than 4096 MeshParts in scoped Sync") end
                 end
-                if previousId=="" then error("old published Model ID unknown; no Place geometry modified") end
-                previousModelId=previousId
-                local previousVersion=nil
-                for _, version in ipairs(preview.inventory or {}) do
-                    if version.modelAssetId==previousId then previousVersion=version break end
-                end
-                if not previousVersion then
-                    error("historical Model evidence missing; no Place geometry modified")
-                end
-                local previousPublished=loader:loadHistoricalRigForComparison(
-                    previousId,slug,previousVersion.rigManifest)
-                local good,problem=pcall(function()
-                    local previousChildren=rigChildren(model)
-                    History.VerifyChildren(previousPublished,previousChildren)
-                    local anchor=Geometry.Align(stage,previousPublished,model)
-                    Placement.PrepareSynced(stage,row.meshOptions,row.surfaceMaterial,nil)
-                    BoneEffects.CopyToIncoming(previousChildren, rigChildren(stage))
-                    transaction = RigSwap.Prepare(model, previousChildren, rigChildren(stage),
-                        {preferredPrimary=anchor})
-                end)
-                previousPublished:Destroy()
-                if not good then error(tostring(problem)) end
-                totalMeshes += #meshParts(stage)
-                if totalMeshes > 4096 then error("more than 4096 MeshParts in scoped Sync") end
             end
+            changeRef = (geometry or metadataCurrent) and oldRef ~= modelId
             local atlasChanges = {}
             local uri = "rbxassetid://" .. atlasId
             for _, part in ipairs(oldParts) do
@@ -325,7 +435,11 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 eventIndex[key].count += count
             end
             if geometry then add("model", previousModelId, modelId, 1) end
-            if changeRef then add("model_reference", oldRef, modelId, 1) end
+            if changeRef then add("model_reference", oldRef, modelId, 1)
+            elseif metadataCurrent and oldId ~= modelId then
+                -- Changed publication stamp, NOT changed geometry.
+                add("model_reference", oldId, modelId, 1)
+            end
             for _, change in ipairs(atlasChanges) do
                 local settings=Visual.Settings(change.part,row)
                 if settings.appearanceMode=="material" then
@@ -376,7 +490,8 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
                 if #historyJson > 30000 then error("Studio history exceeded safe attribute limit") end
             end
             table.insert(plans, {model = model, stage = stage, swap = transaction,
-                geometry = geometry, oldId = oldId, oldRef = oldRef,
+                geometry = geometry, metadataCurrent = metadataCurrent,
+                oldId = oldId, oldRef = oldRef,
                 changeRef = changeRef, atlasChanges = atlasChanges,alphaChanges=alphaChanges,
                 historyJson = historyJson, oldHistory = model:GetAttribute(HISTORY),
                 oldSha = model:GetAttribute("Game1DecoPublishedModelSha256"),
@@ -405,8 +520,10 @@ function DecoPlacedAssetSync.RefreshIds(workspace: Workspace, registry: any, slu
             if item.swap then
                 RigSwap.Commit(item.swap)
                 geometryUpdated += 1
-                -- Rename only the retained root identity. The root Instance,
-                -- parent, pivot and scale are guarded by RigSwap and stay put.
+            end
+            if item.swap or item.metadataCurrent then
+                -- Rename only the retained root identity. Its parent, scale and
+                -- geometry stay put; pivot metadata follows the aligned publication.
                 model:SetAttribute(SLUG,slug)
                 local instanceId=tostring(model:GetAttribute(INSTANCE) or "")
                 if instanceId~="" then model.Name=slug.."__"..instanceId:sub(1,8) end

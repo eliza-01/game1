@@ -300,23 +300,27 @@ class RuntimeBuildRouteTests(unittest.TestCase):
         status,plan=route('/api/lod-manager/preflight',lambda:{},{'lod_manager':self.manager})
         self.assertEqual(status,200,plan)
         self.assertEqual(plan['eligible'],2)
-        status,result=route('/api/lod-manager/prepare',lambda:{'token':plan['token'],'confirmation':'PREPARE RUNTIME'},
+        status,result=route('/api/lod-manager/prepare',lambda:{'token':plan['token']},
                             {'lod_manager':self.manager})
         self.assertEqual(status,200,result)
         self.assertTrue(Path(result['runtimePath']).exists())
         self.assertFalse(result['publishAllowed'])
-        status,detail=route('/api/lod-manager/prepare',lambda:{'token':plan['token'],'confirmation':'PREPARE RUNTIME'},
+        status,detail=route('/api/lod-manager/prepare',lambda:{'token':plan['token']},
                             {'lod_manager':self.manager})
         self.assertEqual(status,400)
         self.assertIn('expired',detail['error'])
 
-    def test_missing_live_scan_and_wrong_confirmation_block_build(self):
+    def test_missing_live_scan_and_invalid_token_payload_block_build(self):
         from api.write_world import route
         status,detail=route('/api/lod-manager/preflight',lambda:{},{'lod_manager':self.manager})
         self.assertEqual(status,400)
         self.assertIn('Scan Place again',detail['error'])
         self.manager._verified=(1,1.0,0)
         plan=self.manager.preflight({})
-        with self.assertRaisesRegex(ValueError,'Type PREPARE RUNTIME'):
+        with self.assertRaisesRegex(ValueError,'requires a preflight token'):
             self.manager.prepare({'token':plan['token'],'confirmation':'yes'})
+        with self.assertRaisesRegex(ValueError,'requires a preflight token'):
+            self.manager.prepare({})
+        with self.assertRaisesRegex(ValueError,'Preflight expired'):
+            self.manager.prepare({'token':'stale-token'})
         self.assertFalse(self.manager.builder.destination.exists())

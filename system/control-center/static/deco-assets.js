@@ -3,11 +3,15 @@
  * Atlas Registry and Studio Sync own their respective domain operations.
  */
 const decoAssetState = {
-  data: null, modelPath: '', texturePath: '', atlasVariantId: 0,
+  data: null, atlasCatalog: [], modelPath: '', texturePath: '', atlasVariantId: 0,
   inspection: null, meshOptions: {},
   libraryCategory: 'all', syncingSlug: null, atlasBusy: false,
   studioVerifications: {}, // read-only Find evidence, not inferred from atlas revision
 };
+function decoAssetAtlasCatalog() {
+  return decoAssetState.atlasCatalog?.length
+    ? decoAssetState.atlasCatalog : (decoAssetState.data?.atlases || []);
+}
 const DECO_LIBRARY_CATEGORY_KEY = 'game1.locationAssets.libraryCategory';
 const DECO_ATLAS_COLORS = ['#d9ac43', '#a47bdf', '#4f95ee', '#54b991', '#939ba8'];
 
@@ -88,7 +92,7 @@ function decoAssetSetForm() {
   $('location-asset-destructible').checked = false;
   $('location-asset-surface-material').value = 'default';
   $('location-asset-appearance-mode').value = 'material';
-  $('location-asset-visual-material').value = 'SmoothPlastic';
+  $('location-asset-visual-material').value = 'Plastic';
   $('location-asset-visual-color').value = '#ffffff';
   decoAssetToggleAppearance();
   window.game1LocationCategoryPicker?.refresh($('location-asset-category'));
@@ -110,7 +114,7 @@ function decoAssetMatchingVariant(path) {
   const filename = String(path || '').split(/[\\/]/).pop();
   const match = filename.match(/^(.+)_([1-9][0-9]*)x([1-9][0-9]*)_atlas\.(png|jpe?g)$/i);
   if (!match) return null;
-  const family = (decoAssetState.data?.atlases || []).find(
+  const family = decoAssetAtlasCatalog().find(
     group => group.atlasKey.toLowerCase() === match[1].toLowerCase());
   return family?.variants?.find(variant => Number(variant.width) === Number(match[2])
     && Number(variant.height) === Number(match[3])) || null;
@@ -119,16 +123,18 @@ function decoAssetRenderTextureReferences() {
   const select = $('location-asset-texture-reference');
   const query = $('location-asset-atlas-search').value.trim().toLowerCase();
   select.innerHTML = '<option value="">New local PNG/JPG atlas</option>';
-  for (const family of decoAssetState.data?.atlases || []) {
+  const variants=decoAssetAtlasCatalog().flatMap(family=>(family.variants||[])
+    .map(variant=>({...variant,atlasKey:family.atlasKey})));
+  for (const section of window.game1ConsumerAtlasEditor.sections(variants)) {
     const group = document.createElement('optgroup');
-    group.label = window.game1AtlasIdentity.describe({atlasKey:family.atlasKey}).key;
-    for (const variant of family.variants || []) {
-      if (query && !`${family.atlasKey} ${variant.resolution} ${variant.filename}`.toLowerCase().includes(query)
+    group.label = section.label;
+    for (const variant of section.items) {
+      if (query && !`${variant.atlasKey} ${variant.resolution} ${variant.filename}`.toLowerCase().includes(query)
           && Number(variant.id) !== decoAssetState.atlasVariantId) continue;
       const option = document.createElement('option');
       option.value = `variant:${variant.id}`;
       option.textContent = window.game1AtlasIdentity.label({
-        filename:variant.filename, atlasKey:family.atlasKey, resolution:variant.resolution,
+        filename:variant.filename, atlasKey:variant.atlasKey, resolution:variant.resolution,
       }, {assetId:variant.current ? variant.published_id : 'publish required'});
       group.appendChild(option);
     }
@@ -231,7 +237,7 @@ function decoAssetRender() {
       option.disabled = Boolean(item.requiresTexture) && decoAssetAppearanceMode()==='material';
       visualMaterials.appendChild(option);
     }
-    visualMaterials.value = 'SmoothPlastic';
+    visualMaterials.value = 'Plastic';
   }
   decoAssetToggleAppearance();
   decoAssetRenderLibraryFilter();
@@ -282,7 +288,12 @@ function decoAssetRender() {
 }
 async function decoAssetLoad() {
   try {
-    decoAssetState.data = await request('/api/location-assets');
+    const [data,atlasLibrary] = await Promise.all([
+      request('/api/location-assets'),
+      request('/api/texture-atlases').catch(()=>({families:[]})),
+    ]);
+    decoAssetState.data = data;
+    decoAssetState.atlasCatalog = atlasLibrary.families || [];
     decoAssetRender();
   } catch (error) { toast(`Location Assets: ${error.message}`, true); }
 }
@@ -292,11 +303,11 @@ function decoAssetRenderInspection() {
   host.innerHTML=window.game1MeshAuthoring.inspectionView(
     decoAssetState.inspection,decoAssetState.meshOptions,'location-mesh',{
       materials:decoAssetState.data?.options?.visualMaterials||[],
-      atlases:decoAssetState.data?.atlases||[],alphaEnabled:false});
+      atlases:decoAssetAtlasCatalog(),alphaEnabled:false});
   window.game1MeshAuthoring.wire(host,decoAssetState.meshOptions,null,
     Boolean(decoAssetState.inspection?.hasCollider),{
       materials:decoAssetState.data?.options?.visualMaterials||[],
-      atlases:decoAssetState.data?.atlases||[],alphaEnabled:false});
+      atlases:decoAssetAtlasCatalog(),alphaEnabled:false});
 }
 async function decoAssetInspectSource(path){
   return request('/api/location-assets/inspect', {method:'POST',
@@ -373,7 +384,8 @@ async function decoAssetSaveEdits(slug, payload, expectedRevision) {
       destructible:payload.destructible ?? Boolean(row.destructible),
       surfaceMaterial:payload.surfaceMaterial ?? row.surfaceMaterial ?? 'default',
       appearanceMode:payload.appearanceMode ?? row.appearanceMode ?? 'atlas',
-      visualMaterial:payload.visualMaterial ?? row.visualMaterial ?? 'SmoothPlastic',
+      visualMaterial:payload.visualMaterial ?? row.visualMaterial ?? 'Plastic',
+      ...(payload.alphaEnabled===undefined?{}:{alphaEnabled:payload.alphaEnabled}),
       visualColor:payload.visualColor ?? row.visualColor ?? '#FFFFFF',
       modelSourcePath:payload.modelSourcePath || '', textureSourcePath:payload.textureSourcePath || '',
       atlasVariantId:(payload.appearanceMode ?? row.appearanceMode)==='material'?0:

@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "slug": "ground_torch_01",
-  "sourceSha256": "97b084d881e17c2298c0e2f45e20e4555a21f18aa5bea6c8eeba81178344b020",
+  "sourceSha256": "71481fb1f282dccd9d7e8dd772f1655ff53ec7c953e154f213b83bfd9961f0b3",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
       {
         "name": "ground_torch_01",
         "armature": "ground_torch_01_armature",
-        "vertices": 2007,
+        "vertices": 216,
         "bones": [
           {
             "name": "fire_bone",

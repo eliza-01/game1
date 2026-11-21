@@ -16,7 +16,8 @@ class M95Contracts(unittest.TestCase):
         for name in ("Game1MonsterSpawnMarker", "Game1NpcSpawnMarker", "Game1LocationMarker"):
             self.assertIn(name, module)
         for item in ("LocalTransparencyModifier", '"Enabled", false', 'workspace.DescendantAdded:Connect',
-                     'plugin:SetSetting(SETTING_KEY, value)', 'self.button:SetActive(value)'):
+                     'plugin:SetSetting(SETTING_KEY, value)', 'self.button:SetActive(self.visible and self.npcVisible)',
+                     'self.npcButton:SetActive(self.npcVisible)'):
             self.assertIn(item, module)
         self.assertIn("StudioMarkerVisibility.new(plugin, toolbar, Workspace)", main)
         self.assertIn("StudioMarkerVisibility", project['tree']['modules'])
@@ -55,7 +56,7 @@ class M95Contracts(unittest.TestCase):
             self.assertIn(f"$('monster-spawn-{suffix}')", monster_js)
             self.assertNotIn(f"$('npc-spawn-{suffix}')", npc_js)
         self.assertIn('if self.kind == "npc"', backend)
-        self.assertIn('else {"mapKey": "main", "respawnSeconds": 10, "spawnRadius": 15, "maxAlive": 3}', backend)
+        self.assertIn('else {"mapKey": "main", "respawnSeconds": 10, "homeRadiusStuds": 150, "spawnRadius": 15, "maxAlive": 3}', backend)
 
 
 if __name__ == "__main__":

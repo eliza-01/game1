@@ -39,7 +39,7 @@ Roblox recommends the latter Workspace values in its instance streaming guidance
 2. In **LOD readiness**, set a streaming mode for eligible assets or use **Enable all ready**. Other systems and unsupported geometries stay Off.
 3. Adjust global camera LOD thresholds and Workspace settings. Each (?) explains one control. **Default** fills values but does not save; click **Save settings**.
 4. Save the original authoring Place as `place/game1_runtime_source.rbxlx` in Roblox XML Place format.
-5. Run **Preflight**; check selected counts and source SHA256. Confirm `PREPARE RUNTIME` for byte-verified backup + separate Runtime draft.
+5. Run **Preflight**; check selected counts and source SHA256. Click **Backup + Build Runtime draft** (no typed confirmation). A red Save Place copy reminder remains visible; the build still creates and verifies its own byte-for-byte backup.
 6. Open **only the new Runtime copy** in Studio, connect Rojo, test 2 clients with differing camera distances and check geometry, collision, and Output. Do not publish until validated.
 
 The **Copy Studio Command Bar** action helps apply the *same Workspace* profile to the authoring Place; properties not available to Command Bar must be set manually in Studio Workspace Properties. Saving Control Center settings alone does not modify an open authoring Place.

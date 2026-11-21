@@ -1,3 +1,9 @@
+-- This must run before shared-manifest waits and service bootstrap. A published
+-- authoring Place can otherwise replicate neon Location boundaries if startup
+-- later fails or stalls. RuntimePlaceBuilder also strips this folder offline.
+local authoringCleanup = require(script:WaitForChild("world"):WaitForChild("Game1AuthoringCleanupService"))
+authoringCleanup.Start()
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")

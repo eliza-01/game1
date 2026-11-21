@@ -198,7 +198,7 @@ class LocationAssetStore:
             # Old rows remain atlas based. Never invent Image IDs for material mode.
             appearance_columns = {
                 'appearance_mode': "TEXT NOT NULL DEFAULT 'atlas'",
-                'visual_material': "TEXT NOT NULL DEFAULT 'SmoothPlastic'",
+                'visual_material': "TEXT NOT NULL DEFAULT 'Plastic'",
                 'visual_color': "TEXT NOT NULL DEFAULT '#FFFFFF'",
             }
             if any(key not in columns for key in appearance_columns):
@@ -546,9 +546,15 @@ class LocationAssetStore:
         destructible = parse_bool(payload.get("destructible"), bool(old.get("destructible")) if old else False)
         surface_material = taxonomy.surface_material(payload.get('surfaceMaterial',
             old.get('surface_material', 'default') if old else 'default'))
+        # The modern editor always specifies one of the two appearance modes.
+        # Legacy programmatic registration may supply an Atlas without a mode;
+        # infer the combined mode instead of silently rejecting its Image source.
+        initial_mode = (old.get('appearance_mode') if old else
+            'material_atlas' if (payload.get('textureSourcePath') or payload.get('atlasVariantId'))
+            else 'material')
         appearance_mode, visual_material, visual_color = appearance.validated(
-            payload.get('appearanceMode', old.get('appearance_mode') if old else 'atlas'),
-            payload.get('visualMaterial', old.get('visual_material') if old else 'SmoothPlastic'),
+            payload.get('appearanceMode', initial_mode),
+            payload.get('visualMaterial', old.get('visual_material') if old else 'Plastic'),
             payload.get('visualColor', old.get('visual_color') if old else '#FFFFFF'))
         alpha_enabled = (location_asset_alpha.validate_alpha(payload['alphaEnabled'])
                          if 'alphaEnabled' in payload else bool(old.get('alpha_enabled')) if old else False)
@@ -564,6 +570,18 @@ class LocationAssetStore:
             if not candidate.is_file() or candidate.suffix.casefold() != '.fbx':
                 raise ValueError('choose a valid Location Asset FBX')
             inspected = inspect_location_fbx(self.root, candidate)
+        # Campfires have a stable two-socket authoring contract. The fire
+        # presentation and the pot attachment must remain independently
+        # addressable across immutable FBX publications.
+        if inspected is not None and slug.startswith('campfire_'):
+            bone_names = {bone.get('name')
+                          for mesh in inspected.get('meshes', [])
+                          for bone in mesh.get('bones', [])
+                          if isinstance(bone, dict)}
+            required = {'fire_socket', 'cooking_pot_01_socket'}
+            missing = sorted(required - bone_names)
+            if missing:
+                raise ValueError('campfire FBX requires Bones: ' + ', '.join(missing))
         # Physics authoring is explicit. Old registrations retain their original
         # model behavior until the operator saves per-mesh controls.
         option_source = payload.get('meshOptions')
@@ -683,7 +701,7 @@ class LocationAssetStore:
                 raise ValueError('appearance revision changed; refresh before binding atlas')
             self.atlases.bind("location_asset", slug, variant_id, allow_unpublished=True)
             with self.connect() as db:
-                db.execute("UPDATE location_assets SET appearance_mode='atlas', "
+                db.execute("UPDATE location_assets SET appearance_mode='material_atlas', "
                            "revision=revision+1,updated_at=? WHERE slug=?",(time.time(),slug))
         else:
             self.atlases.bind("location_asset", slug, variant_id, expected_revision=expected_revision)

@@ -8,7 +8,7 @@ const src = fs.readFileSync(path.resolve(__dirname, '../control-center/static/pl
 const elements = new Map();
 function element(id) {
   if (!elements.has(id)) elements.set(id, {
-    id, innerHTML:'', textContent:'', checked:id==='pr-backup', dataset:{}, disabled:false,
+    id, innerHTML:'', textContent:'', checked:false, dataset:{}, disabled:false,
     handlers:{}, addEventListener(name,fn){ this.handlers[name]=fn; },
     querySelectorAll(){return [];}, replaceChildren(){this.innerHTML='';},
   });

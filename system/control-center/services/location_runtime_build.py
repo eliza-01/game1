@@ -62,6 +62,43 @@ def _items(root):
             yield from _items(child)
 
 
+def _authoring_marker_root(tree):
+    """Find the editor-only Game1Authoring folder without touching its source.
+
+    Do not remove a folder if an unmanaged object has taken that reserved name,
+    or if a reference outside the folder would become dangling in Runtime.
+    """
+    workspace = [node for node in tree.getroot()
+                 if node.tag == 'Item' and node.get('class') == 'Workspace']
+    if len(workspace) != 1:
+        raise ValueError('Saved Place must include exactly one Workspace service')
+    roots = [node for node in workspace[0] if node.tag == 'Item'
+             and _name(node) == 'Game1Authoring']
+    if not roots:
+        return workspace[0], None, set()
+    if len(roots) != 1 or roots[0].get('class') != 'Folder':
+        raise ValueError('Workspace.Game1Authoring must be one editor-owned Folder')
+    authored = {roots[0], *_items(roots[0])}
+    refs = [node.get('referent') for node in authored]
+    if any(not ref for ref in refs) or len(refs) != len(set(refs)):
+        raise ValueError('Game1Authoring contains missing or duplicate XML referents')
+    owned_refs = set(refs)
+    for node in _items(tree.getroot()):
+        if node in authored:
+            continue
+        for ref in node.findall('./Properties/Ref'):
+            if (ref.text or '').strip() in owned_refs:
+                raise ValueError('External reference into Game1Authoring; cannot strip safely')
+    return workspace[0], roots[0], owned_refs
+
+
+def _strip_authoring_markers(tree):
+    workspace, folder, refs = _authoring_marker_root(tree)
+    if folder is not None:
+        workspace.remove(folder)
+    return refs
+
+
 def _model_paths(root):
     # Path has the same service/Model hierarchy used by Studio's GetFullName.
     def walk(node, parts):
@@ -560,6 +597,7 @@ class RuntimePlaceBuilder:
         from .location_streaming_config import DEFAULT_SETTINGS, validate_settings
         settings = validate_settings(settings or DEFAULT_SETTINGS)
         tree = _parse(source)
+        _, authoring_root, authoring_refs = _authoring_marker_root(tree)
         targets = sorted({row['slug'] for row in rows})
         selected = _verify(tree, rows, targets)
         from .house_runtime_compilation import inspect as inspect_houses, payload as house_payload
@@ -587,7 +625,8 @@ class RuntimePlaceBuilder:
                 'untouchedHouseCounts': untouched_houses,
                 'untouchedHouseModels': sum(untouched_houses.values()),
                 'counts': {slug: sum(r['slug'] == slug for r in rows) for slug in targets},
-                'sourceBytes': source.stat().st_size}
+                'sourceBytes': source.stat().st_size,
+                'authoringMarkersToStrip': len(authoring_refs)}
 
     def prepare(self, rows, *, expected_sha, snapshot_id, catalog_digest, settings=None, house_inputs=None):
         if not isinstance(expected_sha, str) or len(expected_sha) != 64:
@@ -630,6 +669,10 @@ class RuntimePlaceBuilder:
                         ref.text = 'null'
                 model.remove(mesh)
             converted_house_parts = transform_houses(selected_houses, house_inputs or {})
+            # Authoring boundaries and spawn gizmos are never runtime objects.
+            # Only remove the reserved Workspace folder, not actual NPC spawns.
+            authored_refs = _strip_authoring_markers(tree)
+            removed_refs.update(authored_refs)
             runtime_payload = _runtime_payload(rows, snapshot_id=snapshot_id, catalog_digest=catalog_digest,
                                                settings=settings, houses=prepared_houses)
             _apply_workspace_streaming(tree, settings)
@@ -652,6 +695,9 @@ class RuntimePlaceBuilder:
                 if prop.text != expected_value:
                     raise RuntimeError('Runtime Workspace streaming value mismatch: ' + property_name)
             after_refs = [node.get('referent') for node in _items(rebuilt.getroot())]
+            if any(path == 'Workspace.Game1Authoring' or path.startswith('Workspace.Game1Authoring.')
+                   for path, _ in _model_paths(rebuilt.getroot())):
+                raise RuntimeError('Editor-only Game1Authoring leaked into Runtime Place')
             # Every removed visual referent must also disappear from all Ref
             # properties; a dangling PrimaryPart must never reach Studio.
             if any((ref.text or '').strip() in removed_refs
@@ -718,7 +764,8 @@ class RuntimePlaceBuilder:
                 'housePlacements': len(selected_houses),
                 'untouchedHouseCounts': meta['untouchedHouseCounts'],
                 'retainedCollisionModels': sum(any(n.get('class') in COLLISION_CLASSES for n in row['hierarchy']) for row in rows),
-                'retainedPlacementRoots': len(rows), 'publishAllowed': False,
+                'retainedPlacementRoots': len(rows),
+                'removedAuthoringInstances': len(authored_refs), 'publishAllowed': False,
                 'placements': rows,
             }
             (build_dir / 'placement_manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -730,6 +777,7 @@ class RuntimePlaceBuilder:
                 'convertedHouseVisualMeshParts': converted_house_parts,
                 'untouchedHouseCounts': meta['untouchedHouseCounts'],
                 'runtimeVisualMarker': RUNTIME_MANIFEST_NAME,
+                'removedAuthoringInstances': len(authored_refs),
                 'streamingModes': runtime_payload['modes'], 'workspace': settings['workspace'],
                 'publishAllowed': False,
                 'note': 'Draft only: bounded client FULL/LOD1 pilot embedded; Studio and mobile validation NOT_RUN; publish gate closed',
@@ -740,6 +788,7 @@ class RuntimePlaceBuilder:
                     'removedVisualMeshParts': sum(len(x) if isinstance(x, list) else 1 for _row, _model, x in matched), 'convertedHouseVisualMeshParts': converted_house_parts,
                     'housePlacements': len(selected_houses),
                     'untouchedHouseCounts': meta['untouchedHouseCounts'],
+                    'removedAuthoringInstances': len(authored_refs),
                     'publishAllowed': False}
         except Exception:
             # On error keep no misleading partial runtime artefacts.

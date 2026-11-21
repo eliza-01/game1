@@ -92,6 +92,7 @@ foreach($Marker in @(
     'Save Assets Data',
     'Game1DecoAssets',
     'Game1AuthoringMarkers',
+    'Game1NpcSpawnMarkers',
     'StudioMarkerVisibility',
     'StudioHousePlacementPreview',
     'StudioPlotsCatalog',

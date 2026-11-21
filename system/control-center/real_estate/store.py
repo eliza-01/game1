@@ -65,7 +65,7 @@ def mesh_options(parts, raw: dict | None, legacy_atlases=()) -> dict:
         # One shared Material + Color validator for Real Estate and Location Assets.
         try:
             mode, material, color = appearance.validated(
-                mode, entry.get('visualMaterial', 'SmoothPlastic'),
+                mode, entry.get('visualMaterial', 'Plastic'),
                 entry.get('visualColor', '#FFFFFF'),
             )
         except ValueError as error:

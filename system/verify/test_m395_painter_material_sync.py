@@ -59,8 +59,8 @@ class PainterMaterialSyncContract(unittest.TestCase):
         self.assertIn('preview.appearanceSignature===appearanceSignature(item)', ui)
         self.assertIn('state.scanStale=true;', ui)
         self.assertIn('state.scan.appearanceSignature===appearanceSignature(item)', ui)
-        self.assertIn('if(hasUnsavedIdentity())', ui)
-        self.assertIn('Сначала нажми Apply Changes', ui)
+        self.assertIn('if(!ensureSavedModelForSync())return;', ui)
+        self.assertIn('Model · FBX → Apply Changes', ui)
 
     def test_external_sync_uses_shared_visual_and_rechecks_actual_studio_properties(self):
         sync = source('system/studio-plugin/modules/StudioPlaceRegistrySync.luau')

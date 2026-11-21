@@ -4,6 +4,7 @@ local Visibility = {}
 Visibility.__index = Visibility
 
 local SETTING_KEY = "Game1AuthoringMarkersVisible_v1"
+local NPC_SETTING_KEY = "Game1NpcSpawnMarkersVisible_v1"
 local MARKER_TAGS = {"Game1MonsterSpawnMarker", "Game1NpcSpawnMarker", "Game1LocationMarker"}
 
 local function isMarker(instance: Instance): boolean
@@ -20,13 +21,24 @@ function Visibility.new(plugin: Plugin, toolbar: PluginToolbar, workspace: Works
         original = setmetatable({}, {__mode = "k"}),
         destroyed = false,
         visible = true,
+        npcVisible = true,
     }, Visibility)
     local ok, saved = pcall(function() return plugin:GetSetting(SETTING_KEY) end)
     if ok and type(saved) == "boolean" then self.visible = saved end
-    self.button = toolbar:CreateButton("Game1AuthoringMarkers", "Show / hide Game1 spawn markers and location boundaries", "", "Markers")
+    self.npcVisible = self.visible
+    local npcOk, savedNpc = pcall(function() return plugin:GetSetting(NPC_SETTING_KEY) end)
+    if npcOk and type(savedNpc) == "boolean" then self.npcVisible = savedNpc end
+    self.button = toolbar:CreateButton("Game1AuthoringMarkers", "Show / hide ALL Game1 authoring markers", "", "Markers")
     self.button.ClickableWhenViewportHidden = true
-    table.insert(self.connections, self.button.Click:Connect(function() self:SetVisible(not self.visible) end))
-    self.button:SetActive(self.visible)
+    table.insert(self.connections, self.button.Click:Connect(function()
+        self:SetVisible(not (self.visible and self.npcVisible))
+    end))
+    self.npcButton = toolbar:CreateButton("Game1NpcSpawnMarkers", "Show / hide only NPC spawn markers", "", "NPC Spawns")
+    self.npcButton.ClickableWhenViewportHidden = true
+    table.insert(self.connections, self.npcButton.Click:Connect(function()
+        self:SetNpcVisible(not self.npcVisible)
+    end))
+    self:_updateButtons()
     table.insert(self.connections, plugin.Unloading:Connect(function()
         -- Undo temporary visual overrides before unloading, without replacing
         -- the user's saved show/hide preference for the next Studio session.
@@ -62,10 +74,17 @@ local function visualProperty(instance: Instance): (string?, any, any)
     return nil, nil, nil
 end
 
-function Visibility:_setItem(instance: Instance)
+function Visibility:_updateButtons()
+    self.button:SetActive(self.visible and self.npcVisible)
+    self.npcButton:SetActive(self.npcVisible)
+end
+
+function Visibility:_setItem(instance: Instance, marker: Instance)
     local property, hiddenValue, defaultVisible = visualProperty(instance)
     if not property then return end
-    if not self.visible then
+    local shown = if marker:GetAttribute("Game1NpcSpawnMarker") == true
+        then self.npcVisible else self.visible
+    if not shown then
         if self.original[instance] == nil then
             local ok, old = pcall(function() return (instance :: any)[property] end)
             if ok then
@@ -92,16 +111,16 @@ function Visibility:_apply(instance: Instance): number
         marker = marker.Parent
     end
     if marker ~= nil and isMarker(marker) then
-        self:_setItem(instance)
-        for _, child in ipairs(instance:GetDescendants()) do self:_setItem(child) end
+        self:_setItem(instance, marker)
+        for _, child in ipairs(instance:GetDescendants()) do self:_setItem(child, marker) end
         return 1
     elseif instance == self.workspace then
         local count = 0
         for _, child in ipairs(self.workspace:GetDescendants()) do
             if isMarker(child) then
                 count += 1
-                self:_setItem(child)
-                for _, descendant in ipairs(child:GetDescendants()) do self:_setItem(descendant) end
+                self:_setItem(child, child)
+                for _, descendant in ipairs(child:GetDescendants()) do self:_setItem(descendant, child) end
             end
         end
         return count
@@ -112,8 +131,10 @@ end
 function Visibility:SetVisible(value: boolean)
     if self.destroyed then return end
     self.visible = value
-    self.button:SetActive(value)
+    self.npcVisible = value
+    self:_updateButtons()
     pcall(function() self.plugin:SetSetting(SETTING_KEY, value) end)
+    pcall(function() self.plugin:SetSetting(NPC_SETTING_KEY, value) end)
     local count = self:_apply(self.workspace)
     print(("[game1][studio-markers] %s · %d marker(s)")
         :format(if value then "shown" else "hidden", count))
@@ -124,12 +145,23 @@ function Visibility:SetVisible(value: boolean)
     end
 end
 
+function Visibility:SetNpcVisible(value: boolean)
+    if self.destroyed then return end
+    self.npcVisible = value
+    self:_updateButtons()
+    pcall(function() self.plugin:SetSetting(NPC_SETTING_KEY, value) end)
+    local count = self:_apply(self.workspace)
+    print(("[game1][studio-markers] NPC %s · %d total authoring markers")
+        :format(if value then "shown" else "hidden", count))
+end
+
 function Visibility:Destroy()
     if self.destroyed then return end
     self.destroyed = true
     -- Do not persist 'shown' to plugin settings: the preference survives reload,
     -- but editor-owned marker properties must not remain hidden after unloading.
     self.visible = true
+    self.npcVisible = true
     pcall(function() self:_apply(self.workspace) end)
     for _, connection in ipairs(self.connections) do connection:Disconnect() end
     table.clear(self.connections)

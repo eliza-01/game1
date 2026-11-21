@@ -9,6 +9,32 @@ window.game1ConsumerAtlasEditor = (() => {
   const variants = catalog => (catalog||[]).flatMap(group =>
     (group.variants||[]).map(v => ({...v,atlasKey:group.atlasKey})));
   const available = catalog => variants(catalog).filter(v => v.current && v.published_id && !v.retired);
+  const sectionOrder = ['location','estate','character','weapon','npc','shared'];
+  const sectionLabels = Object.freeze({
+    location:'Location Assets',estate:'Real Estate',character:'Characters',
+    weapon:'Weapons & arrows',npc:'NPC',shared:'Shared / unused',
+  });
+  function sectionKey(variant){
+    const domains=new Set();
+    for(const scope of variant.scopes||[])if(scope==='character')domains.add('character');
+    for(const consumer of variant.consumers||[]){
+      const type=String(consumer.consumer_type||'');
+      if(type==='location_asset')domains.add('location');
+      else if(type==='real_estate')domains.add('estate');
+      else if(type==='character_part')domains.add('character');
+      else if(type==='weapon'||type==='arrow')domains.add('weapon');
+      else if(type==='npc')domains.add('npc');
+      else domains.add('shared');
+    }
+    return domains.size===1?[...domains][0]:'shared';
+  }
+  function sections(items){
+    const grouped=new Map(sectionOrder.map(key=>[key,[]]));
+    for(const item of items||[])grouped.get(sectionKey(item)).push(item);
+    return sectionOrder.filter(key=>grouped.get(key).length).map(key=>({
+      key,label:sectionLabels[key],items:grouped.get(key),
+    }));
+  }
   function render(state,{currentId=0,linked=[],familyVariants=[],catalog=[],busy=false,openPublish=false,offerPublication=false,allowUpload=true}={}){
     const active=Number(currentId||0);
     const selected=variants(catalog).find(v=>Number(v.id)===active)||
@@ -52,7 +78,7 @@ window.game1ConsumerAtlasEditor = (() => {
         ${unpublished&&openPublish&&!offerPublication?`<div class="shared-atlas-unpublished"><span>Atlas registered · Image ID not published</span><button type="button" data-ca-open-publish>Publish this atlas</button></div>`:''}
         <div class="actions"><button type="button" data-ca-toggle ${disabled?'disabled':''}>Connect existing atlas</button>${allowUpload?`<button type="button" data-ca-upload ${disabled?'disabled':''}>Upload new atlas</button>`:''}</div>
         ${state.picker?`<div class="shared-atlas-picker"><label>Search all published atlases<input type="search" data-ca-search value="${html(state.search)}" placeholder="Filename · resolution · Image ID"></label>
-          <div class="shared-atlas-choices">${choices.length?choices.map(v=>`<button type="button" data-ca-attach="${Number(v.id)}" ${disabled?'disabled':''}><strong>${html(v.filename)}</strong><small>${html(v.resolution)} · ${html(v.published_id)}</small></button>`).join(''):'<small>No published, unattached atlases match the search.</small>'}</div></div>`:''}
+          <div class="shared-atlas-choices">${choices.length?sections(choices).map(section=>`<section class="shared-atlas-choice-section" data-ca-section="${section.key}"><strong class="shared-atlas-choice-heading">${html(section.label)}</strong>${section.items.map(v=>`<button type="button" data-ca-attach="${Number(v.id)}" ${disabled?'disabled':''}><strong>${html(v.filename)}</strong><small>${html(v.atlasKey)} · ${html(v.resolution)} · ${html(v.published_id)}</small></button>`).join('')}</section>`).join(''):'<small>No published, unattached atlases match the search.</small>'}</div></div>`:''}
         ${state.pending?`<div class="shared-atlas-preview" role="group" aria-label="Atlas upload preview">
           <strong>${state.pending.existing?'Replace shared atlas publication':'Register and publish new atlas'}</strong>
           <small>${html(state.pending.filename)} · ${html(state.pending.width)}×${html(state.pending.height)}</small>
@@ -178,5 +204,5 @@ window.game1ConsumerAtlasEditor = (() => {
         (warnings?` WARNING: ${warnings}`:''),Boolean(warnings));
     });
   }
-  return Object.freeze({newState,render,wire,previewDots});
+  return Object.freeze({newState,render,wire,previewDots,sections});
 })();

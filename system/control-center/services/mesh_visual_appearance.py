@@ -25,7 +25,7 @@ def validated(mode: object, material: object, color: object) -> tuple[str, str, 
     mode = str(mode or 'atlas').strip().lower()
     if mode not in ('atlas', 'material', 'material_atlas'):
         raise ValueError('appearanceMode must be atlas, material or material_atlas')
-    material = str(material or 'SmoothPlastic').strip()
+    material = str(material or 'Plastic').strip()
     if material not in BASEPART_MATERIALS:
         raise ValueError('visualMaterial must be a supported Roblox BasePart Enum.Material')
     if mode == 'material' and material == 'ForceField':

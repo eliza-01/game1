@@ -520,7 +520,7 @@ function DecoManager:attachHistoricalMeshSync(slug: string, modelId: string, atl
             changes=changes,meshIdsBefore=meshes,meshIdsAfter=meshes}}}
 end
 
-function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, expectedModelId: string?, expectedAtlasId: string?, scanToken: string?, expectedRevision: number?, selectedKeys: {string}?)
+function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, expectedModelId: string?, expectedAtlasId: string?, scanToken: string?, expectedRevision: number?, selectedKeys: {string}?, rigChoices: {[string]: string}?)
     self:_setStatus("Refreshing Location Assets registry…")
     local ok, result = pcall(function()
         return self.loader:fetchRegistry()
@@ -594,7 +594,7 @@ function DecoManager:refreshRegistry(targetSlug: string?, applyIds: boolean?, ex
         -- A waypoint BEFORE the update makes Undo possible even for an error.
         self.ChangeHistoryService:SetWaypoint("Before Location Asset Model + Appearance Sync: " .. targetSlug)
         syncResult = DecoPlacedAssetSync.RefreshIds(
-            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId, self.loader, scanned, selected)
+            self.Workspace, result, targetSlug, self.HttpService, expectedModelId, expectedAtlasId, self.loader, scanned, selected, rigChoices)
         syncResult.fullySynced=allPending
         self.ChangeHistoryService:SetWaypoint("Location Asset Model + Appearance Sync: " .. targetSlug)
     end

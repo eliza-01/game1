@@ -139,6 +139,9 @@ function RigSwap.Commit(plan: any)
         error("managed rig replacement transaction is stale")
     end
     local ok, reason = pcall(function()
+        if not sameFrame(plan.root:GetPivot(), plan.pivot) then
+            error("managed rig replacement: placed root pivot changed since preflight")
+        end
         for _, entry in ipairs(plan.old) do
             if entry.object.Parent ~= plan.root or entry.object.Name ~= entry.name then
                 error("managed rig changed since preflight")
@@ -147,15 +150,12 @@ function RigSwap.Commit(plan: any)
         end
         for _, child in ipairs(plan.incoming) do child.Parent = plan.root end
         if plan.newPrimary then
-            -- Replacing a placed PrimaryPart must not redefine the placed Model pivot.
-            -- Import revisions can give COL/visual/carrier different part pivots
-            -- and orientations. PivotOffset is metadata: rebase the NEW part
-            -- onto the saved root pivot without moving any MeshPart CFrame.
+            -- Rebase only the incoming part's pivot metadata onto the saved
+            -- placement frame. Never adopt the authored publication pivot.
             plan.newPrimary.PivotOffset = plan.newPrimary.CFrame:ToObjectSpace(plan.pivot)
             plan.root.PrimaryPart = plan.newPrimary
         elseif not plan.primary then
             -- WorldPivot is editor metadata; setting it does not move any part.
-            -- Without this, Roblox auto-pivot may change when geometry changes.
             plan.root.WorldPivot = plan.pivot
         end
         local actualPivot, actualScale = plan.root:GetPivot(), plan.root:GetScale()

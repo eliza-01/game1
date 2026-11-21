@@ -7,6 +7,14 @@ local BoneEffects = {}
 
 local MAX_EFFECTS_PER_RIG = 128
 
+-- Campfire publications now use explicit semantic sockets. Keep one narrow,
+-- backwards-compatible migration for already placed fire effects: the old
+-- fire_bone decoration may follow the new fire_socket. No fuzzy or positional
+-- matching is allowed; every other Bone rename remains a hard failure.
+local BONE_ALIASES = table.freeze({
+    fire_bone = "fire_socket",
+})
+
 local function isLeafEffect(item: Instance): boolean
     return #item:GetChildren() == 0
         and (item:IsA("Fire") or item:IsA("ParticleEmitter") or item:IsA("PointLight")
@@ -87,6 +95,23 @@ function BoneEffects.CopyToIncoming(outgoing: {Instance}, incoming: {Instance}):
             error("ambiguous placed Bone effect owner: " .. parent.Name)
         end
         local destination = newBones[key]
+        if not destination then
+            local alias = BONE_ALIASES[parent.Name]
+            if alias then
+                local aliasMatches = {}
+                for candidateKey, candidate in pairs(newBones) do
+                    if candidate.Name == alias then
+                        table.insert(aliasMatches, {key = candidateKey, bone = candidate})
+                    end
+                end
+                if #aliasMatches == 1 then
+                    destination = aliasMatches[1].bone
+                elseif #aliasMatches > 1 then
+                    error("ambiguous Bone alias " .. parent.Name .. " -> " .. alias
+                        .. "; no Place geometry modified")
+                end
+            end
+        end
         if not destination then
             error("placed Bone decoration " .. item.Name .. " cannot follow missing Bone "
                 .. parent.Name .. "; no Place geometry modified")

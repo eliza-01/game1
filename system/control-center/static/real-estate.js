@@ -63,8 +63,8 @@ function realEstateForm(row){
     studs:row?.meshOptions?.[part]?.loadDistanceStuds ?? 50
   }]));
   realEstateState.appearance=Object.fromEntries(meshNames.map(part=>[part,{
-    appearanceMode:row?.meshOptions?.[part]?.appearanceMode||'material',
-    visualMaterial:row?.meshOptions?.[part]?.visualMaterial||'SmoothPlastic',
+    appearanceMode:window.game1MeshAuthoring.displayAppearanceMode(row?.meshOptions?.[part]?.appearanceMode||'material'),
+    visualMaterial:row?.meshOptions?.[part]?.visualMaterial||'Plastic',
     visualColor:row?.meshOptions?.[part]?.visualColor||'#FFFFFF',
     alphaEnabled:row?.meshOptions?.[part]?.alphaEnabled===true
   }]));
@@ -339,7 +339,7 @@ function realEstateRenderTextures(row){
   const parts=realEstateParts();
   for(const part of parts){
     realEstateState.meshOptions[part]=realEstateNormalizePhysics(part,realEstateState.meshOptions[part]);
-    realEstateState.appearance[part] ||= {appearanceMode:'material',visualMaterial:'SmoothPlastic',visualColor:'#FFFFFF',alphaEnabled:false};
+    realEstateState.appearance[part] ||= {appearanceMode:'material',visualMaterial:'Plastic',visualColor:'#FFFFFF',alphaEnabled:false};
     realEstateState.distance[part] ||= {enabled:part==='window_frames_glass',studs:50};
   }
   const options=realEstateOptions();
@@ -361,13 +361,13 @@ function realEstateRenderTextures(row){
     const flags=realEstateState.meshOptions[part];
     const appearance=realEstateState.appearance[part];
     const atlas=appearance.appearanceMode!=='material';
-    const material=appearance.appearanceMode!=='atlas';
+    const material=true;
     const materials=realEstateState.data?.visualMaterials||[];
     return `<details class="real-estate-texture-row" data-texture-part="${esc(part)}" ${openParts.has(part)?'open':''}>
       <summary class="real-estate-texture-heading"><strong class="real-estate-mesh-name">${esc(realEstateMeshLabel(part))}</strong><span class="real-estate-mesh-kind">Visual mesh</span></summary>
       <div class="real-estate-texture-body">
       <div class="real-estate-mesh-switches" role="group" aria-label="${esc(part)} mesh appearance">
-        <label>Appearance <select id="real-estate-appearance-${esc(part)}"><option value="material" ${appearance.appearanceMode==='material'?'selected':''}>Material + Color</option><option value="atlas" ${appearance.appearanceMode==='atlas'?'selected':''}>Texture Atlas</option><option value="material_atlas" ${appearance.appearanceMode==='material_atlas'?'selected':''}>Material + Color + Atlas</option></select></label>
+        <label>Appearance <select id="real-estate-appearance-${esc(part)}"><option value="material" ${appearance.appearanceMode==='material'?'selected':''}>Material + Color</option><option value="material_atlas" ${appearance.appearanceMode==='material_atlas'?'selected':''}>Material + Color + Atlas</option></select></label>
         <span id="real-estate-material-controls-${esc(part)}" ${!material?'hidden':''}><select id="real-estate-material-${esc(part)}" aria-label="${esc(part)} Roblox material">${materials.map(item=>`<option value="${esc(item.id)}" ${appearance.visualMaterial===item.id?'selected':''} ${item.requiresTexture&&appearance.appearanceMode==='material'?'disabled':''}>${esc(item.label)}${item.requiresTexture?' · requires texture':''}</option>`).join('')}</select>
         <input type="color" id="real-estate-color-${esc(part)}" aria-label="${esc(part)} color" value="${esc(appearance.visualColor)}"></span>
         <label id="real-estate-alpha-controls-${esc(part)}" ${!atlas?'hidden':''}><input type="checkbox" id="real-estate-alpha-${esc(part)}" ${appearance.alphaEnabled?'checked':''}> Alpha transparency</label>

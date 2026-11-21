@@ -6,7 +6,7 @@ const vm = require('vm');
 const html = fs.readFileSync('system/control-center/static/index.html', 'utf8');
 for (const id of ['nav-lod-manager', 'lod-manager-view', 'lod-scan', 'lod-snapshot',
                   'lod-rows', 'lod-revisions', 'lod-prepare', 'lod-build-execute',
-                  'lod-build-confirm', 'lod-build-preview', 'lod-source-path', 'lod-search', 'lod-filter',
+                  'lod-build-preview', 'lod-source-path', 'lod-search', 'lod-filter',
                   'lod-settings-section', 'lod-workspace-target-radius', 'lod-distance-hide',
                   'lod-enable-ready', 'lod-save-settings', 'lod-copy-workspace', 'lod-preset-default']) {
   assert(html.includes(`id="${id}"`), `missing UI element ${id}`);
@@ -33,6 +33,7 @@ const response = {
   revisions:[{id:12,recordedUtc:1784160000,placeId:99,total:52}],
   build:{enabled:false,canPreflight:false, sourceFile:'place/game1_runtime_source.rbxlx'}
 };
+let preparePayload=null;
 const clipboard = {value:'',writeText:async value => {clipboard.value=value}};
 const ctx = {document:{getElementById:get},window:{},navigator:{clipboard},request:async (path,opts)=> {
   if (path === '/api/lod-manager/settings') return {...response,settings:{...response.settings,...JSON.parse(opts.body)}};
@@ -42,8 +43,8 @@ const ctx = {document:{getElementById:get},window:{},navigator:{clipboard},reque
   if (path === '/api/lod-manager/preflight') return {token:'token1',snapshotRevision:13,eligible:52,
     counts:{stone_fence_02:52}, protectedNotModified:4, sourceSha256:'a'.repeat(64),
     distances:response.settings.distances,workspace:response.settings.workspace};
-  if (path === '/api/lod-manager/prepare') return {backupPath:'backup',runtimePath:'runtime',
-    manifestPath:'manifest',reportPath:'report',removedVisualMeshParts:52,publishAllowed:false};
+  if (path === '/api/lod-manager/prepare') {preparePayload=JSON.parse(opts.body);return {backupPath:'backup',runtimePath:'runtime',
+    manifestPath:'manifest',reportPath:'report',removedVisualMeshParts:52,publishAllowed:false};}
   return response;
 }};
 vm.runInNewContext(fs.readFileSync('system/control-center/static/lod-manager.js','utf8'),ctx);
@@ -59,12 +60,13 @@ vm.runInNewContext(fs.readFileSync('system/control-center/static/lod-manager.js'
   assert.strictEqual(get('lod-prepare').disabled, false);
   await get('lod-prepare').on_click();
   assert(get('lod-build-preview').textContent.includes('52'));
-  get('lod-build-confirm').value = 'PREPARE RUNTIME';
-  get('lod-build-confirm').on_input({target:{value:'PREPARE RUNTIME'}});
+  assert(!html.includes('id="lod-build-confirm"'));
+  assert(html.includes('lm-backup-reminder'));
   assert.strictEqual(get('lod-build-execute').disabled,false);
   await get('lod-build-execute').on_click();
   assert(get('lod-build-status').textContent.includes('ЗАБЛОКИРОВАНА'));
   assert(get('lod-build-preview').textContent.includes('runtime'));
+  assert.deepStrictEqual(preparePayload,{token:'token1'},'prepare sends token only');
   await get('lod-copy-workspace').on_click();
   assert(clipboard.value.includes('StreamingTargetRadius=1024'));
   assert(clipboard.value.includes('ModelStreamingBehavior.Improved'));

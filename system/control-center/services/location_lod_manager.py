@@ -85,10 +85,8 @@ class LocationLodManager:
                     'message': 'All scanned registered Location Asset types stream by default; explicit Off overrides remain author-controlled.'}
 
     def prepare(self, payload: dict) -> dict:
-        if not isinstance(payload, dict) or set(payload) != {'token', 'confirmation'}:
-            raise ValueError('Runtime preparation requires preflight token and explicit confirmation')
-        if payload['confirmation'] != 'PREPARE RUNTIME':
-            raise ValueError('Type PREPARE RUNTIME to confirm backup and draft build')
+        if not isinstance(payload, dict) or set(payload) != {'token'} or not isinstance(payload['token'], str):
+            raise ValueError('Runtime preparation requires a preflight token')
         with self._build_lock:
             if not self._preflight or payload['token'] != self._preflight[0]:
                 raise ValueError('Preflight expired; run Preflight again')

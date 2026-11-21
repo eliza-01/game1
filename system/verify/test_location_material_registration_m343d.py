@@ -61,8 +61,8 @@ class LocationMaterialM343D(TestCase):
             store = LocationAssetStore(Path(tmp))
             with store.connect() as db:
                 db.execute("INSERT INTO location_assets(slug,name_en,category,model_path,model_asset_id,"
-                           "revision,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                           ('old_atlas','Old Atlas','prop','legacy.fbx','98765',1,1,1))
+                           "revision,created_at,updated_at,appearance_mode,visual_material) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                           ('old_atlas','Old Atlas','prop','legacy.fbx','98765',1,1,1,'atlas','SmoothPlastic'))
             old = store.get('old_atlas')
             self.assertEqual(old['appearanceMode'], 'atlas')
             self.assertEqual(old['visualMaterial'], 'SmoothPlastic')

@@ -36,8 +36,7 @@
 #lod-manager-view .lm-build{opacity:1}
 #lod-manager-view .lm-source-path{display:block;margin-top:9px;padding:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere;font-size:11px;user-select:text}
 #lod-manager-view .lm-build-preview{margin-top:12px;padding:12px;background:var(--panel2);border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 monospace}
-#lod-manager-view .lm-confirm{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
-#lod-manager-view .lm-confirm input{max-width:260px}
+#lod-manager-view .lm-backup-reminder{font-size:12px;line-height:1.4;color:var(--danger);font-weight:700}
 @media(max-width:940px){#lod-manager-view .lm-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:550px){#lod-manager-view .lm-metrics{grid-template-columns:1fr 1fr}#lod-manager-view .lm-filters input{min-width:0;width:100%}}
 

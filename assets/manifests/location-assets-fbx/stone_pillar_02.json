@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "slug": "stone_pillar_02",
-  "sourceSha256": "75584d75d1950ee004568566aebb4dbc210ebe73771b40a1027df7f33777c63e",
+  "sourceSha256": "731533f0cd20f147004d259d7c8f24f1471f6c56813ee2a21f544f35385ab5a2",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
       {
         "name": "stone_pillar_02",
         "armature": "",
-        "vertices": 1176,
+        "vertices": 351,
         "bones": [],
         "influencedBones": [],
         "role": "visual",

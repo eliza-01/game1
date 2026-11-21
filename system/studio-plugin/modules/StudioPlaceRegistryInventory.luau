@@ -655,6 +655,7 @@ function Inventory.Scan(workspaceService: Workspace, catalog: any, service: any)
                 rows[idx].duplicateId=true
                 rows[idx].needsStructure=true
                 rows[idx].canSync=false
+                rows[idx].status="pending"
                 table.insert(rows[idx].issues,"Повторяющийся Placement ID")
             end
         end

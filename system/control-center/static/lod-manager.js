@@ -50,7 +50,7 @@
       const view=await request('/api/lod-manager/settings', {method:'POST',
         headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       state.overview=view; state.preflight=null;
-      $('lod-build-confirm-label').hidden=true; $('lod-build-execute').hidden=true;
+      $('lod-build-execute').hidden=true;
       $('lod-build-preview').hidden=true;
       $('lod-build-status').textContent='Настройки изменены. Запусти Preflight по новому профилю.';
       $('lod-settings-status').textContent='Сохранено. Preflight нужно выполнить заново; Studio не изменена.';
@@ -75,7 +75,6 @@
       state.overview=await request('/api/lod-manager');
       state.preflight=null;
       $('lod-build-preview').hidden=true;
-      $('lod-build-confirm-label').hidden=true;
       $('lod-build-execute').hidden=true;
       $('lod-build-status').textContent='Профиль дома изменён — нужен новый Preflight и Runtime Draft.';
       $('lod-settings-status').textContent=`${slug}: ${mode} сохранён через Real Estate.`;
@@ -166,7 +165,6 @@
     if (!data.build?.canPreflight) {
       state.preflight = null;
       $('lod-build-preview').hidden = true;
-      $('lod-build-confirm-label').hidden = true;
       $('lod-build-execute').hidden = true;
       $('lod-build-execute').disabled = true;
       $('lod-build-status').textContent = 'Сначала Scan Place в текущей сессии. Затем сохрани XML Place и запусти Preflight.';
@@ -206,7 +204,6 @@
     state.preflight = null;
     $('lod-prepare').disabled = true;
     $('lod-build-preview').hidden = true;
-    $('lod-build-confirm-label').hidden = true;
     $('lod-build-execute').hidden = true;
     $('lod-build-status').textContent = 'Проверяем сохранённый XML Place и каждый выбранный экземпляр…';
     try {
@@ -227,19 +224,17 @@
         ` · Workspace Target ${plan.workspace.targetRadius} studs · SHA256 исходника: ${plan.sourceSha256}` +
         (exclusions.length ? `\nНЕ ВКЛЮЧЕНЫ В RUNTIME STREAMING (${omitted} домов, ${unselectedLocations.reduce((n,x)=>n+x.count,0)} Location):\n${exclusions.join('\n')}` : '');
       $('lod-build-preview').hidden = false;
-      $('lod-build-confirm').value = '';
-      $('lod-build-confirm-label').hidden = false;
       $('lod-build-execute').hidden = false;
-      $('lod-build-execute').disabled = true;
+      $('lod-build-execute').disabled = false;
       $('lod-build-status').textContent = exclusions.length
-        ? 'Preflight OK, НО часть объектов останется в Workspace — смотри список выше. Включи их streaming profile или подтверди частичную сборку.'
-        : 'Preflight OK. Build создаст проверенный backup и отдельную Runtime XML-копию; ничего не удалит в Studio. Введи подтверждение.';
+        ? 'Preflight OK, НО часть объектов останется в Workspace — смотри список выше. Включи их streaming profile либо собери частичный Runtime Draft.'
+        : 'Preflight OK. Build создаст проверенный backup и отдельную Runtime XML-копию; ничего не удалит в Studio.';
     } catch(error) {
       $('lod-build-status').textContent = `Preflight остановлен: ${error.message}`;
     } finally { state.busy = false; render(); }
   }
   async function prepare() {
-    if(state.busy || !state.preflight || $('lod-build-confirm').value !== 'PREPARE RUNTIME')return;
+    if(state.busy || !state.preflight)return;
     state.busy = true;
     const token = state.preflight.token;
     state.preflight = null;
@@ -248,7 +243,7 @@
     $('lod-build-status').textContent = 'Создаём backup, проверяем SHA256, собираем отдельный Runtime Place…';
     try {
       const result = await request('/api/lod-manager/prepare', {method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({token,confirmation:'PREPARE RUNTIME'})});
+        body:JSON.stringify({token})});
       const remaining=Object.entries(result.untouchedHouseCounts||{});
       $('lod-build-status').textContent = `Runtime draft создан: Location ${result.removedVisualMeshParts} MeshParts удалены · Real Estate ${result.housePlacements||0} домов / ${result.convertedHouseVisualMeshParts||0} MeshParts заменены прокси.` +
         (remaining.length ? ` ВНИМАНИЕ: ${remaining.map(([slug,n])=>`${slug} × ${n}`).join(', ')} остались FULL в Workspace.` : '') +
@@ -261,7 +256,6 @@ Build report: ${result.reportPath}`;
     } catch(error) { $('lod-build-status').textContent = `Runtime build остановлен: ${error.message}`; }
     finally {
       state.busy = false;
-      $('lod-build-confirm-label').hidden = true;
       $('lod-build-execute').hidden = true;
       render();
     }
@@ -326,9 +320,6 @@ Build report: ${result.reportPath}`;
   for(const id of helpIds){$(id).addEventListener('input',()=>{$('lod-settings-status').textContent='Настройки изменены. Нажми Save settings.';});}
   $('lod-prepare').addEventListener('click', preflight);
   $('lod-build-execute').addEventListener('click', prepare);
-  $('lod-build-confirm').addEventListener('input', event => {
-    $('lod-build-execute').disabled = state.busy || !state.preflight || event.target.value !== 'PREPARE RUNTIME';
-  });
   $('lod-scan').addEventListener('click',scan);
   $('lod-refresh').addEventListener('click',load);
   $('lod-search').addEventListener('input',event=>{state.term=event.target.value.trim().toLowerCase();render();});

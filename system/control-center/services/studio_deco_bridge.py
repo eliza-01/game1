@@ -20,6 +20,7 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                             appearance_mode: str = 'atlas',
                             phase: str = 'scan', scan_token: str = '',
                             selected_keys: list[str] | None = None, part_key: str = '',
+                            rig_choices: dict[str, str] | None = None,
                             part_keys: list[str] | None = None,
                             model_history: list[str] | None = None,
                             model_mesh_inventory: list[dict] | None = None) -> dict:
@@ -59,6 +60,11 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
                 or any(not isinstance(k, str) or not re.fullmatch(r'p[1-9][0-9]{0,3}', k)
                        for k in selected_keys)):
             raise ValueError('explicit bounded managed MeshPart selection is required')
+    if phase == 'replace' and rig_choices is not None:
+        if (not isinstance(rig_choices, dict) or len(rig_choices) > len(selected_keys or [])
+                or any(not isinstance(k, str) or k not in selected_keys
+                       or v not in ('rig', 'static') for k, v in rig_choices.items())):
+            raise ValueError('invalid per-placement rig selection')
     operation_id = uuid.uuid4().hex
     command = {
         'project': PROJECT,
@@ -74,7 +80,8 @@ def run_deco_refresh_bridge(*, timeout_seconds: float = 75.0,
         **({'modelHistory':model_history, 'modelMeshInventory':model_mesh_inventory or []}
            if phase=='scan' else {'scanToken':scan_token,'partKeys':part_keys}
            if phase=='select' else {'scanToken':scan_token,'partKey':part_key}
-           if phase=='attach' else {'scanToken':scan_token,'selectedKeys':selected_keys}),
+           if phase=='attach' else {'scanToken':scan_token,'selectedKeys':selected_keys,
+                                     'rigChoices':rig_choices or {}}),
     }
     state = {"claimed": False, "result": None}
 

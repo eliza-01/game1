@@ -185,6 +185,9 @@
 .shared-atlas-picker,.shared-atlas-preview {border:1px solid var(--line);border-radius:9px;padding:11px;display:grid;gap:9px;min-width:0;}
 .shared-atlas-picker input {width:100%;min-width:0;}
 .shared-atlas-choices {max-height:210px;overflow:auto;display:grid;gap:5px;}
+.shared-atlas-choice-section {display:grid;gap:5px;padding:4px 0 8px;}
+.shared-atlas-choice-section+.shared-atlas-choice-section {border-top:1px solid var(--line);padding-top:10px;}
+.shared-atlas-choice-heading {font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
 .shared-atlas-choices button {text-align:left;display:grid;gap:3px;min-width:0;}
 .shared-atlas-choices button strong,.shared-atlas-choices button small {overflow-wrap:anywhere;}
 .shared-model-state {display:grid;gap:3px;padding:5px 0;}
@@ -277,3 +280,10 @@
 .location-mesh-appearance [data-mesh-visual-atlas-fields] {display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:9px;min-width:0}
 .location-mesh-appearance [data-mesh-visual-alpha] {display:flex;align-items:center;gap:7px}
 .location-mesh-appearance small {overflow-wrap:anywhere}
+
+/* M400 · Shared Appearance authoring is located in Model, not a second Texture tab. */
+#location-asset-edit-dialog .la-model-appearance {display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:10px;}
+#location-asset-edit-dialog .la-model-appearance > label {display:grid;gap:5px;}
+#location-asset-edit-dialog .la-model-appearance [data-la-model-visual-fields] {display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+#location-asset-edit-dialog .la-model-appearance .shared-atlas-editor {min-width:0;}
+#location-asset-edit-dialog [hidden] {display:none!important;}

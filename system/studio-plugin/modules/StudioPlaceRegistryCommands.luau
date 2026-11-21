@@ -84,8 +84,13 @@ return function(config: any)
                 recordingName="G1PlaceRegistry:"..command.operationId}
             local actionReport
             if phase=="repair" then
+                -- The scan session also contains x... LandscapePainter
+                -- attachment refs. They have no Deco Placement ID and must
+                -- never participate in the duplicate-ID inventory for Repair.
                 local allRefs={}
-                for _,ref in pairs(session.refs) do table.insert(allRefs,ref) end
+                for _,ref in pairs(session.refs) do
+                    if not ref.external then table.insert(allRefs,ref) end
+                end
                 table.sort(allRefs,function(a,b) return a.row.key<b.row.key end)
                 ctx.allRefs=allRefs
                 actionReport=Repair.Apply(chosen,ctx)

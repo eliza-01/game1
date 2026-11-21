@@ -265,10 +265,24 @@ def route(path, body, deps):
                     kwargs['part_key'] = payload.get('partKey')
                 else:
                     kwargs['selected_keys'] = payload.get('selectedKeys')
+                    if 'rigChoices' in payload:
+                        kwargs['rig_choices'] = payload['rigChoices']
             studio = deps['sync_location_assets_to_studio'](**kwargs)
             if phase == 'scan':
                 if {entry.get('modelAssetId') for entry in studio['inventory']} != set(kwargs['model_history']):
                     raise ValueError('Studio Mesh ID inventory does not match published Model history')
+                # A previous scan could persist an empty inventory for the
+                # CURRENT publication. Treat that as missing evidence, never
+                # as a reason to mark every placed MeshPart outdated forever.
+                # The Studio scanner reloads the published Model on this case;
+                # a failed reload must not overwrite the cache or acknowledge Sync.
+                current_inventory = next((entry for entry in studio['inventory']
+                    if entry.get('modelAssetId') == str(row['model_asset_id'])), None)
+                if (not isinstance(current_inventory, dict)
+                        or not isinstance(current_inventory.get('meshes'), list)
+                        or not current_inventory['meshes']):
+                    raise ValueError('Studio did not verify Mesh IDs of the current published Model; '
+                                     'Find again after updating the Studio plugin')
                 location_assets.record_mesh_id_inventory(slug, studio['inventory'])
                 studio['verification'] = classify_scan(studio)
                 if studio['verification'] == 'current':

@@ -29,7 +29,7 @@ def scan_report(*, parts=None, mode='current', unmanaged=0, geometry=0):
                 texturePending=sum(item['managed'] and item['needsTexture'] for item in items),
                 alphaPending=sum(item['managed'] and item['needsAlpha'] for item in items),
                 geometryPending=geometry,
-                inventory=[dict(modelAssetId='12345',meshes=[])])
+                inventory=[dict(modelAssetId='12345',meshes=[dict(meshId='44556',count=1,visualNames=['ivy_02'])])])
 
 
 class FakeAtlas:

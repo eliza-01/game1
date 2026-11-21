@@ -37,9 +37,18 @@ return function(config: any)
             end
             if type(command.scanToken)~="string" or type(command.selectedKeys)~="table" then
                 error("Find Mesh IDs and select pending MeshParts first") end
+            local choices=command.rigChoices or {}
+            if type(choices)~="table" then error("invalid rig selection") end
+            local selected={}
+            for _, key in ipairs(command.selectedKeys) do selected[key]=true end
+            for key, mode in pairs(choices) do
+                if not selected[key] or (mode~="rig" and mode~="static") then
+                    error("rig selection must refer to a selected MeshPart")
+                end
+            end
             return config.decoManager:refreshRegistry(command.targetSlug,true,
                 command.modelAssetId,command.atlasAssetId,command.scanToken,command.bindingRevision,
-                command.selectedKeys)
+                command.selectedKeys,choices)
         end)
         local payload={project="game1",command="deco-refresh",schemaVersion=9,
             operationId=command.operationId,targetSlug=command.targetSlug,

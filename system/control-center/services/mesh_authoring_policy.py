@@ -65,7 +65,7 @@ def normalize_location_options(analysis: dict, raw: dict | None) -> dict:
         # copy of that default on each part. Only explicit overrides persist.
         if 'appearanceMode' in entry:
             mode, material, color = appearance.validated(
-                entry['appearanceMode'], entry.get('visualMaterial', 'SmoothPlastic'),
+                entry['appearanceMode'], entry.get('visualMaterial', 'Plastic'),
                 entry.get('visualColor', '#FFFFFF'))
             physics.update(appearanceMode=mode, visualMaterial=material, visualColor=color)
             if 'alphaEnabled' in entry:

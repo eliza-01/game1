@@ -313,15 +313,25 @@ function Inventory.Scan(workspace: Workspace, slug: string, row: any,
         if seenIds[modelId] then error("duplicate Model history ID") end
         seenIds[modelId]=true
         local desc=cache[modelId]
-        -- M238 cache did not retain names: enrich the CURRENT publication once.
-        -- Never guess visual IDs from Blender mesh names or historical IDs.
-        if not desc or (modelId==newModelId and #desc.meshes>0
-            and type(desc.meshes[1].visualNames)~="table") then
+        -- A published Location Model has visual geometry. An empty cached
+        -- inventory is NOT proof that all placed MeshParts are outdated.
+        -- M407 could reconcile an already-current rig while Find kept using
+        -- this empty cache, leaving a permanent false Mesh-stale status.
+        -- Reload a missing inventory, or an empty CURRENT inventory, from
+        -- the immutable Roblox Model. Historical empty entries remain
+        -- non-evidence: do not introduce a new dependency on old removed IDs.
+        -- Never synthesize Mesh IDs from the FBX manifest or placed instances.
+        if not desc or (modelId==newModelId and (#desc.meshes==0
+            or type(desc.meshes[1].visualNames)~="table")) then
             local published=loader:loadForMeshInventory(modelId,slug)
             desc=Inventory.Describe(modelId,published)
             published:Destroy()
-            -- Keep the immutable per-version authoring evidence even when
-            -- Studio had to refresh only the Mesh ID cache.
+            if modelId==newModelId and #desc.meshes==0 then
+                error("published Model " .. modelId .. " returned no MeshPart IDs; "
+                    .. "cannot verify Studio geometry or repair the inventory cache")
+            end
+            -- The rig manifest is immutable per Model publication, even when
+            -- Studio repairs the observed Mesh ID inventory.
             if cache[modelId] then desc.rigManifest=cache[modelId].rigManifest end
         end
         table.insert(inventory,desc)

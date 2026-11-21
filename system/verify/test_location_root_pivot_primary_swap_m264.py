@@ -1,4 +1,4 @@
-"""M264 regression: relocating a PrimaryPart pivot must not move placed geometry.
+"""Location pivot regression: adopting a published pivot must not move geometry.
 
 The numerical test exercises rigid-frame composition independent of Roblox.
 The source contracts still require an Edit-mode Studio smoke test for engine
@@ -56,7 +56,7 @@ class PlacedRootPrimarySwapM264(TestCase):
         self.assertFalse(close(compose(compose(placed[0],incoming_pivot_metadata),
                                        inverse(old_template_parts[0])), placement))
 
-    def test_shared_swap_preserves_placement_and_rollback_contract(self):
+    def test_shared_swap_adopts_explicit_pivot_and_preserves_rollback_contract(self):
         swap=self.source('StudioManagedRigSwap.luau')
         locate='plan.newPrimary.PivotOffset = plan.newPrimary.CFrame:ToObjectSpace(plan.pivot)'
         self.assertEqual(swap.count(locate),1)
@@ -67,9 +67,17 @@ class PlacedRootPrimarySwapM264(TestCase):
         self.assertIn('or math.abs(actualScale - plan.scale) > 0.000001',swap)
         self.assertIn('or plan.root.Parent ~= plan.parent',swap)
         self.assertIn('plan.root.PrimaryPart = plan.primary',swap)
+        self.assertIn('plan.root.WorldPivot = plan.pivot',swap)
         self.assertIn('for _, entry in ipairs(plan.old) do entry.object:Destroy() end',swap)
         self.assertNotIn('plan.root:PivotTo(plan.pivot)',swap)
         self.assertNotIn('plan.root:ScaleTo(',swap)
+
+        location=self.source('DecoPlacedAssetSync.luau')
+        registry=self.source('StudioPlaceRegistrySync.luau')
+        estate=self.source('StudioRealEstatePlacedVisualSync.luau')
+        self.assertNotIn('targetRootPivot=',location)
+        self.assertNotIn('targetRootPivot=',registry)
+        self.assertNotIn('targetRootPivot=',estate)
 
     def test_future_mesh_provenance_uses_geometry_frame(self):
         history=self.source('StudioPublishedMeshHistory.luau')

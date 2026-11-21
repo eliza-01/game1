@@ -17,13 +17,17 @@ window.game1StudioSync=(()=>{
     }finally{pending.delete(slug);}
   }
   const scanLocation=slug=>send('location',slug,{slug,phase:'scan'});
-  const replaceLocation=(slug,scanToken,selectedKeys)=>{
+  const replaceLocation=(slug,scanToken,selectedKeys,rigChoices={})=>{
     if(!/^[0-9a-fA-F-]{32,36}$/.test(String(scanToken||'')))throw Error('Use Find Mesh IDs first');
     if(!Array.isArray(selectedKeys)||!selectedKeys.length||selectedKeys.length>4096||
       new Set(selectedKeys).size!==selectedKeys.length||
       selectedKeys.some(k=>!/^p[1-9][0-9]{0,3}$/.test(k)))
       throw Error('Select pending MeshParts before Sync');
-    return send('location',slug,{slug,phase:'replace',scanToken,selectedKeys});
+    if(!rigChoices||typeof rigChoices!=='object'||Array.isArray(rigChoices)||
+      Object.keys(rigChoices).some(k=>!selectedKeys.includes(k)||
+        !['rig','static'].includes(rigChoices[k])))
+      throw Error('Неверный выбор типа рига для выбранных MeshPart');
+    return send('location',slug,{slug,phase:'replace',scanToken,selectedKeys,rigChoices});
   };
   const selectLocation=(slug,scanToken,partKeys)=>{
     if(!/^[0-9a-fA-F-]{32,36}$/.test(String(scanToken||'')))throw Error('Use Find Mesh IDs first');

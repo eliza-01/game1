@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "campfire_01",
-  "sourceSha256": "8323f265be8707128e5f1822f26abc88f4073c19d93f3a8473a0e2e9c1980130",
+  "sourceSha256": "74e7908e5c6411a707326c0342c2d213ec2af72540327b5804c3bc404d54716b",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
@@ -11,7 +11,29 @@
         "vertices": 279,
         "bones": [
           {
-            "name": "fire_bone",
+            "name": "cooking_pot_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              -0.0014296,
+              0.0,
+              1.0,
+              0.0,
+              -0.0003886,
+              0.0,
+              0.0,
+              1.0,
+              1.23265,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "fire_socket",
             "parent": "",
             "matrixLocal": [
               1.0,
@@ -19,13 +41,13 @@
               2e-07,
               0.0,
               -2e-07,
-              0.0871556,
-              0.9961948,
-              -0.025732,
-              -0.0,
-              -0.9961948,
-              0.0871555,
-              1.2133821,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0484726,
               0.0,
               0.0,
               0.0,
@@ -34,7 +56,8 @@
           }
         ],
         "influencedBones": [
-          "fire_bone"
+          "cooking_pot_01_socket",
+          "fire_socket"
         ],
         "role": "visual",
         "physics": {
@@ -50,10 +73,32 @@
       {
         "name": "rig_carrier",
         "armature": "campfire_01_armature",
-        "vertices": 3,
+        "vertices": 6,
         "bones": [
           {
-            "name": "fire_bone",
+            "name": "cooking_pot_01_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              -0.0014296,
+              0.0,
+              1.0,
+              0.0,
+              -0.0003886,
+              0.0,
+              0.0,
+              1.0,
+              1.23265,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          {
+            "name": "fire_socket",
             "parent": "",
             "matrixLocal": [
               1.0,
@@ -61,13 +106,13 @@
               2e-07,
               0.0,
               -2e-07,
-              0.0871556,
-              0.9961948,
-              -0.025732,
-              -0.0,
-              -0.9961948,
-              0.0871555,
-              1.2133821,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0484726,
               0.0,
               0.0,
               0.0,
@@ -76,7 +121,8 @@
           }
         ],
         "influencedBones": [
-          "fire_bone"
+          "cooking_pot_01_socket",
+          "fire_socket"
         ],
         "role": "carrier",
         "physics": {

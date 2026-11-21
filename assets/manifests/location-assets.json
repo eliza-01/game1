@@ -2805,9 +2805,9 @@
       "model_published_sha256": "23916002c7f87bcbac219d436e08986e975c0f927124c5e72546183d8864b803",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 8,
+      "revision": 9,
       "created_at": 1795193385.5415175,
-      "updated_at": 1795201141.4519002,
+      "updated_at": 1795252651.8317504,
       "published_at": 1795198332.844682,
       "surface_material": "brick",
       "alpha_enabled": 0,
@@ -3524,7 +3524,7 @@
           "glass": false,
           "noCollide": true,
           "visualColor": "#393D51",
-          "visualMaterial": "Granite"
+          "visualMaterial": "Slate"
         },
         "roof": {
           "appearanceMode": "material",
@@ -3582,7 +3582,7 @@
       "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
       "atlasVariantId": 0,
-      "bindingRevision": 8,
+      "bindingRevision": 9,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Building",
@@ -9679,15 +9679,15 @@
       "name_en": "Campfire 01",
       "category": "light",
       "model_path": "assets/source/location-assets/light/campfire_01/model/campfire_01.fbx",
-      "model_sha256": "8323f265be8707128e5f1822f26abc88f4073c19d93f3a8473a0e2e9c1980130",
-      "model_asset_id": "130064092512022",
-      "model_published_sha256": "8323f265be8707128e5f1822f26abc88f4073c19d93f3a8473a0e2e9c1980130",
+      "model_sha256": "74e7908e5c6411a707326c0342c2d213ec2af72540327b5804c3bc404d54716b",
+      "model_asset_id": "139460244573372",
+      "model_published_sha256": "74e7908e5c6411a707326c0342c2d213ec2af72540327b5804c3bc404d54716b",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 10,
+      "revision": 12,
       "created_at": 1792517965.2518861,
-      "updated_at": 1794278320.9412763,
-      "published_at": 1794278320.9412763,
+      "updated_at": 1795213759.9112282,
+      "published_at": 1795213759.9112282,
       "surface_material": "wood",
       "alpha_enabled": 0,
       "appearance_mode": "atlas",
@@ -9712,7 +9712,29 @@
             "vertices": 279,
             "bones": [
               {
-                "name": "fire_bone",
+                "name": "cooking_pot_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -0.0014296,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.0003886,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.23265,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "fire_socket",
                 "parent": "",
                 "matrixLocal": [
                   1.0,
@@ -9720,13 +9742,13 @@
                   2e-07,
                   0.0,
                   -2e-07,
-                  0.0871556,
-                  0.9961948,
-                  -0.025732,
-                  -0.0,
-                  -0.9961948,
-                  0.0871555,
-                  1.2133821,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0484726,
                   0.0,
                   0.0,
                   0.0,
@@ -9735,7 +9757,8 @@
               }
             ],
             "influencedBones": [
-              "fire_bone"
+              "cooking_pot_01_socket",
+              "fire_socket"
             ],
             "role": "visual",
             "physics": {
@@ -9751,10 +9774,32 @@
           {
             "name": "rig_carrier",
             "armature": "campfire_01_armature",
-            "vertices": 3,
+            "vertices": 6,
             "bones": [
               {
-                "name": "fire_bone",
+                "name": "cooking_pot_01_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -0.0014296,
+                  0.0,
+                  1.0,
+                  0.0,
+                  -0.0003886,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.23265,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
+              {
+                "name": "fire_socket",
                 "parent": "",
                 "matrixLocal": [
                   1.0,
@@ -9762,13 +9807,13 @@
                   2e-07,
                   0.0,
                   -2e-07,
-                  0.0871556,
-                  0.9961948,
-                  -0.025732,
-                  -0.0,
-                  -0.9961948,
-                  0.0871555,
-                  1.2133821,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  1.0484726,
                   0.0,
                   0.0,
                   0.0,
@@ -9777,7 +9822,8 @@
               }
             ],
             "influencedBones": [
-              "fire_bone"
+              "cooking_pot_01_socket",
+              "fire_socket"
             ],
             "role": "carrier",
             "physics": {
@@ -9798,8 +9844,30 @@
         "unassignedArmatures": []
       },
       "rigManifest": {
-        "boneHash": "7263cbc51d37fac11f1218b28cec8f119314b8302394852fd1409d5940fdfe19",
+        "boneHash": "399f94601f072efc2bcad05bd30ed43feccfe6f8d5c1b98c0345fd44e1d759d9",
         "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              -0.0014296,
+              0.0,
+              1.0,
+              0.0,
+              -0.0003886,
+              0.0,
+              0.0,
+              1.0,
+              1.23265,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "cooking_pot_01_socket",
+            "parent": ""
+          },
           {
             "matrix": [
               1.0,
@@ -9807,24 +9875,24 @@
               2e-07,
               0.0,
               -2e-07,
-              0.0871556,
-              0.9961948,
-              -0.025732,
-              -0.0,
-              -0.9961948,
-              0.0871555,
-              1.2133821,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              -1.0,
+              0.0,
+              1.0484726,
               0.0,
               0.0,
               0.0,
               1.0
             ],
-            "name": "fire_bone",
+            "name": "fire_socket",
             "parent": ""
           }
         ],
         "carrierName": "rig_carrier",
-        "inventoryHash": "8fbedcc27dc6b4c676882c12bc1ac52dd84d1b55fcff3c25ead10743a3fb425b",
+        "inventoryHash": "21b959663936adf1fa821701e817ed9fcccc1e36d9b76d909f774d18262b2505",
         "parts": [
           {
             "name": "campfire_01",
@@ -9832,20 +9900,15 @@
             "vertices": 279
           },
           {
-            "name": "col_mesh",
-            "role": "collider",
-            "vertices": 60
-          },
-          {
             "name": "rig_carrier",
             "role": "rig_carrier",
-            "vertices": 3
+            "vertices": 6
           }
         ],
         "rigKind": "skinned",
         "schemaVersion": 2,
         "sourceSha256": "",
-        "structuralHash": "641061970ac6e5037a94baa4dbfe28a7fbe157f089f7ce1aaaf9817107af3483"
+        "structuralHash": "45a4acad54a87a64eb7d6966b7da462fbfb9988cb2ed112f6ba744aaab29ec57"
       },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
@@ -9858,11 +9921,65 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -0.080352783203125,
+            0.0119476318359375,
+            -0.7332916259765625,
+            1.0,
+            2.6193447411060333e-10,
+            0.0,
+            0.0,
+            -2.818705979734659e-07,
+            1.000000238418579,
+            -3.7834979593753815e-10,
+            -1.0,
+            -2.823071554303169e-07
+          ],
+          "meshId": "114940904292759",
+          "size": [
+            5.008420467376709,
+            1.5793931484222412,
+            4.88838005065918
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              0.041046142578125,
+              -0.1982269287109375,
+              -0.279571533203125,
+              -0.4607124626636505,
+              -0.002250696299597621,
+              0.8875465989112854,
+              -0.8875297904014587,
+              -0.0055000921711325645,
+              -0.46071767807006836,
+              0.005918523762375116,
+              -0.9999823570251465,
+              0.0005364008829928935
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              3.4602880477905273,
+              0.6191741228103638,
+              2.5836472511291504
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "ff2f4b53c3bd925a83e6c77415f9af08e9149cd016cf95311f3f26abc0798e21",
       "surfaceMaterial": "wood",
       "appearanceMode": "atlas",
       "visualMaterial": "SmoothPlastic",
@@ -9945,7 +10062,7 @@
       "category_label": "Light",
       "publishedVisualMeshes": [
         {
-          "meshId": "127690947645680",
+          "meshId": "114940904292759",
           "name": "campfire_01"
         }
       ],
@@ -9958,19 +10075,19 @@
       "name_en": "Ground Torch 01",
       "category": "light",
       "model_path": "assets/source/location-assets/light/ground_torch_01/model/ground_torch_01.fbx",
-      "model_sha256": "97b084d881e17c2298c0e2f45e20e4555a21f18aa5bea6c8eeba81178344b020",
-      "model_asset_id": "131758360108923",
-      "model_published_sha256": "97b084d881e17c2298c0e2f45e20e4555a21f18aa5bea6c8eeba81178344b020",
+      "model_sha256": "71481fb1f282dccd9d7e8dd772f1655ff53ec7c953e154f213b83bfd9961f0b3",
+      "model_asset_id": "100718497513350",
+      "model_published_sha256": "71481fb1f282dccd9d7e8dd772f1655ff53ec7c953e154f213b83bfd9961f0b3",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 7,
+      "revision": 12,
       "created_at": 1792109428.4855547,
-      "updated_at": 1795182689.9639766,
-      "published_at": 1794105974.1723387,
+      "updated_at": 1795252100.2870142,
+      "published_at": 1795251910.0577362,
       "surface_material": "metal",
       "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "Brick",
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
       "visual_color": "#303030",
       "lod1": {
         "kind": "lod1",
@@ -9988,7 +10105,7 @@
           {
             "name": "ground_torch_01",
             "armature": "ground_torch_01_armature",
-            "vertices": 2007,
+            "vertices": 216,
             "bones": [
               {
                 "name": "fire_bone",
@@ -10103,17 +10220,12 @@
           }
         ],
         "carrierName": "rig_carrier",
-        "inventoryHash": "b6a8d587ff1da97d05cef46dd8ceada4192080c2e848320a630b79e01b2b91d6",
+        "inventoryHash": "7afae1ca6d810f81493bae590420f899ea23794cda2cec0c98ff9623a1d48069",
         "parts": [
-          {
-            "name": "col_mesh",
-            "role": "collider",
-            "vertices": 224
-          },
           {
             "name": "ground_torch_01",
             "role": "visual",
-            "vertices": 2007
+            "vertices": 216
           },
           {
             "name": "rig_carrier",
@@ -10124,27 +10236,84 @@
         "rigKind": "skinned",
         "schemaVersion": 2,
         "sourceSha256": "",
-        "structuralHash": "06b48813894c4d7a49d5831be17f2ca0dfff1e371e5dec3ee4f0f8e55409d544"
+        "structuralHash": "a8f2cdb2c5f67a880fc966b71876bee17c26a1e1d984de50cb5e729aecd28235"
       },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
         "ground_torch_01": {
+          "appearanceMode": "material",
           "collisionFidelity": "Box",
           "doubleSided": false,
           "glass": false,
-          "noCollide": true
+          "noCollide": true,
+          "visualColor": "#4C4C4C",
+          "visualMaterial": "Slate"
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -0.002105712890625,
+            0.034149169921875,
+            0.3166618347167969,
+            1.0,
+            -2.4493082635491166e-16,
+            0.0,
+            0.0,
+            -2.821299744937278e-07,
+            1.0,
+            0.0,
+            -1.0,
+            -2.821300029154372e-07
+          ],
+          "meshId": "99710860182787",
+          "size": [
+            2.000916004180908,
+            2.8638453483581543,
+            2.0032765865325928
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              0.008392333984375,
+              0.082977294921875,
+              0.5050010681152344,
+              -0.01436471939086914,
+              -2.4493082635491166e-16,
+              -0.9998968243598938,
+              0.9998968243598938,
+              -2.821299744937278e-07,
+              -0.01436471939086914,
+              -2.821008422415616e-07,
+              -1.0,
+              4.052719049241205e-09
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              1.1576589345932007,
+              2.619718551635742,
+              1.1875869035720825
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "cbc8692d7a46ba35eb18c9574ab4a97d5bbeec72cf2ca145123b5ea1ac02b7d0",
       "surfaceMaterial": "metal",
-      "appearanceMode": "atlas",
-      "visualMaterial": "Brick",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
       "visualColor": "#303030",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -10153,103 +10322,27 @@
         "robloxMaterial": "Metal",
         "soundFamily": "metal"
       },
-      "texture_path": "assets/source/texture-atlases/ground_torch_01/128x128/ground_torch_01_128x128_atlas.png",
-      "texture_filename": "ground_torch_01_128x128_atlas.png",
-      "texture_sha256": "40c8678e768365542611273ea2bd6b283e56f348ee9fa5c0a6fce6a6dc1e39ac",
-      "texture_asset_id": "119831110703019",
-      "texture_published_sha256": "40c8678e768365542611273ea2bd6b283e56f348ee9fa5c0a6fce6a6dc1e39ac",
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 40,
+      "atlasVariantId": 0,
       "atlasFamily": "ground_torch_01",
       "atlasResolution": "128x128",
-      "bindingRevision": 6,
+      "bindingRevision": 12,
       "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 20,
-          "family_id": 16,
-          "width": 2048,
-          "height": 2048,
-          "filename": "wall_torch_01.jpg",
-          "original_filename": "wall_torch_01.jpg",
-          "source_path": "assets/source/texture-atlases/wall_torch_01/2048x2048/migrated/f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104/wall_torch_01.jpg",
-          "source_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
-          "uses_alpha": false,
-          "published_id": "133426040591241",
-          "published_sha256": "f2e5349b2b7de2cac11340d2fb091ebd9bae397672e7cdcdba462db9466ec104",
-          "moderation_state": "Reviewing",
-          "published_at": 1793661745.075649,
-          "created_at": 1793661745.075649,
-          "retired_at": null,
-          "atlas_key": "wall_torch_01",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "2048x2048",
-          "baseKey": "wall_torch",
-          "version": "01"
-        },
-        {
-          "id": 41,
-          "family_id": 32,
-          "width": 512,
-          "height": 512,
-          "filename": "ground_torch_01_512x512_atlas.png",
-          "original_filename": "ground_torch_01_512x512_atlas.png",
-          "source_path": "assets/source/texture-atlases/ground_torch_01/512x512/ground_torch_01_512x512_atlas.png",
-          "source_sha256": "399fa78203f7275e3e8d74ed2d4a92e77d358dfa2801356d168f9a4c83b5859b",
-          "uses_alpha": true,
-          "published_id": "116362991193690",
-          "published_sha256": "399fa78203f7275e3e8d74ed2d4a92e77d358dfa2801356d168f9a4c83b5859b",
-          "moderation_state": "Reviewing",
-          "published_at": 1794107311.8176115,
-          "created_at": 1794107307.9335408,
-          "retired_at": null,
-          "atlas_key": "ground_torch_01",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "512x512",
-          "baseKey": "ground_torch",
-          "version": "01"
-        },
-        {
-          "id": 40,
-          "family_id": 32,
-          "width": 128,
-          "height": 128,
-          "filename": "ground_torch_01_128x128_atlas.png",
-          "original_filename": "ground_torch_01_128x128_atlas.png",
-          "source_path": "assets/source/texture-atlases/ground_torch_01/128x128/ground_torch_01_128x128_atlas.png",
-          "source_sha256": "40c8678e768365542611273ea2bd6b283e56f348ee9fa5c0a6fce6a6dc1e39ac",
-          "uses_alpha": true,
-          "published_id": "119831110703019",
-          "published_sha256": "40c8678e768365542611273ea2bd6b283e56f348ee9fa5c0a6fce6a6dc1e39ac",
-          "moderation_state": "Reviewing",
-          "published_at": 1794106114.9258444,
-          "created_at": 1794106111.3803103,
-          "retired_at": null,
-          "atlas_key": "ground_torch_01",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "128x128",
-          "baseKey": "ground_torch",
-          "version": "01"
-        }
-      ],
-      "textureUsesAlpha": true,
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Light",
       "publishedVisualMeshes": [
         {
-          "meshId": "129094987162444",
+          "meshId": "99710860182787",
           "name": "ground_torch_01"
         }
       ],
@@ -10814,19 +10907,19 @@
       "name_en": "Lantern 01",
       "category": "light",
       "model_path": "assets/source/location-assets/light/lantern_01/model/lantern_01.fbx",
-      "model_sha256": "8a7854e3bd9787b4f088b614d7fe7ad73de48e844440c821a0049cdb8003e801",
-      "model_asset_id": "139526633880726",
-      "model_published_sha256": "8a7854e3bd9787b4f088b614d7fe7ad73de48e844440c821a0049cdb8003e801",
+      "model_sha256": "cbc401bbfb2d16aa5e7265b74607d53b0103e6099c174e4002ba50fffd3734cb",
+      "model_asset_id": "118279766326390",
+      "model_published_sha256": "cbc401bbfb2d16aa5e7265b74607d53b0103e6099c174e4002ba50fffd3734cb",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 6,
+      "revision": 16,
       "created_at": 1791577146.911755,
-      "updated_at": 1795173754.9064503,
-      "published_at": 1794415183.4159954,
+      "updated_at": 1795257984.9471295,
+      "published_at": 1795257984.9471295,
       "surface_material": "wood",
       "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
       "visual_color": "#FFFFFF",
       "lod1": {
         "kind": "lod1",
@@ -10844,30 +10937,8 @@
           {
             "name": "lantern_01",
             "armature": "lantern_01_armature",
-            "vertices": 847,
+            "vertices": 141,
             "bones": [
-              {
-                "name": "bind_01_socket",
-                "parent": "",
-                "matrixLocal": [
-                  -0.0,
-                  0.0,
-                  -1.0,
-                  -0.0466435,
-                  1.0,
-                  0.0,
-                  -0.0,
-                  0.0060394,
-                  0.0,
-                  -0.9999999,
-                  0.0,
-                  3.5294206,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
               {
                 "name": "light_01_socket",
                 "parent": "",
@@ -10875,15 +10946,15 @@
                   -0.0,
                   0.0,
                   -1.0,
-                  0.0,
+                  0.0454393,
                   1.0,
                   0.0,
                   -0.0,
-                  -0.0043594,
+                  -0.0141162,
                   0.0,
                   -0.9999999,
                   0.0,
-                  1.0902271,
+                  -2.4434845,
                   0.0,
                   0.0,
                   0.0,
@@ -10908,30 +10979,8 @@
           {
             "name": "rig_carrier",
             "armature": "lantern_01_armature",
-            "vertices": 6,
+            "vertices": 3,
             "bones": [
-              {
-                "name": "bind_01_socket",
-                "parent": "",
-                "matrixLocal": [
-                  -0.0,
-                  0.0,
-                  -1.0,
-                  -0.0466435,
-                  1.0,
-                  0.0,
-                  -0.0,
-                  0.0060394,
-                  0.0,
-                  -0.9999999,
-                  0.0,
-                  3.5294206,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
               {
                 "name": "light_01_socket",
                 "parent": "",
@@ -10939,15 +10988,15 @@
                   -0.0,
                   0.0,
                   -1.0,
-                  0.0,
+                  0.0454393,
                   1.0,
                   0.0,
                   -0.0,
-                  -0.0043594,
+                  -0.0141162,
                   0.0,
                   -0.9999999,
                   0.0,
-                  1.0902271,
+                  -2.4434845,
                   0.0,
                   0.0,
                   0.0,
@@ -10956,7 +11005,6 @@
               }
             ],
             "influencedBones": [
-              "bind_01_socket",
               "light_01_socket"
             ],
             "role": "carrier",
@@ -10978,44 +11026,22 @@
         "unassignedArmatures": []
       },
       "rigManifest": {
-        "boneHash": "bd13cd5811d8f6275ecf5bc35256ae6800f2df95b39725b8da4dfda00fb426ed",
+        "boneHash": "67af703ba3a5507776baae66468fa59074a846c79f931be714296300697494e1",
         "bones": [
           {
             "matrix": [
               -0.0,
               0.0,
               -1.0,
-              -0.0466435,
+              0.0454393,
               1.0,
               0.0,
               -0.0,
-              0.0060394,
+              -0.0141162,
               0.0,
               -0.9999999,
               0.0,
-              3.5294206,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "name": "bind_01_socket",
-            "parent": ""
-          },
-          {
-            "matrix": [
-              -0.0,
-              0.0,
-              -1.0,
-              0.0,
-              1.0,
-              0.0,
-              -0.0,
-              -0.0043594,
-              0.0,
-              -0.9999999,
-              0.0,
-              1.0902271,
+              -2.4434845,
               0.0,
               0.0,
               0.0,
@@ -11026,48 +11052,102 @@
           }
         ],
         "carrierName": "rig_carrier",
-        "inventoryHash": "51cac264e2ab413463524402b0cc7dc83466cdb685f01b6d9c2db31fae12d329",
+        "inventoryHash": "0f19643872884f9c2d2713478cf0d027f01bdd51d5a33d281f925fc0aeafd25b",
         "parts": [
-          {
-            "name": "col_mesh",
-            "role": "collider",
-            "vertices": 109
-          },
           {
             "name": "lantern_01",
             "role": "visual",
-            "vertices": 847
+            "vertices": 141
           },
           {
             "name": "rig_carrier",
             "role": "rig_carrier",
-            "vertices": 6
+            "vertices": 3
           }
         ],
         "rigKind": "skinned",
         "schemaVersion": 2,
         "sourceSha256": "",
-        "structuralHash": "6a690ed4ede0516c120610415ad7a46e523cdac33f83e6621602c87083d0b9ba"
+        "structuralHash": "3c439c6b3c8371909060d9116fdf1a8b873b3ba9e6cba69bc00dc5c094b73b41"
       },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
       "meshOptions": {
         "lantern_01": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 81,
           "collisionFidelity": "Box",
           "doubleSided": false,
           "glass": false,
-          "noCollide": true
+          "noCollide": true,
+          "visualColor": "#858585",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "121111101046810"
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            0.0464935302734375,
+            0.001953125,
+            1.7666358947753906,
+            1.000000238418579,
+            0.0,
+            0.0,
+            0.0,
+            -2.7939677238464355e-07,
+            1.000000238418579,
+            7.455724926330731e-11,
+            -1.0000004768371582,
+            -2.824165221682051e-07
+          ],
+          "meshId": "82462379123855",
+          "size": [
+            2.069965124130249,
+            3.534152030944824,
+            2.06996488571167
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              0.0352325439453125,
+              -0.03704833984375,
+              2.2030715942382812,
+              -0.013235092163085938,
+              0.008096104487776756,
+              -0.9998798370361328,
+              0.9997332096099854,
+              -0.018837658688426018,
+              -0.013385653495788574,
+              -0.018943769857287407,
+              -0.9997901320457458,
+              -0.007844626903533936
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              1.4733232259750366,
+              2.6089155673980713,
+              1.4730427265167236
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "3f24d80d847e224c6dcc0775f72cf668a13cbda6ee44ba1b647e67f165395a20",
       "surfaceMaterial": "wood",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
       "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -11076,53 +11156,27 @@
         "robloxMaterial": "Wood",
         "soundFamily": "wood"
       },
-      "texture_path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
-      "texture_filename": "lantern_01_64x128_atlas.png",
-      "texture_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
-      "texture_asset_id": "131501553365251",
-      "texture_published_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
-      "texture_moderation_state": "Approved",
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "INDEXED_LEGACY",
       "texture_reference_slug": "",
-      "atlasVariantId": 84,
-      "atlasFamily": "lantern_01",
-      "atlasResolution": "64x128",
-      "bindingRevision": 6,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 84,
-          "family_id": 2,
-          "width": 64,
-          "height": 128,
-          "filename": "lantern_01_64x128_atlas.png",
-          "original_filename": "lantern_01_64x128_atlas.png",
-          "source_path": "assets/source/texture-atlases/lantern_01/64x128/lantern_01_64x128_atlas.png",
-          "source_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
-          "uses_alpha": true,
-          "published_id": "131501553365251",
-          "published_sha256": "ca9a12aacf3ad5305a6baa34baa728198a272b8d81188ae7163f915f7e1d992e",
-          "moderation_state": "Approved",
-          "published_at": 1795176078.749668,
-          "created_at": 1795176074.7635748,
-          "retired_at": null,
-          "atlas_key": "lantern_01",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "64x128",
-          "baseKey": "lantern",
-          "version": "01"
-        }
-      ],
-      "textureUsesAlpha": true,
+      "atlasVariantId": 0,
+      "atlasFamily": "npc_guard_02_gradient_512x512atlas",
+      "atlasResolution": "512x512",
+      "bindingRevision": 16,
+      "studioSyncStatus": "unverified",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Light",
       "publishedVisualMeshes": [
         {
-          "meshId": "78408861629389",
+          "meshId": "82462379123855",
           "name": "lantern_01"
         }
       ],
@@ -12209,18 +12263,18 @@
       "name_en": "Stone Pillar 02",
       "category": "pillar",
       "model_path": "assets/source/location-assets/pillar/stone_pillar_02/model/stone_pillar_02.fbx",
-      "model_sha256": "75584d75d1950ee004568566aebb4dbc210ebe73771b40a1027df7f33777c63e",
-      "model_asset_id": "124151728112602",
-      "model_published_sha256": "75584d75d1950ee004568566aebb4dbc210ebe73771b40a1027df7f33777c63e",
+      "model_sha256": "731533f0cd20f147004d259d7c8f24f1471f6c56813ee2a21f544f35385ab5a2",
+      "model_asset_id": "138656886615071",
+      "model_published_sha256": "731533f0cd20f147004d259d7c8f24f1471f6c56813ee2a21f544f35385ab5a2",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 4,
+      "revision": 5,
       "created_at": 1794028066.028978,
-      "updated_at": 1794709971.2773063,
-      "published_at": 1794028107.9032092,
+      "updated_at": 1795270803.3009717,
+      "published_at": 1795270803.3009717,
       "surface_material": "stone",
       "alpha_enabled": 0,
-      "appearance_mode": "atlas",
+      "appearance_mode": "material",
       "visual_material": "SmoothPlastic",
       "visual_color": "#FFFFFF",
       "lod1": {
@@ -12239,7 +12293,7 @@
           {
             "name": "stone_pillar_02",
             "armature": "",
-            "vertices": 1176,
+            "vertices": 351,
             "bones": [],
             "influencedBones": [],
             "role": "visual",
@@ -12258,15 +12312,34 @@
         "armatures": [],
         "unassignedArmatures": []
       },
-      "rigManifest": null,
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "f045980240cb91658a756e5524d7c58beb8a8af30990e2b7d01b1eb0ba56f1ab",
+        "parts": [
+          {
+            "name": "stone_pillar_02",
+            "role": "visual",
+            "vertices": 351
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "703f658629126be6b500dd54370c952e80084011254594540b94327a7180ffd5"
+      },
       "needsFbxInspection": false,
-      "legacyStaticPublication": true,
+      "legacyStaticPublication": false,
       "meshOptions": {
         "stone_pillar_02": {
+          "appearanceMode": "material",
           "collisionFidelity": "Box",
           "doubleSided": false,
           "glass": false,
-          "noCollide": true
+          "noCollide": true,
+          "visualColor": "#7C7C7C",
+          "visualMaterial": "Slate"
         }
       },
       "collisionBlueprintNeedsCapture": false,
@@ -12276,7 +12349,7 @@
       "collisionBlueprint": null,
       "collisionBlueprintSha256": "",
       "surfaceMaterial": "stone",
-      "appearanceMode": "atlas",
+      "appearanceMode": "material",
       "visualMaterial": "SmoothPlastic",
       "visualColor": "#FFFFFF",
       "alphaEnabled": false,
@@ -12286,78 +12359,27 @@
         "robloxMaterial": "Slate",
         "soundFamily": "stone"
       },
-      "texture_path": "assets/source/texture-atlases/stone_pillar_02/32x64/stone_pillar_02_32x64_atlas.png",
-      "texture_filename": "stone_pillar_02_32x64_atlas.png",
-      "texture_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
-      "texture_asset_id": "96258371276574",
-      "texture_published_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
       "texture_moderation_state": "Reviewing",
       "texture_reference_slug": "",
-      "atlasVariantId": 66,
+      "atlasVariantId": 0,
       "atlasFamily": "stone_pillar_02",
       "atlasResolution": "32x64",
-      "bindingRevision": 2,
+      "bindingRevision": 5,
       "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 37,
-          "family_id": 30,
-          "width": 128,
-          "height": 256,
-          "filename": "stone_pillar_02_128x256_atlas.png",
-          "original_filename": "stone_pillar_02_128x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/stone_pillar_02/128x256/stone_pillar_02_128x256_atlas.png",
-          "source_sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
-          "uses_alpha": true,
-          "published_id": "101117475420735",
-          "published_sha256": "b770c0aa9d7ff5eea5d7a48d0b5c20d1d0365601287457f646f51de2ddd010ad",
-          "moderation_state": "Reviewing",
-          "published_at": 1794066393.8433344,
-          "created_at": 1794028065.6058714,
-          "retired_at": null,
-          "atlas_key": "stone_pillar_02",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "128x256",
-          "baseKey": "stone_pillar",
-          "version": "02"
-        },
-        {
-          "id": 66,
-          "family_id": 30,
-          "width": 32,
-          "height": 64,
-          "filename": "stone_pillar_02_32x64_atlas.png",
-          "original_filename": "stone_pillar_02_32x64_atlas.png",
-          "source_path": "assets/source/texture-atlases/stone_pillar_02/32x64/stone_pillar_02_32x64_atlas.png",
-          "source_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
-          "uses_alpha": true,
-          "published_id": "96258371276574",
-          "published_sha256": "143b0c3bad1852b973ad6c63a7180a4edb50b65e29e9824fbdf06af35aa31f22",
-          "moderation_state": "Reviewing",
-          "published_at": 1794525568.7617693,
-          "created_at": 1794525565.1448848,
-          "retired_at": null,
-          "atlas_key": "stone_pillar_02",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "32x64",
-          "baseKey": "stone_pillar",
-          "version": "02"
-        }
-      ],
-      "textureUsesAlpha": true,
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
+      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Pillar",
       "publishedVisualMeshes": [
         {
-          "meshId": "79569085063588",
+          "meshId": "138108173040649",
           "name": "stone_pillar_02"
         }
       ],

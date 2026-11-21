@@ -7,6 +7,17 @@ window.game1MeshAuthoring = (() => {
   const isRetired = name => /(?:^|_)col(?:_|$)/i.test(name);
   const isCarrier = name => String(name||'').toLowerCase()==='rig_carrier';
   const isGlass = name => String(name||'').toLowerCase().includes('glass');
+  // Historical 'atlas' remains readable; new authoring uses just two modes.
+  const displayAppearanceMode = mode => mode==='atlas'?'material_atlas':(mode||'');
+  function atlasOptions(catalog,selected=0){
+    const items=(catalog||[]).flatMap(group=>(group.variants||[]).map(v=>({...v,atlasKey:group.atlasKey})))
+      .filter(v=>!v.retired||Number(v.id)===Number(selected));
+    return window.game1ConsumerAtlasEditor.sections(items).map(section=>
+      `<optgroup label="${e(section.label)}">`+section.items.map(v=>
+        `<option value="${Number(v.id)}" ${Number(v.id)===Number(selected)?'selected':''}>`+
+        `${e(v.atlasKey)} · ${e(v.filename)} · ${v.published_id?'Image '+e(v.published_id):'publish required'}</option>`
+      ).join('')+'</optgroup>').join('');
+  }
   function defaults(name,hasCollider=false,domain='estate') {
     return {glass:isGlass(name),noCollide:domain!=='location',collisionFidelity:'Box',doubleSided:false};
   }
@@ -17,6 +28,9 @@ window.game1MeshAuthoring = (() => {
     const {collisionMesh, ...clean}={...defaults(name,hasCollider,domain),...(raw||{})};
     // texture_asset_id is derived by the server, never sent back on save.
     const {texture_asset_id,textureAssetId,...authoring}=clean;
+    // An atlas-only legacy override becomes the equivalent two-mode authoring
+    // record on its next explicit save; no Image ID or binding is changed here.
+    if(domain==='location'&&authoring.appearanceMode==='atlas')authoring.appearanceMode='material_atlas';
     return {...authoring,collisionFidelity:effectiveFidelity(clean)};
   }
   const status=flags=>`CanCollide: ${flags.noCollide!==true} · CanTouch: false · CanQuery: ${flags.noCollide!==true}`;
@@ -45,34 +59,32 @@ window.game1MeshAuthoring = (() => {
   }
   function visualControls(name,flags,ctx){
     if(!ctx)return '';
-    const mode=flags.appearanceMode||'';
-    const materials=(ctx.materials||[]).map(m=>`<option value="${e(m.id)}" ${(flags.visualMaterial||'SmoothPlastic')===m.id?'selected':''}>${e(m.label)}</option>`).join('');
-    const variants=(ctx.atlases||[]).flatMap(f=>(f.variants||[]).map(v=>({...v,family:f.atlasKey})))
-      .filter(v=>!v.retired);
+    const mode=displayAppearanceMode(flags.appearanceMode);
+    const material=flags.visualMaterial||'Plastic';
+    const materials=(ctx.materials||[]).map(m=>`<option value="${e(m.id)}" ${material===m.id?'selected':''}>${e(m.label)}</option>`).join('');
     const selected=Number(flags.atlasVariantId||0);
-    const choices=variants.map(v=>`<option value="${Number(v.id)}" ${selected===Number(v.id)?'selected':''}>${e(v.filename||v.family)} · ${v.published_id?'Image '+e(v.published_id):'not published'}</option>`).join('');
+    const defaultAtlas=ctx.defaultUsesAtlas!==false;
     return `<div class="location-mesh-appearance" data-mesh-appearance>
       <label>Appearance<select data-mesh-visual="appearanceMode">
         <option value="" ${!mode?'selected':''}>Inherit Location Asset</option>
         <option value="material" ${mode==='material'?'selected':''}>Material + Color</option>
-        <option value="atlas" ${mode==='atlas'?'selected':''}>Texture Atlas</option>
         <option value="material_atlas" ${mode==='material_atlas'?'selected':''}>Material + Color + Atlas</option>
       </select></label>
-      <div data-mesh-visual-material-fields ${!mode||mode==='atlas'?'hidden':''}>
+      <div data-mesh-visual-material-fields ${!mode?'hidden':''}>
         <label>Roblox Material<select data-mesh-visual="visualMaterial">${materials}</select></label>
         <label>Color<input type="color" data-mesh-visual="visualColor" value="${e(flags.visualColor||'#FFFFFF')}"></label>
       </div>
-      <div data-mesh-visual-atlas-fields ${mode==='atlas'||mode==='material_atlas'?'':'hidden'}>
+      <div data-mesh-visual-atlas-fields ${mode==='material_atlas'?'':'hidden'}>
         <label>Atlas variant<select data-mesh-visual="atlasVariantId">
-          <option value="0" ${!selected?'selected':''}>Inherit default atlas</option>${choices}
+          <option value="0" ${!selected?'selected':''}>${defaultAtlas?'Inherit default atlas':'Choose an atlas variant…'}</option>${atlasOptions(ctx.atlases,selected)}
         </select></label>
         <button type="button" data-mesh-new-atlas>Choose PNG/JPG for this MeshPart</button>
-        <small data-mesh-atlas-path>${e(flags.textureSourcePath||'Existing published atlas / inherited atlas')}</small>
+        <small data-mesh-atlas-path>${e(flags.textureSourcePath||'Registered atlas / inherited default')}</small>
       </div>
-      <label data-mesh-visual-alpha ${mode==='atlas'||mode==='material_atlas'?'':'hidden'}>
+      <label data-mesh-visual-alpha ${mode==='material_atlas'?'':'hidden'}>
         <input type="checkbox" data-mesh-visual="alphaEnabled" ${(flags.alphaEnabled===undefined?ctx.alphaEnabled===true:flags.alphaEnabled===true)?'checked':''}> Alpha transparency
       </label>
-      <small class="hint">${mode?'Independent MeshPart appearance':'Uses the Location Asset default. Changing the default will update this MeshPart.'}</small>
+      <small class="hint">${mode?(mode==='material_atlas'&&!selected&&!defaultAtlas?'Select a variant: the Location Asset has no default atlas.':'Independent MeshPart appearance'):'Uses the Location Asset default. Resetting an override restores inheritance.'}</small>
     </div>`;
   }
   function inspectionView(analysis,options={},prefix='location-mesh',visualContext=null) {
@@ -121,7 +133,7 @@ window.game1MeshAuthoring = (() => {
           }else{
             row[field]=value;
             if(field==='appearanceMode' && value){
-              row.visualMaterial ||= 'SmoothPlastic';row.visualColor ||= '#FFFFFF';
+              row.visualMaterial ||= 'Plastic';row.visualColor ||= '#FFFFFF';
               if(value==='material') {delete row.atlasVariantId;delete row.textureSourcePath;delete row.alphaEnabled;}
             }
             if(field==='atlasVariantId')delete row.textureSourcePath;
@@ -131,9 +143,9 @@ window.game1MeshAuthoring = (() => {
           const material=meshRow.querySelector('[data-mesh-visual-material-fields]');
           const atlas=meshRow.querySelector('[data-mesh-visual-atlas-fields]');
           const alpha=meshRow.querySelector('[data-mesh-visual-alpha]');
-          if(material)material.hidden=!mode||mode==='atlas';
-          if(atlas)atlas.hidden=mode!=='atlas'&&mode!=='material_atlas';
-          if(alpha)alpha.hidden=mode!=='atlas'&&mode!=='material_atlas';
+          if(material)material.hidden=!mode;
+          if(atlas)atlas.hidden=mode!=='material_atlas';
+          if(alpha)alpha.hidden=mode!=='material_atlas';
           if(field==='atlasVariantId')meshRow.querySelector('[data-mesh-atlas-path]').textContent='Selected registered variant';
           onChange?.(options);
         }
@@ -168,5 +180,5 @@ window.game1MeshAuthoring = (() => {
       });
     });
   }
-  return Object.freeze({defaults,effectiveFidelity,normalize,controls,seeded,inspectionView,wire,status,boneList});
+  return Object.freeze({defaults,effectiveFidelity,normalize,controls,seeded,inspectionView,wire,status,boneList,displayAppearanceMode,atlasOptions});
 })();

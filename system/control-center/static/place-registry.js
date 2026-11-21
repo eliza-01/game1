@@ -19,12 +19,12 @@
       if (!button) continue;
       const write = name === 'pr-repair-all' || name === 'pr-sync-all';
       button.disabled = source.busy || (name !== 'pr-scan' && !active()) ||
-        (write && (source.scan?.incomplete || !byId('pr-backup').checked ||
+        (write && (source.scan?.incomplete ||
           (name === 'pr-repair-all' && !(source.scan?.placements || []).some(needsRepair))));
     }
     for (const button of byId('pr-groups').querySelectorAll('button[data-pr-action]')) {
       const write = button.dataset.prAction !== 'select';
-      button.disabled = !active() || (write && (source.scan?.incomplete || !byId('pr-backup').checked || button.dataset.prBlocked==='true'));
+      button.disabled = !active() || (write && (source.scan?.incomplete || button.dataset.prBlocked==='true'));
     }
   }
 
@@ -49,10 +49,12 @@
   function item(row) {
     const issues=(row.issues || []).map(v=>`<span class="pr-warning">${html(v)}</span>`).join('');
     const repair=needsRepair(row),sync=needsSync(row);
+    const position=row.duplicateId && Array.isArray(row.transform?.position) && row.transform.position.length===3
+      ? ` · Position ${row.transform.position.map(v=>Number(v).toFixed(2)).join(', ')}` : '';
     return `<div class="pr-item${row.ambiguous?' pr-ambiguous':''}">
       <div class="pr-item-heading"><strong>${html(row.name)}</strong>
         <code>${html(row.key)} · ${html(row.placementId || 'нет Placement ID')}</code></div>
-      <div class="pr-path" title="${html(row.path)}">${html(row.path)}</div>
+      <div class="pr-path" title="${html(row.path)}">${html(row.path)}${html(position)}</div>
       <div class="pr-status-row"><span class="${row.needsMesh?'pr-old':'pr-ok'}">Mesh ${row.needsMesh?'✕ устарел':'✓ актуален'}</span>
         <span class="${row.needsTexture?'pr-old':'pr-ok'}">Texture ${row.needsTexture?'✕ устарела':'✓ актуальна'}</span>
         ${row.needsRig?'<span class="pr-old">Rig ✕ отличается состав MeshPart</span>':''}
@@ -93,7 +95,7 @@
             data-pr-blocked="${repairs===0}">Repair group (${repairs})</button>
           <button type="button" data-pr-action="sync-group" data-group="${html(slug)}"
             data-pr-blocked="${syncs===0}">Sync group (${syncs})</button>
-          <small>Только ${html(slug)} · Repair исправляет структуру, Sync обновляет устаревшие ресурсы</small></div>
+          <small>Только ${html(slug)} · Repair исправляет Placement ID и метаданные, Sync обновляет ресурсы</small></div>
           <div class="pr-rows">${rows.map(item).join('')}</div></div></details>`;
     }).join('');
     const protectedRows=(data.protected || []).filter(r=>r.kind==='landscape_attachment');
@@ -198,8 +200,7 @@
     if(!active()) return $action('Сначала выполни Scan Place.');
     if(keys.length===0) return $action(phase==='repair'?'Нет нарушений структуры для Repair.':'Все подходящие ресурсы актуальны.');
     if(source.scan.incomplete) return $action('Неполное сканирование: изменения заблокированы.');
-    if(!byId('pr-backup').checked) return $action('Подтверди резервную копию .rbxl в верхней части раздела.');
-    const details=phase==='repair'?'Исправление модели и Placement ID, без изменения CFrame':
+    const details=phase==='repair'?'Исправление Placement ID и метаданных Model, без изменения геометрии и CFrame':
       'Замена только однозначно распознанных опубликованных ресурсов';
     if(!confirm(`${phase.toUpperCase()} · ${description || keys.length+' размещений'}\n${details}.\n\nПродолжить?`)) return;
     run(phase,keys);
@@ -211,7 +212,6 @@
   byId('pr-sync-all').onclick=()=>active()&&mutate('sync',[
     ...source.scan.placements.filter(needsSync).map(p=>p.key),
     ...eligibleExternal().map(p=>p.key)],'все группы');
-  byId('pr-backup').onchange=buttons;
   byId('pr-groups').addEventListener('toggle',event=>{
     const group=event.target;
     if(group.tagName!=='DETAILS'||!group.dataset.group||source.expanded===null) return;

@@ -243,7 +243,7 @@
       "meshOptions": {
         "house": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -1473,7 +1473,7 @@
       "meshOptions": {
         "house": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -1486,7 +1486,7 @@
         },
         "door": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -1499,7 +1499,7 @@
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": true,
@@ -3367,7 +3367,7 @@
       "meshOptions": {
         "house": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -3380,7 +3380,7 @@
         },
         "door": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -3393,7 +3393,7 @@
         },
         "restoration": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -3406,7 +3406,7 @@
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": true,
@@ -5616,7 +5616,7 @@
       "meshOptions": {
         "house": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -5629,7 +5629,7 @@
         },
         "door": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -5642,7 +5642,7 @@
         },
         "restoration": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": false,
@@ -5655,7 +5655,7 @@
         },
         "window_frames_glass": {
           "appearanceMode": "atlas",
-          "visualMaterial": "SmoothPlastic",
+          "visualMaterial": "Plastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,
           "glass": true,

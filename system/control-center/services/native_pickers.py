@@ -8,6 +8,36 @@ import shutil
 import subprocess
 
 
+# Browser-triggered pickers run in a separate Host Agent process, which has no
+# foreground window of its own. Use an invisible topmost *owner* (not a global
+# always-on-top setting for Explorer) to keep the transient dialog in front.
+_PICKER_OWNER = r'''
+Add-Type -AssemblyName System.Windows.Forms
+function Show-Game1Dialog {
+    param([System.Windows.Forms.CommonDialog]$dialog)
+    $owner = New-Object System.Windows.Forms.Form
+    $owner.ShowInTaskbar = $false
+    $owner.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+    $owner.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+    $owner.Width = 1
+    $owner.Height = 1
+    $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
+    $area = $screen.WorkingArea
+    $owner.Left = $area.Left + [int]($area.Width / 2)
+    $owner.Top = $area.Top + [int]($area.Height / 2)
+    $owner.Opacity = 0
+    $owner.TopMost = $true
+    try {
+        $owner.Show()
+        [void]$owner.Activate()
+        return $dialog.ShowDialog($owner)
+    } finally {
+        $owner.Dispose()
+    }
+}
+'''
+
+
 def _powershell_picker(script: str, extra_env: dict | None = None) -> str:
     powershell = shutil.which("powershell.exe") or shutil.which("powershell")
     if not powershell:
@@ -16,7 +46,7 @@ def _powershell_picker(script: str, extra_env: dict | None = None) -> str:
     if extra_env:
         picker_env.update({str(key): str(value) for key, value in extra_env.items()})
     completed = subprocess.run(
-        [powershell, "-NoProfile", "-STA", "-Command", script],
+        [powershell, "-NoProfile", "-STA", "-Command", _PICKER_OWNER + "\n" + script],
         capture_output=True,
         text=True,
         timeout=120,
@@ -36,7 +66,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose character fbx'
 $dialog.Filter = 'fbx character model (*.fbx)|*.fbx'
 $dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }
@@ -52,7 +82,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose Character atlas PNG/JPG'
 $dialog.Filter = 'Character atlas (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg'
 $dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }
@@ -69,7 +99,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose weapon fbx'
 $dialog.Filter = 'fbx weapon model (*.fbx)|*.fbx'
 $dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }
@@ -85,7 +115,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose location asset fbx'
 $dialog.Filter = 'fbx location asset model (*.fbx)|*.fbx'
 $dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }
@@ -101,7 +131,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose location asset texture'
 $dialog.Filter = 'texture (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|png texture (*.png)|*.png|jpeg texture (*.jpg;*.jpeg)|*.jpg;*.jpeg'
 $dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }
@@ -117,7 +147,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose monster fbx'
 $dialog.Filter = 'fbx monster model (*.fbx)|*.fbx'
 $dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }
@@ -133,7 +163,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose monster textures'
 $dialog.Filter = 'monster textures (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp'
 $dialog.Multiselect = $true
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output ($dialog.FileNames -join [char]31)
 }
@@ -150,7 +180,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose weapon textures'
 $dialog.Filter = 'weapon textures (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp'
 $dialog.Multiselect = $true
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output ($dialog.FileNames -join [char]31)
 }
@@ -170,7 +200,7 @@ $initialPath = $env:GAME1_ANIMATION_PICKER_INITIAL_PATH
 if ($initialPath -and [System.IO.Directory]::Exists($initialPath)) {
     $dialog.SelectedPath = $initialPath
 }
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.SelectedPath
 }
@@ -195,7 +225,7 @@ if ($initialPath -and [System.IO.File]::Exists($initialPath)) {
 if ($initialPath -and [System.IO.Directory]::Exists($initialPath)) {
     $dialog.InitialDirectory = $initialPath
 }
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }
@@ -212,7 +242,7 @@ $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = 'game1 · choose Real Estate FBX'
 $dialog.Filter = 'real estate model (*.fbx)|*.fbx'
 $dialog.Multiselect = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }
@@ -231,7 +261,7 @@ $dialog.Filter = 'Roblox animation (*.rbxm;*.rbxmx)|*.rbxm;*.rbxmx'
 $dialog.Multiselect = $false
 $initialPath = $env:GAME1_ANIMATION_PICKER_INITIAL_PATH
 if ($initialPath -and [System.IO.Directory]::Exists($initialPath)) { $dialog.InitialDirectory = $initialPath }
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+if ((Show-Game1Dialog $dialog) -eq [System.Windows.Forms.DialogResult]::OK) {
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $dialog.FileName
 }

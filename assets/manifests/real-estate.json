@@ -6354,7 +6354,7 @@
       "model_moderation": "Approved",
       "revision": 27,
       "created_at": 1795087964.5584087,
-      "updated_at": 1795164887.0977576,
+      "updated_at": 1795274267.4897075,
       "skeleton": {
         "schemaVersion": 1,
         "meshes": [
@@ -18081,7 +18081,7 @@
           "publishedSha256": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300"
         },
         "walls_inside": {
-          "assetId": "80390291657476",
+          "assetId": "127716865198879",
           "publishedSha256": "80126229a7a27149656950d8e693771f9b031ebc5249134b5bb0ff0aaafd8300"
         },
         "walls_outside": {

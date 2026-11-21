@@ -16,6 +16,7 @@ from PIL import Image, UnidentifiedImageError
 
 from services.texture_atlas_registry import parse_filename, digest
 from services.atlas_source_review import image_preview
+from services.windows_explorer import reveal_folder
 from character_core.part_names import TOKEN
 
 
@@ -134,5 +135,5 @@ class CharacterAtlasAuthoring:
         if os.name != 'nt':
             raise ValueError('Show in folder is supported by the Windows Host Agent')
         # No shell, user-controlled command, or server-side rename.
-        os.startfile(str(path.parent))
+        reveal_folder(path.parent)
         return {'opened': True}

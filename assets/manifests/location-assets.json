@@ -12343,11 +12343,65 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -0.55908203125,
+            3.366302490234375,
+            0.2097625732421875,
+            1.0000004768371582,
+            -1.8189894035458565e-12,
+            -2.9802322387695312e-08,
+            -3.637978807091713e-12,
+            1.0,
+            7.275957614183426e-12,
+            1.1920928955078125e-07,
+            7.275957614183426e-12,
+            1.0000004768371582
+          ],
+          "meshId": "138108173040649",
+          "size": [
+            2.3727002143859863,
+            4.411614894866943,
+            2.3691632747650146
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              -0.494049072265625,
+              3.378498077392578,
+              0.2087249755859375,
+              -0.9995720386505127,
+              -3.136241139145568e-05,
+              -0.029266834259033203,
+              -3.130029290332459e-05,
+              1.0,
+              -2.5799599825404584e-06,
+              0.02926674485206604,
+              -1.6627855075057596e-06,
+              -0.9995720982551575
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              1.4936203956604004,
+              4.363242149353027,
+              1.5203901529312134
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "e0fb3fdee59175dcfc4e86c6c45dbe46621a8820f34e15810aa226103a330f02",
       "surfaceMaterial": "stone",
       "appearanceMode": "material",
       "visualMaterial": "SmoothPlastic",

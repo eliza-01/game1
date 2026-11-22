@@ -1,6 +1,6 @@
 # M442 · House Fireplace / Location Campfire — общий контракт
 
-**Текущий источник истины:** `src/server/world/HouseFireplaceService.luau` (состояние и таймеры), `src/server/world/LocationCampfireService.luau` (размещённые костры), `src/server/world/HouseSocketService.luau` (дома), `src/shared/world/FireplaceMechanicsConfig.luau` (эффекты, события и настройки), `src/client/world/HouseFireplaceController.luau` (HUD).
+**Текущий источник истины:** `src/server/world/HouseFireplaceService.luau` (состояние и таймеры), `src/server/world/LocationCampfireService.luau` (размещённые костры), `src/server/world/HouseSocketService.luau` (дома), `src/shared/world/FireplaceMechanicsConfig.luau` (эффекты, события и настройки), `src/client/world/HouseFireplaceController.luau` (данные HUD), `src/client/world/InformativeWindowDock.luau` (общая оболочка информативных окон).
 
 ## 1 · Авторские сокеты
 
@@ -28,7 +28,7 @@
 - Часы готовки фиксируются при добавлении ингредиентов; при окончании топлива они не сбрасываются. Инвентарь, реальные выдачи блюд, сохранение состояния после restart — **stubs/не реализованы**.
 - Дым House (`HouseSocketEffects.StartSmoke`) создаётся выключенным. `BindChimney` связывает его с **этим** камином и включает только для `firewood` или `embers`. Отсутствие камина означает отсутствие дыма.
 - Камерный ввод ПКМ не должен перекрываться прозрачным экранным фреймом. Action-панель одна, справа по центру на ПК, с крупными touch-кнопками на мобильном. Взаимодействия E/F выполняются по серверным `ProximityPrompt`.
-- Статус источника показывается в **одной** нижней центральной панели, по умолчанию в пределах 50 studs; × скрывает до выхода из зоны, за её пределами панель скрыта автоматически. Никаких отдельных BillboardGui над объектами.
+- Статус источника показывается в **общем** нижнем контейнере информативных окон `InformativeWindowDock`, по умолчанию в пределах 50 studs. Шеврон вниз сворачивает содержимое, компактная нейтральная кнопка «Инфо» со шевроном вверх около атаки разворачивает его без выхода из зоны. За пределами радиуса оба элемента скрываются автоматически. Никаких отдельных BillboardGui над объектами. M446 заменил кнопки ✓ / 🔥 из M445.
 
 ## 3 · Огонь и свет костра
 

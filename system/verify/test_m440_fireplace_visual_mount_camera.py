@@ -30,13 +30,17 @@ class M440FireplaceVisualMountCamera(unittest.TestCase):
         self.assertIn('UiInputGuard.BlocksWorldInput(input, gameProcessed)', camera)
 
     def test_bottom_status_has_no_fullscreen_pointer_capture(self):
-        client = source('src/client/world/HouseFireplaceController.luau')
-        self.assertIn('screen = Instance.new("ScreenGui")', client)
-        self.assertIn('panel = Instance.new("Frame")', client)
-        self.assertIn('panel.Position = UDim2.new(0.5, 0, 1, -24)', client)
-        self.assertIn('close.Activated:Connect', client)
-        self.assertNotIn('Instance.new("BillboardGui")', client)
-        self.assertIn('panel.Size = UDim2.new(0.9, 0, 0, 92)', client)
+        presenter = source('src/client/world/HouseFireplaceController.luau')
+        dock = source('src/client/world/InformativeWindowDock.luau')
+        self.assertIn('InfoDock.Get()', presenter)
+        self.assertIn('gui = Instance.new("ScreenGui")', dock)
+        self.assertIn('panel = Instance.new("Frame")', dock)
+        self.assertIn('panel.Position = UDim2.new(0.5, 0, 1, -24)', dock)
+        self.assertIn('collapse.Activated:Connect', dock)
+        self.assertIn('restore.Activated:Connect', dock)
+        self.assertNotIn('Instance.new("BillboardGui")', presenter + dock)
+        self.assertIn('panel.Size = UDim2.new(0.9, 0, 0, 92)', dock)
+        self.assertNotIn('WorldInputPassthrough', dock)
 
     def test_mounted_published_models_use_canonical_authored_pivot(self):
         mount = source('src/server/world/HouseSocketAssetMount.luau')

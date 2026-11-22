@@ -13,6 +13,7 @@ function Layout.Resolve(width, height)
         stick = stick,
         radius = stick * 0.58,
         margin = margin,
+        gap = gap, -- shared spacing for context/info docks; do not infer it from an attack box
         jump = {size = secondary, x = margin, y = margin},
         attack = {size = attack, x = margin + secondary + gap, y = margin + gap},
         aim = {size = secondary, x = margin, y = margin + secondary + gap},

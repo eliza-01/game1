@@ -28,7 +28,6 @@ local NpcWeaponVisibilityController = require(WeaponRoot:WaitForChild("NpcWeapon
 local TestLoadoutController = require(DevRoot:WaitForChild("TestLoadoutController"))
 local HouseSocketDebugController = require(DevRoot:WaitForChild("HouseSocketDebugController"))
 local HouseSocketPromptController = require(script:WaitForChild("world"):WaitForChild("HouseSocketPromptController"))
-local HouseFireplaceController = require(script:WaitForChild("world"):WaitForChild("HouseFireplaceController"))
 local MovementDebugController = require(DevRoot:WaitForChild("MovementDebugController"))
 local MonsterDebugController = require(DevRoot:WaitForChild("MonsterDebugController"))
 local MonsterRoot = script:WaitForChild("monster")
@@ -59,7 +58,14 @@ NpcOverheadController.Start()
 PlayerHealthHudController.Start()
 DeathRespawnController.Start()
 HouseSocketPromptController.Start()
-HouseFireplaceController.Start()
+-- Presentation is optional. A HUD error must not cancel startup of
+-- subsequent world visuals or the entire Studio development toolbar.
+local fireplaceOk, fireplaceError = pcall(function()
+    require(script:WaitForChild("world"):WaitForChild("HouseFireplaceController", 5)).Start()
+end)
+if not fireplaceOk then
+    warn("[game1][client] fireplace information UI failed; other modules remain available: " .. tostring(fireplaceError))
+end
 require(script:WaitForChild("world"):WaitForChild("LandscapeSwayController")).Start()
 require(script:WaitForChild("world"):WaitForChild("LocationWorldStreamer")).Start()
 require(script:WaitForChild("world"):WaitForChild("BoneOrbController")).Start()

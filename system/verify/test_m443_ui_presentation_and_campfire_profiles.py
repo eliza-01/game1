@@ -130,10 +130,12 @@ class UiPresentationIntegrationM443(unittest.TestCase):
     def test_all_four_runtime_surfaces_read_same_settings(self):
         prompt = source('src/client/world/HouseSocketPromptController.luau')
         fireplace = source('src/client/world/HouseFireplaceController.luau')
+        info_dock = source('src/client/world/InformativeWindowDock.luau')
         for group in ('interaction', 'notification'):
             self.assertIn(f'UiSettings.Current().{group}', prompt)
         self.assertIn('UiSettings.Current().resource', source('src/client/world/FloatingResourceFeedback.luau'))
         self.assertIn('UiSettings.Current().status', fireplace)
+        self.assertIn('UiSettings.Current().status', info_dock)
         self.assertIn('UiSettings.Changed:Connect', fireplace)
         self.assertIn('UiSettings.Changed:Connect', prompt)
         self.assertIn('UiInputGuard', source('src/client/character/CameraController.luau'))

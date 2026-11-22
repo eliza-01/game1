@@ -80,16 +80,21 @@ class CampfireAndFireplaceM442(unittest.TestCase):
         self.assertIn('remote:FireServer(socket, key)', prompt)
         self.assertIn('if not selected or selected.Parent ~= socket then return end', prompt)
 
-    def test_status_is_one_closable_bottom_panel_with_retained_radius(self):
+    def test_status_is_one_collapsible_bottom_panel_with_retained_radius(self):
         client = read('src/client/world/HouseFireplaceController.luau')
-        self.assertIn('panel.Position = UDim2.new(0.5, 0, 1, -24)', client)
-        self.assertIn('close.Activated:Connect', client)
-        self.assertIn('dismissed[selected] = true', client)
-        self.assertIn('dismissed[socket] = nil', client)
+        dock = read('src/client/world/InformativeWindowDock.luau')
+        self.assertIn('InfoDock.Get()', client)
+        self.assertIn('dock:Pane("fireplace")', client)
+        self.assertIn('panel.Position = UDim2.new(0.5, 0, 1, -24)', dock)
+        self.assertIn('collapse.Activated:Connect', dock)
+        self.assertIn('restore.Activated:Connect', dock)
+        self.assertIn('collapsed[currentSource] = true', dock)
+        self.assertIn('collapsed[currentSource] = nil', dock)
+        self.assertIn('collapsed[source] = nil', dock)
         self.assertIn('if distance > radius then', client)
-        self.assertIn('active(socket) and not dismissed[socket]', client)
+        self.assertIn('elseif registered(socket) and distance < minDistance then', client)
         self.assertIn('if fuel == "firewood" or fuel == "fire" or fuel == "embers"', client)
-        self.assertNotIn('BillboardGui', client)
+        self.assertNotIn('BillboardGui', client + dock)
 
     def test_campfire_socket_head_alignment_handles_vertical_cooking_bone(self):
         mount = read('src/server/world/HouseSocketAssetMount.luau')

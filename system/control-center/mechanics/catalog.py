@@ -31,6 +31,7 @@ SOURCES = {
     'fireplace-config': ('src/shared/world/FireplaceMechanicsConfig.luau', 'Огонь, ресурсы и таймеры'),
     'fireplace-tuning': ('src/shared/world/FireplaceMechanicsTuning.luau', 'Генерируемые параметры'),
     'fireplace-status': ('src/client/world/HouseFireplaceController.luau', 'Индикаторы огня и готовки'),
+    'informative-window-dock': ('src/client/world/InformativeWindowDock.luau', 'Общий интерфейс информативных окон'),
     'fireplace-doc': ('docs/workflows/CAMPFIRE_AND_FIREPLACE_M442_RU.md', 'Камин и костёр · M442'),
     'socket-authoring-doc': ('docs/workflows/REAL_ESTATE_SOCKET_AND_PLOT_PIVOT_M373_RU.md', 'Канонические сокеты · M373'),
     'socket-ownership-doc': ('docs/workflows/REAL_ESTATE_SHARED_RIG_SOCKET_OWNERSHIP_M182_RU.md', 'Владение костями · M182'),

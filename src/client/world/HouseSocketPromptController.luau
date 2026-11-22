@@ -7,6 +7,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 
 local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
@@ -87,6 +88,41 @@ local function rounded(parent: Instance, radiusPixels: number)
     local item = Instance.new("UICorner")
     item.CornerRadius = UDim.new(0, radiusPixels)
     item.Parent = parent
+end
+
+local RESOURCE_ICONS = {
+    wood = "🪵",
+    carrot = "🥕",
+    onion = "🧅",
+    potato = "🥔",
+}
+
+local function showFloatingSpend(layer: ScreenGui, items: {any})
+    local host = layer:FindFirstChild("SpendHost")
+    if not host or not host:IsA("Frame") then return end
+    for index, item in ipairs(items) do
+        local label = Instance.new("TextLabel")
+        label.AnchorPoint = Vector2.new(0.5, 1)
+        label.Position = UDim2.new(0.5, 0, 0.78, -(index - 1) * 28)
+        label.Size = UDim2.fromOffset(240, 24)
+        label.BackgroundTransparency = 1
+        label.TextColor3 = Color3.fromRGB(244, 246, 249)
+        label.TextStrokeTransparency = 0.55
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 18
+        local icon = RESOURCE_ICONS[tostring(item.icon or "")] or "•"
+        local amount = tonumber(item.amount) or 0
+        local amountText = if amount > 0 then "+" .. tostring(amount) else tostring(amount)
+        label.Text = string.format("%s  %s  %s", icon, amountText, tostring(item.label or ""))
+        label.Parent = host
+        local tween = TweenService:Create(label, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = label.Position - UDim2.fromOffset(0, 34),
+            TextTransparency = 1,
+            TextStrokeTransparency = 1,
+        })
+        tween:Play()
+        tween.Completed:Connect(function() label:Destroy() end)
+    end
 end
 
 -- E and F at the same socket are represented as ONE panel. Both actions
@@ -368,9 +404,13 @@ function Controller.Start()
         message.Visible = false
         message.Parent = gui
         rounded(message, 9)
+        local spendHost = Instance.new("Frame")
+        spendHost.Name = "SpendHost"
+        spendHost.BackgroundTransparency = 1
+        spendHost.Size = UDim2.fromScale(1, 1)
+        spendHost.Parent = gui
         local revision = 0
-        feedbackRemote.OnClientEvent:Connect(function(text)
-            if typeof(text) ~= "string" then return end
+        local function showMessage(text: string)
             revision += 1
             local thisRevision = revision
             message.Text = text
@@ -378,6 +418,18 @@ function Controller.Start()
             task.delay(2.7, function()
                 if revision == thisRevision then message.Visible = false end
             end)
+        end
+        feedbackRemote.OnClientEvent:Connect(function(payload)
+            if typeof(payload) == "string" then
+                showMessage(payload)
+                return
+            end
+            if typeof(payload) ~= "table" then return end
+            if payload.kind == "toast" and typeof(payload.text) == "string" then
+                showMessage(payload.text)
+            elseif payload.kind == "resource" and typeof(payload.items) == "table" then
+                showFloatingSpend(gui, payload.items)
+            end
         end)
     end)
     -- Ten hertz is sufficient for range/visibility UI. The server still

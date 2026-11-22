@@ -44,6 +44,12 @@ class MechanicsM436(unittest.TestCase):
             for name in cards[key]['sockets']:
                 if name.endswith('_socket') and name != 'door_01_hinge_socket':
                     self.assertIn(name, contract, (key,name))
+        # Pot's attachment belongs to the placed cooking_pot_01 asset, not to a house.
+        self.assertNotIn('cooking_pot_socket', cards['fireplace']['sockets'])
+        self.assertIn('cooking_pot_socket', '\n'.join(
+            line for section in cards['fireplace']['sections'] for line in section['lines']))
+        pot_service = (ROOT/'src/server/world/HouseFireplaceService.luau').read_text('utf-8')
+        self.assertIn('FindFirstChild("cooking_pot_socket", true)', pot_service)
         self.assertIn('door_<NN>_hinge_socket', (ROOT/'docs/workflows/REAL_ESTATE_SOCKET_AND_PLOT_PIVOT_M373_RU.md').read_text('utf-8'))
         self.assertIn('HouseSocketInteract', service)
         self.assertIn('cooldown[player]', service)

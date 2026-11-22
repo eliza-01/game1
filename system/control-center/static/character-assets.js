@@ -8,6 +8,7 @@ const FILENAME_GUIDE_OPEN_KEY='game1.animation.filenameRules.open';
 const ANIMATION_FOLDER_KEY='game1.animation.folder';
 const ASSET_MANAGER_VIEW_KEY='game1.assetManager.activeSection';
 const ASSET_MANAGER_VIEWS=new Set(['characters','animations','animation-speed','weapons','monsters','npcs','locations','location-assets','place-registry','lod-manager','database','atlas','real-estate','mechanics','timelines','options','kanban']);
+const ASSET_MANAGER_TITLES={characters:'Characters',animations:'Animations','animation-speed':'Animation Speed',weapons:'Weapons',monsters:'Monsters',npcs:'NPCs',locations:'Locations','location-assets':'Location Assets','place-registry':'Place Registry','lod-manager':'LOD Manager',database:'Database',atlas:'Atlas','real-estate':'Real Estate',mechanics:'Mechanics',timelines:'Timelines',options:'Options',kanban:'Kanban'};
 
 function normalizeAnimationFolderPath(value){
   let path=String(value??'').trim();
@@ -53,6 +54,16 @@ function toast(message,error=false,persistent=false){
   el.setAttribute('role',error?'alert':'status');
   el.className='toast show'+(error?' error':'');
 }
+window.game1BusyOverlay=window.game1BusyOverlay||(()=>{
+  const node=()=>$('app-busy-overlay');
+  const label=()=>$('app-busy-text');
+  let depth=0;
+  return {
+    show(text='Processing…'){depth+=1;const root=node();if(!root)return;if(label())label().textContent=String(text);root.hidden=false;document.body.style.pointerEvents='none';root.style.pointerEvents='auto';},
+    hide(){depth=Math.max(0,depth-1);if(depth)return;const root=node();if(!root)return;root.hidden=true;document.body.style.pointerEvents='';},
+    set(text='Processing…'){if(label())label().textContent=String(text)},
+  };
+})();
 async function request(url,options){const response=await fetch(url,options);let data={};try{data=await response.json()}catch{}if(!response.ok)throw Error(data.error||`http ${response.status}`);return data}
 function selectedRow(){return state.data?.items?.find(x=>x.id===state.selected)||null}
 function identityId(){return `${$('race').value}_${$('gender').value}`}
@@ -63,6 +74,7 @@ function setView(view){
   if(view==='asset-audit')view='database'; // M217 saved-view migration
   if(!ASSET_MANAGER_VIEWS.has(view))view='characters';
   state.view=view;
+  document.title=ASSET_MANAGER_TITLES[view]||'Characters';
   try{localStorage.setItem(ASSET_MANAGER_VIEW_KEY,view)}catch{}
   $('characters-view').hidden=view!=='characters';$('animations-view').hidden=view!=='animations';$('animation-speed-view').hidden=view!=='animation-speed';$('weapons-view').hidden=view!=='weapons';$('monsters-view').hidden=view!=='monsters';$('npcs-view').hidden=view!=='npcs';$('locations-view').hidden=view!=='locations';$('location-assets-view').hidden=view!=='location-assets';$('place-registry-view').hidden=view!=='place-registry';$('lod-manager-view').hidden=view!=='lod-manager';$('database-view').hidden=view!=='database';$('atlas-view').hidden=view!=='atlas';$('database-nav').hidden=view!=='database';$('real-estate-view').hidden=view!=='real-estate';$('mechanics-view').hidden=view!=='mechanics';$('timelines-view').hidden=view!=='timelines';$('options-view').hidden=view!=='options';$('kanban-view').hidden=view!=='kanban';
   $('character-rail').hidden=view!=='characters';$('animation-rail').hidden=view!=='animations';$('weapon-rail').hidden=view!=='weapons';$('monster-rail').hidden=view!=='monsters';$('npc-rail').hidden=view!=='npcs';$('real-estate-rail').hidden=view!=='real-estate';

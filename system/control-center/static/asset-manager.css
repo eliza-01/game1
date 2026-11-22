@@ -282,3 +282,10 @@ main > .content{padding-top:14px}
 .npc-atlas-choices button{display:grid;gap:3px;min-width:0;text-align:left;padding:10px;border:1px solid var(--line,#3b4655);border-radius:8px;background:transparent;color:inherit}
 .npc-atlas-choices button[aria-selected="true"]{outline:2px solid var(--accent,#79b5ff);outline-offset:-2px}
 .npc-atlas-choices small{opacity:.75;overflow-wrap:anywhere}
+
+
+.app-busy-overlay[hidden]{display:none!important}
+.app-busy-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,11,16,.66);z-index:9999;backdrop-filter:blur(2px)}
+.app-busy-card{min-width:260px;padding:18px 20px;border:1px solid rgba(118,137,156,.25);border-radius:14px;background:#171d26;color:#eef3f8;display:flex;gap:12px;align-items:center;box-shadow:0 16px 44px rgba(0,0,0,.34)}
+.app-busy-spinner{width:18px;height:18px;border-radius:999px;border:2px solid rgba(255,255,255,.18);border-top-color:#d9ac43;animation:game1-spin .9s linear infinite}
+@keyframes game1-spin{to{transform:rotate(360deg)}}

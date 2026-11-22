@@ -17,6 +17,7 @@ local Elevator = require(script.Parent:WaitForChild("HouseElevatorService"))
 local CameraSync = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterCameraSync"))
 local Effects = require(script.Parent:WaitForChild("HouseSocketEffects"))
 local Discovery = require(script.Parent:WaitForChild("HouseSocketDiscovery"))
+local Fireplace = require(script.Parent:WaitForChild("HouseFireplaceService"))
 
 local Service = {}
 type Entry = {sockets: {[string]: Attachment}, connections: {RBXScriptConnection}, generated: {Instance}, padlockPart: BasePart?}
@@ -110,7 +111,7 @@ local function handleInteraction(house: Model, name: string, player: Player, key
     local definition = Contract.Get(name)
     if not entry or not socket or not socket:IsDescendantOf(house) or not definition or not definition.interact then return end
     if key ~= "E" and key ~= "F" then return end
-    if definition.role ~= "elevator" and definition.role ~= "door" and key ~= "E" then return end
+    if definition.role ~= "elevator" and definition.role ~= "door" and definition.role ~= "fireplace" and key ~= "E" then return end
     -- Check that the requested key is actually offered for this socket.
     -- Includes F only on offered elevator routes or unlocked door handles.
     if definition.role == "elevator" then
@@ -172,6 +173,8 @@ local function handleInteraction(house: Model, name: string, player: Player, key
         if feedback then feedback:FireClient(player, message) end
     elseif definition.role == "chest" then
         if feedback then feedback:FireClient(player, "Сундук пока недоступен") end
+    elseif definition.role == "fireplace" then
+        Fireplace.Interact(house, player, key)
     end
 end
 
@@ -181,6 +184,7 @@ local function clear(house: Model)
     registered[house] = nil
     refreshQueued[house] = nil
     Door.Cleanup(house)
+    Fireplace.Unregister(house)
     for _, connection in entry.connections do connection:Disconnect() end
     for _, generated in entry.generated do generated:Destroy() end
 end
@@ -252,6 +256,8 @@ local function register(house: Model)
                 createPrompt(socket, definition, "E", definition.action)
                 if definition.role == "door" and Contract.HasPadlock(entry.sockets) then
                     createPrompt(socket, definition, "F", "Навесить замок · ключ")
+                elseif definition.role == "fireplace" then
+                    createPrompt(socket, definition, "F", "Убрать котел")
                 end
             end
         end
@@ -263,6 +269,17 @@ local function register(house: Model)
             end
         elseif definition.role == "chimney" then
             table.insert(entry.generated, Effects.StartSmoke(socket))
+        elseif definition.role == "fireplace" then
+            Fireplace.Register(house, socket, entry.generated)
+        end
+    end
+    do
+        local socket = entry.sockets["fireplace_01_socket"]
+        local definition = Contract.Get("fireplace_01_socket")
+        if socket and definition and definition.interact then
+            Fireplace.BindPrompts(house, socket,
+                socket:FindFirstChild("Game1HouseInteraction") :: ProximityPrompt?,
+                socket:FindFirstChild("Game1HouseInteractionAlternate") :: ProximityPrompt?)
         end
     end
     local door = house:FindFirstChild("DoorAssembly")
@@ -418,7 +435,7 @@ function Service.Start()
         remote.Name = "HouseSocketFeedback"
         remote.Parent = folder
     end
-    if remote:IsA("RemoteEvent") then feedback = remote end
+    if remote:IsA("RemoteEvent") then feedback = remote; Fireplace.SetFeedbackRemote(remote) end
     -- Custom characters do not use Roblox Humanoid proximity activation.
     -- Their client selects from server-authored prompts, then supplies only
     -- the replicated socket Instance. Ownership, reach and cooldown remain

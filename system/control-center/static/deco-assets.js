@@ -348,6 +348,7 @@ async function decoAssetChooseTexture() {
 }
 async function decoAssetRegister() {
   try {
+    window.game1BusyOverlay?.show('Registering Location Asset…');
     const payload = {
       nameEn: $('location-asset-name').value.trim(), slug:$('location-asset-slug').value.trim(),
       category:$('location-asset-category').value, destructible: $('location-asset-destructible').checked,
@@ -363,6 +364,7 @@ async function decoAssetRegister() {
     if (!payload.modelSourcePath || !decoAssetState.inspection) throw Error('Choose and analyze the FBX first');
     if (payload.appearanceMode!=='material' && !payload.textureSourcePath && !payload.atlasVariantId)
       throw Error('Choose PNG/JPG or an existing atlas');
+    window.game1BusyOverlay?.set('Registering Location Asset…');
     const row = await request('/api/location-assets', {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload),
     });
@@ -373,7 +375,7 @@ async function decoAssetRegister() {
     $('new-location-asset-main').textContent = '+ New asset';
     toast(`Registered ${row.slug} · ready to publish`);
     window.game1LocationAssetWorkflow.open(row.slug, 'publish');
-  } catch (error) { toast(`Register: ${error.message}`, true); }
+  } catch (error) { toast(`Register: ${error.message}`, true); } finally { window.game1BusyOverlay?.hide(); }
 }
 async function decoAssetSaveEdits(slug, payload, expectedRevision) {
   const row = decoAssetRow(slug);

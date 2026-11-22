@@ -24,7 +24,7 @@ local definitions: {SocketDefinition} = {
     {name = "elevator_02_socket", role = "elevator", hoverRadius = 5, action = "Спуститься на 1 этаж", radius = 10, interact = true, optional = true},
     {name = "elevator_03_socket", role = "elevator", hoverRadius = 5, action = "Спуститься на 2 этаж", radius = 10, interact = true, optional = true},
     {name = "chimney_01_socket", role = "chimney", action = "Дымоход", radius = 8, interact = false},
-    {name = "fireplace_01_socket", role = "fireplace", action = "Камин", radius = 8, interact = false, optional = true},
+    {name = "fireplace_01_socket", role = "fireplace", action = "Разжечь огонь", radius = 8, interact = true, optional = true},
     {name = "house_floor_03_spawn_socket", role = "spawn", action = "Этаж 3", radius = 8, interact = false, optional = true},
     {name = "house_floor_01_spawn_socket", role = "spawn", action = "Этаж 1", radius = 8, interact = false},
     {name = "house_floor_02_spawn_socket", role = "spawn", action = "Этаж 2", radius = 8, interact = false},

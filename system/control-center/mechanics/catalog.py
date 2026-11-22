@@ -25,6 +25,7 @@ SOURCES = {
     'spawn-orientation': ('src/shared/world/HouseSpawnOrientation.luau', 'Направление spawn'),
     'camera-sync': ('src/server/character/CharacterCameraSync.luau', 'Синхронизация камеры'),
     'socket-effects': ('src/server/world/HouseSocketEffects.luau', 'Эффекты/заглушки'),
+    'fireplace-service': ('src/server/world/HouseFireplaceService.luau', 'Камин и готовка'),
     'socket-authoring-doc': ('docs/workflows/REAL_ESTATE_SOCKET_AND_PLOT_PIVOT_M373_RU.md', 'Канонические сокеты · M373'),
     'socket-ownership-doc': ('docs/workflows/REAL_ESTATE_SHARED_RIG_SOCKET_OWNERSHIP_M182_RU.md', 'Владение костями · M182'),
     'teleport-camera-doc': ('docs/workflows/HOUSE_TELEPORT_CAMERA_M431_RU.md', 'Камера после телепорта · M431'),

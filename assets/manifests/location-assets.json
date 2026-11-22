@@ -13254,6 +13254,251 @@
       "aliases": []
     },
     {
+      "slug": "embers_01",
+      "name_en": "Embers 01",
+      "category": "prop",
+      "model_path": "assets/source/location-assets/prop/embers_01/model/embers_01.fbx",
+      "model_sha256": "6a27eda2f9ea6db463d5c5c57de93f09daaef04d6e5136ccb65ea4be8442723f",
+      "model_asset_id": "105557330088880",
+      "model_published_sha256": "6a27eda2f9ea6db463d5c5c57de93f09daaef04d6e5136ccb65ea4be8442723f",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1795369853.2588189,
+      "updated_at": 1795369916.841229,
+      "published_at": 1795369916.841229,
+      "surface_material": "sand",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "embers_01",
+            "armature": "",
+            "vertices": 60,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "9ae6596f1401c7ed5735d7fb9a2f7a28e09377c6bcc76c2839141413c8020fa1",
+        "parts": [
+          {
+            "name": "embers_01",
+            "role": "visual",
+            "vertices": 60
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "fc992dc6d8561a0711ba02555c9cd5800f2bced04d38bf1011c094470f31a6a9"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "embers_01": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#C90D0D",
+          "visualMaterial": "CrackedLava"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "sand",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "sand",
+        "label": "Sand",
+        "robloxMaterial": "Sand",
+        "soundFamily": "earth"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 1,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Prop",
+      "publishedVisualMeshes": [],
+      "aliases": []
+    },
+    {
+      "slug": "firewood_01",
+      "name_en": "Firewood 01",
+      "category": "prop",
+      "model_path": "assets/source/location-assets/tree/firewood_01/model/firewood_01.fbx",
+      "model_sha256": "ed3433caa4afac0fb4377848322d4c7a264de2637c5e36e8143fc842543bb76d",
+      "model_asset_id": "89394626947223",
+      "model_published_sha256": "ed3433caa4afac0fb4377848322d4c7a264de2637c5e36e8143fc842543bb76d",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 4,
+      "created_at": 1795369662.4766488,
+      "updated_at": 1795369765.4263282,
+      "published_at": 1795369688.101887,
+      "surface_material": "wood",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "firewood_01",
+            "armature": "",
+            "vertices": 90,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "5a5b5736bdfc91c4c071f3d8118dfa91298ca16950e6b889c128302fd4228ff2",
+        "parts": [
+          {
+            "name": "firewood_01",
+            "role": "visual",
+            "vertices": 90
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "e550254aa6ee8524acfb222261cdc9944a9a91eb69ee5137d4e44de26c458553"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "firewood_01": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#755A51",
+          "visualMaterial": "Wood"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "wood",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "wood",
+        "label": "Wood",
+        "robloxMaterial": "Wood",
+        "soundFamily": "wood"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 4,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Prop",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "71592185994944",
+          "name": "firewood_01"
+        }
+      ],
+      "aliases": []
+    },
+    {
       "slug": "test_window_01",
       "name_en": "Test Window 01",
       "category": "prop",
@@ -13393,15 +13638,15 @@
       "name_en": "cooking pot 01",
       "category": "prop",
       "model_path": "assets/source/location-assets/prop/cooking_pot_01/model/cooking_pot_01.fbx",
-      "model_sha256": "2a94f40eb4ff6a9d4470199b5345d163cd4fd04a8b78aa75faed690d3b8a4d96",
-      "model_asset_id": "110474147120708",
-      "model_published_sha256": "2a94f40eb4ff6a9d4470199b5345d163cd4fd04a8b78aa75faed690d3b8a4d96",
+      "model_sha256": "bea48e3373d80d2b341188b0dfce6885b86cc6e6cc2e4d6628adac97354484ee",
+      "model_asset_id": "106362334793032",
+      "model_published_sha256": "bea48e3373d80d2b341188b0dfce6885b86cc6e6cc2e4d6628adac97354484ee",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 2,
+      "revision": 6,
       "created_at": 1795368172.1019812,
-      "updated_at": 1795368198.404517,
-      "published_at": 1795368198.404517,
+      "updated_at": 1795369238.4427862,
+      "published_at": 1795369238.4427862,
       "surface_material": "metal",
       "alpha_enabled": 0,
       "appearance_mode": "material",
@@ -13424,7 +13669,7 @@
           {
             "name": "cooking_pot_01",
             "armature": "cooking_pot_01_armature",
-            "vertices": 90,
+            "vertices": 120,
             "bones": [
               {
                 "name": "cooking_pot_socket",
@@ -13432,16 +13677,16 @@
                 "matrixLocal": [
                   1.0,
                   0.0,
-                  0.0,
+                  -4e-07,
                   -0.016018,
                   0.0,
+                  -1.0,
+                  0.0,
+                  0.0377928,
+                  -4e-07,
                   0.0,
                   -1.0,
-                  -0.0422651,
-                  0.0,
-                  1.0,
-                  0.0,
-                  2.4031212,
+                  2.6411338,
                   0.0,
                   0.0,
                   0.0,
@@ -13474,16 +13719,16 @@
                 "matrixLocal": [
                   1.0,
                   0.0,
-                  0.0,
+                  -4e-07,
                   -0.016018,
                   0.0,
+                  -1.0,
+                  0.0,
+                  0.0377928,
+                  -4e-07,
                   0.0,
                   -1.0,
-                  -0.0422651,
-                  0.0,
-                  1.0,
-                  0.0,
-                  2.4031212,
+                  2.6411338,
                   0.0,
                   0.0,
                   0.0,
@@ -13513,22 +13758,22 @@
         "unassignedArmatures": []
       },
       "rigManifest": {
-        "boneHash": "e334cbe6f6385624d4ffdf6a20c9d498e8b05b769b459356c2ee39d4ccfac8ea",
+        "boneHash": "1e712979a34eb0427c81efcd999911a5cab1176f8869671e8599493daec927ff",
         "bones": [
           {
             "matrix": [
               1.0,
               0.0,
-              0.0,
+              -4e-07,
               -0.016018,
               0.0,
+              -1.0,
+              0.0,
+              0.0377928,
+              -4e-07,
               0.0,
               -1.0,
-              -0.0422651,
-              0.0,
-              1.0,
-              0.0,
-              2.4031212,
+              2.6411338,
               0.0,
               0.0,
               0.0,
@@ -13539,12 +13784,12 @@
           }
         ],
         "carrierName": "rig_carrier",
-        "inventoryHash": "e91a100d028ea4ac50958c61cc13f97fdd66dc057cd94eeb20798d8a687cade2",
+        "inventoryHash": "e7993ceb14129a5fa5efae9e709356d946d001f29ef5deff7c9183aff3352b85",
         "parts": [
           {
             "name": "cooking_pot_01",
             "role": "visual",
-            "vertices": 90
+            "vertices": 120
           },
           {
             "name": "rig_carrier",
@@ -13555,7 +13800,7 @@
         "rigKind": "skinned",
         "schemaVersion": 2,
         "sourceSha256": "",
-        "structuralHash": "2d4ae51f99751c80c0486cdbe8a8f9bd666937a2e487ea8007db948f83c671a4"
+        "structuralHash": "7937b53692efcdbae314d5df991af4b128eaf1a825229a21fd1c64cacf65778b"
       },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
@@ -13600,11 +13845,16 @@
       "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
       "atlasVariantId": 0,
-      "bindingRevision": 2,
+      "bindingRevision": 6,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Prop",
-      "publishedVisualMeshes": [],
+      "publishedVisualMeshes": [
+        {
+          "meshId": "111627460487794",
+          "name": "cooking_pot_01"
+        }
+      ],
       "aliases": []
     },
     {
@@ -18537,8 +18787,8 @@
     }
   ],
   "summary": {
-    "registered": 40,
-    "published": 40,
+    "registered": 42,
+    "published": 42,
     "changed": 0
   }
 }

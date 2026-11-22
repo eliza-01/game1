@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "embers_01",
+  "sourceSha256": "6a27eda2f9ea6db463d5c5c57de93f09daaef04d6e5136ccb65ea4be8442723f",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "embers_01",
+        "armature": "",
+        "vertices": 60,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

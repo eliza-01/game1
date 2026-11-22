@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "firewood_01",
+  "sourceSha256": "ed3433caa4afac0fb4377848322d4c7a264de2637c5e36e8143fc842543bb76d",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "firewood_01",
+        "armature": "",
+        "vertices": 90,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

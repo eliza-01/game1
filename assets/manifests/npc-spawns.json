@@ -64,17 +64,17 @@
       },
       "yawDegrees": 276.8,
       "respawnSeconds": 10.0,
-      "homeRadiusStuds": 16.0,
+      "homeRadiusStuds": 160.0,
       "enabled": true,
       "createdAtUtc": "2026-11-20T15:24:35.410371Z",
-      "updatedAtUtc": "2026-11-20T15:24:41.999657Z",
+      "updatedAtUtc": "2026-11-22T02:18:38.705603Z",
       "placedAtUtc": "2026-11-20T15:24:31.005963Z",
       "studioSync": {
         "status": "synced",
         "recordFingerprint": "0a5cfcaf6a3683dec3e055d9a34a4a6c68f057baeda577dae729721640032e15",
         "placeId": 0,
         "markerPath": "Workspace.Game1Authoring.NpcSpawns.Guard_02_2057f9cd",
-        "syncedAtUtc": "2026-11-20T15:24:43.038290Z"
+        "syncedAtUtc": "2026-11-22T02:18:40.014800Z"
       }
     },
     "spawn-fd9fb3cd2cad496fbe7b525577186010": {

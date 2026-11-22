@@ -105,6 +105,11 @@ StudioOptionsDraftBridge({
     agentToken = AGENT_TOKEN,
 })
 
+require(script.Parent.modules.StudioLodPreviewBridge)({
+    plugin = plugin, ReplicatedStorage = ReplicatedStorage, RunService = RunService,
+    HttpService = HttpService, agentBaseUrl = AGENT_BASE_URL, agentToken = AGENT_TOKEN,
+})
+
 local function checkAgent()
     local ok, response = pcall(HttpService.RequestAsync, HttpService, {
         Url = AGENT_URL,

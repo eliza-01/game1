@@ -23,13 +23,17 @@ const data={settings,snapshot:{revisionId:1,recordedUtc:1,fingerprint:'a'.repeat
     ambiguous:0,noModel:0,collisionReview:0,scanWarnings:0},items:[],realEstate:{items:[house]},revisions:[],
   build:{canPreflight:false,sourceFile:'source.rbxlx'}};
 const writes=[];
+let behavior='success';
 const sandbox={document:{getElementById:node},window:{},navigator:{clipboard:{writeText:()=>Promise.resolve()}},
   request:async(url,options)=>{
     if(url==='/api/lod-manager')return data;
     writes.push({url,payload:JSON.parse(options.body)});
     if(url.endsWith('/distances')){
+      if(behavior==='reject')throw Error('part LOD distances changed; refresh');
+      if(behavior==='stale')return {distances:{...house.partStreaming.roof,...writes.at(-1).payload.distances,revision:house.partStreaming.roof.revision+1}};
       const item=house.partStreaming.roof;
       Object.assign(item,writes.at(-1).payload.distances,{revision:item.revision+1});
+      return {distances:{...item}};
     }
     return data;
   }};
@@ -40,10 +44,13 @@ const ticks=()=>new Promise(resolve=>setImmediate(resolve));
  node('lod-tab-house').on_click();
  assert(node('lod-house-rows').innerHTML.includes('data-part-distance="lod1"'));
  assert(node('lod-house-rows').innerHTML.includes('data-part-distance="hide"'));
- assert(node('lod-house-rows').innerHTML.includes('Save distances'));
+ assert(node('lod-house-rows').innerHTML.includes('Сохранить'));
  assert(!node('lod-house-rows').innerHTML.includes('Save house distances'));
  assert(!node('lod-house-rows').innerHTML.includes('data-house-setting'));
- const section={querySelector:selector=>({value:selector.includes('lod1')?'200':'700'})};
+ const fields={lod1:{value:'200',dataset:{partDistance:'lod1'}},hide:{value:'700',dataset:{partDistance:'hide'}}};
+ const section={dataset:{partHouse:house.slug,partName:'roof'},querySelector:selector=>
+   selector.includes('data-part-distance')?fields[selector.includes('lod1')?'lod1':'hide']:null};
+ for(const field of Object.values(fields))field.closest=()=>section;
  const button={dataset:{partDistanceSave:'roof',partHouse:house.slug},closest:selector=>{
    if(selector==='button[data-part-distance-save]')return button;
    if(selector==='.lm-house-part')return section;
@@ -58,5 +65,38 @@ const ticks=()=>new Promise(resolve=>setImmediate(resolve));
  assert.equal(house.partStreaming.walls_outside.lod1,120);
  assert.equal(house.partStreaming.roof.revision,2);
  assert.equal(node('lod-build-execute').hidden,true);
- console.log('M414 part distance editor: OK');
+ assert(node('lod-house-rows').innerHTML.includes('Сохранено: 200 / 700 studs · rev 2'));
+ await sandbox.window.game1LodManagerLoad();
+ assert(node('lod-house-rows').innerHTML.includes('value="700"'));
+ fields.hide.value='210';
+ node('lod-house-rows').on_change({target:fields.hide});
+ assert.equal(fields.lod1.value,'189');
+ assert.equal(fields.hide.value,'210');
+ await node('lod-house-rows').on_click({target:button});
+ assert.equal(writes.length,2);
+ assert.equal(writes[1].payload.distances.lod1,189);
+ assert.equal(house.partStreaming.roof.hide,210);
+ // Save also normalizes when no change event was delivered.
+ fields.lod1.value='50';fields.hide.value='40';
+ await node('lod-house-rows').on_click({target:button});
+ assert.equal(fields.lod1.value,'20');
+ assert.equal(fields.hide.value,'41');
+ assert(node('lod-house-rows').innerHTML.includes('Сохранено: 20 / 41 studs · rev 4'));
+ fields.hide.value='0';
+ await node('lod-house-rows').on_click({target:button});
+ assert.equal(writes.length,3);
+ assert(node('lod-house-rows').innerHTML.includes('UNLOADED от 1 до 10000'));
+ fields.lod1.value='200';fields.hide.value='800';behavior='reject';
+ await node('lod-house-rows').on_click({target:button});
+ assert(node('lod-house-rows').innerHTML.includes('Не подтверждено: part LOD distances changed'));
+ assert(node('lod-house-rows').innerHTML.includes('value="800"'));
+ behavior='stale';
+ await node('lod-house-rows').on_click({target:button});
+ assert(node('lod-house-rows').innerHTML.includes('Сервер не подтвердил сохранённые значения'));
+ assert.equal(house.partStreaming.roof.hide,41);
+ behavior='success';
+ await node('lod-house-rows').on_click({target:button});
+ assert(node('lod-house-rows').innerHTML.includes('Сохранено: 200 / 800 studs · rev 5'));
+ assert.equal(house.partStreaming.walls_outside.hide,400);
+ console.log('M414/M424/M425 part distance editor: OK');
 })().catch(e=>{console.error(e);process.exitCode=1;});

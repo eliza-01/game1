@@ -63,8 +63,8 @@ class M386HouseMeshDistance(unittest.TestCase):
         self.assertEqual(self.client.count('RunService.RenderStepped:Connect'), 0)
         self.assertEqual(self.client.count('CollectionService:GetTagged(VISUAL_TAG)'), 1)
         self.assertIn('local VISUAL_INTERVAL = 1', self.client)
-        self.assertIn('sampleVisuals(cameraPosition)', self.client)
-        self.assertIn('if not manifest or elapsed < TICK then return end', self.client)
+        self.assertIn('sampleVisuals(cameraPosition, preview)', self.client)
+        self.assertIn('if not manifest then return end', self.client)
         self.assertIn('Policy.VisualWithin(', self.client)
         self.assertIn('part.LocalTransparencyModifier = if visible then record.original else 1', self.client)
         self.assertIn('part.CFrame:PointToObjectSpace(cameraPosition)', self.client)
@@ -74,7 +74,7 @@ class M386HouseMeshDistance(unittest.TestCase):
         self.assertIn('if not part:IsA("MeshPart") or not part:IsDescendantOf(Workspace) then return end', self.client)
         self.assertNotIn('Workspace:GetDescendants()', self.client)
         self.assertNotIn('task.wait(', self.client)
-        self.assertNotIn('part:Destroy()', self.client.split('local function sampleVisuals(cameraPosition)')[1].split('end\n\nlocal function transform', 1)[0])
+        self.assertNotIn('part:Destroy()', self.client.split('local function sampleVisuals(cameraPosition, preview)')[1].split('end\n\nlocal function transform', 1)[0])
 
 
 if __name__ == '__main__':

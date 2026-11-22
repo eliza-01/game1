@@ -32,9 +32,9 @@
       "model_asset_id": "85467038493846",
       "model_published_sha256": "1742962af3bd7ad9e43c1cdb8a0858f7b66b65e2754f10320ddd46120348a161",
       "moderation_state": "Approved",
-      "revision": 7,
+      "revision": 8,
       "created_at": 1795020421.3703227,
-      "updated_at": 1795024867.4238863,
+      "updated_at": 1795314740.2036598,
       "published_at": 1795024728.6003592,
       "armature_name": "guard_02_armature",
       "bone_count": 74,
@@ -133,8 +133,8 @@
       "stats": {
         "MaxHP": 100,
         "Damage": 10,
-        "AttackSpeed": 100,
-        "RunSpeed": 155,
+        "AttackSpeed": 180,
+        "RunSpeed": 200,
         "CritChance": 20
       },
       "behavior": {

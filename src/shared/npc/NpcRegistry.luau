@@ -18,8 +18,8 @@ return table.freeze({
 			stats = table.freeze({
 				["MaxHP"] = 100,
 				["Damage"] = 10,
-				["AttackSpeed"] = 100,
-				["RunSpeed"] = 155,
+				["AttackSpeed"] = 180,
+				["RunSpeed"] = 200,
 				["CritChance"] = 20,
 			}),
 			textures = table.freeze({

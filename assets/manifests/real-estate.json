@@ -17255,27 +17255,27 @@
         },
         "door_handles": {
           "part_name": "door_handles",
-          "lod1": 40,
-          "hide": 400,
-          "revision": 1
+          "lod1": 29,
+          "hide": 50,
+          "revision": 2
         },
         "fireplace": {
           "part_name": "fireplace",
-          "lod1": 40,
-          "hide": 400,
-          "revision": 1
+          "lod1": 29,
+          "hide": 50,
+          "revision": 2
         },
         "floors": {
           "part_name": "floors",
-          "lod1": 50,
-          "hide": 400,
-          "revision": 1
+          "lod1": 20,
+          "hide": 41,
+          "revision": 2
         },
         "flowerbed": {
           "part_name": "flowerbed",
-          "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "lod1": 79,
+          "hide": 100,
+          "revision": 2
         },
         "foundation": {
           "part_name": "foundation",
@@ -17291,9 +17291,9 @@
         },
         "plants": {
           "part_name": "plants",
-          "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "lod1": 79,
+          "hide": 100,
+          "revision": 3
         },
         "roof": {
           "part_name": "roof",
@@ -17310,8 +17310,8 @@
         "walls_inside": {
           "part_name": "walls_inside",
           "lod1": 40,
-          "hide": 400,
-          "revision": 1
+          "hide": 80,
+          "revision": 2
         },
         "walls_outside": {
           "part_name": "walls_outside",
@@ -17321,21 +17321,21 @@
         },
         "window_frames": {
           "part_name": "window_frames",
-          "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "lod1": 39,
+          "hide": 150,
+          "revision": 5
         },
         "window_frames_glass": {
           "part_name": "window_frames_glass",
-          "lod1": 50,
-          "hide": 400,
-          "revision": 1
+          "lod1": 39,
+          "hide": 60,
+          "revision": 2
         },
         "wooden_structures": {
           "part_name": "wooden_structures",
-          "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "lod1": 99,
+          "hide": 120,
+          "revision": 2
         }
       },
       "textures": {

@@ -68,12 +68,60 @@
 #lod-manager-view .lm-domain-tabs button{font:inherit;font-size:12px;padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--text)}
 #lod-manager-view .lm-domain-tabs button[aria-selected="true"]{border-color:var(--mint);background:var(--panel);font-weight:700}
 #lod-manager-view [hidden]{display:none!important}
-#lod-manager-view .lm-house-parts{margin-top:8px}
-#lod-manager-view .lm-house-parts summary{cursor:pointer;font-weight:600}
-#lod-manager-view .lm-house-part{padding:9px 2px;border-bottom:1px solid var(--line)}
-#lod-manager-view .lm-house-part .actions{margin-top:5px;flex-wrap:wrap}
-#lod-manager-view .lm-house-part small{display:block;color:var(--muted)}
-#lod-manager-view .lm-house-profile{margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:8px}
-#lod-manager-view .lm-house-profile-fields{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 8px}
-#lod-manager-view .lm-house-profile-fields label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
-#lod-manager-view .lm-house-profile-fields input{max-width:115px}
+/* M423 · Settings-only Real Estate, readable house → group → mesh hierarchy. */
+#lod-manager-view .lm-house-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+#lod-manager-view .lm-house-intro h4{margin:0}
+#lod-manager-view .lm-house-intro .lm-note{max-width:670px;margin-bottom:0}
+#lod-manager-view .lm-house-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#lod-manager-view .lm-house-filters input{min-width:205px}
+#lod-manager-view .lm-house-filters select{min-width:165px}
+#lod-manager-view .lm-house-cards{display:flex;flex-direction:column;gap:12px}
+#lod-manager-view .lm-house-card{border:1px solid var(--line);border-radius:13px;background:var(--panel2);overflow:hidden}
+#lod-manager-view .lm-house-card>summary{display:flex;gap:12px;align-items:center;flex-wrap:wrap;cursor:pointer;padding:16px 18px;list-style:none}
+#lod-manager-view .lm-house-card>summary::-webkit-details-marker{display:none}
+#lod-manager-view .lm-house-card>summary::before{content:'▸';color:var(--mint);font-size:15px;transition:transform .15s}
+#lod-manager-view .lm-house-card[open]>summary::before{transform:rotate(90deg)}
+#lod-manager-view .lm-house-card[open]>summary{border-bottom:1px solid var(--line)}
+#lod-manager-view .lm-house-title{display:flex;flex-direction:column;gap:3px;min-width:150px;flex:1;overflow-wrap:anywhere}
+#lod-manager-view .lm-house-title strong{font-size:14px}
+#lod-manager-view .lm-house-title small,#lod-manager-view .lm-house-summary-meta{font-size:11px;color:var(--muted)}
+#lod-manager-view .lm-house-summary-meta{white-space:nowrap}
+#lod-manager-view .lm-house-readiness,#lod-manager-view .lm-part-state{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:4px 9px;font-size:11px;white-space:nowrap}
+#lod-manager-view .lm-house-readiness.is-ready,#lod-manager-view .lm-part-state.is-published{color:var(--mint)}
+#lod-manager-view .lm-house-readiness.is-review,#lod-manager-view .lm-part-state.is-missing{color:var(--orange)}
+#lod-manager-view .lm-house-content{padding:16px 18px 18px;background:var(--panel)}
+#lod-manager-view .lm-house-settings{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:15px}
+#lod-manager-view .lm-house-settings label{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;font-weight:600}
+#lod-manager-view .lm-house-stream-mode{min-width:225px;max-width:100%;font-size:12px}
+#lod-manager-view .lm-house-readiness-text{font-size:11px;max-width:450px;line-height:1.5}
+#lod-manager-view .lm-house-readiness-text.is-ready{color:var(--mint)}
+#lod-manager-view .lm-house-readiness-text.is-review{color:var(--orange)}
+#lod-manager-view .lm-house-groups{display:flex;flex-direction:column;gap:12px;margin-top:15px}
+#lod-manager-view .lm-part-group{border:1px solid var(--line);border-radius:11px;background:var(--panel2);overflow:hidden}
+#lod-manager-view .lm-part-group>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:11px 14px;font-size:12px;font-weight:700}
+#lod-manager-view .lm-part-group>summary::-webkit-details-marker{display:none}
+#lod-manager-view .lm-part-group>summary::before{content:'▸';font-size:13px;color:var(--mint)}
+#lod-manager-view .lm-part-group[open]>summary::before{content:'▾'}
+#lod-manager-view .lm-part-group>summary small{font-weight:400;color:var(--muted);margin-left:auto}
+#lod-manager-view .lm-part-group[open]>summary{border-bottom:1px solid var(--line)}
+#lod-manager-view .lm-part-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:11px}
+#lod-manager-view .lm-house-part{border:1px solid var(--line);border-radius:9px;padding:13px;min-width:0;background:var(--panel);display:flex;flex-direction:column;gap:10px}
+#lod-manager-view .lm-part-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#lod-manager-view .lm-part-name{display:flex;flex-direction:column;gap:3px;min-width:0}
+#lod-manager-view .lm-part-name strong{font-size:12px;overflow-wrap:anywhere}
+#lod-manager-view .lm-part-name small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+#lod-manager-view .lm-part-path{font-size:11px;letter-spacing:.02em;margin:0;color:var(--muted)}
+#lod-manager-view .lm-house-profile-fields{display:flex;flex-wrap:wrap;gap:9px;align-items:flex-end}
+#lod-manager-view .lm-house-profile-fields label{font-size:11px;color:var(--muted);display:flex;flex:1;min-width:105px;flex-direction:column;gap:5px}
+#lod-manager-view .lm-house-profile-fields input{width:100%;min-width:0;font-variant-numeric:tabular-nums}
+#lod-manager-view .lm-part-save{font-size:12px;min-height:36px}
+#lod-manager-view .lm-part-footer{border-top:1px solid var(--line);padding-top:9px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+#lod-manager-view .lm-part-footer small{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+#lod-manager-view .lm-part-manage{font-size:11px;padding:5px 8px}
+#lod-manager-view .lm-house-empty{border:1px dashed var(--line);border-radius:10px;padding:20px;color:var(--muted);text-align:center}
+@media(max-width:1080px){#lod-manager-view .lm-part-grid{grid-template-columns:1fr}}
+@media(max-width:640px){#lod-manager-view .lm-house-filters{width:100%}#lod-manager-view .lm-house-filters input,#lod-manager-view .lm-house-filters select{flex:1;min-width:130px}#lod-manager-view .lm-house-content{padding:11px}#lod-manager-view .lm-house-card>summary{padding:12px}#lod-manager-view .lm-house-profile-fields label{min-width:95px}}
+
+#lod-manager-view .lm-part-feedback{font-size:11px;line-height:1.4;margin:0;color:var(--muted);overflow-wrap:anywhere}
+#lod-manager-view .lm-part-feedback.error{color:var(--orange)}
+#lod-manager-view .lm-part-feedback.saved{color:var(--mint)}

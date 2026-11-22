@@ -1,7 +1,7 @@
 /* M234 · Real Estate mesh editor. Uses the SAME consumer atlas editor as
  * Location Assets; Real Estate retains house-specific Model publication/Sync.
  */
-const realEstateMeshWorkflow={slug:'',part:'',tab:'model',busy:false,result:'',error:false,
+const realEstateMeshWorkflow={slug:'',part:'',tab:'model',busy:false,result:'',error:false,lodSource:'',
   atlas:window.game1ConsumerAtlasEditor.newState()};
 function realEstateMeshWorkflowEnsure(){
   return window.game1AssetWorkflowDialog.ensure('real-estate-mesh-dialog','Manage Real Estate mesh',()=>{
@@ -16,7 +16,7 @@ function realEstateMeshWorkflowOpen(slug,part,tab='model'){
   const row=realEstateRows().find(item=>item.slug===slug);
   if(!row||!(row.meshParts||[]).includes(part))return;
   realEstateMeshWorkflow.slug=slug;realEstateMeshWorkflow.part=part;
-  realEstateMeshWorkflow.tab=tab;
+  realEstateMeshWorkflow.tab=tab;realEstateMeshWorkflow.lodSource='';
   realEstateMeshWorkflow.result='';realEstateMeshWorkflow.error=false;
   realEstateMeshWorkflow.atlas=window.game1ConsumerAtlasEditor.newState();
   realEstateForm(row);
@@ -48,7 +48,8 @@ function realEstateMeshWorkflowRender(){
   const authored=row.meshSources?.[part];
   const busy=realEstateMeshWorkflow.busy||realEstateMeshWorkflow.atlas.busy||
     realEstatePublicationBusy(row.slug)||realEstateState.atlasBusy;
-  const tabs=[{id:'model',label:'Model · FBX'},{id:'texture',label:'Texture · atlas'}];
+  const tabs=[{id:'model',label:'Model · FBX'},{id:'texture',label:'Texture · atlas'},
+    {id:'lod1',label:'LOD1 · FBX'}];
   const model=window.game1AssetWorkflowDialog.step('Model · FBX',
     'Replace the FBX of this mesh only. Other models and images stay unchanged.',
     `<small class="deco-manage-value">${esc(row.meshSources?.[part]?'Independent FBX revision':'Original house FBX')}</small>`+
@@ -61,6 +62,21 @@ function realEstateMeshWorkflowRender(){
     currentId:texture.atlasVariantId||0,
     linked:texture.atlasOptions||texture.atlasVariants||[],
     catalog:realEstateState.data?.atlasCatalog||[],busy});
+  const lod=row.partLod1?.[part]||{status:'NOT_REGISTERED',revision:0};
+  const lodName=`${row.slug}_${part}_lod1.fbx`;
+  const lodStatus=lod.status||'NOT_REGISTERED';
+  const lodEditor=window.game1AssetWorkflowDialog.step('LOD1 · геометрия части',
+    'Отдельный упрощённый FBX для этой части. Дистанции и режим задаются в LOD Manager.',
+    `<div class="shared-model-state"><small>Статус: <strong>${esc(lodStatus)}</strong></small>`+
+    `<small> · Model ID: <strong>${esc(lod.modelAssetId||'—')}</strong></small>`+
+    `${lod.reuse?`<small> · Reuse: ${esc(lod.reuse.domain+'/'+lod.reuse.slug)}</small>`:''}</div>`+
+    `<p class="hint">Имя FBX: <code>${esc(lodName)}</code></p>`+
+    `<div class="actions"><button type="button" data-mw-lod-choose ${busy?'disabled':''}>Выбрать LOD1 FBX</button>`+
+    `<button type="button" data-mw-lod-stage ${busy||!realEstateMeshWorkflow.lodSource?'disabled':''}>Сохранить FBX</button>`+
+    `<button type="button" data-mw-lod-reuse ${busy?'disabled':''}>Использовать опубликованный LOD1</button>`+
+    `<button type="button" data-mw-lod-publish ${busy||!['STAGED','UPDATE_AVAILABLE'].includes(lodStatus)?'disabled':''}>Опубликовать LOD1</button></div>`+
+    `${realEstateMeshWorkflow.lodSource?`<small class="deco-manage-value">Выбран: ${esc(realEstateMeshWorkflow.lodSource)}</small>`:''}`,
+    lodStatus==='PUBLISHED'?'Опубликован':'LOD1 не готов',lodStatus==='PUBLISHED'?'ready':'pending');
   const footer=window.game1AssetWorkflowDialog.step('Studio Sync',
     'Explicitly synchronize this mesh Model and Atlas to ServerStorage and managed placed houses. This action is independent of the editor tab.',
     `<div class="actions"><button type="button" data-mw-sync ${busy||!syncReady?'disabled':''}>Sync Model + Atlas · Studio</button></div>`,
@@ -70,7 +86,8 @@ function realEstateMeshWorkflowRender(){
     `<h3>${esc(part)}</h3></div><button type="button" data-mw-close aria-label="Close">✕</button></div>`+
     `<div class="real-estate-mesh-dialog-body" aria-busy="${busy}">`+
     window.game1AssetWorkflowDialog.tabs(tabs,realEstateMeshWorkflow.tab)+
-    `${realEstateMeshWorkflow.tab==='model'?model:atlas}${footer}`+
+    `${realEstateMeshWorkflow.tab==='model'?model:realEstateMeshWorkflow.tab==='texture'?atlas:lodEditor}`+
+    `${realEstateMeshWorkflow.tab==='lod1'?'':footer}`+
     `<div class="real-estate-workflow-result ${realEstateMeshWorkflow.error?'issue':''}" role="status" ${realEstateMeshWorkflow.result?'':'hidden'}>${esc(realEstateMeshWorkflow.result)}</div></div>`;
   dialog.querySelector('[data-mw-close]').onclick=()=>{if(!busy)dialog.close();};
   dialog.querySelectorAll('[data-mw-tab]').forEach(button=>button.onclick=()=>{
@@ -106,6 +123,40 @@ function realEstateMeshWorkflowRender(){
       (found===0?' · no managed house instances found':'')+
       (warnings.length?` · ${warnings.join(' | ')}`:''),incomplete);
   }));
+  if(realEstateMeshWorkflow.tab==='lod1'){
+    const endpoint=`/api/real-estate/${encodeURIComponent(row.slug)}/parts/${encodeURIComponent(part)}`;
+    bind('lod-choose',()=>realEstateMeshWorkflowRun('Выбираем LOD1 FBX',async()=>{
+      const selected=await request('/api/files/choose-real-estate-model',{method:'POST'});
+      if(!selected?.path){realEstateMeshWorkflowMessage('Выбор отменён');return;}
+      const name=selected.path.replace(/\\/g,'/').split('/').pop();
+      if(name!==lodName)throw Error(`Имя файла должно быть ${lodName}`);
+      realEstateMeshWorkflow.lodSource=selected.path;
+      realEstateMeshWorkflowMessage(`LOD1 FBX выбран: ${name}`);
+    }));
+    bind('lod-stage',()=>realEstateMeshWorkflowRun('Сохраняем LOD1 FBX',async()=>{
+      if(!realEstateMeshWorkflow.lodSource)throw Error('Сначала выбери LOD1 FBX');
+      await request(endpoint+'/lod1-stage',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({sourcePath:realEstateMeshWorkflow.lodSource,expectedRevision:lod.revision})});
+      realEstateMeshWorkflow.lodSource='';
+      await realEstateLoad();
+      realEstateMeshWorkflowMessage('LOD1 FBX сохранён. Теперь можно опубликовать.');
+    }));
+    bind('lod-reuse',()=>realEstateMeshWorkflowRun('Выбираем опубликованный LOD1',async()=>{
+      const choice=await window.game1LodReusePicker.pick('house_part',row.slug+'/'+part);
+      if(!choice){realEstateMeshWorkflowMessage('Выбор отменён');return;}
+      await request(endpoint+'/lod1-reuse',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(window.game1LodReusePicker.payload(choice,lod.revision))});
+      realEstateMeshWorkflow.lodSource='';
+      await realEstateLoad();
+      realEstateMeshWorkflowMessage('Опубликованная геометрия LOD1 назначена.');
+    }));
+    bind('lod-publish',()=>realEstateMeshWorkflowRun('Публикуем LOD1',async()=>{
+      await request(endpoint+'/lod1-publish',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({expectedRevision:lod.revision,description:`Game1 ${row.slug}/${part} part LOD1`})});
+      await realEstateLoad();
+      realEstateMeshWorkflowMessage('LOD1 опубликован. Настрой дистанции в LOD Manager.');
+    }));
+  }
   if(realEstateMeshWorkflow.tab==='texture'){
     window.game1ConsumerAtlasEditor.wire(dialog,realEstateMeshWorkflow.atlas,{
       consumerType:'real_estate',slug:row.slug,part,

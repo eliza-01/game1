@@ -50,6 +50,15 @@ function Policy.Resolve(distance, previousState, config, mode)
     return resolveBands(distance, previousState, states, cutoffs, config.hysteresis)
 end
 
+-- Distance to the rotated visual bounds, independent of an authored pivot.
+function Policy.SurfaceDistance(point, frame, size)
+    local localPoint = frame:PointToObjectSpace(point)
+    local half = size * 0.5
+    return Vector3.new(math.max(0, math.abs(localPoint.X) - half.X),
+        math.max(0, math.abs(localPoint.Y) - half.Y),
+        math.max(0, math.abs(localPoint.Z) - half.Z)).Magnitude
+end
+
 -- Real Estate reuses the same hysteresis resolver independently per MeshPart.
 -- Distances are authored exclusively in LOD Manager; no whole-house boundary.
 function Policy.ResolveHouse(distance, previousState, config)

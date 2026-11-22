@@ -12372,8 +12372,8 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 1,
-      "collisionBlueprintRevision": 1,
+      "collisionBlueprintRetainedRevision": 2,
+      "collisionBlueprintRevision": 2,
       "collisionBlueprintPartCount": 1,
       "collisionBlueprint": {
         "anchor": {
@@ -12405,32 +12405,32 @@
             "collisionGroup": "Default",
             "id": "Part",
             "localCFrame": [
-              -0.494049072265625,
-              3.378498077392578,
-              0.2087249755859375,
-              -0.9995720386505127,
+              -0.559417724609375,
+              3.2711257934570312,
+              0.2039794921875,
+              -0.9992362260818481,
               -3.136241139145568e-05,
-              -0.029266834259033203,
-              -3.130029290332459e-05,
+              -0.03909030556678772,
+              -3.127342279185541e-05,
               1.0,
-              -2.5799599825404584e-06,
-              0.02926674485206604,
+              -2.8874883355456404e-06,
+              0.03909021615982056,
               -1.6627855075057596e-06,
-              -0.9995720982551575
+              -0.9992362856864929
             ],
             "name": "Part",
             "shape": "Block",
             "size": [
-              1.4936203956604004,
-              4.363242149353027,
-              1.5203901529312134
+              1.5986216068267822,
+              4.515002250671387,
+              1.5451985597610474
             ]
           }
         ],
         "pivot": "Model:GetPivot()",
         "schemaVersion": 2
       },
-      "collisionBlueprintSha256": "e0fb3fdee59175dcfc4e86c6c45dbe46621a8820f34e15810aa226103a330f02",
+      "collisionBlueprintSha256": "7e0eb6655076379a02f01a14e3ae7ed4451649aa546e4a8786bd04b92532c601",
       "surfaceMaterial": "stone",
       "appearanceMode": "material",
       "visualMaterial": "SmoothPlastic",

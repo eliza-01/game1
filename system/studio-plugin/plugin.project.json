@@ -121,6 +121,9 @@
       "StudioPlotsSelectionFilter": {
         "$path": "modules/StudioPlotsSelectionFilter.luau"
       },
+      "StudioLodPreviewBridge": {
+        "$path": "modules/StudioLodPreviewBridge.luau"
+      },
       "StudioOptionsDraftBridge": {
         "$path": "modules/StudioOptionsDraftBridge.luau"
       },

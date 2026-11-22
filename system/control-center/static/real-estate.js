@@ -108,8 +108,8 @@ function realEstateForm(row){
   realEstateRuntimeRender(row);
   realEstateRender();
 }
-// Real Estate owns house and per-MeshPart FULL authoring. All LOD1 geometry
-// authoring now lives in the shared LOD Manager readiness surface.
+// Real Estate owns FULL and per-MeshPart LOD1 FBX publication;
+// LOD Manager owns only streaming modes and distances.
 function realEstateRuntimeRender(row){
   const target=$('real-estate-runtime-content');
   if(!row){target.innerHTML='<small class="muted">Register a house first.</small>';return;}
@@ -118,7 +118,7 @@ function realEstateRuntimeRender(row){
   const warnings=row.runtimeReadiness?.warnings||[];
   target.innerHTML=`<div class="real-estate-runtime-info">
     <small>${esc(row.slug)} · ${count}/${(row.meshParts||[]).length} parts published · ${esc(profile.mode)}</small>
-    <p class="hint">Streaming mode and all per-MeshPart FULL / LOD1 / Unloaded distances: LOD Manager → 02 · LOD readiness → Real Estate.</p>
+    <p class="hint">Streaming mode and per-MeshPart LOD1 / Unloaded distances: LOD Manager → 02 · Real Estate. LOD1 FBX authoring: Manage MeshPart → LOD1.</p>
     <div class="status-box">${warnings.length?warnings.map(esc).join(' · '):'Studio Runtime validation pending'}</div>
   </div>`;
 }
@@ -754,6 +754,14 @@ async function realEstateLoad(){
   }catch(error){toast(error.message,true);}
 }
 window.game1RealEstateLoad=realEstateLoad;
+// Cross-section navigation, without duplicating LOD1 authoring in LOD Manager.
+window.game1RealEstateOpenLod1=async (slug,part)=>{
+  realEstateState.selected=slug;
+  realEstateRemember();
+  setView('real-estate');
+  await realEstateLoad();
+  realEstateMeshWorkflowOpen(slug,part,'lod1');
+};
 $('real-estate-new').onclick=()=>realEstateForm(null);
 $('real-estate-refresh').onclick=realEstateLoad;
 $('real-estate-choose').onclick=realEstateChooseFbx;

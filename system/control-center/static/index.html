@@ -15,14 +15,14 @@
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="location-instance-manager.css?v=353">
 <link rel="stylesheet" href="place-registry.css?v=405">
-<link rel="stylesheet" href="lod-manager.css?v=405">
+<link rel="stylesheet" href="lod-manager.css?v=424">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=5">
 <link rel="stylesheet" href="character-armor.css?v=1">
 <link rel="stylesheet" href="location-category-picker.css?v=249">
 <link rel="stylesheet" href="location-alpha.css?v=250">
 <link rel="stylesheet" href="deco-assets.css?v=411">
-<link rel="stylesheet" href="real-estate.css?v=385a&physics=205">
+<link rel="stylesheet" href="real-estate.css?v=423&physics=205">
 <link rel="stylesheet" href="kanban.css?v=339">
 <style>#location-asset-editor-panel [hidden],#location-asset-edit-dialog [hidden]{display:none!important}</style>
 </head>
@@ -646,7 +646,7 @@
 
 <div id="lod-manager-view" hidden>
   <div class="panel hero"><div><span class="eyebrow">Location Assets · World Streaming</span>
-    <h2>LOD Manager</h2><p>Снимки размещений и готовность FULL / LOD. Используется существующий Place Registry — без повторного сканера и без изменения Studio.</p></div></div>
+    <h2>LOD Manager</h2><p>Снимки размещений и готовность FULL / LOD. Используется существующий Place Registry — без повторного сканера. Сохранённые визуальные дистанции и режимы автоматически действуют в Studio Play (авторский Place); параметры Workspace Streaming требуют подготовки Runtime.</p></div></div>
   <section class="panel lm-panel">
     <div class="lm-toolbar"><div><span class="eyebrow">01 · Inventory</span><h3>Snapshot · Studio</h3></div>
       <div class="actions"><button id="lod-refresh" type="button">Refresh</button><button id="lod-scan" class="primary" type="button">Scan Place</button></div></div>
@@ -675,11 +675,13 @@
       <p class="lm-note">Auto включает все зарегистрированные Location Assets. FULL → LOD1 → UNLOADED работает только с опубликованным LOD1; без него доступен FULL → UNLOADED.</p>
     </div>
     <div id="lod-house-panel" role="tabpanel" aria-labelledby="lod-tab-house" hidden>
-      <div class="lm-list-head"><h4>Real Estate <small id="lod-house-count" class="lm-note"></small></h4></div>
-      <p class="lm-note">Здесь настраиваются режим и дистанции House Streaming, а LOD1 назначается выборочно: например, стенам, крыше и трубе. Части без LOD1 исчезнут при дальнем переходе. Материал, цвет, атлас и прозрачность сохраняются от соответствующей FULL-части. Для LOD FBX проверь pivot, размеры и UV. Индивидуальные дистанции FULL редактируются в Real Estate.</p>
-      <div class="lm-table"><table><thead><tr><th>House type / parts</th><th>Plots</th><th>Runtime mode</th><th>Part LOD1</th><th>Readiness</th></tr></thead>
-        <tbody id="lod-house-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
-      <p id="lod-house-message" class="lm-note" role="status"></p>
+      <div class="lm-house-intro"><div><h4>Real Estate <small id="lod-house-count" class="lm-note"></small></h4>
+        <p class="lm-note">Здесь — только режим стриминга и дистанции каждой части дома. FBX, переиспользование и публикация LOD1 — в Real Estate → редактор MeshPart → LOD1.</p></div>
+        <div class="lm-house-filters"><input id="lod-house-search" type="search" placeholder="Поиск дома или части…" aria-label="Поиск домов и MeshPart">
+          <select id="lod-house-filter" aria-label="Фильтр готовности домов"><option value="all">Все дома</option>
+            <option value="ready">Готовы к Preflight</option><option value="review">Требуют проверки</option></select></div></div>
+      <div id="lod-house-rows" class="lm-house-cards"><p class="lm-house-empty">Загрузка домов…</p></div>
+      <p id="lod-house-message" class="lm-note" role="status" aria-live="polite"></p>
     </div>
   </section>
   <section class="panel lm-panel" id="lod-settings-section">
@@ -687,7 +689,7 @@
       <div class="actions"><button id="lod-preset-default" type="button">Default · Roblox recommended</button>
         <button id="lod-save-settings" class="primary" type="button">Save settings</button></div></div>
     <p class="lm-note">Visual LOD создаётся локально по расстоянию от камеры; Roblox Workspace Streaming доставляет серверную геометрию относительно персонажа. Это независимые механизмы.</p>
-    <h4 class="lm-settings-title">Client visual distance · studs</h4>
+    <h4 class="lm-settings-title">Location Assets · client visual distance · studs</h4>
     <div class="lm-setting-grid">
       <label>LOD1 от <span class="lm-help" tabindex="0" role="button" title="Переход с FULL на LOD1 при удалении камеры. Если LOD1 нет, режим FULL-only использует FULL до Hide.">?</span><input id="lod-distance-1" type="number" min="16" max="10000" step="1"></label>
       <label>LOD2 от <span class="lm-help" tabindex="0" role="button" title="Порог для LOD2, только если LOD2 опубликован и выбран режим LOD2. Иначе LOD1 остаётся до Hide.">?</span><input id="lod-distance-2" type="number" min="16" max="10000" step="1"></label>
@@ -1043,7 +1045,7 @@
 <script src="location-collision.js?v=385"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=405"></script>
-<script src="lod-manager.js?v=405"></script>
+<script src="lod-manager.js?v=426"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="lod-reuse-picker.js?v=411"></script>
@@ -1058,8 +1060,8 @@
 <script src="monster-assets.js?v=338"></script>
 <script src="npc-assets.js?v=370"></script>
 <script src="npc-spawns.js?v=337"></script>
-<script src="real-estate.js?v=385a&visual=400&runtime=387&rig=186&atlas=202&physics=232&reuse=411"></script>
-<script src="real-estate-mesh-workflow.js?v=234"></script>
+<script src="real-estate.js?v=423&visual=400&runtime=387&rig=186&atlas=202&physics=232&reuse=411"></script>
+<script src="real-estate-mesh-workflow.js?v=423"></script>
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=338"></script>
 <script src="kanban.js?v=339"></script>

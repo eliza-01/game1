@@ -34,12 +34,13 @@ local function removeVisual(part)
         part.LocalTransparencyModifier = record.original
     end
 end
-local function sampleVisuals(cameraPosition)
+local function sampleVisuals(cameraPosition, preview)
     for part, record in visuals do
         if not part:IsDescendantOf(Workspace) then
             removeVisual(part)
             continue
         end
+        if preview and preview:Owns(part) then record.visible = nil; continue end
         local distanceLimit = part:GetAttribute("Game1VisualDistanceStuds")
         if typeof(distanceLimit) ~= "number" or distanceLimit < 20 or distanceLimit > 1000 then
             -- StreamingEnabled may replicate the tag before its attributes.
@@ -158,6 +159,14 @@ function Streamer.Start()
     if manifest and manifest.houses then
         houseAdapter = HouseVisualAdapter.new(manifest.houses, cache)
     end
+    local preview = nil
+    if not marker and RunService:IsStudio() then
+        preview = require(script.Parent:WaitForChild("StudioLodPreviewAdapter")).new(function(part)
+            local record = visuals[part]
+            return if record then record.original else part.LocalTransparencyModifier
+        end)
+        status = makeStatus()
+    end
     local elapsed = 0
     local visualElapsed = VISUAL_INTERVAL -- first distance test immediately
     local lastWarning = 0
@@ -171,11 +180,24 @@ function Streamer.Start()
         local cameraPosition = camera.CFrame.Position
         if visualElapsed >= VISUAL_INTERVAL then
             visualElapsed = 0
-            sampleVisuals(cameraPosition)
+            if preview then preview:Resolve(cameraPosition) end
+            sampleVisuals(cameraPosition, preview)
             if houseAdapter then houseAdapter:Resolve(cameraPosition) end
         end
-        if not manifest or elapsed < TICK then return end
+        if elapsed < TICK then return end
         elapsed = 0
+        if preview then
+            preview:FollowMoving()
+            preview:Step(MAX_CHANGES_PER_TICK)
+            if status then
+                local counts = preview:Stats()
+                status.Text = if preview.digest then
+                    ("Studio LOD preview | FULL %d · LOD1 %d · LOD2 %d · UNLOADED %d\nVisual only · profile %s")
+                        :format(counts.FULL, counts.LOD1, counts.LOD2, counts.UNLOADED, preview.digest:sub(1,12))
+                    else "Studio LOD preview | waiting for local Bridge / Control Center"
+            end
+        end
+        if not manifest then return end
         -- Reserve half the existing shared budget for houses so dense Location
         -- placement fields cannot starve the house adapter indefinitely.
         local changes = if houseAdapter then houseAdapter:Step(MAX_CHANGES_PER_TICK // 2) else 0

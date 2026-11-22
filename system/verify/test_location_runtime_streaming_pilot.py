@@ -45,7 +45,8 @@ class RuntimeStreamingPilot(unittest.TestCase):
         self.assertIn('cache:SetAttribute("Ready", ready)', service)
         self.assertIn('LocationLodTemplateService', (ROOT / 'src/server/bootstrap/ServiceCatalog.luau').read_text())
         self.assertIn('LocationWorldStreamer', (ROOT / 'src/client/init.client.luau').read_text())
-        self.assertIn('if not marker then return end', service)
+        self.assertIn('if not marker then', service)
+        self.assertIn('StudioLodPreviewTemplates")).Start(loadPrototype)', service)
 
     def test_server_template_ignores_retired_collision_mesh_in_published_model(self):
         # M342 deleted COL meshes from managed Place and FBX publication, but

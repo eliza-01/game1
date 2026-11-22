@@ -27,7 +27,7 @@ function fakeDialog(){return {
   querySelectorAll(sel){return sel==='[data-mw-tab]'?[...this.innerHTML.matchAll(/data-mw-tab="([^"]+)"/g)]
       .map(m=>({dataset:{mwTab:m[1]},onclick:null})):[];}
 };}
-const row={slug:'house_level4_01',meshParts:['house','door','col_mesh'],
+const row={slug:'house_level4_01',meshParts:['house','door'],
   rigAssets:{house:{assetId:'100',publishedSha256:'ok'}},
   rigSourceHashes:{house:'ok'},textures:{house:{atlasVariantId:23,atlasBindingRevision:1}},
   publicationCurrent:{}};
@@ -50,8 +50,8 @@ check("realEstateMeshWorkflow.tab='texture';realEstateMeshWorkflowRender()");
 assert.match(dialog.innerHTML,/data-shared-atlas/);
 assert.match(dialog.innerHTML,/data-mw-sync/);
 check("realEstateMeshWorkflowOpen('house_level4_01','col_mesh')");
-assert.equal(check('realEstateMeshWorkflow.tab'),'model');
-assert.equal(dialog.querySelectorAll('[data-mw-tab]').length,1);
+assert.equal(check('realEstateMeshWorkflow.tab'),'texture'); // legacy collider cannot open a visual editor
+assert.equal(dialog.querySelectorAll('[data-mw-tab]').length,3); // Model / Atlas / LOD1 for visual meshes
 '''
         result=subprocess.run([node,'-e',script],cwd=STATIC,text=True,capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr)

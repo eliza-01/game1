@@ -30,13 +30,7 @@ type House = {
 local function fromComponents(values): CFrame
     return CFrame.new(table.unpack(values))
 end
-local function surfaceDistance(point: Vector3, frame: CFrame, size: Vector3): number
-    local localPoint = frame:PointToObjectSpace(point)
-    local half = size * 0.5
-    return Vector3.new(math.max(0, math.abs(localPoint.X) - half.X),
-        math.max(0, math.abs(localPoint.Y) - half.Y),
-        math.max(0, math.abs(localPoint.Z) - half.Z)).Magnitude
-end
+local surfaceDistance = Policy.SurfaceDistance
 local function resolvePath(start: Instance, path: {string}): Instance?
     local node: Instance? = start
     for _, key in ipairs(path) do

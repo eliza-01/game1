@@ -114,7 +114,10 @@ function Service.Start()
     if started then return end
     started = true
     local marker = ReplicatedStorage:FindFirstChild(Contract.MarkerName)
-    if not marker then return end -- never run on editable authoring Place
+    if not marker then
+        require(script.Parent:WaitForChild("StudioLodPreviewTemplates")).Start(loadPrototype)
+        return
+    end -- compiled Runtime uses only its pinned manifest
     if not marker:IsA("StringValue") then
         warn("[game1][LOD] invalid runtime manifest marker class")
         return

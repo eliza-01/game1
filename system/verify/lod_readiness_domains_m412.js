@@ -4,7 +4,8 @@ const fs=require('fs');
 const vm=require('vm');
 const html=fs.readFileSync('system/control-center/static/index.html','utf8');
 for(const id of ['lod-readiness-section','lod-tab-location','lod-tab-house',
-                 'lod-location-panel','lod-house-panel','lod-house-rows','lod-house-message']){
+                 'lod-location-panel','lod-house-panel','lod-house-rows','lod-house-message',
+                 'lod-house-search','lod-house-filter']){
   assert(html.includes(`id="${id}"`),id);
 }
 assert(!html.includes('id="lod-real-estate-section"'), 'duplicate Real Estate section');
@@ -28,21 +29,11 @@ const data={snapshot:{revisionId:3,recordedUtc:1,fingerprint:'a'.repeat(64),plac
     partStreaming:{roof:{lod1:100,hide:500,revision:1},wall:{lod1:100,hide:300,revision:1}},
     partLod1:{roof:{status:'NOT_REGISTERED',revision:0,modelAssetId:''},wall:{status:'PUBLISHED',revision:1,modelAssetId:'123456'}}}]},
   revisions:[],build:{canPreflight:false,sourceFile:'source.rbxlx'}};
-let chosen=false;
-const ctx={document:{getElementById:node},window:{game1LodReusePicker:{pick:async()=>null,payload:()=>null}},
-  navigator:{clipboard:{writeText:async()=>{}}},request:async(path, opts)=>{
+let navigation=null;
+const ctx={document:{getElementById:node},window:{game1RealEstateOpenLod1:(slug,part)=>{navigation={slug,part}}},
+  navigator:{clipboard:{writeText:async()=>{}}},request:async(path)=>{
     if(path==='/api/lod-manager')return data;
-    if(path==='/api/files/choose-real-estate-model'){
-      chosen=true;return {path:'c:/house_level5_01_roof_lod1.fbx'};
-    }
-    if(path.endsWith('/lod1-stage')){
-      assert(chosen);const body=JSON.parse(opts.body);
-      assert.strictEqual(body.expectedRevision,0);
-      assert(body.sourcePath.includes('roof_lod1.fbx'));
-      data.realEstate.items[0].partLod1.roof={status:'STAGED',revision:1,modelAssetId:''};
-      return {lod1:data.realEstate.items[0].partLod1.roof};
-    }
-    return data;
+    throw Error('LOD Manager must not upload or publish house FBX: '+path);
   }};
 vm.runInNewContext(fs.readFileSync('system/control-center/static/lod-manager.js','utf8'),ctx);
 (async()=>{
@@ -55,19 +46,21 @@ vm.runInNewContext(fs.readFileSync('system/control-center/static/lod-manager.js'
  assert(node('lod-location-panel').hidden);
  assert(!node('lod-house-panel').hidden);
  assert.strictEqual(node('lod-tab-house')['aria-selected'],'true');
- assert(node('lod-house-rows').innerHTML.includes('roof'));
- assert(node('lod-house-rows').innerHTML.includes('wall'));
- assert(node('lod-house-rows').innerHTML.includes('#FF1100'));
- assert(node('lod-house-rows').innerHTML.includes('1 / 2 LOD1 parts'));
- assert(node('lod-house-rows').innerHTML.includes('Save distances'));
- assert(node('lod-house-rows').innerHTML.includes('data-part-distance="lod1"'));
- const click=(kind)=>node('lod-house-rows').on_click({target:{closest:(selector)=>selector==='button[data-part-action]' ? ({dataset:{partAction:kind,partSlug:'house_level5_01',partName:'roof'}}) : null}});
- click('choose');
- await new Promise(resolve=>setImmediate(resolve));
- assert(node('lod-house-rows').innerHTML.includes('house_level5_01_roof_lod1.fbx'));
- click('stage');
- await new Promise(resolve=>setImmediate(resolve));
- assert(node('lod-house-rows').innerHTML.includes('STAGED'));
+ const markup=node('lod-house-rows').innerHTML;
+ assert(markup.includes('roof'));
+ assert(markup.includes('wall'));
+ assert(markup.includes('Крыша и проёмы'));
+ assert(markup.includes('Стены и конструкции'));
+ assert(markup.includes('data-part-distance="lod1"'));
+ assert(markup.includes('data-part-distance="hide"'));
+ assert(markup.includes('data-house-lod-edit="house_level5_01"'));
+ assert(!markup.includes('data-part-action='), 'no LOD upload controls in Manager');
+ for(const label of ['Choose FBX','Stage FBX','Publish LOD1','Use published LOD1'])
+   assert(!markup.includes(label),label);
+ const button={dataset:{houseLodEdit:'house_level5_01',houseLodPart:'roof'},
+   closest:selector=>selector==='button[data-house-lod-edit]'?button:null};
+ node('lod-house-rows').on_click({target:button});
+ assert.deepStrictEqual(navigation,{slug:'house_level5_01',part:'roof'});
  node('lod-tab-location').on_click();
  assert(!node('lod-location-panel').hidden);
  console.log('M412 LOD readiness domain tabs and house part actions: OK');

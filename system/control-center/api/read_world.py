@@ -14,6 +14,13 @@ def route(parsed, sources, info):
         except (ValueError, OSError) as error:
             return 400, {'error': str(error)}
 
+    if path == "/api/lod-manager/studio-preview":
+        try:
+            from services.lod_studio_preview import snapshot
+            return 200, snapshot(sources["lod_manager"])
+        except (ValueError, OSError, RuntimeError) as error:
+            return 400, {"error": str(error)}
+
     if path == "/api/lod-manager":
         try:
             return 200, sources["lod_manager"].overview()

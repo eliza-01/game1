@@ -14,17 +14,31 @@ from real_estate.rig_publication_policy import publication_analysis
 DEFAULT_LOD1 = 150
 DEFAULT_HIDE = 400
 HYSTERESIS = 10  # One shared client LOD policy, not an editor field.
+MIN_LOD1 = 20
+MIN_GAP = 2 * HYSTERESIS + 1
+MAX_HIDE = 10000
 
 
 def validate(value: dict) -> dict:
     if not isinstance(value, dict) or set(value) != {'lod1', 'hide'}:
         raise ValueError('expected per-part lod1 / hide distances')
     a, b = value['lod1'], value['hide']
-    if type(a) is not int or type(b) is not int or not (20 <= a < b <= 10000):
+    if type(a) is not int or type(b) is not int or not (MIN_LOD1 <= a < b <= MAX_HIDE):
         raise ValueError('part LOD1 / Unloaded must be integers: 20 <= LOD1 < Unloaded <= 10000')
-    if a <= HYSTERESIS or b - a <= 2 * HYSTERESIS:
+    if a <= HYSTERESIS or b - a < MIN_GAP:
         raise ValueError('part distances must leave room for shared hysteresis')
     return {'lod1': a, 'hide': b}
+
+
+def normalize_edit(value: dict) -> dict:
+    """UNLOADED is authoritative; project the edit onto valid runtime thresholds."""
+    if not isinstance(value, dict) or set(value) != {'lod1', 'hide'}:
+        raise ValueError('expected per-part lod1 / hide distances')
+    a, b = value['lod1'], value['hide']
+    if type(a) is not int or type(b) is not int or a < MIN_LOD1 or not 1 <= b <= MAX_HIDE:
+        raise ValueError('part distances must be positive integers: LOD1 >= 20; Unloaded <= 10000')
+    b = max(b, MIN_LOD1 + MIN_GAP)
+    return validate({'lod1': min(a, b - MIN_GAP), 'hide': b})
 
 
 def ensure_schema(store):
@@ -57,7 +71,7 @@ def ensure_schema(store):
                     lod1 = int(distance)
                 else:
                     lod1 = base_lod
-                hide = max(base_hide, lod1 + 2 * HYSTERESIS + 1)
+                hide = max(base_hide, lod1 + MIN_GAP)
                 if hide > 10000:
                     raise ValueError(f'{slug}/{part}: historical distance cannot be migrated safely')
                 db.execute("""INSERT OR IGNORE INTO real_estate_part_distances
@@ -92,8 +106,7 @@ def save(store, slug, part, value, expected_revision):
     house=store.get(slug)
     if not house or part not in house['meshParts']:
         raise ValueError('unknown visual MeshPart')
-    current=house['partStreaming'][part]
-    value=validate(value)
+    value=normalize_edit(value)
     if type(expected_revision) is not int or expected_revision < 0:
         raise ValueError('part distances revision required')
     with store.connect() as db:

@@ -4,7 +4,8 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g,
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const state = {overview:null, busy:false, filter:'all', term:'', preflight:null, domain:'location',
-    pendingFiles:{}, expandedHouses:new Set()};
+    expandedHouses:new Set(), collapsedGroups:new Set(), houseTerm:'', houseFilter:'all',
+    partEdits:new Map(), partMessages:new Map()};
   const defaultSettings = {
     distances:{lod1:120,lod2:260,hide:400,hysteresis:12},
     workspace:{streamingEnabled:true,minRadius:64,targetRadius:1024,
@@ -54,7 +55,7 @@
       $('lod-build-execute').hidden=true;
       $('lod-build-preview').hidden=true;
       $('lod-build-status').textContent='Настройки изменены. Запусти Preflight по новому профилю.';
-      $('lod-settings-status').textContent='Сохранено. Preflight нужно выполнить заново; Studio не изменена.';
+      $('lod-settings-status').textContent='Сохранено. Studio Play получает визуальные LOD-настройки автоматически; для Runtime нужен новый Preflight.';
       fillSettings(view.settings);
     } catch(error) {
       $('lod-settings-status').textContent=`Не сохранено: ${error.message}`;
@@ -77,7 +78,7 @@
       $('lod-build-preview').hidden=true;
       $('lod-build-execute').hidden=true;
       $('lod-build-status').textContent='Профиль дома изменён — нужен новый Preflight и Runtime Draft.';
-      $('lod-settings-status').textContent=`${slug}: house streaming profile saved.`;
+      $('lod-settings-status').textContent=`${slug}: профиль сохранён; Studio Play обновится автоматически.`;
     } catch(error) {
       $('lod-settings-status').textContent=`${slug}: ${error.message}`;
     } finally {state.busy=false;render();}
@@ -86,37 +87,94 @@
   function saveHouseMode(slug, mode) {
     saveHouseProfile(slug,{mode});
   }
+  // Presentation-only groupings; arbitrary authored mesh names remain visible.
+  const housePartGroups = [
+    ['foundation','Основа',/^(house|ground|foundation|floor|floors)(_|$)/],
+    ['walls','Стены и конструкции',/^(walls?|stone_structures|wooden_structures)(_|$)/],
+    ['exterior','Крыша и проёмы',/^(roof|chimney|window|door)(_|$)/],
+    ['details','Интерьер и декор',/^(fireplace|flowerbed|plants?|restoration)(_|$)/],
+  ];
+  function groupHouseParts(parts) {
+    const groups=new Map([...housePartGroups.map(([key,label])=>[key,{key,label,parts:[]}]),
+      ['other',{key:'other',label:'Другие части',parts:[]}]]);
+    for(const part of parts) {
+      const key=housePartGroups.find(([, ,test])=>test.test(part.name.toLowerCase()))?.[0]||'other';
+      groups.get(key).parts.push(part);
+    }
+    return [...groups.values()].filter(group=>group.parts.length);
+  }
+
+  const partKey = (slug,part) => JSON.stringify([slug,part]);
+  const partRecord = (overview,slug,part) => overview?.realEstate?.items
+    ?.find(h=>h.slug===slug)?.partStreaming?.[part];
+  function readPartFields(section) {
+    return Object.fromEntries(['lod1','hide'].map(key=>[
+      key,section.querySelector(`[data-part-distance="${key}"]`)?.value??'']));
+  }
+  // Mirror the server's edit normalization; persisted/runtime validation stays strict.
+  function normalizePartEdit(raw) {
+    const values=Object.fromEntries(Object.entries(raw).map(([name,value])=>[name,Number(value)]));
+    if(Object.keys(raw).some(name=>!raw[name].trim() || !Number.isSafeInteger(values[name])))
+      throw Error('Введи целые числа studs.');
+    if(values.lod1<20 || values.hide<1 || values.hide>10000)
+      throw Error('LOD1 ≥ 20; UNLOADED от 1 до 10000 studs.');
+    values.hide=Math.max(41,values.hide);
+    values.lod1=Math.min(values.lod1,values.hide-21);
+    return values;
+  }
+  function normalizePartFields(section, raw) {
+    const values=normalizePartEdit(raw);
+    const changed=Object.keys(values).some(name=>values[name]!==Number(raw[name]));
+    if(changed)for(const name of Object.keys(values)) {
+      section.querySelector(`[data-part-distance="${name}"]`).value=String(values[name]);
+    }
+    return {values,changed};
+  }
+  function partStatus(key, kind, message) {
+    state.partMessages.set(key,{kind,message});
+  }
   async function savePartDistances(slug, part, section) {
     if(state.busy || !state.overview)return;
-    const house=(state.overview.realEstate?.items||[]).find(h=>h.slug===slug);
-    const previous=house?.partStreaming?.[part];
-    if(!previous)return;
-    const values={};
-    for(const key of ['lod1','hide']) {
-      const field=section.querySelector(`[data-part-distance="${key}"]`);
-      const value=Number(field?.value);
-      if(!field?.value?.trim() || !Number.isSafeInteger(value)) {
-        $('lod-house-message').textContent=`${slug}/${part}: ${key} must be integer studs`;
-        return;
-      }
-      values[key]=value;
+    const key=partKey(slug,part);
+    const previous=partRecord(state.overview,slug,part);
+    const raw=readPartFields(section);
+    state.partEdits.set(key,raw);
+    if(!previous || !Number.isSafeInteger(previous.revision)) {
+      partStatus(key,'error','Нет данных о ревизии. Нажми Refresh.');render();return;
     }
-    if(values.lod1<20 || values.lod1+20>=values.hide || values.hide>10000) {
-      $('lod-house-message').textContent=`${slug}/${part}: LOD1 >= 20; Unloaded > LOD1 + 20; max 10000`;
-      return;
-    }
-    state.busy=true;
+    let values;
     try {
-      await request(`/api/real-estate/${encodeURIComponent(slug)}/parts/${encodeURIComponent(part)}/distances`,{
+      ({values}=normalizePartFields(section,raw));
+      state.partEdits.set(key,Object.fromEntries(Object.entries(values).map(([name,value])=>[name,String(value)])));
+    }catch(error){
+      partStatus(key,'error',error.message);render();return;
+    }
+    const revision=previous.revision;
+    state.busy=true;
+    partStatus(key,'pending','Сохраняем…');render();
+    // The persisted revision, not a successful HTTP status or an optimistic
+    // local value, is the acknowledgement of a successful write.
+    const matches = row => row?.lod1===values.lod1 && row?.hide===values.hide &&
+      Number.isSafeInteger(row.revision) && row.revision===revision+1;
+    try {
+      const result=await request(`/api/real-estate/${encodeURIComponent(slug)}/parts/${encodeURIComponent(part)}/distances`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({distances:values,expectedRevision:previous.revision})});
-      state.overview=await request('/api/lod-manager');
+        body:JSON.stringify({distances:values,expectedRevision:revision})});
       state.preflight=null;
       $('lod-build-execute').hidden=true;
       $('lod-build-preview').hidden=true;
-      $('lod-house-message').textContent=`${slug}/${part}: distances saved. New Preflight required.`;
-    }catch(error){$('lod-house-message').textContent=`${slug}/${part}: ${error.message}`;}
-    finally{state.busy=false;render();}
+      const fresh=await request('/api/lod-manager',{cache:'no-store'});
+      state.overview=fresh;
+      const saved=partRecord(fresh,slug,part);
+      if(!matches(result?.distances)||!matches(saved))
+        throw Error('Сервер не подтвердил сохранённые значения. Проверь Refresh и повтори Save.');
+      state.partEdits.delete(key);
+      state.partMessages.delete(key);
+      $('lod-house-message').textContent=`${slug}/${part}: сохранено. Studio Play обновится автоматически; для Runtime нужен новый Preflight.`;
+    }catch(error){
+      partStatus(key,'error',`Не подтверждено: ${error.message}`);
+      $('lod-house-message').textContent=`${slug}/${part}: ${error.message}`;
+    }finally{state.busy=false;render();}
   }
   const compact = value => Number(value || 0).toLocaleString('ru-RU');
   const date = value => value ? new Date(value*1000).toLocaleString('ru-RU') : '—';
@@ -127,6 +185,7 @@
   function render() {
     const data = state.overview;
     $('lod-scan').disabled = state.busy;
+    $('lod-refresh').disabled = state.busy;
     $('lod-save-settings').disabled = state.busy;
     $('lod-enable-ready').disabled = state.busy;
     $('lod-disable-all').disabled = state.busy;
@@ -183,48 +242,78 @@
           </select><div class="lm-stream-status">${escape(item.streamingReason || (item.streamingMode==='auto' ? 'По умолчанию FULL; все размещения данного типа' : 'Выбор сохранён'))}</div></td></tr>`;
     }).join('') : '<tr><td colspan="5" class="lm-empty">Нет записей с такими условиями.</td></tr>';
     const houses=data.realEstate?.items || [];
-    $('lod-house-count').textContent = `${houses.length} видов · ${data.realEstate?.selected||0} профилей · ${data.realEstate?.placements||0} Plot bindings`;
-    $('lod-house-rows').innerHTML=houses.length ? houses.map(h => {
-      const parts=(h.parts||[]);
+    const visibleHouses=houses.filter(h=>{
+      const parts=h.parts||[];
+      const matchesText=!state.houseTerm || h.slug.toLowerCase().includes(state.houseTerm) ||
+        parts.some(p=>p.name.toLowerCase().includes(state.houseTerm));
+      if(!matchesText)return false;
+      if(state.houseFilter==='ready')return Boolean(h.ready);
+      if(state.houseFilter==='review')return !h.ready;
+      return true;
+    });
+    $('lod-house-count').textContent = `${visibleHouses.length} / ${houses.length} домов · ${data.realEstate?.placements||0} Plot bindings`;
+    $('lod-house-rows').innerHTML=visibleHouses.length ? visibleHouses.map(h=>{
+      const parts=h.parts||[];
       const ready=parts.filter(p=>h.partLod1?.[p.name]?.status==='PUBLISHED').length;
-      const details=parts.map(part=>{
-        const lod=h.partLod1?.[part.name]||{};
-        const key=h.slug+'/'+part.name;
-        const pending=state.pendingFiles[key];
-        const canPublish=['STAGED','UPDATE_AVAILABLE'].includes(lod.status);
-        const action=(kind,label,disabled=false)=>`<button type="button" data-part-action="${kind}"
-          data-part-slug="${escape(h.slug)}" data-part-name="${escape(part.name)}"
-          ${state.busy||disabled?'disabled':''}>${label}</button>`;
-        const distances=h.partStreaming?.[part.name]||{lod1:150,hide:400,revision:0};
-        return `<div class="lm-house-part"><strong>${escape(part.name)}</strong>
-          <small>${escape(part.appearance)} · ${escape(part.color)}</small>
-          <div class="lm-house-profile-fields" data-part-distance-panel="${escape(part.name)}">
-            <label>LOD1 from<input type="number" min="20" max="9979" step="1" data-part-distance="lod1" value="${Number(distances.lod1)}" ${state.busy?'disabled':''}></label>
-            <label>Unloaded from<input type="number" min="41" max="10000" step="1" data-part-distance="hide" value="${Number(distances.hide)}" ${state.busy?'disabled':''}></label>
-            <button type="button" data-part-distance-save="${escape(part.name)}" data-part-house="${escape(h.slug)}" ${state.busy?'disabled':''}>Save distances</button>
-          </div>
-          <small>${h.mode==='lod1' && lod.status==='PUBLISHED'?'FULL → LOD1 → UNLOADED':'FULL → UNLOADED (without active LOD1)'}</small>
-          <small>LOD1: ${escape(lod.status||'NOT_REGISTERED')} · Model ${escape(lod.modelAssetId||'—')}${lod.reuse?' · reused from '+escape(lod.reuse.domain+'/'+lod.reuse.slug):''}</small>
-          <div class="actions">${action('choose','Choose FBX')}${action('stage','Stage FBX',!pending)}
-            ${action('reuse','Use published LOD1')}${action('publish','Publish LOD1',!canPublish)}</div>
-          ${pending?`<small>Selected: ${escape(pending)}</small>`:''}</div>`;
+      const mode=h.mode||'off';
+      const groups=groupHouseParts(parts).map(group=>{
+        const groupKey=h.slug+'/'+group.key;
+        const cards=group.parts.map(part=>{
+          const lod=h.partLod1?.[part.name]||{};
+          const distances=h.partStreaming?.[part.name];
+          const key=partKey(h.slug,part.name);
+          const fields=state.partEdits.get(key)||distances||{};
+          const status=state.partMessages.get(key)||{kind:distances?'saved':'error',message:distances?
+            `Сохранено: ${distances.lod1} / ${distances.hide} studs · rev ${distances.revision}`:
+            'Нет данных о дистанциях. Нажми Refresh.'};
+          const disabled=state.busy||!distances;
+          const published=lod.status==='PUBLISHED';
+          const sequence=mode==='lod1'&&published?'FULL → LOD1 → UNLOADED':'FULL → UNLOADED';
+          return `<article class="lm-house-part" aria-label="${escape(part.name)}" data-part-house="${escape(h.slug)}" data-part-name="${escape(part.name)}">
+            <div class="lm-part-top"><div class="lm-part-name"><strong>${escape(part.name)}</strong>
+              <small>${escape(part.appearance||'material')} · ${escape(part.color||'—')}</small></div>
+              <span class="lm-part-state ${published?'is-published':'is-missing'}" title="${escape(lod.status||'NOT_REGISTERED')}">
+                ${published?'LOD1 опубликован':'Без опубликованного LOD1'}</span></div>
+            <p class="lm-part-path">${sequence}</p>
+            <div class="lm-house-profile-fields" data-part-distance-panel="${escape(part.name)}">
+              <label>LOD1 от · studs<input type="number" min="20" max="9979" step="1" data-part-distance="lod1"
+                value="${escape(fields.lod1)}" ${disabled?'disabled':''}></label>
+              <label>UNLOADED от · studs<input type="number" min="41" max="10000" step="1" data-part-distance="hide"
+                value="${escape(fields.hide)}" ${disabled?'disabled':''}></label>
+              <button type="button" class="lm-part-save" data-part-distance-save="${escape(part.name)}"
+                data-part-house="${escape(h.slug)}" ${disabled?'disabled':''}>Сохранить</button>
+            </div>
+            <p class="lm-part-feedback ${escape(status.kind)}" role="status" aria-live="polite">${escape(status.message)}</p>
+            <div class="lm-part-footer"><small>Model ID: ${escape(lod.modelAssetId||'—')}</small>
+              <button type="button" class="lm-part-manage" data-house-lod-edit="${escape(h.slug)}"
+                data-house-lod-part="${escape(part.name)}">LOD1 FBX · Real Estate</button></div>
+          </article>`;
+        }).join('');
+        return `<details class="lm-part-group" data-house-group="${escape(groupKey)}"
+          ${state.collapsedGroups.has(groupKey)?'':'open'}>
+          <summary><span>${escape(group.label)}</span><small>${group.parts.length} частей</small></summary>
+          <div class="lm-part-grid">${cards}</div></details>`;
       }).join('');
-      return `<tr>
-        <td><strong>${escape(h.slug)}</strong><details class="lm-house-parts"
-          data-house-details="${escape(h.slug)}" ${state.expandedHouses.has(h.slug)?'open':''}>
-          <summary>${ready} / ${parts.length} LOD1 parts</summary><small>Per-part distances · studs · hysteresis 10</small>${details}</details></td>
-        <td>${compact(h.count)}</td>
-        <td><select class="lm-house-stream-mode" data-house-slug="${escape(h.slug)}"
-          aria-label="House streaming mode ${escape(h.slug)}" ${state.busy?'disabled':''}>
-          ${[['off','Off · Workspace'],['full','FULL → UNLOADED'],['lod1','FULL → part LOD1 → UNLOADED']]
-            .map(([mode,label])=>`<option value="${mode}" ${h.mode===mode?'selected':''}
-              ${(mode!=='off'&&h.mode!==mode&&h.fullStatus!=='PUBLISHED')||
-                (mode==='lod1'&&h.mode!=='lod1'&&ready===0)?'disabled':''}>${label}</option>`).join('')}
-          </select></td><td>${ready}/${parts.length} published</td>
-        <td>${h.mode==='off'?'<span class="lm-note">Off</span>':
-          h.ready?'<span class="lm-ready">Профиль готов к Preflight</span>':
-          `<span class="lm-danger">${escape((h.warnings||[]).join(' · ')||'Проверь публикации')}</span>`}</td></tr>`;
-    }).join('') : '<tr><td colspan="5">Нет зарегистрированных домов</td></tr>';
+      const readyText=h.ready?'Готов к Preflight':(h.warnings||[]).join(' · ')||'Требуется проверка';
+      return `<details class="lm-house-card" data-house-details="${escape(h.slug)}" ${state.expandedHouses.has(h.slug)?'open':''}>
+        <summary><span class="lm-house-title"><strong>${escape(h.slug)}</strong><small>${compact(h.count)} размещений</small></span>
+          <span class="lm-house-summary-meta">${ready}/${parts.length} LOD1</span>
+          <span class="lm-house-readiness ${h.ready?'is-ready':'is-review'}">${h.ready?'Готов':'Проверить'}</span></summary>
+        <div class="lm-house-content">
+          <div class="lm-house-settings"><label>Режим House Streaming
+            <select class="lm-house-stream-mode" data-house-slug="${escape(h.slug)}"
+              aria-label="House streaming mode ${escape(h.slug)}" ${state.busy?'disabled':''}>
+              ${[['off','Off · Workspace'],['full','FULL → UNLOADED'],['lod1','FULL → LOD1 → UNLOADED']]
+                .map(([value,label])=>`<option value="${value}" ${mode===value?'selected':''}
+                  ${(value!=='off'&&mode!==value&&h.fullStatus!=='PUBLISHED')||
+                    (value==='lod1'&&mode!=='lod1'&&ready===0)?'disabled':''}>${label}</option>`).join('')}
+            </select></label>
+            <span class="lm-house-readiness-text ${h.ready?'is-ready':'is-review'}">${escape(readyText)}</span>
+          </div>
+          <div class="lm-house-groups">${groups||'<p class="lm-note">Нет визуальных частей</p>'}</div>
+        </div>
+      </details>`;
+    }).join('') : `<p class="lm-house-empty">${houses.length?'Нет домов по выбранному фильтру.':'Нет зарегистрированных домов.'}</p>`;
     $('lod-count').textContent = `${rows.length} / ${data.items.length} видов`;
     $('lod-revisions').innerHTML = data.revisions.length ? data.revisions.map(r =>
       `<span class="lm-revision">#${r.id} · ${date(r.recordedUtc)} · ${compact(r.total)} pcs
@@ -243,12 +332,15 @@
   }
 
   async function load() {
+    if(state.busy)return;
+    state.busy=true;render();
     try {
-      state.overview = await request('/api/lod-manager');
+      state.overview = await request('/api/lod-manager',{cache:'no-store'});
       fillSettings(state.overview.settings);
       render();
       $('lod-status').textContent = 'Показан последний сохранённый снимок. Для проверки изменений в Studio нажми Scan.';
     } catch(error) { $('lod-status').textContent = `LOD Manager: ${error.message}`; }
+    finally {state.busy=false;render();}
   }
   async function scan() {
     if(state.busy)return;
@@ -332,73 +424,68 @@ Build report: ${result.reportPath}`;
   for (const domain of ['location','house']) {
     $(`lod-tab-${domain}`).addEventListener('click', () => {state.domain=domain;render();});
   }
-  async function handlePartAction(button) {
-    if(state.busy || !state.overview)return;
-    const slug=button.dataset.partSlug, part=button.dataset.partName;
-    const key=slug+'/'+part;
-    const house=(state.overview.realEstate?.items||[]).find(h=>h.slug===slug);
-    const lod=house?.partLod1?.[part];
-    if(!house || !lod)return;
-    const endpoint=`/api/real-estate/${encodeURIComponent(slug)}/parts/${encodeURIComponent(part)}`;
-    const kind=button.dataset.partAction;
-    state.busy=true;
-    $('lod-house-message').textContent=`${key}: ${kind}…`;
-    try {
-      if(kind==='choose') {
-        const chosen=await request('/api/files/choose-real-estate-model',{method:'POST'});
-        if(chosen.path){
-          const expected=`${slug}_${part}_lod1.fbx`;
-          if(chosen.path.replace(/\\/g,'/').split('/').pop()!==expected)
-            throw Error(`FBX filename must be ${expected}`);
-          state.pendingFiles[key]=chosen.path;
-        }
-      } else {
-        let path='', data=null;
-        if(kind==='stage') {
-          path='/lod1-stage';
-          if(!state.pendingFiles[key])throw Error('Choose part LOD1 FBX first');
-          data={sourcePath:state.pendingFiles[key],expectedRevision:lod.revision};
-        } else if(kind==='reuse') {
-          const choice=await window.game1LodReusePicker.pick('house_part',key);
-          if(!choice)return;
-          path='/lod1-reuse';
-          data=window.game1LodReusePicker.payload(choice,lod.revision);
-        } else if(kind==='publish') {
-          path='/lod1-publish';
-          data={expectedRevision:lod.revision,description:`Game1 ${key} part LOD1`};
-        }
-        await request(endpoint+path,{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify(data)});
-        if(kind==='stage')delete state.pendingFiles[key];
-        state.overview=await request('/api/lod-manager');
-        state.preflight=null;
-        $('lod-build-execute').hidden=true;
-        $('lod-build-preview').hidden=true;
-      }
-      $('lod-house-message').textContent=`${key}: ${kind} OK. Preflight требуется заново.`;
-    } catch(error) {
-      $('lod-house-message').textContent=`${key}: ${error.message}`;
-    } finally {state.busy=false;render();}
-  }
   $('lod-house-rows').addEventListener('toggle', event => {
     const detail=event.target;
-    if (!detail?.dataset?.houseDetails)return;
-    if (detail.open) state.expandedHouses.add(detail.dataset.houseDetails);
-    else state.expandedHouses.delete(detail.dataset.houseDetails);
+    if(detail?.isConnected===false)return;
+    if(detail?.dataset?.houseDetails){
+      if(detail.open)state.expandedHouses.add(detail.dataset.houseDetails);
+      else state.expandedHouses.delete(detail.dataset.houseDetails);
+    }else if(detail?.dataset?.houseGroup){
+      if(detail.open)state.collapsedGroups.delete(detail.dataset.houseGroup);
+      else state.collapsedGroups.add(detail.dataset.houseGroup);
+    }
   }, true);
+  $('lod-house-rows').addEventListener('input', event => {
+    const field=event.target;
+    if(!field?.dataset?.partDistance)return;
+    const section=field.closest('.lm-house-part');
+    if(!section)return;
+    const key=partKey(section.dataset.partHouse,section.dataset.partName);
+    state.partEdits.set(key,readPartFields(section));
+    partStatus(key,'pending','Не сохранено — нажми Сохранить.');
+    const feedback=section.querySelector('.lm-part-feedback');
+    if(feedback){feedback.className='lm-part-feedback pending';feedback.textContent=state.partMessages.get(key).message;}
+  });
   $('lod-house-rows').addEventListener('click', event => {
     const distanceButton=event.target.closest?.('button[data-part-distance-save]');
     if(distanceButton){
       const section=distanceButton.closest('.lm-house-part');
-      if(section)savePartDistances(distanceButton.dataset.partHouse,distanceButton.dataset.partDistanceSave,section);
+      if(section)return savePartDistances(distanceButton.dataset.partHouse,distanceButton.dataset.partDistanceSave,section);
       return;
     }
-    const button=event.target.closest?.('button[data-part-action]');
-    if(button)handlePartAction(button);
+    const edit=event.target.closest?.('button[data-house-lod-edit]');
+    if(edit){
+      if(typeof window.game1RealEstateOpenLod1==='function')
+        window.game1RealEstateOpenLod1(edit.dataset.houseLodEdit,edit.dataset.houseLodPart);
+      else $('nav-real-estate').click();
+    }
   });
   $('lod-house-rows').addEventListener('change', event => {
+    const field=event.target;
+    if(field?.dataset?.partDistance){
+      const section=field.closest('.lm-house-part');
+      if(!section)return;
+      const key=partKey(section.dataset.partHouse,section.dataset.partName);
+      const raw=readPartFields(section);
+      try {
+        const {values,changed}=normalizePartFields(section,raw);
+        if(changed){
+          state.partEdits.set(key,Object.fromEntries(Object.entries(values).map(([name,value])=>[name,String(value)])));
+          partStatus(key,'pending',`Скорректировано: ${values.lod1} / ${values.hide} studs. Нажми Сохранить.`);
+          const feedback=section.querySelector('.lm-part-feedback');
+          if(feedback){feedback.className='lm-part-feedback pending';feedback.textContent=state.partMessages.get(key).message;}
+        }
+      }catch(error){/* Keep unfinished input; Save reports validation errors. */}
+      return;
+    }
     const el=event.target, slug=el?.dataset?.houseSlug;
     if(slug)saveHouseMode(slug,el.value);
+  });
+  $('lod-house-search').addEventListener('input',event=>{
+    state.houseTerm=event.target.value.trim().toLowerCase();render();
+  });
+  $('lod-house-filter').addEventListener('change',event=>{
+    state.houseFilter=event.target.value;render();
   });
   $('lod-rows').addEventListener('change', event => {
     const el=event.target, slug=el?.dataset?.streamSlug;

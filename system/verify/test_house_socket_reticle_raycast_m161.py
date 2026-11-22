@@ -33,7 +33,7 @@ class M161ReticleRaycast(unittest.TestCase):
             self.assertIn(f'"elevator_{n:02d}_socket", role = "elevator", hoverRadius = 5', contract)
         server = source('src/server/world/HouseSocketService.luau')
         self.assertIn('if not definition or not definition.hoverRadius then return nil end', server)
-        self.assertIn('if not RunService:IsStudio() or not definition or not definition.hoverRadius then', server)
+        self.assertIn('not PublishedDebugAccess.ServerAllowed(player) or not definition or not definition.hoverRadius', server)
         self.assertIn('radiusFor(player, name) + (if definition.hoverRadius then 0 else 2)', server)
 
     def test_aim_uses_headshot_center_ray_not_free_mouse(self):
@@ -44,7 +44,7 @@ class M161ReticleRaycast(unittest.TestCase):
         self.assertIn('ViewportPointToRay(v.X * cameraSettings.cursorX, v.Y * cameraSettings.cursorY)',camera)
         self.assertIn('camera:ViewportPointToRay(viewport.X * cursor.X, viewport.Y * cursor.Y)',prompt)
         self.assertNotIn('UserInputService:GetMouseLocation()', prompt)
-        self.assertIn('Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, hoverRadius(name))', prompt)
+        self.assertIn('Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, aimRadius)', prompt)
         self.assertIn('Occlusion.IsClear(ray.Origin, ray.Direction, aimEntry, player.Character)', prompt)
 
     def test_one_real_raycast_without_queryable_fake_targets(self):
@@ -59,9 +59,9 @@ class M161ReticleRaycast(unittest.TestCase):
     def test_standard_and_custom_characters_both_gate_aim_sockets(self):
         prompt = source('src/client/world/HouseSocketPromptController.luau')
         self.assertIn('if definition and definition.hoverRadius then 0 else radius(name)', prompt)
-        self.assertIn('if definition and definition.hoverRadius then return end', prompt)
+        self.assertIn('if definition == CAMPFIRE_DEFINITION then 0 else clientNativeDistance(name)', prompt)
         self.assertIn('(not SpatialRoot.IsCustom(player) and not definition.hoverRadius)', prompt)
-        self.assertIn('nearestCustomPrompt(root, not custom)', prompt)
+        self.assertIn('nearestCustomPrompt(root, false)', prompt)
         self.assertIn('nearestCustomPrompt(root, not SpatialRoot.IsCustom(player))', prompt)
         self.assertIn('remote:FireServer(socket, key)', prompt)
 

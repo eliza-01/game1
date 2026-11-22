@@ -69,7 +69,7 @@ class HouseSocketM159(unittest.TestCase):
         self.assertIn('local visible: {[Attachment]: LayerCollector} = {}', client)
         self.assertIn('Game1HouseInteractionAlternate', client)
         self.assertIn('for _, name in {"Game1HouseInteraction", "Game1HouseInteractionAlternate"}', client)
-        self.assertIn('text.RichText = true', client)
+        self.assertIn('action.RichText = true', client)
         self.assertIn('local colored = escaped:gsub("ключ",', client)
         self.assertIn('"#4DD8A8" else "#FF6E6E"', client)
         self.assertIn('remote:FireServer(socket, key)', client)

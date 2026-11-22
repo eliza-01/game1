@@ -106,7 +106,7 @@ local function prototype(slug: string): Model?
     return model
 end
 
-function Mount.Spawn(slug: string, parent: Instance, socket: Attachment): (Model?, Attachment?)
+function Mount.Spawn(slug: string, parent: Instance, socket: Attachment, ownerHeading: Vector3?): (Model?, Attachment?)
     local source = prototype(slug)
     if not source then return nil, nil end
     local model = source:Clone()
@@ -117,6 +117,16 @@ function Mount.Spawn(slug: string, parent: Instance, socket: Attachment): (Model
     -- -> HEAD) is the object's FRONT, while world +Y stays upright. Props
     -- get NO character clearance; the socket HEAD is their exact mount point.
     local targetFrame = SpawnOrientation.Upright(socketFrame, fromBone, 0)
+    if not targetFrame and ownerHeading then
+        -- Authored campfire cooking_pot_01_socket points vertically in the
+        -- current FBX. It has an exact HEAD but cannot encode horizontal yaw.
+        -- In this one case use the owning campfire's placed heading, keeping
+        -- the HEAD position and WORLD up unchanged (never guess an offset).
+        local flat = Vector3.new(ownerHeading.X, 0, ownerHeading.Z)
+        if flat.Magnitude > 1e-4 then
+            targetFrame = CFrame.lookAlong(socketFrame.Position, flat.Unit, Vector3.yAxis)
+        end
+    end
     if not targetFrame then
         warn("[game1][fireplace] no horizontal HEAD direction for " .. slug)
         model:Destroy()

@@ -38,7 +38,7 @@ class HouseSocketCustomCharacterM150(unittest.TestCase):
         self.assertIn('entry.sockets[socket.Name] ~= socket', server)
         self.assertIn('handleInteraction(house, socket.Name, player, key)', server)
         self.assertIn('cooldown[player]', server)
-        self.assertIn('if SpatialRoot.IsCustom(player) then return end', client)
+        self.assertIn('nearestCustomPrompt(root, false)', client)
         self.assertIn('remote:FireServer(socket, key)', client)
         self.assertNotIn('remote:FireServer(frame.Position)', client)
         self.assertIn('UserInputService.InputBegan:Connect', client)
@@ -47,7 +47,7 @@ class HouseSocketCustomCharacterM150(unittest.TestCase):
         client = text("src/client/world/HouseSocketPromptController.luau")
         method = client.split('local function nearestCustomPrompt', 1)[1].split('local function updateCustomPrompt', 1)[0]
         self.assertIn('for prompt in prompts do', method)
-        self.assertIn('distance > radius(name)', method)
+        self.assertIn('distance > maxDistance', method)
         self.assertIn('camera:WorldToViewportPoint', method)
         self.assertNotIn('Workspace:GetDescendants()', method)
         self.assertIn('elapsed < 0.1', client)

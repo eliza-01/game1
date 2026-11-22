@@ -1,10 +1,10 @@
-/* M436: read-only mechanics technical cards, one UI for shared and entity-owned scripts. */
+/* Compact mechanics tech cards + isolated, validated heat-source tuning. */
 (() => {
   'use strict';
   const root = document.getElementById('mechanics-view');
   if (!root) return;
   const get = id => document.getElementById(id);
-  const state = {catalog: null, domain: 'house', query: '', open: null, mode: new Map(), sources: new Map(), errors: new Map()};
+  const state = {catalog: null, domain: 'house', query: '', open: null, mode: new Map(), sources: new Map(), errors: new Map(), fireplaceSettings: null, fireplaceLimits: null, fireplaceBusy: false};
   const DOMAIN_KEY = 'game1.mechanics.domain.v1';
   try {state.domain = localStorage.getItem(DOMAIN_KEY) || 'house';} catch {}
 
@@ -59,11 +59,90 @@
     state.mode.set(item.id, mode);
     renderBody(item, body);
   }
+  const TUNING_LABELS = {
+    FuelDurationSeconds: ['Дрова · сек', 'House'],
+    EmbersDurationSeconds: ['Угли · сек', 'House'],
+    CampfireDurationSeconds: ['Костёр · сек', 'Campfire'],
+    CookingSecondsOnFire: ['Готовка на огне · сек', 'Cooking'],
+    CookingSecondsOnEmbers: ['Готовка на углях · сек', 'Cooking'],
+    ProgressVisibleRadius: ['Индикаторы · studs', 'UI'],
+    CampfireInteractionRadius: ['Дистанция действий костра · studs', 'Campfire'],
+    CampfireAimRadius: ['Наведение костра · studs', 'Campfire'],
+  };
+  async function loadSettings(item, body) {
+    if (state.fireplaceSettings || state.fireplaceBusy) return;
+    state.fireplaceBusy = true;
+    try {
+      const response = await fetch('/api/mechanics/fireplace-settings');
+      const data = await response.json();
+      if (!response.ok || !data.settings) throw new Error(data.error || `HTTP ${response.status}`);
+      state.fireplaceSettings = data.settings;
+      state.fireplaceLimits = data.limits;
+      if (body.isConnected) renderBody(item, body);
+    } catch (error) {status(`Настройки: ${error.message}`, true);}
+    finally {state.fireplaceBusy = false;}
+  }
+  function renderSettings(item, body, host) {
+    if (!state.fireplaceSettings) {
+      host.append(element('p','mx-footnote','Загрузка параметров…'));
+      void loadSettings(item, body);
+      return;
+    }
+    const form = element('form', 'mx-settings');
+    const grid = element('div', 'mx-setting-grid');
+    const entries = Object.entries(state.fireplaceSettings);
+    for (const [key, value] of entries) {
+      if (!TUNING_LABELS[key]) continue;
+      const [title, group] = TUNING_LABELS[key];
+      const field = element('label', 'mx-setting');
+      const name = element('span', 'mx-setting-name', title);
+      const input = element('input');
+      const limits = state.fireplaceLimits?.[key] || [1, 7200];
+      input.type = 'number';
+      input.step = '1';
+      input.min = String(limits[0]);
+      input.max = String(limits[1]);
+      input.value = String(value);
+      input.required = true;
+      input.name = key;
+      input.setAttribute('aria-label', title);
+      field.append(name, input, element('small','mx-setting-group',group));
+      grid.append(field);
+    }
+    form.append(grid);
+    const actions = element('div','mx-settings-actions');
+    const save = element('button','primary','Сохранить настройки');
+    save.type = 'submit';
+    actions.append(save);
+    actions.append(element('p','mx-footnote','После сохранения обнови Studio Sync и перезапусти Play. Fire Tuner на существующих кострах сохраняет свои настройки.'));
+    form.append(actions);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (state.fireplaceBusy || !form.reportValidity()) return;
+      const values = Object.fromEntries(entries.map(([key]) => [key,Number(form.elements.namedItem(key).value)]));
+      save.disabled = true;
+      state.fireplaceBusy = true;
+      try {
+        const response = await fetch('/api/mechanics/fireplace-settings',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({settings:values,expected:state.fireplaceSettings}),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.settings) throw new Error(data.error || `HTTP ${response.status}`);
+        state.fireplaceSettings = data.settings;
+        state.sources.delete(`${item.id}:fireplace-config`);
+        status('Настройки сохранены · требуется Studio Sync и перезапуск Play.');
+        if (body.isConnected) renderBody(item, body);
+      } catch (error) {status(`Настройки: ${error.message}`,true);}
+      finally {state.fireplaceBusy = false;save.disabled = false;}
+    });
+    host.append(form);
+  }
   function renderBody(item, body) {
     const mode = state.mode.get(item.id) || 'brief';
     body.replaceChildren();
     const switcher = element('div', 'mx-switcher');
-    for (const [key, label] of [['brief','Кратко'], ['full','Полная карта'], ['scripts','Скрипты']]) {
+    for (const [key, label] of [['brief','Кратко'], ['full','Полная карта'], ['scripts','Скрипты'], ...(item.id === 'fireplace' ? [['settings','Настройки']] : [])]) {
       switcher.append(makeButton(label, mode === key, () => selectMode(item, body, key)));
     }
     body.append(switcher);
@@ -89,6 +168,8 @@
       }
       const references = element('p', 'mx-footnote', 'Источники: действующие Luau-модули и техническая документация проекта. Полный текст доступен во вкладке «Скрипты».');
       content.append(references);
+    } else if (mode === 'settings' && item.id === 'fireplace') {
+      renderSettings(item, body, content);
     } else {
       content.append(element('p', 'mx-footnote', 'Исходный текст файлов проекта · только чтение. Содержимое загружается по запросу.'));
       const sourceList = element('div', 'mx-source-list');

@@ -192,6 +192,7 @@ end
 local function register(house: Model)
     if registered[house] or not Discovery.IsHouse(house) then return end
     local entry: Entry = {sockets = {}, connections = {}, generated = {}, padlockPart = nil}
+    local chimneySmoke: ParticleEmitter? = nil
     registered[house] = entry
     local missing = {}
     local foundCount = 0
@@ -268,11 +269,14 @@ local function register(house: Model)
                 if definition.role == "padlock" then entry.padlockPart = part end
             end
         elseif definition.role == "chimney" then
-            table.insert(entry.generated, Effects.StartSmoke(socket))
+            chimneySmoke = Effects.StartSmoke(socket)
+            chimneySmoke.Enabled = false
+            table.insert(entry.generated, chimneySmoke)
         elseif definition.role == "fireplace" then
             Fireplace.Register(house, socket, entry.generated)
         end
     end
+    if chimneySmoke then Fireplace.BindChimney(house, chimneySmoke) end
     do
         local socket = entry.sockets["fireplace_01_socket"]
         local definition = Contract.Get("fireplace_01_socket")

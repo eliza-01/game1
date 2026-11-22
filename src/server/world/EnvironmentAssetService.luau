@@ -18,6 +18,15 @@ local registeredModels: { Model } = {}
 local registryRevision = 0
 local workspaceConnections: { RBXScriptConnection } = {}
 local registeredAttributeConnections: { [Model]: RBXScriptConnection } = {}
+-- Domain-neutral callbacks. Consumers observe published placements without a
+-- parallel Workspace scanner or a dependency on location authoring internals.
+local observers: {[any]: boolean} = {}
+local function emit(model: Model, definition: any?)
+    for callback in pairs(observers) do
+        local ok, reason = pcall(callback, model, definition)
+        if not ok then warn("[game1][environment] observer: " .. tostring(reason)) end
+    end
+end
 
 local function clearConnections()
     for _, connection in ipairs(workspaceConnections) do
@@ -63,6 +72,7 @@ local function unregisterModel(model: Model, deferRebuild: boolean?)
         return
     end
     definitionsByModel[model] = nil
+    emit(model, nil)
     local connection = registeredAttributeConnections[model]
     if connection then
         connection:Disconnect()
@@ -112,6 +122,7 @@ local function registerModel(model: Model, deferRebuild: boolean?)
     end
     EnvironmentAssetVisuals.ApplyModel(model, definition)
     applyStaticRuntimePhysics(model, definition)
+    emit(model, definition)
     if deferRebuild ~= true then
         rebuildRegisteredModels()
     end
@@ -151,6 +162,14 @@ end
 -- gameplay rules.
 function EnvironmentAssetService.GetRegisteredSnapshot(): ({ Model }, number)
     return registeredModels, registryRevision
+end
+
+function EnvironmentAssetService.Observe(callback: (Model, any?) -> ())
+    observers[callback] = true
+    for model, definition in pairs(definitionsByModel) do
+        if model:IsDescendantOf(Workspace) then callback(model, definition) end
+    end
+    return function() observers[callback] = nil end
 end
 
 function EnvironmentAssetService.Start()

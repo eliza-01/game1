@@ -1,10 +1,16 @@
 --!strict
+-- Static effects presets and identity shared by all heat sources. Numeric
+-- tuning lives in one generated module owned by Mechanics -> Fireplace.
+local Tuning = require(script.Parent:WaitForChild("FireplaceMechanicsTuning"))
 local Config = {
-    FuelDurationSeconds = 120,
-    EmbersDurationSeconds = 120,
-    CookingSecondsOnFire = 30,
-    CookingSecondsOnEmbers = 60,
-    ProgressVisibleRadius = 50,
+    FuelDurationSeconds = Tuning.FuelDurationSeconds,
+    CampfireDurationSeconds = Tuning.CampfireDurationSeconds,
+    CampfireInteractionRadius = Tuning.CampfireInteractionRadius,
+    CampfireAimRadius = Tuning.CampfireAimRadius,
+    EmbersDurationSeconds = Tuning.EmbersDurationSeconds,
+    CookingSecondsOnFire = Tuning.CookingSecondsOnFire,
+    CookingSecondsOnEmbers = Tuning.CookingSecondsOnEmbers,
+    ProgressVisibleRadius = Tuning.ProgressVisibleRadius,
     ResourceSpend = table.freeze({
         Wood = table.freeze({icon = "wood", amount = 5, label = "Дерево"}),
         Carrot = table.freeze({icon = "carrot", amount = 1, label = "Морковка"}),

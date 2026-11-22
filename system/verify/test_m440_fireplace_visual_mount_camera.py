@@ -24,9 +24,14 @@ class M440FireplaceVisualMountCamera(unittest.TestCase):
         self.assertIn('WorldInputPassthrough', guard)
         self.assertIn('UiInputGuard.BlocksWorldInput(input, gameProcessed)', camera)
 
-    def test_billboard_is_input_transparent(self):
+    def test_bottom_status_has_no_fullscreen_pointer_capture(self):
         client = source('src/client/world/HouseFireplaceController.luau')
-        self.assertIn('gui:SetAttribute("WorldInputPassthrough", true)', client)
+        self.assertIn('screen = Instance.new("ScreenGui")', client)
+        self.assertIn('panel = Instance.new("Frame")', client)
+        self.assertIn('panel.Position = UDim2.new(0.5, 0, 1, -24)', client)
+        self.assertIn('close.Activated:Connect', client)
+        self.assertNotIn('Instance.new("BillboardGui")', client)
+        self.assertIn('panel.Size = UDim2.new(0.9, 0, 0, 92)', client)
 
     def test_mounted_published_models_use_canonical_authored_pivot(self):
         mount = source('src/server/world/HouseSocketAssetMount.luau')

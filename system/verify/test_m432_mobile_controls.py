@@ -54,12 +54,13 @@ class MobileControlsM432(unittest.TestCase):
             self.assertIn(icon, VIEW)
 
     def test_context_dock_uses_same_selection_and_server(self):
-        self.assertIn('local docked = touch and SpatialRoot.IsCustom(player)', PROMPT)
-        self.assertIn('MobileLayout.Context(screen.AbsoluteSize.X, screen.AbsoluteSize.Y, panelHeight)', PROMPT)
+        self.assertIn('local touch = UserInputService.TouchEnabled', PROMPT)
+        self.assertIn('MobileLayout.Context(gui.AbsoluteSize.X, gui.AbsoluteSize.Y, panelHeight)', PROMPT)
         self.assertIn('if not selected or selected.Parent ~= socket then return end', PROMPT)
         self.assertEqual(PROMPT.count('RunService.Heartbeat:Connect'), 1)
         self.assertEqual(PROMPT.count('remote:FireServer(socket, key)'), 1)
-        self.assertIn('Instance.new("BillboardGui")', PROMPT)
+        self.assertIn('gui = Instance.new("ScreenGui")', PROMPT)
+        self.assertIn('background.Position = UDim2.new(1, -22, 0.5, 0)', PROMPT)
         self.assertIn('prompt.KeyboardKeyCode.Name', PROMPT)
         self.assertIn('if visible[socket] and visibleSignature[socket] == state then return end', PROMPT)
 

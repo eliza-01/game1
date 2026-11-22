@@ -32,6 +32,10 @@ function ServiceCatalog.Build(root: Instance)
         {name = "HouseSocketService", critical = false, start = function()
             require(world:WaitForChild("HouseSocketService")).Start()
         end},
+        {name = "LocationCampfireService", critical = false,
+            dependsOn = {"EnvironmentAssetService", "HouseSocketService"}, start = function()
+            require(world:WaitForChild("LocationCampfireService")).Start()
+        end},
         {name = "EntityHitboxService", critical = true, start = function()
             local EntityHitboxService = require(combat:WaitForChild("EntityHitboxService"))
             EntityHitboxService.Start()

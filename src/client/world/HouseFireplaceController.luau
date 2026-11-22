@@ -1,4 +1,7 @@
 --!strict
+-- One dismissible bottom HUD for House fireplaces and world Campfires.
+-- Server attributes own time/state; this client only chooses the nearest
+-- active source within the configurable presentation radius.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -11,7 +14,9 @@ local Config = require(Shared:WaitForChild("world"):WaitForChild("FireplaceMecha
 local player = Players.LocalPlayer
 local Controller = {}
 local started = false
-local tracked: {[Attachment]: BillboardGui} = {}
+local tracked: {[Attachment]: boolean} = {}
+local dismissed: {[Attachment]: boolean} = {}
+local selected: Attachment? = nil
 
 local function rounded(parent: GuiObject, radius: number)
     local corner = Instance.new("UICorner")
@@ -19,151 +24,193 @@ local function rounded(parent: GuiObject, radius: number)
     corner.Parent = parent
 end
 
-local function makeBar(parent: Instance, y: number, name: string, labelText: string)
-    local row = Instance.new("Frame")
-    row.Name = name
-    row.BackgroundTransparency = 1
-    row.Position = UDim2.fromOffset(10, y)
-    row.Size = UDim2.new(1, -20, 0, 26)
-    row.Parent = parent
+local function row(parent: Frame, y: number, name: string, title: string): Frame
+    local container = Instance.new("Frame")
+    container.Name = name
+    container.BackgroundTransparency = 1
+    container.Position = UDim2.fromOffset(12, y)
+    container.Size = UDim2.new(1, -24, 0, 25)
+    container.Parent = parent
 
     local label = Instance.new("TextLabel")
-    label.Name = "Label"
     label.BackgroundTransparency = 1
-    label.Size = UDim2.fromOffset(70, 24)
+    label.Size = UDim2.fromOffset(65, 22)
     label.Font = Enum.Font.GothamSemibold
     label.TextSize = 12
-    label.TextColor3 = Color3.fromRGB(241, 245, 249)
+    label.Text = title
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Text = labelText
-    label.Parent = row
+    label.TextColor3 = Color3.fromRGB(240, 245, 249)
+    label.Parent = container
 
-    local shell = Instance.new("Frame")
-    shell.Name = "Shell"
-    shell.BackgroundColor3 = Color3.fromRGB(46, 55, 66)
-    shell.Position = UDim2.fromOffset(74, 4)
-    shell.Size = UDim2.new(1, -74, 0, 16)
-    shell.Parent = row
-    rounded(shell, 8)
+    local bar = Instance.new("Frame")
+    bar.Name = "Bar"
+    bar.Position = UDim2.fromOffset(68, 3)
+    bar.Size = UDim2.new(1, -68, 0, 16)
+    bar.BackgroundColor3 = Color3.fromRGB(48, 60, 70)
+    bar.ClipsDescendants = true
+    bar.Parent = container
+    rounded(bar, 7)
 
     local fill = Instance.new("Frame")
     fill.Name = "Fill"
-    fill.BackgroundColor3 = Color3.fromRGB(231, 128, 48)
-    fill.Size = UDim2.fromScale(1, 1)
-    fill.Parent = shell
-    rounded(fill, 8)
+    fill.Size = UDim2.fromScale(0, 1)
+    fill.BackgroundColor3 = Color3.fromRGB(232, 136, 52)
+    fill.Parent = bar
+    rounded(fill, 7)
 
-    local value = Instance.new("TextLabel")
-    value.Name = "Value"
-    value.BackgroundTransparency = 1
-    value.Size = UDim2.fromScale(1, 1)
-    value.Font = Enum.Font.GothamMedium
-    value.TextSize = 11
-    value.TextColor3 = Color3.fromRGB(250, 251, 252)
-    value.Text = ""
-    value.Parent = shell
-
-    return row
+    local remaining = Instance.new("TextLabel")
+    remaining.Name = "Remaining"
+    remaining.Size = UDim2.fromScale(1, 1)
+    remaining.BackgroundTransparency = 1
+    remaining.Font = Enum.Font.GothamMedium
+    remaining.TextColor3 = Color3.fromRGB(249, 249, 249)
+    remaining.TextSize = 11
+    remaining.Parent = bar
+    return container
 end
 
-local function build(socket: Attachment): BillboardGui
-    local gui = Instance.new("BillboardGui")
-    gui.Name = "Game1FireplaceHud"
-    gui:SetAttribute("WorldInputPassthrough", true)
-    gui.Adornee = socket
-    gui.AlwaysOnTop = true
-    gui.LightInfluence = 0
-    gui.StudsOffsetWorldSpace = Vector3.new(0, 2.6, 0)
-    gui.Size = UDim2.fromOffset(220, 74)
+local function ui(): (Frame, Frame, Frame)
+    local screen = Instance.new("ScreenGui")
+    screen.Name = "Game1FireplaceStatus"
+    screen.ResetOnSpawn = false
+    screen.DisplayOrder = 18
+    screen.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+    screen.Parent = player:WaitForChild("PlayerGui")
 
-    local frame = Instance.new("Frame")
-    frame.Name = "Panel"
-    frame.BackgroundColor3 = Color3.fromRGB(20, 26, 34)
-    frame.BackgroundTransparency = 0.07
-    frame.Size = UDim2.fromScale(1, 1)
-    frame.Parent = gui
-    rounded(frame, 10)
+    local panel = Instance.new("Frame")
+    panel.Name = "Panel"
+    panel.Visible = false
+    panel.AnchorPoint = Vector2.new(0.5, 1)
+    panel.Position = UDim2.new(0.5, 0, 1, -24)
+    panel.Size = UDim2.new(0.9, 0, 0, 92)
+    panel.BackgroundColor3 = Color3.fromRGB(19, 27, 35)
+    panel.BackgroundTransparency = 0.04
+    panel.Parent = screen
+    rounded(panel, 11)
+    local constraint = Instance.new("UISizeConstraint")
+    constraint.MaxSize = Vector2.new(340, 92)
+    constraint.MinSize = Vector2.new(250, 92)
+    constraint.Parent = panel
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(79, 93, 109)
-    stroke.Transparency = 0.18
-    stroke.Parent = frame
+    stroke.Color = Color3.fromRGB(89, 106, 120)
+    stroke.Transparency = 0.2
+    stroke.Parent = panel
 
-    makeBar(frame, 8, "FuelRow", "Топливо")
-    makeBar(frame, 39, "CookRow", "Блюдо")
-    return gui
+    local title = Instance.new("TextLabel")
+    title.Name = "SourceTitle"
+    title.BackgroundTransparency = 1
+    title.Position = UDim2.fromOffset(12, 5)
+    title.Size = UDim2.new(1, -48, 0, 20)
+    title.Font = Enum.Font.GothamSemibold
+    title.Text = "Камин"
+    title.TextColor3 = Color3.fromRGB(242, 247, 250)
+    title.TextSize = 13
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = panel
+
+    local close = Instance.new("TextButton")
+    close.Name = "Dismiss"
+    close.Position = UDim2.new(1, -32, 0, 5)
+    close.Size = UDim2.fromOffset(25, 23)
+    close.Text = "×"
+    close.Font = Enum.Font.GothamSemibold
+    close.TextSize = 18
+    close.TextColor3 = Color3.fromRGB(220, 226, 232)
+    close.BackgroundColor3 = Color3.fromRGB(44, 57, 69)
+    close.Parent = panel
+    rounded(close, 6)
+    close.Activated:Connect(function()
+        if selected then dismissed[selected] = true end
+        panel.Visible = false
+    end)
+    return panel, row(panel, 30, "FuelRow", "Огонь"), row(panel, 60, "CookRow", "Блюдо")
 end
 
 local function listen(instance: Instance)
     if not instance:IsA("Attachment") then return end
-    if instance.Name ~= "fireplace_01_socket" then return end
-    if tracked[instance] then return end
-    local gui = build(instance)
-    gui.Parent = player:WaitForChild("PlayerGui")
-    tracked[instance] = gui
+    if instance.Name ~= "fireplace_01_socket" and instance.Name ~= "fire_socket" then return end
+    tracked[instance] = true
 end
 
-local function setBar(row: Frame, active: boolean, ratio: number, label: string, fillColor: Color3)
-    row.Visible = active
-    if not active then return end
-    local fill = row.Shell.Fill
-    fill.Size = UDim2.fromScale(math.clamp(ratio, 0, 1), 1)
-    fill.BackgroundColor3 = fillColor
-    row.Shell.Value.Text = label
+local function socketPosition(socket: Attachment): Vector3
+    return if socket:IsA("Bone") then (socket :: Bone).TransformedWorldCFrame.Position else socket.WorldPosition
 end
 
-local function updateOne(socket: Attachment, gui: BillboardGui, root: BasePart, serverNow: number)
-    if not socket:IsDescendantOf(Workspace) then gui:Destroy(); tracked[socket] = nil; return end
-    gui.Enabled = false
-    local visibleRadius = tonumber(socket:GetAttribute("Game1FireplaceVisibleRadius")) or Config.ProgressVisibleRadius
-    local distance = (socket.WorldPosition - root.Position).Magnitude
-    if distance > visibleRadius then return end
-    local fuelState = tostring(socket:GetAttribute("Game1FireplaceFuelState") or "empty")
-    local fuelEndsAt = tonumber(socket:GetAttribute("Game1FireplaceFuelEndsAt")) or 0
+local function active(socket: Attachment): boolean
+    local fuel = socket:GetAttribute("Game1FireplaceFuelState")
+    local cooking = socket:GetAttribute("Game1FireplaceCookState")
+    return fuel == "firewood" or fuel == "fire" or fuel == "embers"
+        or cooking == "cooking" or cooking == "ready"
+end
+
+local function setBar(entry: Frame, ratio: number, caption: string, color: Color3)
+    entry.Visible = true
+    entry.Bar.Fill.Size = UDim2.fromScale(math.clamp(ratio, 0, 1), 1)
+    entry.Bar.Fill.BackgroundColor3 = color
+    entry.Bar.Remaining.Text = caption
+end
+
+local function render(socket: Attachment, panel: Frame, fuelRow: Frame, cookRow: Frame, timeNow: number)
+    local fuel = tostring(socket:GetAttribute("Game1FireplaceFuelState") or "empty")
+    local fuelEnd = tonumber(socket:GetAttribute("Game1FireplaceFuelEndsAt")) or 0
     local fuelDuration = tonumber(socket:GetAttribute("Game1FireplaceFuelDuration")) or 0
-    local cookState = tostring(socket:GetAttribute("Game1FireplaceCookState") or "idle")
-    local cookEndsAt = tonumber(socket:GetAttribute("Game1FireplaceCookEndsAt")) or 0
+    local cook = tostring(socket:GetAttribute("Game1FireplaceCookState") or "idle")
+    local cookEnd = tonumber(socket:GetAttribute("Game1FireplaceCookEndsAt")) or 0
     local cookDuration = tonumber(socket:GetAttribute("Game1FireplaceCookDuration")) or 0
 
-    local fuelFrame = gui.Panel:FindFirstChild("FuelRow") :: Frame
-    local cookFrame = gui.Panel:FindFirstChild("CookRow") :: Frame
-    if not fuelFrame or not cookFrame then return end
-
-    local fuelActive = fuelState == "firewood" or fuelState == "embers"
-    local fuelRemaining = math.max(0, fuelEndsAt - serverNow)
-    local fuelRatio = if fuelActive and fuelDuration > 0 then fuelRemaining / fuelDuration else 0
-    setBar(fuelFrame, fuelActive, fuelRatio,
-        if fuelState == "embers" then "Угли" else "Огонь",
-        if fuelState == "embers" then Color3.fromRGB(205, 88, 64) else Color3.fromRGB(234, 146, 53))
-
-    local cookActive = cookState == "cooking" or cookState == "ready"
-    local cookRatio = if cookState == "ready" then 1
-        elseif cookDuration > 0 then 1 - math.max(0, cookEndsAt - serverNow) / cookDuration
-        else 0
-    setBar(cookFrame, cookActive, cookRatio,
-        if cookState == "ready" then "Готово" else string.format("%ds", math.ceil(math.max(0, cookEndsAt - serverNow))),
-        Color3.fromRGB(89, 164, 111))
-
-    gui.Enabled = fuelActive or cookActive
+    panel.SourceTitle.Text = if socket.Name == "fire_socket" then "Костёр" else "Камин"
+    fuelRow.Visible = false
+    cookRow.Visible = false
+    if fuel == "firewood" or fuel == "fire" or fuel == "embers" then
+        local remaining = math.max(0, fuelEnd - timeNow)
+        local ratio = if fuelDuration > 0 then remaining / fuelDuration else 0
+        setBar(fuelRow, ratio,
+            (if fuel == "embers" then "Угли · " else "Огонь · ") .. tostring(math.ceil(remaining)) .. "с",
+            if fuel == "embers" then Color3.fromRGB(192, 76, 67) else Color3.fromRGB(235, 145, 55))
+    end
+    if cook == "cooking" or cook == "ready" then
+        local remaining = math.max(0, cookEnd - timeNow)
+        setBar(cookRow, if cook == "ready" then 1 else if cookDuration > 0 then 1 - remaining / cookDuration else 0,
+            if cook == "ready" then "Готово" else tostring(math.ceil(remaining)) .. "с",
+            Color3.fromRGB(92, 171, 116))
+    end
+    panel.Visible = fuelRow.Visible or cookRow.Visible
 end
 
 function Controller.Start()
     if started then return end
     started = true
-    for _, instance in ipairs(Workspace:GetDescendants()) do listen(instance) end
+    local panel, fuelRow, cookRow = ui()
+    for _, descendant in ipairs(Workspace:GetDescendants()) do listen(descendant) end
     Workspace.DescendantAdded:Connect(listen)
-    local acc = 0
+    local elapsed = 0
     RunService.Heartbeat:Connect(function(dt)
-        acc += dt
-        if acc < 0.1 then return end
-        acc = 0
+        elapsed += dt
+        if elapsed < 0.1 then return end
+        elapsed = 0
         local root = SpatialRoot.Get(player)
-        if not root then
-            for _, gui in pairs(tracked) do gui.Enabled = false end
-            return
+        local closest: Attachment? = nil
+        local minDistance = math.huge
+        for socket in pairs(tracked) do
+            if not socket:IsDescendantOf(Workspace) then
+                tracked[socket] = nil
+                dismissed[socket] = nil
+            elseif root then
+                local radius = tonumber(socket:GetAttribute("Game1FireplaceVisibleRadius")) or Config.ProgressVisibleRadius
+                local distance = (socketPosition(socket) - root.Position).Magnitude
+                if distance > radius then
+                    dismissed[socket] = nil
+                elseif active(socket) and not dismissed[socket] and distance < minDistance then
+                    minDistance = distance
+                    closest = socket
+                end
+            end
         end
-        local serverNow = Workspace:GetServerTimeNow()
-        for socket, gui in pairs(tracked) do
-            updateOne(socket, gui, root, serverNow)
+        selected = closest
+        if closest and root then
+            render(closest, panel, fuelRow, cookRow, Workspace:GetServerTimeNow())
+        else
+            panel.Visible = false
         end
     end)
 end

@@ -9,6 +9,7 @@
 - **[Kanban · актуальное состояние 17 карточек](kanban/STATUS_2026-11-22_M439.md)** — проверка источников и открытая Studio/Android-приёмка; [спецификации карточек](kanban/README.md).
 - **[Текущее ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md)** и **[Архитектурная карта](architecture/CURRENT_ARCHITECTURE_RU.md)** — текущие приоритеты и реальные границы сервера, клиента, систем авторинга.
 - **[Mechanics House](workflows/MECHANICS_HOUSE_CATALOG_M436_RU.md)** — просмотр техкарт с дополнением M438a о Fireplace.
+- **[Камин и костёр · M442](workflows/CAMPFIRE_AND_FIREPLACE_M442_RU.md)** — единая механика готовки, условный дым, мобильный/ПК dock, HUD и редактируемые параметры.
 - Для LOD использовать текущие контрактные модули `location_streaming_config.py`, `LocationWorldStreamer.luau`, `lod_studio_preview.py`, а не общие пороги из исторического M355.
 
 ## 1. Действующие документы

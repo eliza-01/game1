@@ -3,7 +3,6 @@
 -- The server owns prompt/action state; client groups E/F into one badge.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -15,17 +14,31 @@ local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):Wait
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
 local Aim = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketAimPolicy"))
+local FireplaceConfig = require(Shared:WaitForChild("world"):WaitForChild("FireplaceMechanicsConfig"))
 local Occlusion = require(script.Parent:WaitForChild("HouseSocketAimOcclusion"))
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local player = Players.LocalPlayer
 local Controller = {}
 local started = false
 local prompts: {[ProximityPrompt]: RBXScriptConnection} = {}
--- One panel per visible socket: world badge on desktop, thumb dock on custom touch characters.
+-- One panel per selected socket: screen-right desktop dock / mobile thumb dock.
 local visible: {[Attachment]: LayerCollector} = {}
 local visibleSignature: {[Attachment]: string} = {}
-local nativeShown: {[ProximityPrompt]: boolean} = {}
-local selectedCustom: ProximityPrompt? = nil
+
+-- Campfire interaction is a separate Location-domain contract; the House
+-- registry must never treat fire_socket as a House socket.
+local CAMPFIRE_DEFINITION = {
+    name = "fire_socket", interact = true,
+    radius = FireplaceConfig.CampfireInteractionRadius,
+    hoverRadius = FireplaceConfig.CampfireAimRadius,
+}
+local function definitionFor(prompt: ProximityPrompt): any?
+    if prompt:GetAttribute("Game1SocketDomain") == "campfire" then
+        return if prompt:GetAttribute("Game1SocketName") == "fire_socket" then CAMPFIRE_DEFINITION else nil
+    end
+    local name = prompt:GetAttribute("Game1HouseSocketName")
+    return if typeof(name) == "string" then Contract.Get(name) else nil
+end
 
 local function radius(name: string): number
     local definition = Contract.Get(name)
@@ -56,16 +69,16 @@ end
 local function listen(instance: Instance)
     if not instance:IsA("ProximityPrompt") or (instance.Name ~= "Game1HouseInteraction"
         and instance.Name ~= "Game1HouseInteractionAlternate") or prompts[instance] then return end
-    local name = instance:GetAttribute("Game1HouseSocketName")
-    if typeof(name) ~= "string" or not Contract.Get(name) then return end
+    local definition = definitionFor(instance)
+    if not definition then return end
+    local name = definition.name
     local prompt: ProximityPrompt = instance
-    prompt.MaxActivationDistance = clientNativeDistance(name)
+    prompt.MaxActivationDistance = if definition == CAMPFIRE_DEFINITION then 0 else clientNativeDistance(name)
     prompts[prompt] = prompt.AncestryChanged:Connect(function()
         if not prompt:IsDescendantOf(Workspace) then
             local connection = prompts[prompt]
             if connection then connection:Disconnect() end
             prompts[prompt] = nil
-            nativeShown[prompt] = nil
             local socket = prompt.Parent
             if socket and socket:IsA("Attachment") then
                 local gui = visible[socket]
@@ -167,7 +180,9 @@ local function requestAction(prompt: ProximityPrompt)
     local key = prompt.KeyboardKeyCode.Name
     if key ~= "E" and key ~= "F" then return end
     local folder = ReplicatedStorage:FindFirstChild("Game1Remotes")
-    local remote = folder and folder:FindFirstChild("HouseSocketInteract")
+    local remoteName = if prompt:GetAttribute("Game1SocketDomain") == "campfire"
+        then "CampfireSocketInteract" else "HouseSocketInteract"
+    local remote = folder and folder:FindFirstChild(remoteName)
     if remote and remote:IsA("RemoteEvent") then
         remote:FireServer(socket, key)
     end
@@ -193,16 +208,17 @@ local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): Proximit
         if not prompt.Enabled or not prompt:IsDescendantOf(Workspace) then continue end
         local socket = prompt.Parent
         if not socket or not socket:IsA("Attachment") then continue end
-        local name = prompt:GetAttribute("Game1HouseSocketName")
-        if typeof(name) ~= "string" then continue end
-        local definition = Contract.Get(name)
+        local definition = definitionFor(prompt)
         if not definition or not definition.interact then continue end
+        local name = definition.name
         local frame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
         local distance = (frame.Position - root.Position).Magnitude
         -- USE always uses the character root, not the camera.
-        if distance > radius(name) then continue end
+        local maxDistance = if definition == CAMPFIRE_DEFINITION then definition.radius else radius(name)
+        if distance > maxDistance then continue end
         if definition.hoverRadius then
-            local hit = Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, hoverRadius(name))
+            local aimRadius = if definition == CAMPFIRE_DEFINITION then definition.hoverRadius else hoverRadius(name)
+            local hit = Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, aimRadius)
             if hit == nil then continue end
             if hit < aimEntry - 0.001 or (math.abs(hit - aimEntry) <= 0.001
                 and prompt.KeyboardKeyCode == Enum.KeyCode.E
@@ -227,44 +243,34 @@ end
 
 local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCollector
     local touch = UserInputService.TouchEnabled
-    local docked = touch and SpatialRoot.IsCustom(player)
-    local gui: LayerCollector
-    local panelHeight = 12 + #actions * (if touch then 52 else 40)
-    if docked then
-        local screen = Instance.new("ScreenGui")
-        screen.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
-        screen.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
-        screen.DisplayOrder = 16
-        gui = screen
-    else
-        local billboard = Instance.new("BillboardGui")
-        billboard.Adornee = socket
-        billboard.Size = UDim2.fromOffset(272, panelHeight)
-        billboard.Active = touch
-        billboard.StudsOffsetWorldSpace = Vector3.new(0, 1.45, 0)
-        billboard.AlwaysOnTop = true
-        billboard.LightInfluence = 0
-        gui = billboard
-    end
+    -- One input layout for desktop and mobile. Unlike the old BillboardGui,
+    -- this never overlaps the world reticle/camera at the socket position.
+    local gui = Instance.new("ScreenGui")
     gui.Name = "Game1HousePrompt"
+    gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+    gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+    gui.DisplayOrder = 16
     gui.ResetOnSpawn = false
     gui.Parent = player:WaitForChild("PlayerGui")
+    local panelHeight = 12 + #actions * (if touch then 52 else 44)
     local background = Instance.new("Frame")
     background.Name = "Panel"
     background.BackgroundColor3 = Color3.fromRGB(18, 24, 31)
     background.BackgroundTransparency = 0.06
-    background.Size = UDim2.fromScale(1, 1)
     background.Parent = gui
-    if gui:IsA("ScreenGui") then
-        local screen = gui
+    if touch then
         local function layout()
-            local bounds = MobileLayout.Context(screen.AbsoluteSize.X, screen.AbsoluteSize.Y, panelHeight)
+            local bounds = MobileLayout.Context(gui.AbsoluteSize.X, gui.AbsoluteSize.Y, panelHeight)
             background.AnchorPoint = Vector2.new(1, 1)
             background.Size = UDim2.fromOffset(bounds.width, panelHeight)
             background.Position = UDim2.new(1, -bounds.x, 1, -bounds.y)
         end
-        screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
+        gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
         layout()
+    else
+        background.AnchorPoint = Vector2.new(1, 0.5)
+        background.Size = UDim2.fromOffset(272, panelHeight)
+        background.Position = UDim2.new(1, -22, 0.5, 0)
     end
     rounded(background, 11)
     local stroke = Instance.new("UIStroke")
@@ -272,63 +278,31 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
     stroke.Thickness = 1
     stroke.Transparency = 0.12
     stroke.Parent = background
-    for index, prompt in actions do
-        local y = 6 + (index - 1) * (if touch then 52 else 40)
-        if touch then
-            -- One large direct-tap target for every available action, no E/F.
-            local action = Instance.new("TextButton")
-            action.Name = "TouchAction_" .. prompt.KeyboardKeyCode.Name
-            action.Position = UDim2.fromOffset(6, y)
-            action.Size = UDim2.new(1, -12, 0, 46)
-            action.BackgroundColor3 = Color3.fromRGB(37, 51, 62)
-            action.TextColor3 = Color3.fromRGB(244, 246, 249)
-            action.Font = Enum.Font.GothamSemibold
-            action.TextSize = 14
-            action.TextWrapped = true
-            action.Text = prompt.ActionText
-            action.AutoButtonColor = true
-            action.Active = true
-            action.Parent = background
-            rounded(action, 8)
-            action.Activated:Connect(function()
-                if docked then
-                    local root = SpatialRoot.Get(player)
-                    local selected = if root then nearestCustomPrompt(root, false) else nil
-                    if not selected or selected.Parent ~= socket then return end
-                end
-                requestAction(prompt)
-            end)
-            continue
-        end
-        local key = Instance.new("TextLabel")
-        key.Name = "Key"
-        key.Position = UDim2.fromOffset(8, y)
-        key.Size = UDim2.fromOffset(34, 34)
-        key.BackgroundColor3 = Color3.fromRGB(41, 54, 65)
-        key.TextColor3 = Color3.fromRGB(242, 246, 249)
-        key.Font = Enum.Font.GothamBold
-        key.TextSize = 16
-        key.Text = prompt.KeyboardKeyCode.Name
-        key.Parent = background
-        rounded(key, 7)
-        local keyStroke = Instance.new("UIStroke")
-        keyStroke.Color = Color3.fromRGB(122, 141, 155)
-        keyStroke.Transparency = 0.2
-        keyStroke.Parent = key
-        local text = Instance.new("TextLabel")
-        text.Name = "Action"
-        text.Position = UDim2.fromOffset(51, y)
-        text.Size = UDim2.new(1, -61, 0, 34)
-        text.BackgroundTransparency = 1
-        text.TextColor3 = Color3.fromRGB(244, 246, 249)
-        text.RichText = true
-        text.TextXAlignment = Enum.TextXAlignment.Left
-        text.TextYAlignment = Enum.TextYAlignment.Center
-        text.Font = Enum.Font.GothamSemibold
-        text.TextSize = 13
-        text.TextTruncate = Enum.TextTruncate.AtEnd
-        text.Text = actionLabel(prompt.ActionText)
-        text.Parent = background
+    for index, prompt in ipairs(actions) do
+        local y = 6 + (index - 1) * (if touch then 52 else 44)
+        local action = Instance.new("TextButton")
+        action.Name = "InteractionAction_" .. prompt.KeyboardKeyCode.Name
+        action.Position = UDim2.fromOffset(6, y)
+        action.Size = UDim2.new(1, -12, 0, if touch then 46 else 38)
+        action.BackgroundColor3 = Color3.fromRGB(37, 51, 62)
+        action.TextColor3 = Color3.fromRGB(244, 246, 249)
+        action.Font = Enum.Font.GothamSemibold
+        action.TextSize = 14
+        action.TextWrapped = true
+        action.AutoButtonColor = true
+        action.Active = true
+        action.RichText = true
+        action.Text = if touch then actionLabel(prompt.ActionText)
+            else ("[" .. prompt.KeyboardKeyCode.Name .. "]   " .. actionLabel(prompt.ActionText))
+        action.Parent = background
+        rounded(action, 8)
+        action.Activated:Connect(function()
+            if not prompt.Enabled or not prompt:IsDescendantOf(Workspace) then return end
+            local root = SpatialRoot.Get(player)
+            local selected = if root then nearestCustomPrompt(root, false) else nil
+            if not selected or selected.Parent ~= socket then return end
+            requestAction(prompt)
+        end)
     end
     return gui
 end
@@ -349,27 +323,15 @@ local function renderSocket(socket: Attachment)
     visibleSignature[socket] = state
 end
 
-local function nativeActive(socket: Attachment): boolean
-    for prompt in nativeShown do
-        if prompt.Parent == socket and prompt.Enabled then return true end
-    end
-    return false
-end
-
 local function updateCustomPrompt()
     local custom = SpatialRoot.IsCustom(player)
     local root = SpatialRoot.Get(player)
     local alive = not custom or (player.Character and player.Character:GetAttribute("LifeState") == "Alive")
-    local nextPrompt = if root and alive then nearestCustomPrompt(root, not custom) else nil
-    selectedCustom = nextPrompt
+    local nextPrompt = if root and alive then nearestCustomPrompt(root, false) else nil
     local anchor = if nextPrompt then nextPrompt.Parent else nil
     local selectedSocket = if anchor and anchor:IsA("Attachment") then anchor :: Attachment else nil
-    for socket in visible do
-        if socket == selectedSocket or (not custom and nativeActive(socket)) then
-            renderSocket(socket)
-        else
-            hideSocket(socket)
-        end
+    for socket in pairs(visible) do
+        if socket == selectedSocket then renderSocket(socket) else hideSocket(socket) end
     end
     if selectedSocket then renderSocket(selectedSocket) end
 end
@@ -455,8 +417,7 @@ function Controller.Start()
         -- an interaction after the camera turns away or an obstacle appears.
         local selected = nearestCustomPrompt(root, not SpatialRoot.IsCustom(player))
         if not selected or not selected:IsDescendantOf(Workspace) then return end
-        local name = selected:GetAttribute("Game1HouseSocketName")
-        local definition = if typeof(name) == "string" then Contract.Get(name) else nil
+        local definition = definitionFor(selected)
         if not definition or (not SpatialRoot.IsCustom(player) and not definition.hoverRadius) then return end
         local matching: ProximityPrompt? = nil
         for prompt in prompts do
@@ -468,25 +429,9 @@ function Controller.Start()
         if not matching then return end
         requestAction(matching)
     end)
-    ProximityPromptService.PromptShown:Connect(function(prompt)
-        if SpatialRoot.IsCustom(player) then return end
-        local socketName = prompt:GetAttribute("Game1HouseSocketName")
-        local definition = if typeof(socketName) == "string" then Contract.Get(socketName) else nil
-        if definition and definition.hoverRadius then return end
-        if prompt.Name ~= "Game1HouseInteraction" and prompt.Name ~= "Game1HouseInteractionAlternate" then return end
-        local socket = prompt.Parent
-        if not socket or not socket:IsA("Attachment") then return end
-        nativeShown[prompt] = true
-        renderSocket(socket)
-    end)
-    ProximityPromptService.PromptHidden:Connect(function(prompt)
-        if SpatialRoot.IsCustom(player) then return end
-        nativeShown[prompt] = nil
-        local socket = prompt.Parent
-        if socket and socket:IsA("Attachment") and not nativeActive(socket) then
-            hideSocket(socket)
-        end
-    end)
+    -- Native keyboard ProximityPrompt.Triggered remains connected on the
+    -- server; the custom dock owns only presentation and direct-click actions.
+
 end
 
 return table.freeze(Controller)

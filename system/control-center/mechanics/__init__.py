@@ -1,1 +1,1 @@
-"""Read-only technical maps for Game1 mechanics, independent of gameplay state."""
+"""Technical maps and validated shared tuning for Game1 mechanics."""

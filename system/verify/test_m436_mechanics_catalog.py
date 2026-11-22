@@ -106,7 +106,7 @@ class MechanicsM436(unittest.TestCase):
         app = (ROOT/'system/control-center/static/character-assets.js').read_text('utf-8')
         view = (ROOT/'system/control-center/static/mechanics.js').read_text('utf-8')
         for needle in ('nav-mechanics', 'mechanics-view', 'mechanics-domains', 'mechanics-list', 'mechanics-refresh',
-                       'mechanics.css?v=436','mechanics.js?v=436'):
+                       'mechanics.css?v=442','mechanics.js?v=442'):
             self.assertIn(needle,index)
         for needle in ('ASSET_MANAGER_VIEWS', "setView('mechanics')", "view!=='mechanics'", "window.game1MechanicsLoad"):
             self.assertIn(needle,app)

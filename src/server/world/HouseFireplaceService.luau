@@ -11,7 +11,12 @@ local Service = {}
 
 type State = {
     house: Model,
+    kind: string,
     socket: Attachment,
+    potMountSocket: Attachment,
+    chimney: ParticleEmitter?,
+    fireAuthored: boolean,
+    lightAuthored: boolean,
     runtimeFolder: Folder,
     primaryPrompt: ProximityPrompt?,
     alternatePrompt: ProximityPrompt?,
@@ -65,8 +70,22 @@ local function fireAnchor(state: State): Attachment
 end
 
 local function ensureFireVisual(state: State, enabled: boolean)
-    local anchor = fireAnchor(state)
     local fire = state.fire
+    -- Campfires may already have Fire/PointLight from Fire Tuner. Keep their
+    -- authored settings exactly; only change Enabled. Never double the effects.
+    if state.kind == "campfire" and not fire then
+        for _, child in ipairs(state.socket:GetDescendants()) do
+            if child:IsA("Fire") and not state.fire then
+                state.fire = child
+                state.fireAuthored = true
+            elseif child:IsA("PointLight") and not state.light then
+                state.light = child
+                state.lightAuthored = true
+            end
+        end
+        fire = state.fire
+    end
+    local anchor = if not fire or not state.light then fireAnchor(state) else nil
     if not fire then
         fire = Instance.new("Fire")
         fire.Name = "Game1FireplaceFlame"
@@ -155,7 +174,7 @@ local function syncPromptState(state: State)
     if primary then
         primary.Enabled = false
         if state.fuelStage == "empty" then
-            if not state.potInstance then
+            if not state.potInstance or state.potState == "idle" then
                 primary.ActionText = "Разжечь огонь"
                 primary.Enabled = true
             elseif state.potState == "ready" then
@@ -165,7 +184,7 @@ local function syncPromptState(state: State)
                 primary.ActionText = if state.potState == "cooking" then "Блюдо готовится" else "Камин"
                 primary.Enabled = false
             end
-        elseif state.fuelStage == "firewood" and not state.potInstance then
+        elseif (state.fuelStage == "firewood" or state.fuelStage == "fire") and not state.potInstance then
             primary.ActionText = "Поставить котел"
             primary.Enabled = true
         elseif state.potInstance then
@@ -202,6 +221,7 @@ local function syncAttributes(state: State)
     socket:SetAttribute("Game1FireplaceVisibleRadius", Config.ProgressVisibleRadius)
     syncPromptState(state)
     ensureSteam(state, state.potInstance ~= nil and state.fuelStage ~= "empty")
+    if state.chimney then state.chimney.Enabled = state.fuelStage ~= "empty" end
 end
 
 local function replaceFuel(state: State, slug: string?): boolean
@@ -227,6 +247,10 @@ end
 
 local function transitionToEmbers(state: State, revision: number)
     if states[state.house] ~= state or state.fuelRevision ~= revision then return end
+    if state.kind == "campfire" then
+        transitionToEmpty(state, revision)
+        return
+    end
     if not replaceFuel(state, "embers_01") then
         transitionToEmpty(state, revision)
         return
@@ -242,15 +266,15 @@ local function transitionToEmbers(state: State, revision: number)
 end
 
 local function startFire(state: State): boolean
-    if not replaceFuel(state, "firewood_01") then return false end
+    if state.kind == "house" and not replaceFuel(state, "firewood_01") then return false end
     state.fuelRevision += 1
-    state.fuelStage = "firewood"
-    state.fuelDuration = Config.FuelDurationSeconds
-    state.fuelEndsAt = now() + Config.FuelDurationSeconds
+    state.fuelStage = if state.kind == "campfire" then "fire" else "firewood"
+    state.fuelDuration = if state.kind == "campfire" then Config.CampfireDurationSeconds else Config.FuelDurationSeconds
+    state.fuelEndsAt = now() + state.fuelDuration
     ensureFireVisual(state, true)
     syncAttributes(state)
     local revision = state.fuelRevision
-    task.delay(Config.FuelDurationSeconds, function()
+    task.delay(state.fuelDuration, function()
         transitionToEmbers(state, revision)
     end)
     return true
@@ -270,7 +294,8 @@ local function removePot(state: State)
 end
 
 local function placePot(state: State): boolean
-    local instance, potSocket = Mount.Spawn("cooking_pot_01", state.runtimeFolder, state.socket)
+    local ownerHeading = if state.kind == "campfire" then state.house:GetPivot().LookVector else nil
+    local instance, potSocket = Mount.Spawn("cooking_pot_01", state.runtimeFolder, state.potMountSocket, ownerHeading)
     if not instance or not potSocket then return false end
     state.potInstance = instance
     state.potSocket = potSocket
@@ -307,14 +332,19 @@ function Service.SetFeedbackRemote(remote: RemoteEvent)
     feedbackRemote = remote
 end
 
-function Service.Register(house: Model, socket: Attachment, generated: {Instance}?)
+local function register(house: Model, socket: Attachment, potSocket: Attachment, kind: string, generated: {Instance}?)
     if states[house] then return end
     local folder = Instance.new("Folder")
     folder.Name = "Game1FireplaceRuntime"
     folder.Parent = house
     local state: State = {
         house = house,
+        kind = kind,
         socket = socket,
+        potMountSocket = potSocket,
+        chimney = nil,
+        fireAuthored = false,
+        lightAuthored = false,
         runtimeFolder = folder,
         primaryPrompt = nil,
         alternatePrompt = nil,
@@ -338,7 +368,26 @@ function Service.Register(house: Model, socket: Attachment, generated: {Instance
     }
     states[house] = state
     if generated then table.insert(generated, folder) end
+    if kind == "campfire" then ensureFireVisual(state, false) end
     syncAttributes(state)
+end
+
+function Service.Register(house: Model, socket: Attachment, generated: {Instance}?)
+    register(house, socket, socket, "house", generated)
+end
+
+function Service.RegisterCampfire(model: Model, fireSocket: Attachment, cookingSocket: Attachment)
+    register(model, fireSocket, cookingSocket, "campfire", nil)
+end
+
+function Service.BindChimney(house: Model, emitter: ParticleEmitter)
+    local state = states[house]
+    if not state then
+        emitter.Enabled = false
+        return
+    end
+    state.chimney = emitter
+    emitter.Enabled = state.fuelStage ~= "empty"
 end
 
 function Service.BindPrompts(house: Model, socket: Attachment, primary: ProximityPrompt?, alternate: ProximityPrompt?)
@@ -355,6 +404,8 @@ function Service.Unregister(house: Model)
     states[house] = nil
     if state.steam then state.steam:Destroy() end
     if state.steamAnchor then state.steamAnchor:Destroy() end
+    if state.fireAuthored and state.fire then state.fire.Enabled = false end
+    if state.lightAuthored and state.light then state.light.Enabled = false end
     if state.fireAnchor then state.fireAnchor:Destroy() end
     if state.runtimeFolder then state.runtimeFolder:Destroy() end
     local socket = state.socket
@@ -373,7 +424,7 @@ function Service.Interact(house: Model, player: Player, key: string)
         end
         return
     end
-    if state.fuelStage == "empty" and not state.potInstance then
+    if state.fuelStage == "empty" and (not state.potInstance or state.potState == "idle") then
         if not startFire(state) then
             notify(player, "Дрова недоступны: проверь опубликованный firewood_01")
             return
@@ -384,7 +435,7 @@ function Service.Interact(house: Model, player: Player, key: string)
         notify(player, "Огонь разожжён")
         return
     end
-    if state.fuelStage == "firewood" and not state.potInstance then
+    if (state.fuelStage == "firewood" or state.fuelStage == "fire") and not state.potInstance then
         if placePot(state) then
             notify(player, "Котел установлен")
         else

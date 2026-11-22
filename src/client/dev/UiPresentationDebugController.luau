@@ -2,6 +2,7 @@
 -- Studio Play-only live layout control; the plugin relays drafts to Control
 -- Center's UI Options. Nothing here writes to the saved configuration.
 local Players = game:GetService("Players")
+local TextService = game:GetService("TextService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Access = require(ReplicatedStorage:WaitForChild("Game1Shared")
     :WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
@@ -10,6 +11,7 @@ local Contract = require(ReplicatedStorage:WaitForChild("Game1Shared")
 local Dock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
 local Settings = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("UiPresentationSettings"))
+local ResourceFeedback = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("FloatingResourceFeedback"))
 
 local Debug = {}
 local started = false
@@ -23,8 +25,8 @@ local TITLES = {interaction="INTERACTION", status="FIRE / FOOD", notification="N
 local FIELDS = {
     interaction={"offsetXPx", "offsetYPx", "widthPx", "fontPx"},
     status={"offsetXPx", "offsetYPx", "titleFontPx", "labelFontPx", "timerFontPx"},
-    notification={"offsetXPx", "offsetYPx", "fontPx", "durationSeconds"},
-    resource={"offsetXPx", "offsetYPx", "fontPx", "risePx", "durationSeconds"},
+    notification={"offsetXPx", "offsetYPx", "fontPx", "paddingPx", "durationSeconds"},
+    resource={"offsetXPx", "offsetYPx", "fontPx", "paddingPx", "risePx", "durationSeconds"},
 }
 
 local function make(parent: Instance, kind: string, fields: {[string]: any}): any
@@ -99,6 +101,7 @@ function Debug.Start()
     status.TextSize = 10
     local previewScreen, sample, caption = previewSurface(playerGui)
     local activePreview = false
+    local resourcePreview: BillboardGui? = nil
     local remote: RemoteEvent? = nil
     task.spawn(function()
         local remotes = ReplicatedStorage:WaitForChild("Game1Remotes",15)
@@ -123,9 +126,12 @@ function Debug.Start()
     local latest = 0
 
     local function showSample()
-        sample.Visible = activePreview
+        if resourcePreview then resourcePreview:Destroy(); resourcePreview = nil end
+        sample.Visible = activePreview and group ~= "resource"
         if not activePreview then return end
         local cfg = drafts[device][group]
+        caption.Position=UDim2.fromOffset(10,7)
+        caption.Size=UDim2.new(1,-20,1,-14)
         if group == "interaction" then
             if device == "mobile" then
                 local bounds = MobileLayout.Context(previewScreen.AbsoluteSize.X, previewScreen.AbsoluteSize.Y, 70)
@@ -149,15 +155,16 @@ function Debug.Start()
         elseif group == "notification" then
             sample.AnchorPoint=Vector2.new(0.5,1)
             sample.Position=UDim2.new(0.5,cfg.offsetXPx,0.83,cfg.offsetYPx)
-            sample.Size=UDim2.fromOffset(310,65)
             caption.TextSize=cfg.fontPx
             caption.Text="Переход завершён"
+            local measured = TextService:GetTextSize(caption.Text, cfg.fontPx, Enum.Font.GothamSemibold,
+                Vector2.new(430 - cfg.paddingPx*2, 400))
+            sample.Size=UDim2.fromOffset(measured.X+cfg.paddingPx*2, measured.Y+cfg.paddingPx*2)
+            caption.Position=UDim2.fromOffset(cfg.paddingPx,cfg.paddingPx)
+            caption.Size=UDim2.fromOffset(measured.X,measured.Y)
         else
-            sample.AnchorPoint=Vector2.new(0.5,1)
-            sample.Position=UDim2.new(0.5,cfg.offsetXPx,0.78,cfg.offsetYPx)
-            sample.Size=UDim2.fromOffset(255,60)
-            caption.TextSize=cfg.fontPx
-            caption.Text="🪵  −5  Дерево"
+            -- Live head-mounted sample; no resource event or server writes.
+            resourcePreview = ResourceFeedback.Preview(cfg)
         end
     end
     local function preview()
@@ -183,6 +190,7 @@ function Debug.Start()
         latest += 1
         activePreview=false
         sample.Visible=false
+        if resourcePreview then resourcePreview:Destroy(); resourcePreview=nil end
         Settings.Preview(nil,nil)
         status.Text="Saved presentation restored; nothing persisted"
     end
@@ -208,7 +216,7 @@ function Debug.Start()
             item.TextColor3=if key==group then BG else INK
         end
         for index,key in ipairs(FIELDS[group]) do
-            local y=(index-1)*42
+            local y=(index-1)*36
             local value=drafts[device][group][key]
             label(rows,key,0,y,126)
             local minus=button(rows,"−",29,30); minus.Position=UDim2.fromOffset(131,y)

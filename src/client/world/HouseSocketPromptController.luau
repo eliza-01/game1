@@ -6,11 +6,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 
 local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
 local UiSettings = require(script.Parent:WaitForChild("UiPresentationSettings"))
+local ResourceFeedback = require(script.Parent:WaitForChild("FloatingResourceFeedback"))
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
@@ -102,42 +103,6 @@ local function rounded(parent: Instance, radiusPixels: number)
     local item = Instance.new("UICorner")
     item.CornerRadius = UDim.new(0, radiusPixels)
     item.Parent = parent
-end
-
-local RESOURCE_ICONS = {
-    wood = "🪵",
-    carrot = "🥕",
-    onion = "🧅",
-    potato = "🥔",
-}
-
-local function showFloatingSpend(layer: ScreenGui, items: {any})
-    local host = layer:FindFirstChild("SpendHost")
-    if not host or not host:IsA("Frame") then return end
-    local cfg = UiSettings.Current().resource
-    for index, item in ipairs(items) do
-        local label = Instance.new("TextLabel")
-        label.AnchorPoint = Vector2.new(0.5, 1)
-        label.Position = UDim2.new(0.5, cfg.offsetXPx, 0.78, cfg.offsetYPx - (index - 1) * (cfg.fontPx + 10))
-        label.Size = UDim2.fromOffset(math.max(240, cfg.fontPx * 16), math.max(24, cfg.fontPx + 8))
-        label.BackgroundTransparency = 1
-        label.TextColor3 = Color3.fromRGB(244, 246, 249)
-        label.TextStrokeTransparency = 0.55
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = cfg.fontPx
-        local icon = RESOURCE_ICONS[tostring(item.icon or "")] or "•"
-        local amount = tonumber(item.amount) or 0
-        local amountText = if amount > 0 then "+" .. tostring(amount) else tostring(amount)
-        label.Text = string.format("%s  %s  %s", icon, amountText, tostring(item.label or ""))
-        label.Parent = host
-        local tween = TweenService:Create(label, TweenInfo.new(cfg.durationSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Position = label.Position - UDim2.fromOffset(0, cfg.risePx),
-            TextTransparency = 1,
-            TextStrokeTransparency = 1,
-        })
-        tween:Play()
-        tween.Completed:Connect(function() label:Destroy() end)
-    end
 end
 
 -- E and F at the same socket are represented as ONE panel. Both actions
@@ -368,40 +333,50 @@ function Controller.Start()
         gui.DisplayOrder = 35
         gui.ResetOnSpawn = false
         gui.Parent = player:WaitForChild("PlayerGui")
+        local notification = Instance.new("Frame")
+        notification.Name = "NotificationBox"
+        notification.AnchorPoint = Vector2.new(0.5, 1)
+        notification.BackgroundColor3 = Color3.fromRGB(22, 30, 39)
+        notification.BackgroundTransparency = 0.05
+        notification.BorderSizePixel = 0
+        notification.Visible = false
+        notification.Parent = gui
+        rounded(notification, 8)
         local message = Instance.new("TextLabel")
-        message.AnchorPoint = Vector2.new(0.5, 1)
-        message.Position = UDim2.new(0.5, 0, 0.83, 0)
-        message.Size = UDim2.fromOffset(280, 42)
-        message.BackgroundColor3 = Color3.fromRGB(22, 30, 39)
+        message.Name = "Message"
+        message.BackgroundTransparency = 1
         message.TextColor3 = Color3.fromRGB(239, 245, 248)
         message.Font = Enum.Font.GothamMedium
-        message.TextSize = UiSettings.Current().notification.fontPx
-        message.Visible = false
-        message.Parent = gui
-        rounded(message, 9)
-        local spendHost = Instance.new("Frame")
-        spendHost.Name = "SpendHost"
-        spendHost.BackgroundTransparency = 1
-        spendHost.Active = false
-        spendHost.Size = UDim2.fromScale(1, 1)
-        spendHost.Parent = gui
+        message.TextWrapped = true
+        message.TextXAlignment = Enum.TextXAlignment.Center
+        message.Parent = notification
+        local revision = 0
+        local currentText = ""
         local function applyFeedbackSettings()
             local config = UiSettings.Current().notification
-            message.Position = UDim2.new(0.5, config.offsetXPx, 0.83, config.offsetYPx)
-            message.TextSize = config.fontPx
-            message.TextWrapped = true
-            message.Size = UDim2.fromOffset(math.clamp(config.fontPx * 21, 280, 550), math.max(42, config.fontPx + 22))
+            local padding = tonumber(config.paddingPx) or 5
+            local fontPx = tonumber(config.fontPx) or 13
+            -- Measure at the configured font so only the content + padding is
+            -- painted, not the old permanent 280×42 rectangle.
+            local bounds = TextService:GetTextSize(currentText, fontPx, Enum.Font.GothamMedium,
+                Vector2.new(430 - 2 * padding, 400))
+            notification.Position = UDim2.new(0.5, config.offsetXPx, 0.83, config.offsetYPx)
+            notification.Size = UDim2.fromOffset(bounds.X + 2 * padding, bounds.Y + 2 * padding)
+            message.Position = UDim2.fromOffset(padding, padding)
+            message.Size = UDim2.fromOffset(bounds.X, bounds.Y)
+            message.TextSize = fontPx
         end
         applyFeedbackSettings()
         UiSettings.Changed:Connect(applyFeedbackSettings)
-        local revision = 0
         local function showMessage(text: string)
             revision += 1
             local thisRevision = revision
+            currentText = text
             message.Text = text
-            message.Visible = true
+            applyFeedbackSettings()
+            notification.Visible = true
             task.delay(UiSettings.Current().notification.durationSeconds, function()
-                if revision == thisRevision then message.Visible = false end
+                if revision == thisRevision then notification.Visible = false end
             end)
         end
         feedbackRemote.OnClientEvent:Connect(function(payload)
@@ -413,7 +388,7 @@ function Controller.Start()
             if payload.kind == "toast" and typeof(payload.text) == "string" then
                 showMessage(payload.text)
             elseif payload.kind == "resource" and typeof(payload.items) == "table" then
-                showFloatingSpend(gui, payload.items)
+                ResourceFeedback.Show(payload.items)
             end
         end)
     end)

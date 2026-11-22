@@ -76,21 +76,21 @@ UI_PROFILE_DEFAULTS = {
     "desktop": {
         "interaction": {"offsetXPx": 0, "offsetYPx": 0, "widthPx": 272, "fontPx": 14},
         "status": {"offsetXPx": 0, "offsetYPx": 0, "titleFontPx": 13, "labelFontPx": 12, "timerFontPx": 11},
-        "notification": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 13, "durationSeconds": 2.7},
-        "resource": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 18, "risePx": 34, "durationSeconds": 0.9},
+        "notification": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 13, "paddingPx": 5, "durationSeconds": 2.7},
+        "resource": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 18, "paddingPx": 5, "risePx": 34, "durationSeconds": 0.9},
     },
     "mobile": {
         "interaction": {"offsetXPx": 0, "offsetYPx": 0, "widthPx": 272, "fontPx": 14},
         "status": {"offsetXPx": 0, "offsetYPx": 0, "titleFontPx": 13, "labelFontPx": 12, "timerFontPx": 11},
-        "notification": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 13, "durationSeconds": 2.7},
-        "resource": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 18, "risePx": 34, "durationSeconds": 0.9},
+        "notification": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 13, "paddingPx": 5, "durationSeconds": 2.7},
+        "resource": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 18, "paddingPx": 5, "risePx": 34, "durationSeconds": 0.9},
     },
 }
 UI_FIELD_BOUNDS = {
     'offsetXPx': (-500, 500), 'offsetYPx': (-500, 500),
     'widthPx': (180, 450), 'fontPx': (10, 36),
     'titleFontPx': (10, 36), 'labelFontPx': (10, 36),
-    'timerFontPx': (9, 36), 'risePx': (0, 200),
+    'timerFontPx': (9, 36), 'paddingPx': (0, 24), 'risePx': (0, 200),
     'durationSeconds': (0.2, 15),
 }
 
@@ -341,6 +341,12 @@ class OptionsStore:
         normalized_health = normalize_health_ui(payload['healthUi'])
         if normalized_health != payload['healthUi']:
             payload['healthUi'] = normalized_health
+            changed = True
+        # Add newly introduced UI fields to both device profiles in existing
+        # manifests without erasing player-authored offsets/fonts/timers.
+        upgraded_ui = normalize_ui_presentation(payload['uiPresentation'], UI_PROFILE_DEFAULTS)
+        if upgraded_ui != payload['uiPresentation']:
+            payload['uiPresentation'] = upgraded_ui
             changed = True
         if changed:
             payload["schemaVersion"] = 1

@@ -7,20 +7,20 @@ Contract.Defaults = table.freeze({
     desktop = table.freeze({
         interaction = table.freeze({offsetXPx=0, offsetYPx=0, widthPx=272, fontPx=14}),
         status = table.freeze({offsetXPx=0, offsetYPx=0, titleFontPx=13, labelFontPx=12, timerFontPx=11}),
-        notification = table.freeze({offsetXPx=0, offsetYPx=0, fontPx=13, durationSeconds=2.7}),
-        resource = table.freeze({offsetXPx=0, offsetYPx=0, fontPx=18, risePx=34, durationSeconds=0.9}),
+        notification = table.freeze({offsetXPx=0, offsetYPx=0, fontPx=13, paddingPx=5, durationSeconds=2.7}),
+        resource = table.freeze({offsetXPx=0, offsetYPx=0, fontPx=18, paddingPx=5, risePx=34, durationSeconds=0.9}),
     }),
     mobile = table.freeze({
         interaction = table.freeze({offsetXPx=0, offsetYPx=0, widthPx=272, fontPx=14}),
         status = table.freeze({offsetXPx=0, offsetYPx=0, titleFontPx=13, labelFontPx=12, timerFontPx=11}),
-        notification = table.freeze({offsetXPx=0, offsetYPx=0, fontPx=13, durationSeconds=2.7}),
-        resource = table.freeze({offsetXPx=0, offsetYPx=0, fontPx=18, risePx=34, durationSeconds=0.9}),
+        notification = table.freeze({offsetXPx=0, offsetYPx=0, fontPx=13, paddingPx=5, durationSeconds=2.7}),
+        resource = table.freeze({offsetXPx=0, offsetYPx=0, fontPx=18, paddingPx=5, risePx=34, durationSeconds=0.9}),
     }),
 })
 Contract.Bounds = table.freeze({
     offsetXPx={-500,500}, offsetYPx={-500,500}, widthPx={180,450},
     fontPx={10,36}, titleFontPx={10,36}, labelFontPx={10,36}, timerFontPx={9,36},
-    risePx={0,200}, durationSeconds={0.2,15},
+    risePx={0,200}, paddingPx={0,24}, durationSeconds={0.2,15},
 })
 function Contract.Validate(device: any, data: any): {[string]: any}?
     if device ~= "desktop" and device ~= "mobile" or type(data) ~= "table" then return nil end

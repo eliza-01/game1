@@ -473,7 +473,7 @@ function Service.Interact(house: Model, player: Player, key: string)
             state.cookDuration = 0
             state.cookOwner = nil
             syncAttributes(state)
-            notify(player, "Блюдо получено")
+            notify(player, {kind = "resource", items = {{icon = "meal", amount = 1, label = "Блюдо"}}})
             return
         end
     end

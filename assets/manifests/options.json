@@ -162,12 +162,14 @@
         "offsetXPx": 0,
         "offsetYPx": 30,
         "fontPx": 13,
+        "paddingPx": 5,
         "durationSeconds": 2.7
       },
       "resource": {
         "offsetXPx": 0,
         "offsetYPx": 0,
         "fontPx": 18,
+        "paddingPx": 5,
         "risePx": 34,
         "durationSeconds": 3.0
       }
@@ -180,7 +182,7 @@
         "fontPx": 14
       },
       "status": {
-        "offsetXPx": 0,
+        "offsetXPx": 23,
         "offsetYPx": 0,
         "titleFontPx": 13,
         "labelFontPx": 12,
@@ -190,12 +192,14 @@
         "offsetXPx": 0,
         "offsetYPx": 0,
         "fontPx": 13,
+        "paddingPx": 5,
         "durationSeconds": 2.7
       },
       "resource": {
         "offsetXPx": 0,
         "offsetYPx": 0,
         "fontPx": 18,
+        "paddingPx": 5,
         "risePx": 34,
         "durationSeconds": 0.9
       }

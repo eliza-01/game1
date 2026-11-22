@@ -20,7 +20,12 @@ class M440FireplaceVisualMountCamera(unittest.TestCase):
         camera = source('src/client/character/CameraController.luau')
         guard = source('src/client/UiInputGuard.luau')
         self.assertRegex(prompts, r'gui.Name = "Game1HouseFeedback"\s*--[^\n]*\n\s*--[^\n]*\n\s*gui:SetAttribute\("WorldInputPassthrough", true\)')
-        self.assertIn('spendHost.Active = false', prompts)
+        # M444 moved resource feedback from the fullscreen ScreenGui to
+        # per-event, head-anchored BillboardGuis with no pointer capture.
+        resources = source('src/client/world/FloatingResourceFeedback.luau')
+        self.assertIn('ResourceFeedback.Show(payload.items)', prompts)
+        self.assertIn('billboard.Active = false', resources)
+        self.assertIn('billboard:SetAttribute("WorldInputPassthrough", true)', resources)
         self.assertIn('WorldInputPassthrough', guard)
         self.assertIn('UiInputGuard.BlocksWorldInput(input, gameProcessed)', camera)
 

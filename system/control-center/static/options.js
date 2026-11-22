@@ -277,8 +277,8 @@ $('option-published-debug-save').onclick=()=>{
 const GAME1_UI_FIELDS = {
   interaction: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['widthPx','Window width · px',180,450,1],['fontPx','Button font · px',10,36,1]],
   status: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['titleFontPx','Title font · px',10,36,1],['labelFontPx','Row font · px',10,36,1],['timerFontPx','Timer font · px',9,36,1]],
-  notification: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['fontPx','Message font · px',10,36,1],['durationSeconds','Hide after · sec',0.2,15,0.1]],
-  resource: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['fontPx','Resource font · px',10,36,1],['risePx','Float distance · px',0,200,1],['durationSeconds','Fade time · sec',0.2,15,0.1]],
+  notification: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['fontPx','Message font · px',10,36,1],['paddingPx','Box padding · px',0,24,1],['durationSeconds','Hide after · sec',0.2,15,0.1]],
+  resource: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['fontPx','Resource font · px',10,36,1],['paddingPx','Box padding · px',0,24,1],['risePx','Float distance · px',0,200,1],['durationSeconds','Fade time · sec',0.2,15,0.1]],
 };
 function game1UiEnsure(){
   if(!game1OptionsState.uiDrafts)game1OptionsState.uiDrafts=JSON.parse(JSON.stringify(game1OptionsState.data?.uiPresentation||{}));
@@ -298,7 +298,7 @@ function game1UiRender(){
   $('option-ui-mobile').classList.toggle('primary',device==='mobile');
   const profile=game1OptionsState.uiDrafts?.[device];if(!profile)return;
   $('option-ui-fields').innerHTML=Object.entries(GAME1_UI_FIELDS).map(([group,fields])=>
-    `<section class="game1-ui-group"><h4>${({interaction:'01 · Interaction window',status:'02 · Fire & cooking status',notification:'03 · Notifications / transitions',resource:'04 · Resource spending'}[group])}</h4>`+
+    `<section class="game1-ui-group"><h4>${({interaction:'01 · Interaction window',status:'02 · Fire & cooking status',notification:'03 · Notifications / transitions',resource:'04 · Resource gain / spending'}[group])}</h4>`+
     fields.map(([key,label,min,max,step])=>`<label>${label}<input type="number" id="option-ui-${group}-${key}" min="${min}" max="${max}" step="${step}" value="${Number(profile[group]?.[key]??0)}"></label>`).join('')+'</section>').join('');
 }
 function game1UiRead(){

@@ -320,6 +320,18 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {'error': str(error)})
 
+    if path.startswith('/api/texture-atlases/variants/') and path.endswith('/favorite'):
+        try:
+            raw = path[len('/api/texture-atlases/variants/'):-len('/favorite')].strip('/')
+            if not raw.isdigit():
+                raise ValueError('invalid atlas variant ID')
+            payload = body()
+            if not isinstance(payload, dict) or set(payload) != {'favorite'} or type(payload['favorite']) is not bool:
+                raise ValueError('favorite must be a boolean')
+            return out(200, {'variant': location_assets.atlases.set_favorite(int(raw), payload['favorite'])})
+        except (ValueError, OSError) as error:
+            return out(400, {'error': str(error)})
+
     if path.startswith('/api/texture-atlases/variants/') and path.endswith('/retire'):
         try:
             raw = path[len('/api/texture-atlases/variants/'):-len('/retire')].strip('/')

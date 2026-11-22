@@ -57,12 +57,17 @@
   }
   function formDirty(){return !!data&&!!original&&JSON.stringify(payload())!==original;}
   function canDiscard(){return !formDirty()||confirm('Отменить несохранённые изменения?');}
+  function fillAtlasPicker(slot,value){
+    if(!data?.armor?.atlases)return;
+    const variants=window.game1AtlasFavorites?.ordered(data.armor.atlases)||data.armor.atlases;
+    setSelect(byId('atlas-'+slot),variants.map(v=>({label:(window.game1AtlasFavorites?.star(v)||'')+v.atlas_key+' · '+v.resolution+(v.current?'':' · unpublished'),value:String(v.id)})),
+      value,'Без атласа / solid');
+  }
   function fillFaces(values={},textures={},colors={}){
     for(const slot of slots){
       setSelect(byId('slot-'+slot),faceRows(slot).map(row=>({label:row.id+(row.model_asset_id?'':' · unpublished'),value:row.id})),values[slot]);
       if(atlasSlots.includes(slot)){
-        setSelect(byId('atlas-'+slot),data.armor.atlases.map(v=>({label:v.atlas_key+' · '+v.resolution+(v.current?'':' · unpublished'),value:String(v.id)})),
-          textures[slot], 'Без атласа / solid');
+        fillAtlasPicker(slot,textures[slot]);
       }else{
         byId('color-'+slot).value=colors[slot]||'#ffffff';
       }
@@ -234,6 +239,11 @@
     data=await post(base,body);
     edit(current(body.id));render();await loadCharacters();
     message(current(body.id).assembly_resolved.ready?'Saved · ready for Studio Play.':'Saved draft · missing published dependencies.');
+  });
+  // Favorite priority updates live; preserve both atlas selections and unsaved recipe.
+  window.addEventListener('game1-atlas-favorite-changed',()=>{
+    if(!data)return;
+    for(const slot of atlasSlots)fillAtlasPicker(slot,byId('atlas-'+slot).value);
   });
   window.addEventListener('character-components-changed',()=>{if(data&&!busy)refresh().catch(e=>message(e.message,true));});
   window.addEventListener('character-armor-changed',()=>{if(data&&!busy)refresh().catch(e=>message(e.message,true));});

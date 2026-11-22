@@ -221,6 +221,36 @@ class AtlasRegistry:
                 added_at REAL NOT NULL,
                 PRIMARY KEY (consumer_type,consumer_id,variant_id))""")
 
+        # M435: Atlas favorites belong to variants, not individual consumers.
+        # Create an online backup before the additive migration of a populated DB.
+        with self.connect() as db:
+            existing = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='texture_atlas_favorites'").fetchone()
+            populated = db.execute('SELECT 1 FROM texture_atlas_variants LIMIT 1').fetchone()
+            if not existing and populated:
+                backup_dir = self.db.parent / 'backups'
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                with connect_sqlite(backup_dir / ('before_atlas_favorites_m435_' + uuid.uuid4().hex + '.db')) as backup:
+                    db.backup(backup)
+            db.execute("""CREATE TABLE IF NOT EXISTS texture_atlas_favorites (
+                variant_id INTEGER PRIMARY KEY REFERENCES texture_atlas_variants(id),
+                starred_at REAL NOT NULL)""")
+
+    def set_favorite(self, variant_id: int, favorite: bool) -> dict:
+        """Persist only list priority; never change an atlas binding or publication."""
+        if type(variant_id) is not int or variant_id <= 0 or type(favorite) is not bool:
+            raise ValueError('favorite requires a positive variant ID and a boolean')
+        with self.connect() as db:
+            active = db.execute('SELECT id FROM texture_atlas_variants WHERE id=? AND retired_at IS NULL',
+                                (variant_id,)).fetchone()
+            if not active:
+                raise ValueError('unknown active atlas variant')
+            if favorite:
+                db.execute('INSERT OR IGNORE INTO texture_atlas_favorites(variant_id,starred_at) VALUES(?,?)',
+                           (variant_id, time.time()))
+            else:
+                db.execute('DELETE FROM texture_atlas_favorites WHERE variant_id=?', (variant_id,))
+        return self.get_variant(variant_id)
+
     def _enable_retired_key_reuse(self) -> None:
         index_name = 'ux_texture_atlas_active_resolution'
         with _UPLOAD_LOCK:
@@ -365,7 +395,8 @@ class AtlasRegistry:
 
     def get_variant(self, variant_id: int) -> dict | None:
         with self.connect() as db:
-            row = db.execute('''SELECT v.*, f.atlas_key, r.source_sha256 AS replacement_sha256
+            row = db.execute('''SELECT v.*, f.atlas_key, r.source_sha256 AS replacement_sha256,
+                    EXISTS(SELECT 1 FROM texture_atlas_favorites fav WHERE fav.variant_id=v.id) AS favorite
                 FROM texture_atlas_variants v
                 JOIN texture_atlas_families f ON f.id=v.family_id
                 LEFT JOIN texture_atlas_replacements r ON r.variant_id=v.id
@@ -378,6 +409,7 @@ class AtlasRegistry:
         row['current'] = bool(not row['retired'] and row.get('published_id') and row['published_sha256'] == row['source_sha256'])
         row['replacementPending'] = bool(row.get('replacement_sha256') and row['replacement_sha256'] != row['source_sha256'])
         row['uses_alpha'] = bool(row.get('uses_alpha'))
+        row['favorite'] = bool(row.get('favorite')) and not row['retired']
         row['resolution'] = f"{row['width']}x{row['height']}"
         row['baseKey'], row['version'] = atlas_version(row['atlas_key'])
         return row
@@ -393,7 +425,8 @@ class AtlasRegistry:
         search = str(search or '').strip().lower()
         allowed = self.character_variant_ids() if domain == 'character' else None
         with self.connect() as db:
-            rows = db.execute('''SELECT v.*, f.atlas_key, r.source_sha256 AS replacement_sha256
+            rows = db.execute('''SELECT v.*, f.atlas_key, r.source_sha256 AS replacement_sha256,
+                    EXISTS(SELECT 1 FROM texture_atlas_favorites fav WHERE fav.variant_id=v.id) AS favorite
                 FROM texture_atlas_variants v
                 JOIN texture_atlas_families f ON f.id=v.family_id
                 LEFT JOIN texture_atlas_replacements r ON r.variant_id=v.id
@@ -445,7 +478,8 @@ class AtlasRegistry:
                 v.id AS variant_id, v.family_id, v.width, v.height, v.filename,
                 v.original_filename, v.source_path, v.source_sha256, v.uses_alpha,
                 v.published_id, v.published_sha256, v.moderation_state, v.published_at,
-                f.atlas_key FROM texture_atlas_bindings b
+                f.atlas_key, EXISTS(SELECT 1 FROM texture_atlas_favorites fav WHERE fav.variant_id=v.id) AS favorite
+                FROM texture_atlas_bindings b
                 JOIN texture_atlas_variants v ON b.variant_id=v.id
                 JOIN texture_atlas_families f ON f.id=v.family_id
                 WHERE b.consumer_type=? AND b.consumer_id=?''', (consumer_type,consumer_id)).fetchone()

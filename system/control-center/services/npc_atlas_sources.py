@@ -23,12 +23,12 @@ class NpcAtlasSources:
         self.atlases = location_assets.atlases
 
     @staticmethod
-    def _entry(kind, slug, name, slot, image_id, source, sha, published_sha, variant_id=0):
+    def _entry(kind, slug, name, slot, image_id, source, sha, published_sha, variant_id=0, favorite=False):
         if not str(image_id or '').isdigit() or not sha or sha != published_sha:
             return None
         return {
             'kind':kind, 'slug':slug, 'name':name, 'slot':slot,
-            'imageId':str(image_id), 'variantId':int(variant_id or 0),
+            'imageId':str(image_id), 'variantId':int(variant_id or 0), 'favorite':bool(favorite),
             'filename':Path(str(source or '')).name,
             'sourcePath':str(source or ''), 'sha256':str(sha),
             'publishedSha256':str(published_sha),
@@ -39,7 +39,7 @@ class NpcAtlasSources:
         if not variant or not variant['current']:
             return None
         return self._entry(kind, slug, name, slot, variant['published_id'],
-            variant['source_path'], variant['source_sha256'], variant['published_sha256'], variant['id'])
+            variant['source_path'], variant['source_sha256'], variant['published_sha256'], variant['id'], variant['favorite'])
 
     def _sources(self):
         groups = {key:[] for key in self.GROUPS}
@@ -85,12 +85,12 @@ class NpcAtlasSources:
             unique = {}
             for item in rows:
                 unique[(item['slug'],item['slot'],item['variantId'],item['imageId'])] = item
-            groups[kind] = sorted(unique.values(),key=lambda row:(row['name'].lower(),row['slot'],row['filename']))
+            groups[kind] = sorted(unique.values(),key=lambda row:(not row['favorite'],row['name'].lower(),row['slot'],row['filename']))
         return groups
 
     def snapshot(self):
         # Expose publication identity but not absolute local filesystem paths.
-        return {'groups':{kind:[{key:item[key] for key in ('kind','slug','name','slot','imageId','variantId','filename')}
+        return {'groups':{kind:[{key:item[key] for key in ('kind','slug','name','slot','imageId','variantId','filename','favorite')}
                         for item in rows] for kind,rows in self._sources().items()}}
 
     def connect(self, payload):

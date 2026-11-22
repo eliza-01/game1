@@ -133,7 +133,7 @@ function decoAssetRenderTextureReferences() {
           && Number(variant.id) !== decoAssetState.atlasVariantId) continue;
       const option = document.createElement('option');
       option.value = `variant:${variant.id}`;
-      option.textContent = window.game1AtlasIdentity.label({
+      option.textContent = (window.game1AtlasFavorites?.star(variant)||'')+window.game1AtlasIdentity.label({
         filename:variant.filename, atlasKey:variant.atlasKey, resolution:variant.resolution,
       }, {assetId:variant.current ? variant.published_id : 'publish required'});
       group.appendChild(option);

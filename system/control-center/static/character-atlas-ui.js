@@ -3,6 +3,7 @@
   const base='/api/characters/components/atlases';
   const el=id=>document.getElementById('cp-atlas-'+id);
   const atlasPresentation=window.game1CharacterAtlasPresentation;
+  const fav=()=>window.game1AtlasFavorites||{favorite:v=>Boolean(v.favorite),star:v=>v.favorite?'★ ':''};
   const post=(url,data={})=>request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   let catalog=null,inspection=null,busy=false;
   const text=(tag,value)=>{const node=document.createElement(tag);node.textContent=String(value??'');return node;};
@@ -21,7 +22,7 @@
       // One visual section per atlas family; retain the same four-column table.
       const heading=document.createElement('tr');heading.className='cp-atlas-family-row';
       const identity=window.game1AtlasIdentity.describe({atlasKey:group.atlasKey});
-      const title=text('th',`${identity.key} · ${group.variants.length} resolution(s)`+
+      const title=text('th',`${group.variants.some(v=>fav().favorite(v))?'★ ':''}${identity.key} · ${group.variants.length} resolution(s)`+
         (identity.variant?` · ${identity.name} / variant ${identity.variant}`:''));
       title.colSpan=4;title.scope='rowgroup';heading.append(title);host.append(heading);
       for(const v of group.variants){
@@ -31,7 +32,7 @@
         const dot=document.createElement('span');dot.className=`cp-atlas-rank-dot cp-atlas-rank-${v.rank}`;
         dot.title=`Resolution priority ${v.rank+1} within ${group.atlasKey}`;
         dot.setAttribute('aria-label',dot.title);resolution.append(dot,text('span',`${v.width}×${v.height}`));
-        tr.append(text('td',group.atlasKey),resolution,text('td',v.published_id||'—'));
+        tr.append(text('td',fav().star(v)+group.atlasKey),resolution,text('td',v.published_id||'—'));
         const cell=text('td',state);cell.className=v.current&&!v.replacementPending?'cp-health-ok':'cp-health-warning';
         tr.append(cell);host.append(tr);
       }

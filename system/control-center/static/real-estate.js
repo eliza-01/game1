@@ -199,7 +199,7 @@ function realEstatePublishedAtlasChoices(){
       choices.set(reference,{
         reference,group:'atlas',label:family.atlasKey,slug:'',
         filename:variant.filename,path:variant.source_path,
-        assetId:String(variant.published_id),category:'',categoryLabel:''
+        assetId:String(variant.published_id),favorite:variant.favorite,id:variant.id,category:'',categoryLabel:''
       });
     }
   }
@@ -235,6 +235,8 @@ function realEstateReuseOptions(part){
   });
   // One published resolution is one atlas identity regardless of its consumers.
   candidates.sort((a,b)=>{
+    const priority=window.game1AtlasFavorites?.compare(a,b)||0;
+    if(priority)return priority;
     const ai=window.game1AtlasIdentity.describe({filename:a.filename||a.path,atlasKey:a.group==='atlas'?a.label:a.atlasKey});
     const bi=window.game1AtlasIdentity.describe({filename:b.filename||b.path,atlasKey:b.group==='atlas'?b.label:b.atlasKey});
     return ai.key.localeCompare(bi.key)||
@@ -255,12 +257,13 @@ function realEstateReuseOptions(part){
   for(const e of visible){
     const identity=window.game1AtlasIdentity.describe({filename:e.filename||e.path,
       atlasKey:e.group==='atlas'?e.label:(e.atlasKey||'')});
-    if(identity.key!==previous){
+    const groupName=window.game1AtlasFavorites?.favorite(e)?'★ Favorites':identity.key;
+    if(groupName!==previous){
       if(previous)result.push('</optgroup>');
-      result.push(`<optgroup label="${esc(identity.key)}">`);
-      previous=identity.key;
+      result.push(`<optgroup label="${esc(groupName)}">`);
+      previous=groupName;
     }
-    result.push(`<option value="${esc(e.reference)}">${esc(realEstateReuseLabel(e))}${e.existingUnpublished?' · bound, awaiting publication':''}</option>`);
+    result.push(`<option value="${esc(e.reference)}">${esc((window.game1AtlasFavorites?.star(e)||'')+realEstateReuseLabel(e))}${e.existingUnpublished?' · bound, awaiting publication':''}</option>`);
   }
   if(previous)result.push('</optgroup>');
   return result.join('');
@@ -613,10 +616,10 @@ function realEstateAtlasVersionSelector(texture, part){
   // A version can contain several resolutions; selecting an option changes
   // only this mesh binding. Unpublished alternatives cannot be selected.
   const currentId=Number(texture.atlasVariantId||0);
-  const options=choices.map(v=>{
+  const options=(window.game1AtlasFavorites?.ordered(choices)||choices).map(v=>{
     const selected=Number(v.id)===currentId;
     const enabled=Boolean(v.current&&v.published_id);
-    return `<option value="${Number(v.id)}" ${selected?'selected':''} ${!enabled?'disabled':''}>v${esc(v.version)} · ${esc(v.resolution)}${enabled?'':' · unpublished'}</option>`;
+    return `<option value="${Number(v.id)}" ${selected?'selected':''} ${!enabled?'disabled':''}>${esc(window.game1AtlasFavorites?.star(v)||'')}v${esc(v.version)} · ${esc(v.resolution)}${enabled?'':' · unpublished'}</option>`;
   }).join('');
   const placeholder=currentId?'':`<option value="" selected>Choose published version…</option>`;
   return `<label class="real-estate-atlas-version-picker">Version / resolution <select data-re-atlas-version-part="${esc(part)}" aria-label="${esc(part)} atlas version" ${realEstateState.atlasBusy?'disabled':''}>${placeholder}${options}</select></label>`;

@@ -226,8 +226,9 @@ function npcAtlasStatus(){
 function npcAtlasRows(){return npcAtlasCatalog?.groups?.[$('npc-atlas-category').value]||[]}
 function npcAtlasRenderChoices(){
  const host=$('npc-atlas-choices'),query=$('npc-atlas-search').value.trim().toLowerCase();
- const rows=npcAtlasRows().filter(item=>`${item.name} ${item.slug} ${item.slot} ${item.filename} ${item.imageId}`.toLowerCase().includes(query));
- host.innerHTML=rows.length?rows.map((item,i)=>`<button type="button" role="option" data-npc-atlas-index="${i}" aria-selected="${npcAtlasChoice?.kind===item.kind&&npcAtlasChoice?.slug===item.slug&&npcAtlasChoice?.slot===item.slot&&npcAtlasChoice?.variantId===item.variantId?'true':'false'}"><strong>${esc(item.name)}</strong><small>${esc(item.slug)} · ${esc(item.slot)} · ${esc(item.filename)} · Image ID ${esc(item.imageId)}</small></button>`).join(''):'<small class="muted">No published atlases in this category.</small>';
+ const matching=npcAtlasRows().filter(item=>`${item.name} ${item.slug} ${item.slot} ${item.filename} ${item.imageId}`.toLowerCase().includes(query));
+ const rows=window.game1AtlasFavorites?.ordered(matching)||matching;
+ host.innerHTML=rows.length?rows.map((item,i)=>`<button type="button" role="option" data-npc-atlas-index="${i}" aria-selected="${npcAtlasChoice?.kind===item.kind&&npcAtlasChoice?.slug===item.slug&&npcAtlasChoice?.slot===item.slot&&npcAtlasChoice?.variantId===item.variantId?'true':'false'}"><strong>${esc((window.game1AtlasFavorites?.star(item)||'')+item.name)}</strong><small>${esc(item.slug)} · ${esc(item.slot)} · ${esc(item.filename)} · Image ID ${esc(item.imageId)}</small></button>`).join(''):'<small class="muted">No published atlases in this category.</small>';
  host.querySelectorAll('[data-npc-atlas-index]').forEach((button,i)=>button.onclick=()=>{
   npcAtlasChoice=rows[i];npcAtlasRenderChoices();
  });

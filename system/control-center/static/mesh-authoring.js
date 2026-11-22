@@ -15,7 +15,7 @@ window.game1MeshAuthoring = (() => {
     return window.game1ConsumerAtlasEditor.sections(items).map(section=>
       `<optgroup label="${e(section.label)}">`+section.items.map(v=>
         `<option value="${Number(v.id)}" ${Number(v.id)===Number(selected)?'selected':''}>`+
-        `${e(v.atlasKey)} · ${e(v.filename)} · ${v.published_id?'Image '+e(v.published_id):'publish required'}</option>`
+        `${e((window.game1AtlasFavorites?.star(v)||'')+v.atlasKey)} · ${e(v.filename)} · ${v.published_id?'Image '+e(v.published_id):'publish required'}</option>`
       ).join('')+'</optgroup>').join('');
   }
   function defaults(name,hasCollider=false,domain='estate') {

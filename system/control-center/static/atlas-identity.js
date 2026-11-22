@@ -21,6 +21,22 @@
     const item=describe(value);
     return [item.key,item.resolution,includeFilename?item.filename:'',String(assetId||'')].filter(Boolean).join(' · ');
   }
+  // M435: one view-level comparator shared by every Atlas selector.
+  // Overridden values are used immediately after an Atlas Library toggle.
+  const overrides=new Map();
+  function favorite(v){
+    const id=Number(v?.id||v?.variantId||0);
+    return id&&overrides.has(id)?overrides.get(id):Boolean(v?.favorite);
+  }
+  function compare(a,b){return Number(favorite(b))-Number(favorite(a));}
+  function ordered(rows){return [...(rows||[])].sort(compare);}
+  function star(v){return favorite(v)?'★ ':'';}
+  function update(id,on){
+    overrides.set(Number(id),Boolean(on));
+    if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('game1-atlas-favorite-changed',{detail:{id:Number(id),favorite:Boolean(on)}}));
+  }
+  const favorites=Object.freeze({favorite,compare,ordered,star,update});
+  if(typeof window!=='undefined')window.game1AtlasFavorites=favorites;
   const api={describe,label,pixelArea};
   if(typeof window!=='undefined')window.game1AtlasIdentity=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;

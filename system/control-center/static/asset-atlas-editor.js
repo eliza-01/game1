@@ -5,6 +5,7 @@
 window.game1ConsumerAtlasEditor = (() => {
   const colors = ['#d9ac43','#a47bdf','#4f95ee','#54b991','#939ba8'];
   const html = value => esc(String(value ?? ''));
+  const favorites=()=>window.game1AtlasFavorites||{favorite:v=>Boolean(v.favorite),star:v=>v.favorite?'★ ':''};
   const newState = () => ({search:'',picker:false,busy:false,pending:null,publicationOfferId:0});
   const variants = catalog => (catalog||[]).flatMap(group =>
     (group.variants||[]).map(v => ({...v,atlasKey:group.atlasKey})));
@@ -30,10 +31,17 @@ window.game1ConsumerAtlasEditor = (() => {
   }
   function sections(items){
     const grouped=new Map(sectionOrder.map(key=>[key,[]]));
-    for(const item of items||[])grouped.get(sectionKey(item)).push(item);
-    return sectionOrder.filter(key=>grouped.get(key).length).map(key=>({
-      key,label:sectionLabels[key],items:grouped.get(key),
-    }));
+    const starred=[];
+    for(const item of items||[]){
+      if(favorites().favorite(item))starred.push(item);
+      else grouped.get(sectionKey(item)).push(item);
+    }
+    return [
+      ...(starred.length?[{key:'favorites',label:'★ Favorites',items:starred}]:[]),
+      ...sectionOrder.filter(key=>grouped.get(key).length).map(key=>({
+        key,label:sectionLabels[key],items:grouped.get(key),
+      })),
+    ];
   }
   function render(state,{currentId=0,linked=[],familyVariants=[],catalog=[],busy=false,openPublish=false,offerPublication=false,allowUpload=true}={}){
     const active=Number(currentId||0);
@@ -78,7 +86,7 @@ window.game1ConsumerAtlasEditor = (() => {
         ${unpublished&&openPublish&&!offerPublication?`<div class="shared-atlas-unpublished"><span>Atlas registered · Image ID not published</span><button type="button" data-ca-open-publish>Publish this atlas</button></div>`:''}
         <div class="actions"><button type="button" data-ca-toggle ${disabled?'disabled':''}>Connect existing atlas</button>${allowUpload?`<button type="button" data-ca-upload ${disabled?'disabled':''}>Upload new atlas</button>`:''}</div>
         ${state.picker?`<div class="shared-atlas-picker"><label>Search all published atlases<input type="search" data-ca-search value="${html(state.search)}" placeholder="Filename · resolution · Image ID"></label>
-          <div class="shared-atlas-choices">${choices.length?sections(choices).map(section=>`<section class="shared-atlas-choice-section" data-ca-section="${section.key}"><strong class="shared-atlas-choice-heading">${html(section.label)}</strong>${section.items.map(v=>`<button type="button" data-ca-attach="${Number(v.id)}" ${disabled?'disabled':''}><strong>${html(v.filename)}</strong><small>${html(v.atlasKey)} · ${html(v.resolution)} · ${html(v.published_id)}</small></button>`).join('')}</section>`).join(''):'<small>No published, unattached atlases match the search.</small>'}</div></div>`:''}
+          <div class="shared-atlas-choices">${choices.length?sections(choices).map(section=>`<section class="shared-atlas-choice-section" data-ca-section="${section.key}"><strong class="shared-atlas-choice-heading">${html(section.label)}</strong>${section.items.map(v=>`<button type="button" data-ca-attach="${Number(v.id)}" ${disabled?'disabled':''}><strong>${html(favorites().star(v)+v.filename)}</strong><small>${html(v.atlasKey)} · ${html(v.resolution)} · ${html(v.published_id)}</small></button>`).join('')}</section>`).join(''):'<small>No published, unattached atlases match the search.</small>'}</div></div>`:''}
         ${state.pending?`<div class="shared-atlas-preview" role="group" aria-label="Atlas upload preview">
           <strong>${state.pending.existing?'Replace shared atlas publication':'Register and publish new atlas'}</strong>
           <small>${html(state.pending.filename)} · ${html(state.pending.width)}×${html(state.pending.height)}</small>

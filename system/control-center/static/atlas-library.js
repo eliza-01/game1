@@ -1,23 +1,56 @@
 /* Central Atlas Registry view. Retirement and dependency checking live on server. */
 (() => {
-  const state = {families: [], active: null, busy: false};
+  const state = {families: [], active: null, busy: false, favoriteBusy: false};
+  const favorites = window.game1AtlasFavorites;
   const node = id => document.getElementById(id);
   const variantLabel = v => `${v.atlas_key} · ${v.resolution} · ${v.published_id ? 'Image '+v.published_id : 'not published'}`;
   const available = () => state.families.flatMap(f => f.variants || []);
   const names = v => [...new Set((v.consumers||[]).map(c => String(c.consumer_id||'').split(':')[0]).filter(Boolean))].sort();
   function draw() {
     const filter = (node('atlas-library-search').value || '').trim().toLowerCase();
-    const variants = available().filter(v => !filter || `${v.atlas_key} ${v.filename} ${v.resolution} ${names(v).join(' ')}`.toLowerCase().includes(filter));
+    const variants = available().filter(v => !filter || `${v.atlas_key} ${v.filename} ${v.resolution} ${names(v).join(' ')}`.toLowerCase().includes(filter))
+      .sort((a,b)=>favorites.compare(a,b)||String(a.atlas_key).localeCompare(String(b.atlas_key))||Number(b.width)*Number(b.height)-Number(a.width)*Number(a.height));
     node('atlas-library-count').textContent = String(available().length);
-    node('atlas-library-list').innerHTML = variants.map(v => `<button type="button" class="atlas-library-item" data-atlas-open="${v.id}">
+    node('atlas-library-list').innerHTML = variants.map(v => `<div class="atlas-library-row"><button type="button" class="atlas-library-item" data-atlas-open="${v.id}">
       <span><strong>${esc(v.filename)}</strong><small>${esc(v.resolution)} · ${esc(v.atlas_key)}</small>
         <small class="atlas-library-models">${names(v).length ? `Used by: ${names(v).map(esc).join(' · ')}` : 'No registered models use this variant'}</small></span>
       <span class="atlas-library-id">${v.published_id ? 'Image '+esc(v.published_id) : 'Local only'}</span>
       <span>${v.current ? 'Published' : (v.replacementPending ? 'Changed source' : 'Pending')}</span>
-    </button>`).join('') || '<p class="muted">No atlases match the search.</p>';
+    </button><button type="button" class="atlas-library-star ${favorites.favorite(v)?'is-favorite':''}" data-atlas-favorite="${Number(v.id)}" aria-pressed="${favorites.favorite(v)}" aria-label="${favorites.favorite(v)?'Remove favorite':'Add favorite'} · ${esc(v.filename)}" title="${favorites.favorite(v)?'Remove from favorites':'Add to favorites'}" ${state.favoriteBusy?'disabled':''}>${favorites.favorite(v)?'★':'☆'}</button></div>`).join('') || '<p class="muted">No atlases match the search.</p>';
     node('atlas-library-list').querySelectorAll('[data-atlas-open]').forEach(button => {
       button.onclick = () => openAtlas(Number(button.dataset.atlasOpen));
     });
+    node('atlas-library-list').querySelectorAll('[data-atlas-favorite]').forEach(button => {
+      button.onclick = () => toggleFavorite(Number(button.dataset.atlasFavorite));
+    });
+  }
+  function modalFavorite(){
+    const button=node('atlas-library-favorite');
+    const v=state.active?.variant;
+    button.hidden=!v;
+    if(!v)return;
+    const on=favorites.favorite(v);
+    button.textContent=on?'★ Избранное':'☆ В избранное';
+    button.setAttribute('aria-pressed',String(on));
+    button.disabled=state.favoriteBusy;
+  }
+  async function toggleFavorite(id){
+    if(state.favoriteBusy)return;
+    const variant=available().find(v=>Number(v.id)===Number(id));
+    if(!variant)return;
+    state.favoriteBusy=true;
+    draw();modalFavorite();
+    try{
+      const result=await request(`/api/texture-atlases/variants/${id}/favorite`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({favorite:!favorites.favorite(variant)}),
+      });
+      favorites.update(id,result.variant.favorite);
+      if(Number(state.active?.variant?.id)===id)state.active.variant.favorite=result.variant.favorite;
+      await load();
+      modalFavorite();
+    }catch(error){node('atlas-library-status').textContent=error.message;toast(error.message,true);}
+    finally{state.favoriteBusy=false;draw();modalFavorite();}
   }
   async function load() {
     try {
@@ -54,7 +87,7 @@
         `<li><strong>${esc(c.consumer_type)}</strong> · ${esc(c.consumer_id)} <small>binding revision ${Number(c.revision)}</small></li>`
       ).join('') || '<li>Not used by any registered consumer.</li>';
       node('atlas-library-replacement').innerHTML = '<option value="">Choose published replacement</option>' +
-        (plan.candidates || []).map(v => `<option value="${v.id}">${esc(variantLabel(v))}</option>`).join('');
+        favorites.ordered(plan.candidates || []).map(v => `<option value="${v.id}">${esc(favorites.star(v)+variantLabel(v))}</option>`).join('');
       node('atlas-library-auto').checked = false;
       node('atlas-library-auto').disabled = !plan.suggestedReplacementId;
       // Select the same-model atlas family first; never silently propose a foreign texture.
@@ -65,7 +98,7 @@
         : 'No alternate published resolution in this atlas family. Select a replacement manually.';
       node('atlas-library-confirm').checked = false;
       state.busy = false;
-      updateControls();
+      updateControls();modalFavorite();
       node('atlas-library-dialog').showModal();
     } catch (error) { state.active = null; state.busy = false; toast(error.message, true); }
   }
@@ -95,6 +128,7 @@
   node('atlas-library-refresh').onclick = load;
   node('atlas-library-search').oninput = draw;
   node('atlas-library-close').onclick = () => node('atlas-library-dialog').close();
+  node('atlas-library-favorite').onclick = () => {if(state.active)toggleFavorite(Number(state.active.variant.id));};
   node('atlas-library-auto').onchange = updateControls;
   node('atlas-library-replacement').onchange = updateControls;
   node('atlas-library-confirm').onchange = updateControls;

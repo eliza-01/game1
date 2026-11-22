@@ -77,6 +77,11 @@
     }else byId('readiness').textContent='';
     if(selectedPiece())renderVariant();
   }
+  function renderAtlasOptions(value){
+    if(!catalog)return;
+    const rows=(window.game1AtlasFavorites?.ordered(catalog.atlases)||catalog.atlases);
+    select(byId('atlas'),rows.map(a=>({label:`${(window.game1AtlasFavorites?.star(a)||'')}${a.atlas_key} · ${a.resolution} · ${a.current?'опубликован':'черновик'}`,value:String(a.id)})),value,'Без текстуры · назначить позже');
+  }
   function renderVariant(){
     const piece=selectedPiece();if(!piece)return;
     const gender=byId('gender').value||'unisex',saved=piece.variants[gender]||{};
@@ -84,7 +89,7 @@
     const meshes=catalog.meshes.filter(m=>m.slot===piece.slot&&gendersNeeded.every(g=>m.allowedGenders.includes(g)));
     select(byId('mesh'),meshes.map(m=>({label:`${m.id} · ${m.mesh_family_id} · ${m.model_asset_id?'Model '+m.model_asset_id:'не опубликован'}`,value:m.id})),saved.meshPartId,'Без меша · назначить позже');
     const atlasId=catalog.appearances.find(a=>a.id===saved.appearanceId)?.atlas_variant_id;
-    select(byId('atlas'),catalog.atlases.map(a=>({label:`${a.atlas_key} · ${a.resolution} · ${a.current?'опубликован':'черновик'}`,value:String(a.id)})),atlasId&&String(atlasId),'Без текстуры · назначить позже');
+    renderAtlasOptions(atlasId&&String(atlasId));
     if(pendingResource){
       const control=byId(pendingResource.kind==='mesh'?'mesh':'atlas');
       if([...control.options].some(option=>option.value===pendingResource.value)){
@@ -161,6 +166,10 @@
 
     }
   };
+  // Reorder the visible picker without overwriting unsaved armor edits.
+  window.addEventListener('game1-atlas-favorite-changed',()=>{
+    if(catalog&&selectedPiece())renderAtlasOptions(byId('atlas').value);
+  });
   window.addEventListener('character-components-changed',()=>refresh().catch(err=>notice(err.message,true)));
   refresh().catch(err=>notice(err.message,true));
 })();

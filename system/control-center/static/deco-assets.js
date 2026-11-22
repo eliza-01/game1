@@ -73,6 +73,7 @@ function decoAssetToggleAppearance() {
   document.querySelectorAll('#location-asset-editor-panel .location-atlas-only')
     .forEach(node => { node.hidden = material; });
   // The atlas selection remains in memory but is NEVER submitted in material mode.
+  if(decoAssetState.inspection)decoAssetRenderInspection(); // refresh per-mesh inheritance hint
 }
 function decoAssetSyncSlug() {
   $('location-asset-slug').value = decoAssetSlugify($('location-asset-name').value);
@@ -91,7 +92,7 @@ function decoAssetSetForm() {
     ? decoAssetState.libraryCategory : (categories[0]?.id || 'tree');
   $('location-asset-destructible').checked = false;
   $('location-asset-surface-material').value = 'default';
-  $('location-asset-appearance-mode').value = 'material';
+  $('location-asset-appearance-mode').value = 'material'; // Model only; new MeshParts default to Material + Color + Atlas.
   $('location-asset-visual-material').value = 'Plastic';
   $('location-asset-visual-color').value = '#ffffff';
   decoAssetToggleAppearance();
@@ -303,11 +304,11 @@ function decoAssetRenderInspection() {
   host.innerHTML=window.game1MeshAuthoring.inspectionView(
     decoAssetState.inspection,decoAssetState.meshOptions,'location-mesh',{
       materials:decoAssetState.data?.options?.visualMaterials||[],
-      atlases:decoAssetAtlasCatalog(),alphaEnabled:false});
+      atlases:decoAssetAtlasCatalog(),alphaEnabled:false,defaultUsesAtlas:decoAssetAppearanceMode()!=='material'});
   window.game1MeshAuthoring.wire(host,decoAssetState.meshOptions,null,
     Boolean(decoAssetState.inspection?.hasCollider),{
       materials:decoAssetState.data?.options?.visualMaterials||[],
-      atlases:decoAssetAtlasCatalog(),alphaEnabled:false});
+      atlases:decoAssetAtlasCatalog(),alphaEnabled:false,defaultUsesAtlas:decoAssetAppearanceMode()!=='material'});
 }
 async function decoAssetInspectSource(path){
   return request('/api/location-assets/inspect', {method:'POST',
@@ -321,10 +322,10 @@ async function decoAssetChooseModel() {
     const inspected = await decoAssetInspectSource(chosen.path);
     decoAssetState.modelPath = chosen.path;
     decoAssetState.inspection = inspected.analysis;
-    decoAssetState.meshOptions = window.game1MeshAuthoring.seeded(inspected.analysis);
+    decoAssetState.meshOptions = window.game1MeshAuthoring.seeded(inspected.analysis, {}, true);
     $('picked-location-asset-model').textContent = inspected.sourcePath;
     if(!$('location-asset-name').value.trim()){
-      $('location-asset-name').value=inspected.name.replace(/_/g,' ');
+      $('location-asset-name').value=window.game1AssetNameDefaults.title(inspected.name);
       decoAssetSyncSlug();
     }
     decoAssetRenderInspection();
@@ -356,7 +357,7 @@ async function decoAssetRegister() {
       modelSourcePath:decoAssetState.modelPath,
       textureSourcePath:decoAssetAppearanceMode()!=='material'?decoAssetState.texturePath:'',
       atlasVariantId:decoAssetAppearanceMode()!=='material'?decoAssetState.atlasVariantId:0,
-      createOnly:true, inspectFbx:true,
+      createOnly:true, inspectFbx:true, seedNewMeshDefaults:true,
       meshOptions:decoAssetState.meshOptions,
     };
     if (!payload.modelSourcePath || !decoAssetState.inspection) throw Error('Choose and analyze the FBX first');

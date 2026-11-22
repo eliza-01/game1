@@ -42,11 +42,12 @@ window.game1MeshAuthoring = (() => {
       <small class="real-estate-physics-state" id="${e(prefix)}-physics-state-${e(part)}">${status(flags)}</small>
     </div>`;
   }
-  function seeded(analysis, stored={}) {
+  function seeded(analysis, stored={}, isNew=false) {
     const next={};
     for(const part of analysis?.meshes||[]) {
       if(isCarrier(part.name)||isRetired(part.name))continue;
-      next[part.name]=normalize(part.name,stored?.[part.name],!!analysis.hasCollider,'location');
+      const fresh=isNew?{noCollide:true,appearanceMode:'material_atlas',visualMaterial:'Plastic',visualColor:'#FFFFFF'}:{};
+      next[part.name]=normalize(part.name,{...fresh,...(stored?.[part.name]||{})},!!analysis.hasCollider,'location');
     }
     return next;
   }

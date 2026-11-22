@@ -12,7 +12,7 @@
   const labels={head:'Голова',eye_l:'Левый глаз',eye_r:'Правый глаз',eyebrow_l:'Левая бровь',eyebrow_r:'Правая бровь',hair:'Волосы'};
   const post=(url,payload)=>request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const text=(tag,value)=>{const n=document.createElement(tag);n.textContent=String(value??'');return n;};
-  let data=null,selected=null,revision=0,original='',busy=false;
+  let data=null,selected=null,revision=0,original='',busy=false,autoDraftName=true;
   const current=id=>data?.items.find(row=>row.id===id);
   function message(value,error=false){byId('status').textContent=value;byId('status').classList.toggle('error',error);}
   function setSelect(control,items,value,placeholder='Choose…'){
@@ -103,7 +103,7 @@
     if(errors.length){const ul=document.createElement('ul');errors.forEach(x=>ul.append(text('li',x)));byId('readiness').append(ul);}
   }
   function edit(row){
-    selected=row.id;revision=row.revision;byId('id').readOnly=true;
+    selected=row.id;revision=row.revision;autoDraftName=false;byId('id').readOnly=true;
     const r=row.assembly?.schema_version===2?row.assembly:{};
     byId('id').value=row.id;byId('name').value=row.display_name;
     byId('rig').value=r.rig_id||'';byId('gender').value=r.gender||row.gender||'male';
@@ -118,9 +118,9 @@
       'Старый v1 рецепт отключён. Выбери новый Armor set и сохрани как v2.',r.schema_version!==2);
   }
   function newDraft(){
-    selected=null;revision=0;byId('id').readOnly=false;
+    selected=null;revision=0;autoDraftName=true;byId('id').readOnly=false;
     let id='human_female',i=2;while(data.items.some(x=>x.id===id))id='human_female_'+i++;
-    byId('id').value=id;byId('name').value='Human Female';
+    byId('id').value=id;byId('name').value=window.game1AssetNameDefaults.title(id);
     byId('gender').value='female';
     byId('rig').value=data.catalog.items.find(x=>x.kind==='rig'&&x.id==='human_female')?.id||'';
     fillSets('');fillFaces();fillHairColors();fillMaterials();
@@ -230,7 +230,11 @@
   byId('parts').append(face,body);
   for(const input of ['rig','gender'])byId(input).onchange=()=>{fillFaces();fillHairColors();update();};
   byId('set').onchange=update;
-  for(const field of ['id','name'])byId(field).oninput=update;
+  byId('id').oninput=()=>{
+    if(!selected&&autoDraftName)byId('name').value=window.game1AssetNameDefaults.title(byId('id').value);
+    update();
+  };
+  byId('name').oninput=()=>{if(!selected)autoDraftName=false;update();};
   byId('new').onclick=()=>{if(data&&!busy&&canDiscard()){newDraft();render();}};
   byId('reset').onclick=()=>{if(data&&!busy){if(selected&&current(selected))edit(current(selected));else newDraft();render();}};
   byId('refresh').onclick=()=>run(refresh);

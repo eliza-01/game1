@@ -56,7 +56,7 @@ function toast(message,error=false,persistent=false){
 async function request(url,options){const response=await fetch(url,options);let data={};try{data=await response.json()}catch{}if(!response.ok)throw Error(data.error||`http ${response.status}`);return data}
 function selectedRow(){return state.data?.items?.find(x=>x.id===state.selected)||null}
 function identityId(){return `${$('race').value}_${$('gender').value}`}
-function syncIdentity(){if(state.selected)return;$('character-id').value=identityId();if(state.autoDisplayName)$('display-name').value=`${$('race').value} ${$('gender').value}`}
+function syncIdentity(){if(state.selected)return;$('character-id').value=identityId();if(state.autoDisplayName)$('display-name').value=window.game1AssetNameDefaults.title(`${$('race').value} ${$('gender').value}`)}
 function statusTag(status){return `<span class="tag ${String(status||'').toLowerCase()}">${esc(status||'')}</span>`}
 
 function setView(view){

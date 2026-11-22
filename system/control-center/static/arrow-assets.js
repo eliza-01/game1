@@ -44,7 +44,7 @@ function arrowSelect(slug){
   $('arrow-model-file').textContent=row?.source_path||'choose FBX';
   $('arrow-texture-file').textContent=row?.texture_path||'optional PNG/JPG';
 }
-async function arrowPickModel(){try{const result=await request('/api/files/choose-weapon-model',{method:'POST'});if(result.path){arrowState.modelPath=result.path;$('arrow-model-file').textContent=result.path}}catch(e){toast(e.message,true)}}
+async function arrowPickModel(){try{const result=await request('/api/files/choose-weapon-model',{method:'POST'});if(result.path){arrowState.modelPath=result.path;window.game1AssetNameDefaults.fillFromPath($('arrow-name'),result.path,arrowSyncSlug,!arrowState.selected);$('arrow-model-file').textContent=result.path}}catch(e){toast(e.message,true)}}
 async function arrowPickTexture(){try{const result=await request('/api/files/choose-weapon-textures',{method:'POST'});if((result.paths||[]).length){arrowState.texturePath=result.paths[0];$('arrow-texture-file').textContent=result.paths[0]}}catch(e){toast(e.message,true)}}
 async function arrowSave(){
   try{
@@ -75,6 +75,8 @@ async function arrowSync(slug){try{
   $('arrow-operation-status').textContent=`Syncing ${slug} · Studio Bridge…`;
   await request('/api/arrows/'+encodeURIComponent(slug)+'/sync',{method:'POST'});$('arrow-operation-status').textContent=`${slug} synced to ServerStorage`;toast('arrow template synced to ServerStorage')}catch(e){toast(e.message,true)}}
 async function arrowActivate(){try{await request('/api/arrows/'+encodeURIComponent($('arrow-active').value)+'/activate',{method:'POST'});await arrowLoad();toast('active arrow updated; sync Rojo')}catch(e){toast(e.message,true)}}
+function arrowSyncSlug(){if(!arrowState.selected)$('arrow-slug').value=weaponSlugify($('arrow-name').value)}
+$('arrow-name').oninput=arrowSyncSlug;
 $('arrow-new').onclick=()=>arrowSelect('');
 $('arrow-pick-model').onclick=arrowPickModel;
 $('arrow-pick-texture').onclick=arrowPickTexture;

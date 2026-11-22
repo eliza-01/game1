@@ -87,6 +87,37 @@ def normalize_location_options(analysis: dict, raw: dict | None) -> dict:
     return result
 
 
+def new_location_mesh_options(analysis: dict, raw: dict | None) -> dict:
+    """Seed *new* FBX visual parts, never reinterpret saved legacy overrides.
+
+    The asset Model defaults to material/color; individual MeshParts default
+    to material/color/atlas and require a variant when no model atlas exists.
+    Users can still deliberately select material-only or enable collisions.
+    """
+    if raw is not None and not isinstance(raw, dict):
+        raise ValueError('meshOptions must be an object')
+    provided = raw or {}
+    result = {}
+    for part in analysis.get('meshes', []):
+        name = part['name']
+        if is_location_carrier(name) or retired(name):
+            continue
+        values = provided.get(name, {})
+        if not isinstance(values, dict):
+            raise ValueError(f'{name}: mesh settings must be an object')
+        result[name] = {
+            'noCollide': True,
+            'appearanceMode': 'material_atlas',
+            'visualMaterial': 'Plastic',
+            'visualColor': '#FFFFFF',
+            **values,
+        }
+    # Do not discard unknown names: existing validator must report them.
+    for name in provided.keys() - result.keys():
+        result[name] = provided[name]
+    return result
+
+
 def location_mesh_profile(name: str, *, has_collider: bool) -> dict:
     if is_location_carrier(name):
         return {'role':'carrier', 'canCollide':False, 'canQuery':False,

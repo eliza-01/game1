@@ -14,7 +14,7 @@ from sqlite_connection import connect as connect_sqlite
 from services.texture_alpha import texture_uses_alpha
 from services import location_asset_rename
 from services.location_fbx_inspection import inspect as inspect_location_fbx
-from services.mesh_authoring_policy import normalize_location_options
+from services.mesh_authoring_policy import normalize_location_options, new_location_mesh_options
 from services.retired_col_mesh import strip_options
 from services import location_asset_taxonomy as taxonomy
 from services.location_asset_category_migration import migrate_ivy_category
@@ -611,6 +611,10 @@ class LocationAssetStore:
                     if settings.get('atlasVariantId'):
                         raise ValueError(f'{mesh_name}: choose an atlas file OR registered variant')
                     settings['atlasVariantId'] = self.atlases.adopt_file(str(source_path))['id']
+        # Defaults are assigned only at first registration. Revising an existing
+        # asset must never silently rewrite its physics or atlas overrides.
+        if old is None and inspected is not None and payload.get('seedNewMeshDefaults') is True:
+            option_source = new_location_mesh_options(inspected, option_source)
         effective_options = (normalize_location_options(inspected, option_source)
             if option_source is not None else
             normalize_location_options(inspected, prior_options) if inspected and prior_options else prior_options)

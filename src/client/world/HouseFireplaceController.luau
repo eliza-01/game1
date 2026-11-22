@@ -69,6 +69,7 @@ end
 local function build(socket: Attachment): BillboardGui
     local gui = Instance.new("BillboardGui")
     gui.Name = "Game1FireplaceHud"
+    gui:SetAttribute("WorldInputPassthrough", true)
     gui.Adornee = socket
     gui.AlwaysOnTop = true
     gui.LightInfluence = 0

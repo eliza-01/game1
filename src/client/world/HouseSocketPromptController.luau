@@ -390,6 +390,9 @@ function Controller.Start()
         if not feedbackRemote or not feedbackRemote:IsA("RemoteEvent") then return end
         local gui = Instance.new("ScreenGui")
         gui.Name = "Game1HouseFeedback"
+        -- Decorative notification surface. UiInputGuard must not treat its
+        -- full-screen transparent host as a world-input blocker (RMB orbit).
+        gui:SetAttribute("WorldInputPassthrough", true)
         gui.DisplayOrder = 35
         gui.ResetOnSpawn = false
         gui.Parent = player:WaitForChild("PlayerGui")
@@ -407,6 +410,7 @@ function Controller.Start()
         local spendHost = Instance.new("Frame")
         spendHost.Name = "SpendHost"
         spendHost.BackgroundTransparency = 1
+        spendHost.Active = false
         spendHost.Size = UDim2.fromScale(1, 1)
         spendHost.Parent = gui
         local revision = 0

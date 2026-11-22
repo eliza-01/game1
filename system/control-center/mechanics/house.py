@@ -104,10 +104,11 @@ ITEMS = [
              ]},
              {'title': 'UI и индикация', 'lines': [
                  'Над камином в радиусе 50 studs показываются две полосы: остаток текущего топлива и готовность блюда.',
+                 'Визуальные модели загружаются из Location Registry с индивидуальными Material / Color / Atlas. Как спавн персонажа, монтаж использует HouseSpawnOrientation.Upright (Bone Tail → Head, мировой +Y), но с clearance=0. Точка grip у авторского rig_carrier или единственного MeshPart совмещается с HEAD fireplace_01_socket через BoneModelMount.Place. При ошибке загрузки расход не происходит.',
                  'Встроенный cooking_pot_socket принадлежит модели cooking_pot_01, а не реестру сокетов House. Пар запускается только когда котёл стоит на активном источнике тепла. Эмиттер всегда работает вверх по мировому +Y.',
                  'Все состояния реплицируются через атрибуты fireplace socket; клиент только рисует HUD и визуализацию расхода ресурсов.',
              ]},
-         ], ['socket-contract', 'socket-service', 'fireplace-service']),
+         ], ['socket-contract', 'socket-service', 'fireplace-service', 'fireplace-mount']),
     card('houseplant', 'Растения · точки декора', 'Опора',
          '15 опциональных маркеров в авторской модели, без интерактивности.',
          ['houseplant_01 … houseplant_09', 'houseplant_010 … houseplant_015'], [

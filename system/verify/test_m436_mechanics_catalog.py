@@ -48,8 +48,10 @@ class MechanicsM436(unittest.TestCase):
         self.assertNotIn('cooking_pot_socket', cards['fireplace']['sockets'])
         self.assertIn('cooking_pot_socket', '\n'.join(
             line for section in cards['fireplace']['sections'] for line in section['lines']))
-        pot_service = (ROOT/'src/server/world/HouseFireplaceService.luau').read_text('utf-8')
-        self.assertIn('FindFirstChild("cooking_pot_socket", true)', pot_service)
+        pot_mount = (ROOT/'src/server/world/HouseSocketAssetMount.luau').read_text('utf-8')
+        self.assertIn('FindFirstChild("cooking_pot_socket", true)', pot_mount)
+        self.assertIn('Mount.Spawn("cooking_pot_01"',
+                      (ROOT/'src/server/world/HouseFireplaceService.luau').read_text('utf-8'))
         self.assertIn('door_<NN>_hinge_socket', (ROOT/'docs/workflows/REAL_ESTATE_SOCKET_AND_PLOT_PIVOT_M373_RU.md').read_text('utf-8'))
         self.assertIn('HouseSocketInteract', service)
         self.assertIn('cooldown[player]', service)

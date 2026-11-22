@@ -1,13 +1,10 @@
 --!strict
-local AssetService = game:GetService("AssetService")
-local InsertService = game:GetService("InsertService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local WorldShared = Shared:WaitForChild("world")
-local SocketFacing = require(WorldShared:WaitForChild("SocketFacing"))
-local Registry = require(WorldShared:WaitForChild("LocationAssetRegistry"))
+local Mount = require(script.Parent:WaitForChild("HouseSocketAssetMount"))
 local Config = require(WorldShared:WaitForChild("FireplaceMechanicsConfig"))
 
 local Service = {}
@@ -29,6 +26,7 @@ type State = {
     potInstance: Instance?,
     potSocket: Attachment?,
     steam: ParticleEmitter?,
+    steamAnchor: Attachment?,
     potState: string,
     cookEndsAt: number,
     cookDuration: number,
@@ -38,7 +36,6 @@ type State = {
 
 local states: {[Model]: State} = {}
 local feedbackRemote: RemoteEvent? = nil
-local prototypeCache: {[string]: Instance} = {}
 
 local function getFrame(socket: Attachment): CFrame
     if socket:IsA("Bone") then return socket.TransformedWorldCFrame end
@@ -53,9 +50,16 @@ end
 local function fireAnchor(state: State): Attachment
     local existing = state.fireAnchor
     if existing and existing.Parent then return existing end
+    local socket = state.socket
     local anchor = Instance.new("Attachment")
-    anchor.Name = "Game1FireplaceFireAnchor"
-    anchor.Parent = state.socket
+    -- Reuse the Fire Tuner / BoneFireController world-up contract. The Fire
+    -- starts exactly at the Bone HEAD (Attachment local zero) and emits +Y.
+    anchor.Name = if socket:IsA("Bone") then "Game1FireDirectionFireplace"
+        else "Game1FireplaceFireAnchor"
+    local socketFrame = getFrame(socket)
+    anchor.CFrame = socketFrame.Rotation:Inverse()
+    anchor:SetAttribute("Game1FireWorldUp", true)
+    anchor.Parent = socket
     state.fireAnchor = anchor
     return anchor
 end
@@ -90,96 +94,20 @@ local function ensureFireVisual(state: State, enabled: boolean)
     light.Enabled = enabled and Config.Light.Enabled
 end
 
-local function assetPrototype(slug: string): Instance?
-    if prototypeCache[slug] then return prototypeCache[slug] end
-    local definition = Registry.assets[slug]
-    if type(definition) ~= "table" then return nil end
-    local assetId = tonumber(definition.modelAssetId)
-    if not assetId then return nil end
-    local ok, loaded = pcall(InsertService.LoadAsset, InsertService, assetId)
-    if not ok or not loaded then
-        ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, assetId)
-    end
-    if not ok or not loaded or not loaded:IsA("Model") then
-        warn("[game1][fireplace] load failed " .. slug .. ": " .. tostring(loaded))
-        return nil
-    end
-    local root: Instance = loaded
-    for _, descendant in ipairs(root:GetDescendants()) do
-        if descendant:IsA("Script") or descendant:IsA("LocalScript") or descendant:IsA("ModuleScript") then
-            descendant:Destroy()
-        end
-    end
-    prototypeCache[slug] = root
-    return root
-end
-
-local function worldTarget(socket: Attachment): CFrame
-    local fromBone = socket:IsA("Bone")
-    return SocketFacing.FullFrame(getFrame(socket), fromBone)
-end
-
-local function placeholder(slug: string, parent: Instance, frame: CFrame): BasePart
-    local part = Instance.new("Part")
-    part.Name = slug
-    part.Size = if slug == "cooking_pot_01" then Vector3.new(1.5, 1, 1.5)
-        elseif slug == "embers_01" then Vector3.new(1.3, 0.25, 1.3)
-        else Vector3.new(1.4, 0.45, 1.1)
-    part.Material = if slug == "embers_01" then Enum.Material.CrackedLava else Enum.Material.Wood
-    part.Color = if slug == "embers_01" then Color3.fromRGB(201, 13, 13)
-        elseif slug == "cooking_pot_01" then Color3.fromRGB(76, 79, 84)
-        else Color3.fromRGB(117, 90, 81)
-    part.Anchored = true
-    part.CanCollide = false
-    part.CanTouch = false
-    part.CanQuery = false
-    part.CastShadow = false
-    part.CFrame = frame
-    part.Parent = parent
-    return part
-end
-
-local function cloneAsset(slug: string, parent: Instance, socket: Attachment): (Instance, Attachment?)
-    local frame = worldTarget(socket)
-    local prototype = assetPrototype(slug)
-    local clone = if prototype then prototype:Clone() else nil
-    if not clone then
-        return placeholder(slug, parent, frame), nil
-    end
-    clone.Name = slug
-    for _, descendant in ipairs(clone:GetDescendants()) do
-        if descendant:IsA("BasePart") then
-            descendant.Anchored = true
-            descendant.CanCollide = false
-            descendant.CanTouch = false
-            descendant.CanQuery = false
-            descendant.CastShadow = true
-            descendant.Massless = true
-        end
-    end
-    clone.Parent = parent
-    local foundSocket: Attachment? = nil
-    if clone:IsA("Model") then
-        clone:PivotTo(frame)
-        local descendant = clone:FindFirstChild("cooking_pot_socket", true)
-        if descendant and (descendant:IsA("Attachment") or descendant:IsA("Bone")) then
-            foundSocket = descendant :: Attachment
-        end
-    elseif clone:IsA("BasePart") then
-        clone.CFrame = frame
-    end
-    return clone, foundSocket
-end
-
-local function steamTarget(state: State): Attachment?
-    local socket = state.potSocket
-    if socket and socket.Parent then return socket end
-    return state.socket
-end
-
 local function ensureSteam(state: State, enabled: boolean)
-    local target = steamTarget(state)
-    if not target then return end
+    local socket = state.potSocket
+    if not socket or not socket.Parent then return end
+    local anchor = state.steamAnchor
+    if not anchor or not anchor.Parent then
+        anchor = Instance.new("Attachment")
+        anchor.Name = "Game1CookingSteamWorldUp"
+        anchor.Parent = socket
+        state.steamAnchor = anchor
+    end
+    -- ParticleEmitter.EmissionDirection uses its parent's local axes.
+    -- Cancel the actual cooking_pot_socket world rotation, not only the
+    -- acceleration, or steam from a tilted pot will shoot sideways.
+    anchor.CFrame = getFrame(socket).Rotation:Inverse()
     local steam = state.steam
     if not steam then
         steam = Instance.new("ParticleEmitter")
@@ -203,7 +131,8 @@ local function ensureSteam(state: State, enabled: boolean)
         })
         steam.Color = ColorSequence.new(Color3.fromRGB(220, 223, 227), Color3.fromRGB(246, 246, 246))
         steam.LightEmission = 0
-        steam.Parent = target
+        steam.EmissionDirection = Enum.NormalId.Top
+        steam.Parent = anchor
         state.steam = steam
     end
     steam.Enabled = enabled
@@ -275,14 +204,15 @@ local function syncAttributes(state: State)
     ensureSteam(state, state.potInstance ~= nil and state.fuelStage ~= "empty")
 end
 
-local function replaceFuel(state: State, slug: string?)
-    if state.fuelInstance then
-        state.fuelInstance:Destroy()
-        state.fuelInstance = nil
-    end
+local function replaceFuel(state: State, slug: string?): boolean
+    local replacement: Model? = nil
     if slug and slug ~= "" then
-        state.fuelInstance = cloneAsset(slug, state.runtimeFolder, state.socket)
+        replacement = Mount.Spawn(slug, state.runtimeFolder, state.socket)
+        if not replacement then return false end
     end
+    if state.fuelInstance then state.fuelInstance:Destroy() end
+    state.fuelInstance = replacement
+    return true
 end
 
 local function transitionToEmpty(state: State, revision: number)
@@ -297,10 +227,13 @@ end
 
 local function transitionToEmbers(state: State, revision: number)
     if states[state.house] ~= state or state.fuelRevision ~= revision then return end
+    if not replaceFuel(state, "embers_01") then
+        transitionToEmpty(state, revision)
+        return
+    end
     state.fuelStage = "embers"
     state.fuelDuration = Config.EmbersDurationSeconds
     state.fuelEndsAt = now() + Config.EmbersDurationSeconds
-    replaceFuel(state, "embers_01")
     ensureFireVisual(state, false)
     syncAttributes(state)
     task.delay(Config.EmbersDurationSeconds, function()
@@ -308,18 +241,19 @@ local function transitionToEmbers(state: State, revision: number)
     end)
 end
 
-local function startFire(state: State)
+local function startFire(state: State): boolean
+    if not replaceFuel(state, "firewood_01") then return false end
     state.fuelRevision += 1
     state.fuelStage = "firewood"
     state.fuelDuration = Config.FuelDurationSeconds
     state.fuelEndsAt = now() + Config.FuelDurationSeconds
-    replaceFuel(state, "firewood_01")
     ensureFireVisual(state, true)
     syncAttributes(state)
     local revision = state.fuelRevision
     task.delay(Config.FuelDurationSeconds, function()
         transitionToEmbers(state, revision)
     end)
+    return true
 end
 
 local function removePot(state: State)
@@ -327,6 +261,7 @@ local function removePot(state: State)
     state.potInstance = nil
     state.potSocket = nil
     if state.steam then state.steam:Destroy(); state.steam = nil end
+    if state.steamAnchor then state.steamAnchor:Destroy(); state.steamAnchor = nil end
     state.potState = "idle"
     state.cookEndsAt = 0
     state.cookDuration = 0
@@ -334,14 +269,16 @@ local function removePot(state: State)
     syncAttributes(state)
 end
 
-local function placePot(state: State)
-    local instance, potSocket = cloneAsset("cooking_pot_01", state.runtimeFolder, state.socket)
+local function placePot(state: State): boolean
+    local instance, potSocket = Mount.Spawn("cooking_pot_01", state.runtimeFolder, state.socket)
+    if not instance or not potSocket then return false end
     state.potInstance = instance
     state.potSocket = potSocket
     state.potState = "idle"
     state.cookEndsAt = 0
     state.cookDuration = 0
     syncAttributes(state)
+    return true
 end
 
 local function finishCooking(state: State, revision: number)
@@ -392,6 +329,7 @@ function Service.Register(house: Model, socket: Attachment, generated: {Instance
         potInstance = nil,
         potSocket = nil,
         steam = nil,
+        steamAnchor = nil,
         potState = "idle",
         cookEndsAt = 0,
         cookDuration = 0,
@@ -416,6 +354,7 @@ function Service.Unregister(house: Model)
     if not state then return end
     states[house] = nil
     if state.steam then state.steam:Destroy() end
+    if state.steamAnchor then state.steamAnchor:Destroy() end
     if state.fireAnchor then state.fireAnchor:Destroy() end
     if state.runtimeFolder then state.runtimeFolder:Destroy() end
     local socket = state.socket
@@ -435,7 +374,10 @@ function Service.Interact(house: Model, player: Player, key: string)
         return
     end
     if state.fuelStage == "empty" and not state.potInstance then
-        startFire(state)
+        if not startFire(state) then
+            notify(player, "Дрова недоступны: проверь опубликованный firewood_01")
+            return
+        end
         notify(player, {kind = "resource", items = {
             {icon = Config.ResourceSpend.Wood.icon, amount = -Config.ResourceSpend.Wood.amount, label = Config.ResourceSpend.Wood.label}
         }})
@@ -443,8 +385,11 @@ function Service.Interact(house: Model, player: Player, key: string)
         return
     end
     if state.fuelStage == "firewood" and not state.potInstance then
-        placePot(state)
-        notify(player, "Котел установлен")
+        if placePot(state) then
+            notify(player, "Котел установлен")
+        else
+            notify(player, "Котел недоступен: проверь модель и cooking_pot_socket")
+        end
         return
     end
     if state.potInstance then

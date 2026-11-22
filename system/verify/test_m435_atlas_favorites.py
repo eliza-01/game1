@@ -1,7 +1,6 @@
 """M435: one persisted favorite priority for every Atlas Registry consumer."""
 from __future__ import annotations
 
-import shutil
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -13,6 +12,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system/control-center'))
 from api.write_world import route
+from sqlite_connection import connect as connect_sqlite
 from services.texture_atlas_registry import AtlasRegistry
 from services.npc_atlas_sources import NpcAtlasSources
 
@@ -103,11 +103,36 @@ class AtlasFavoritesM435(TestCase):
             self.skipTest('real authoring database is not part of this distribution')
         separate = self.root / 'real-copy'
         (separate / '.control-center').mkdir(parents=True)
-        shutil.copy2(original, separate / '.control-center' / 'game1.db')
-        original_registry = AtlasRegistry(separate)
-        before = [(v['id'],v['published_id']) for f in original_registry.catalog() for v in f['variants']]
+        copied = separate / '.control-center' / 'game1.db'
+        # SQLite online backup produces a consistent fixture even if Control Center
+        # is using the original database (or has uncheckpointed WAL changes).
+        with connect_sqlite(original) as source, connect_sqlite(copied) as target:
+            source.backup(target)
+        with connect_sqlite(copied) as db:
+            before = [(row['id'], row['published_id']) for row in db.execute(
+                'SELECT id,published_id FROM texture_atlas_variants ORDER BY id')]
+            # Simulate an actual pre-M435 database. An installed M435 database
+            # already has this table and must NOT create another backup on reopen.
+            # Drop only in the temporary snapshot, never in the authoring database.
+            db.execute('DROP TABLE IF EXISTS texture_atlas_favorites')
+
         AtlasRegistry(separate)
-        after = [(v['id'],v['published_id']) for f in AtlasRegistry(separate).catalog() for v in f['variants']]
-        self.assertEqual(before, after)
+        with connect_sqlite(copied) as db:
+            after = [(row['id'], row['published_id']) for row in db.execute(
+                'SELECT id,published_id FROM texture_atlas_variants ORDER BY id')]
+            self.assertEqual(before, after)  # includes retired/history variants
+            self.assertIsNotNone(db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='texture_atlas_favorites'").fetchone())
+        backup_dir = separate / '.control-center' / 'backups'
+        backups = sorted(backup_dir.glob('before_atlas_favorites_m435_*.db'))
+        self.assertEqual(len(backups), 1 if before else 0)
         if before:
-            self.assertEqual(len(list((separate / '.control-center' / 'backups').glob('before_atlas_favorites_m435_*.db'))), 1)
+            with connect_sqlite(backups[0]) as saved:
+                saved_rows = [(row['id'], row['published_id']) for row in saved.execute(
+                    'SELECT id,published_id FROM texture_atlas_variants ORDER BY id')]
+                self.assertIsNone(saved.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='texture_atlas_favorites'").fetchone())
+            self.assertEqual(saved_rows, before)
+        # Idempotence: reopening the migrated database must not make a new backup.
+        AtlasRegistry(separate)
+        self.assertEqual(sorted(backup_dir.glob('before_atlas_favorites_m435_*.db')), backups)

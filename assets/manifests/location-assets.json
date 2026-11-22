@@ -1914,7 +1914,7 @@
           "retired_at": null,
           "atlas_key": "leaves_n_flowers",
           "replacement_sha256": null,
-          "favorite": false,
+          "favorite": true,
           "retired": false,
           "current": true,
           "replacementPending": false,
@@ -2006,7 +2006,7 @@
           "retired_at": null,
           "atlas_key": "npc_guard_02_gradient_512x512atlas",
           "replacement_sha256": null,
-          "favorite": false,
+          "favorite": true,
           "retired": false,
           "current": true,
           "replacementPending": false,
@@ -8836,7 +8836,7 @@
           "retired_at": null,
           "atlas_key": "leaves_n_flowers",
           "replacement_sha256": null,
-          "favorite": false,
+          "favorite": true,
           "retired": false,
           "current": true,
           "replacementPending": false,
@@ -9014,7 +9014,7 @@
           "retired_at": null,
           "atlas_key": "leaves_n_flowers",
           "replacement_sha256": null,
-          "favorite": false,
+          "favorite": true,
           "retired": false,
           "current": true,
           "replacementPending": false,
@@ -9192,7 +9192,7 @@
           "retired_at": null,
           "atlas_key": "leaves_n_flowers",
           "replacement_sha256": null,
-          "favorite": false,
+          "favorite": true,
           "retired": false,
           "current": true,
           "replacementPending": false,
@@ -13386,6 +13386,225 @@
           "name": "window_frame_06"
         }
       ],
+      "aliases": []
+    },
+    {
+      "slug": "cooking_pot_01",
+      "name_en": "cooking pot 01",
+      "category": "prop",
+      "model_path": "assets/source/location-assets/prop/cooking_pot_01/model/cooking_pot_01.fbx",
+      "model_sha256": "2a94f40eb4ff6a9d4470199b5345d163cd4fd04a8b78aa75faed690d3b8a4d96",
+      "model_asset_id": "110474147120708",
+      "model_published_sha256": "2a94f40eb4ff6a9d4470199b5345d163cd4fd04a8b78aa75faed690d3b8a4d96",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 2,
+      "created_at": 1795368172.1019812,
+      "updated_at": 1795368198.404517,
+      "published_at": 1795368198.404517,
+      "surface_material": "metal",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "cooking_pot_01",
+            "armature": "cooking_pot_01_armature",
+            "vertices": 90,
+            "bones": [
+              {
+                "name": "cooking_pot_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -0.016018,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -0.0422651,
+                  0.0,
+                  1.0,
+                  0.0,
+                  2.4031212,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "cooking_pot_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "cooking_pot_01_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "cooking_pot_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -0.016018,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -0.0422651,
+                  0.0,
+                  1.0,
+                  0.0,
+                  2.4031212,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "cooking_pot_socket"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [
+          "cooking_pot_01_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "e334cbe6f6385624d4ffdf6a20c9d498e8b05b769b459356c2ee39d4ccfac8ea",
+        "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              -0.016018,
+              0.0,
+              0.0,
+              -1.0,
+              -0.0422651,
+              0.0,
+              1.0,
+              0.0,
+              2.4031212,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "cooking_pot_socket",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "e91a100d028ea4ac50958c61cc13f97fdd66dc057cd94eeb20798d8a687cade2",
+        "parts": [
+          {
+            "name": "cooking_pot_01",
+            "role": "visual",
+            "vertices": 90
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "2d4ae51f99751c80c0486cdbe8a8f9bd666937a2e487ea8007db948f83c671a4"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "cooking_pot_01": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 81,
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "121111101046810"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "metal",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "metal",
+        "label": "Metal",
+        "robloxMaterial": "Metal",
+        "soundFamily": "metal"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 2,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Prop",
+      "publishedVisualMeshes": [],
       "aliases": []
     },
     {
@@ -18318,8 +18537,8 @@
     }
   ],
   "summary": {
-    "registered": 39,
-    "published": 39,
+    "registered": 40,
+    "published": 40,
     "changed": 0
   }
 }

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "slug": "cooking_pot_01",
+  "sourceSha256": "2a94f40eb4ff6a9d4470199b5345d163cd4fd04a8b78aa75faed690d3b8a4d96",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "cooking_pot_01",
+        "armature": "cooking_pot_01_armature",
+        "vertices": 90,
+        "bones": [
+          {
+            "name": "cooking_pot_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              -0.016018,
+              0.0,
+              0.0,
+              -1.0,
+              -0.0422651,
+              0.0,
+              1.0,
+              0.0,
+              2.4031212,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "cooking_pot_socket"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "cooking_pot_01_armature",
+        "vertices": 3,
+        "bones": [
+          {
+            "name": "cooking_pot_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              -0.016018,
+              0.0,
+              0.0,
+              -1.0,
+              -0.0422651,
+              0.0,
+              1.0,
+              0.0,
+              2.4031212,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "cooking_pot_socket"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [
+      "cooking_pot_01_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

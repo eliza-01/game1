@@ -1,0 +1,58 @@
+{
+  "boneHash": "e334cbe6f6385624d4ffdf6a20c9d498e8b05b769b459356c2ee39d4ccfac8ea",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        -0.016018,
+        0.0,
+        0.0,
+        -1.0,
+        -0.0422651,
+        0.0,
+        1.0,
+        0.0,
+        2.4031212,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "cooking_pot_socket",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "e91a100d028ea4ac50958c61cc13f97fdd66dc057cd94eeb20798d8a687cade2",
+  "parts": [
+    {
+      "name": "cooking_pot_01",
+      "role": "visual",
+      "vertices": 90
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 3
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 1,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 12,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "2a94f40eb4ff6a9d4470199b5345d163cd4fd04a8b78aa75faed690d3b8a4d96",
+  "structuralHash": "2d4ae51f99751c80c0486cdbe8a8f9bd666937a2e487ea8007db948f83c671a4"
+}

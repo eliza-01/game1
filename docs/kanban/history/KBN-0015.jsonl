@@ -1,0 +1,1 @@
+{"revision": 2, "time": "2026-11-22T18:37:09+00:00", "action": "documentation-audit", "detail": "M439: editorial reconciliation and repair of pre-existing specSha256 mismatch", "beforeSha256": "d81812ddeefd8cd6b58b9b21426ccfbd6b0e211ab054c9db4f0463c9e69f0bc6", "afterSha256": "e2ec1fe5d11986e041e65caf8f353a3b3b39bdc5972c96e9df3aaae92008502e"}

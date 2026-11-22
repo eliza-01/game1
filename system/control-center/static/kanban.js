@@ -16,7 +16,7 @@
   function metric() {
     const total=model.cards.length;
     const tasks=model.cards.flatMap(c=>c.tasks||[]);
-    $kb('kb-metrics').innerHTML=`<span><strong>${total}</strong>механик</span><span><strong>${model.cards.filter(c=>c.status==='IN_PROGRESS').length}</strong>в работе</span><span><strong>${model.cards.filter(c=>c.status==='DONE').length}</strong>проверено</span><span><strong>${tasks.filter(x=>x.done).length}/${tasks.length}</strong>пунктов</span>`;
+    $kb('kb-metrics').innerHTML=`<span><strong>${total}</strong>карточек</span><span><strong>${model.cards.filter(c=>c.status==='IN_PROGRESS').length}</strong>в работе</span><span><strong>${model.cards.filter(c=>c.status==='DONE').length}</strong>проверено</span><span><strong>${tasks.filter(x=>x.done).length}/${tasks.length}</strong>пунктов</span>`;
   }
   function cards() {
     metric();const host=$kb('kb-cards');host.replaceChildren();
@@ -34,7 +34,7 @@
     if(!host.children.length)host.textContent='Нет карточек по выбранному фильтру.';
   }
   async function load() {
-    try{const result=await api('');model.cards=result.cards;notice('Данные хранятся в docs/kanban · все пункты изначально PROPOSED');cards()}
+    try{const result=await api('');model.cards=result.cards;notice('Карточки и спецификации синхронизированы через SHA256 · подтверждения Studio/устройств вносятся вручную');cards()}
     catch(error){notice(error.message,true)}
   }
   async function loadDetail(id){

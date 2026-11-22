@@ -25,17 +25,18 @@
 6. Verify `git apply --check` against the actual supplied project version. Deliver changes as a patch from the game1 project root with one single PowerShell block; restart **only** services affected. Do not restart Rojo or open new consoles by default.
 7. In every handoff describe boundaries changed, migrations, observed tests, untested runtime scenarios and any regressions/risks. Never claim full Studio validation from static tests.
 
-## Current documentation and remaining decomposition (updated 2026-11-02)
+## Current documentation and remaining decomposition (M189 baseline; M439 review 2026-11-22)
 
 M189 separates Character and Monster/NPC Animation Python store responsibilities without changing public contracts; see `docs/workflows/CHARACTER_ANIMATION_STORES_R3_M189_RU.md`. R3 is not finished. The M83 audit is **historical**. M85–M105 implemented the bootstrap, Host Agent, Monster AI/Spawner, Hitbox/Combat and Studio Bridge extraction steps. Do **not** repeat their original "not yet implemented" work. The live documents are:
 
-- [`docs/README.md`](docs/README Read First!.md) — documentation index, current vs historical.
+- [`docs/README Read First!.md`](docs/README Read First!.md) — documentation index, current vs historical.
+- [`docs/kanban/STATUS_2026-11-22_M439.md`](docs/kanban/STATUS_2026-11-22_M439.md) — current Kanban code evidence and unverified Studio/mobile acceptance for all 17 cards.
 - [`docs/spec/CURRENT_PROJECT_SPEC_RU.md`](docs/spec/CURRENT_PROJECT_SPEC_RU.md) — current product/technical contracts.
 - [`docs/architecture/CURRENT_ARCHITECTURE_RU.md`](docs/architecture/CURRENT_ARCHITECTURE_RU.md) — module ownership and boundaries.
 - [`docs/architecture/REFACTOR_ROADMAP_RU.md`](docs/architecture/REFACTOR_ROADMAP_RU.md) — still-pending refactor steps, acceptance and non-goals.
 - [`docs/workflows/DEVELOPMENT_AND_VALIDATION_RU.md`](docs/workflows/DEVELOPMENT_AND_VALIDATION_RU.md) — test and handoff procedure.
 
-Historical reports in `docs/history/` are snapshots, not normative contracts. Maintain the historical M83 audit at its existing path because a regression test pins that file. These rules remain binding; a newer document cannot silently waive them.
+Kanban specs and cards must retain matching SHA256/revision/history; `verify.py` now checks this read-only via `KanbanStore` (M439). Historical reports in `docs/history/` are snapshots, not normative contracts. Maintain the historical M83 audit at its existing path because a regression test pins that file. These rules remain binding; a newer document cannot silently waive them.
 
 ## M203 · Real Estate / Location Atlas independence
 

@@ -39,6 +39,21 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 | Verification (M164–M171) | `system/verify/verify.py` → `system/verify/validators/` | Вынесены source-only, project layout, Monster registry/spawn, Actor runtime и Combat Contact/Headshot, Character, Animation, Weapon, Studio Debug, Death, Attack Timeline и Rojo/Animation Speed tooling, Location/Deco/Environment/Texture Sync (M169), Combat foundation/Hitbox/Studio Character Bridge/registered attack clips (M170). `verify.py` содержит только orchestration; M171 устранил пропуск ошибок M54/M55/M128 при расчёте exit code. R2 завершён |
 | House runtime | `HouseSocketContract`, `HouseElevatorPolicy`, `HouseSocketService`, `HouseDoorService`, `HousePadlockService`, клиентский Prompt, Studio debug | USE/AIM, модельный pivot двери, server authorization; детальнее в [ТЗ](../spec/CURRENT_PROJECT_SPEC_RU.md) |
 
+## M439 · актуальная схема World LOD и House Mechanics
+
+| Владелец | Фактические компоненты | Правило |
+|---|---|---|
+| Source registrations | `services/location_lod_resource.py`, Atlas Registry, Real Estate stores | Asset ID/SHA/slug/revision принадлежат своим Stores, не клиенту |
+| LOD profiles | `services/location_streaming_config.py`, `services/house_part_distances.py`, `services/house_runtime_profile.py` | Дистанции на каждый ассет/House part; общие только hysteresis и native Workspace profile |
+| Studio Preview | `services/lod_studio_preview.py` → `StudioLodPreviewContract` → Studio Bridge → `StudioLodPreviewAdapter` | Preview schemaVersion=2, сохранённые изменения приходят в Play без Runtime rebuild |
+| Runtime Build | `services/location_runtime_build.py`, `LocationRuntimeManifestContract`, `LocationLodTemplateService` | Offline `.rbxlx` + backup + marker, `publishAllowed=false` |
+| Client visuals | `LocationWorldStreamer`, `HouseVisualAdapter`, `LocationCompositeVisual` | Визуалы локальные, серверные коллизии остаются в мире |
+| House interactions | `HouseSocketContract`, `HouseSocketService`, `HouseDoorService`, `HouseElevatorService`, `HouseFireplaceService` | Server-owned actions/timers, клиент только визуал и ввод |
+| Mechanics docs | `mechanics/catalog.py`, `mechanics/house.py`, `api/mechanics.py` | Read-only source allowlist; `cooking_pot_socket` — вложенная точка модели котла |
+| Development Kanban | `kanban_store.py`, `docs/kanban/cards`, `specs`, `history` | SHA256+revision+history атомарны; приёмку Studio не синтезировать |
+
+Эта таблица проверена по проектным файлам на срезе M438a; ей **не** присваивается статус Studio Play/полевого теста. См. [актуальный Kanban](../kanban/STATUS_2026-11-22_M439.md).
+
 ## Опасные устаревшие предположения
 
 - **Не считать** `StudioRealEstateSocketRecovery` действующим механизмом: M133 описывает удалённый в M153 workaround. Текущий Studio Bridge проверяет фактические Bones.

@@ -29,6 +29,7 @@ from validators.monsters import check_monster_contracts
 from validators.project_layout import check_project_identity, check_project_layout
 from validators.source_only import check_source_only_contract
 from validators.atlas_independence import check_atlas_independence
+from validators.kanban_integrity import check_kanban_integrity
 
 ROOT = Path(__file__).resolve().parents[2]
 errors = []
@@ -180,6 +181,10 @@ check_location_asset_categories(
     ROOT, err, sources=location_assets, character_js_text=character_js_text,
     studio_plugin_text=studio_plugin_text, install_plugin_text=install_plugin_text,
 )
+
+# Keep the Kanban documentation visible to the normal verify.py gate.
+# A single stale spec SHA otherwise breaks the entire Kanban web/API list.
+check_kanban_integrity(ROOT, err)
 
 if errors:
     print("verify failed")

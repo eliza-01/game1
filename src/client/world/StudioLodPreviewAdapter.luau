@@ -237,9 +237,4 @@ function Adapter:FollowMoving()
         end
     end
 end
-function Adapter:Stats()
-    local counts = {FULL=0, LOD1=0, LOD2=0, UNLOADED=0}
-    for _, record in pairs(self.records) do if record.actual then counts[record.actual] += 1 end end
-    return counts
-end
 return table.freeze(Adapter)

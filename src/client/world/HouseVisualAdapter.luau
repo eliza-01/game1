@@ -293,14 +293,4 @@ function Adapter:FollowMoving()
     end
 end
 
-function Adapter:Stats(): (number, number, number)
-    local full, lod, unloaded = 0, 0, 0
-    for _, record: House in ipairs(self.records) do
-        if record.state == "FULL" then full += 1
-        elseif record.state == "LOD1" then lod += 1
-        else unloaded += 1 end
-    end
-    return full, lod, unloaded
-end
-
 return table.freeze(Adapter)

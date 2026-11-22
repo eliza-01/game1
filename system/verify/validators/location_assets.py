@@ -52,10 +52,14 @@ def check_location_assets_core(root: Path, report_error: Callable[[str], None], 
         category_ids = [row.get("id") for row in ((location_asset_manifest.get("options") or {}).get("categories") or [])]
         # Generated manifests may still have the previous category set until
         # the first Control Center startup re-exports them from LocationAssetStore.
-        expected_categories = ["tree", "bush", "flower", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building"]
+        expected_categories = ["tree", "bush", "ivy", "flower", "leaf", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building"]
+        # An already-generated manifest is rebuilt by the first post-patch
+        # Control Center startup, after the database migration.
+        pre_m434_categories = [c for c in expected_categories if c != 'leaf']
+        pre_m433_categories = [c for c in pre_m434_categories if c != 'ivy']
         legacy_categories = ["tree", "bush", "rock", "light", "fence", "decoration", "ladder", "flower", "building", "prop"]
         revision = location_asset_manifest.get("schemaVersion")
-        if (revision in (5,6) and category_ids != expected_categories) or (revision == 4 and category_ids != legacy_categories):
+        if (revision in (5,6) and category_ids not in (expected_categories, pre_m434_categories, pre_m433_categories)) or (revision == 4 and category_ids != legacy_categories):
             report_error("m128 Location Assets manifest categories have invalid canonical order")
 
     location_asset_store_text = location_asset_store_path.read_text(encoding="utf-8") if location_asset_store_path.is_file() else ""
@@ -171,7 +175,7 @@ def check_location_assets_core(root: Path, report_error: Callable[[str], None], 
         'DecoPreviewWorld',
         '"Save Assets Data"',
         'self.agentBaseUrl .. "/api/location-assets/layout"',
-        'local CATEGORY_ORDER = { "tree", "bush", "flower", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building" }',
+        'local CATEGORY_ORDER = { "tree", "bush", "ivy", "flower", "leaf", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building" }',
     ]:
         if required not in deco_manager_text:
             report_error(f"m43 DecoManager missing {required}")

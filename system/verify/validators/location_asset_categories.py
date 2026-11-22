@@ -36,7 +36,7 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
     for required in [
         'id="new-location-asset-main"',
         'id="location-asset-library-category"',
-        'Flora · tree · bush · flower · rock',
+        'Flora · tree · bush · ivy · flower · leaf · rock',
         'Structure · light · fence · ladder · bridge · pillar · post',
         'id="location-asset-editor-panel"',
         'Register new asset',
@@ -60,12 +60,13 @@ def check_location_asset_categories(root: Path, report_error: Callable[[str], No
     for required in [
         'ladder="Ladder"',
         'flower="Flower"',
-        'local CATEGORY_ORDER = { "tree", "bush", "flower", "rock",',
+        'leaf="Leaf"',
+        'local CATEGORY_ORDER = { "tree", "bush", "ivy", "flower", "leaf", "rock",',
         'local column = (index - 1) % 4',
     ]:
         if required not in deco_manager_text:
             report_error(f"m54 DecoManager category support missing {required}")
-    for required in ['ladder = "Ladders"', 'flower = "Flowers"']:
+    for required in ['ladder = "Ladders"', 'flower = "Flowers"', 'leaf = "Leaves"']:
         if required not in deco_placement_text:
             report_error(f"m54 DecoPlacement category folder missing {required}")
     if "model bridge v24" not in studio_plugin_text or "model bridge v24" not in install_plugin_text:

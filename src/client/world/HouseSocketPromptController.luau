@@ -9,6 +9,8 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 
+local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
+
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
 local Aim = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketAimPolicy"))
@@ -18,8 +20,8 @@ local player = Players.LocalPlayer
 local Controller = {}
 local started = false
 local prompts: {[ProximityPrompt]: RBXScriptConnection} = {}
--- Exactly one BillboardGui per socket (inside/outside each get one panel).
-local visible: {[Attachment]: BillboardGui} = {}
+-- One panel per visible socket: world badge on desktop, thumb dock on custom touch characters.
+local visible: {[Attachment]: LayerCollector} = {}
 local visibleSignature: {[Attachment]: string} = {}
 local nativeShown: {[ProximityPrompt]: boolean} = {}
 local selectedCustom: ProximityPrompt? = nil
@@ -113,7 +115,7 @@ local function actionLabel(action: string): string
 end
 
 local function signature(actions: {ProximityPrompt}): string
-    local parts = {if keyOwned() then "own" else "lost"}
+    local parts = {if keyOwned() then "own" else "lost", if SpatialRoot.IsCustom(player) then "custom" else "native"}
     for _, prompt in actions do
         table.insert(parts, prompt.KeyboardKeyCode.Name .. "=" .. prompt.ActionText)
     end
@@ -135,16 +137,80 @@ local function requestAction(prompt: ProximityPrompt)
     end
 end
 
-local function makeGui(socket: Attachment, actions: {ProximityPrompt}): BillboardGui
-    local gui = Instance.new("BillboardGui")
-    gui.Name = "Game1HousePrompt"
-    gui.Adornee = socket
+-- The same reticle ray as headshot aim (viewport center) selects AIM-enabled
+-- sockets. Do not raycast the camera/mouse cursor or spawn queryable aim Parts:
+-- queryable proxies would interfere with combat rays. After the mathematical
+-- ray/sphere contact, a real Workspace raycast rejects occluded targets.
+-- Both custom and standard characters use this path for AIM sockets. Others
+-- retain the existing proximity behavior on custom characters.
+local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): ProximityPrompt?
+    local camera = Workspace.CurrentCamera
+    if not camera then return nil end
+    local cursor = CameraController.CursorPoint()
+    local viewport = camera.ViewportSize
+    local ray = camera:ViewportPointToRay(viewport.X * cursor.X, viewport.Y * cursor.Y)
+    local selectedAim: ProximityPrompt? = nil
+    local aimEntry = math.huge
+    local selectedOther: ProximityPrompt? = nil
+    local otherDistance = math.huge
+    for prompt in prompts do
+        if not prompt.Enabled or not prompt:IsDescendantOf(Workspace) then continue end
+        local socket = prompt.Parent
+        if not socket or not socket:IsA("Attachment") then continue end
+        local name = prompt:GetAttribute("Game1HouseSocketName")
+        if typeof(name) ~= "string" then continue end
+        local definition = Contract.Get(name)
+        if not definition or not definition.interact then continue end
+        local frame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
+        local distance = (frame.Position - root.Position).Magnitude
+        -- USE always uses the character root, not the camera.
+        if distance > radius(name) then continue end
+        if definition.hoverRadius then
+            local hit = Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, hoverRadius(name))
+            if hit == nil then continue end
+            if hit < aimEntry - 0.001 or (math.abs(hit - aimEntry) <= 0.001
+                and prompt.KeyboardKeyCode == Enum.KeyCode.E
+                and (not selectedAim or selectedAim.KeyboardKeyCode ~= Enum.KeyCode.E)) then
+                selectedAim, aimEntry = prompt, hit
+            end
+        elseif not aimedOnly then
+            local projected, onScreen = camera:WorldToViewportPoint(frame.Position)
+            if not onScreen or projected.Z <= 0 then continue end
+            if distance < otherDistance - 0.01 or (math.abs(distance - otherDistance) <= 0.01
+                and prompt.KeyboardKeyCode == Enum.KeyCode.E
+                and (not selectedOther or selectedOther.KeyboardKeyCode ~= Enum.KeyCode.E)) then
+                selectedOther, otherDistance = prompt, distance
+            end
+        end
+    end
+    if selectedAim and Occlusion.IsClear(ray.Origin, ray.Direction, aimEntry, player.Character) then
+        return selectedAim
+    end
+    return selectedOther
+end
+
+local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCollector
     local touch = UserInputService.TouchEnabled
-    gui.Size = UDim2.fromOffset(272, 12 + #actions * (if touch then 48 else 40))
-    gui.Active = touch
-    gui.StudsOffsetWorldSpace = Vector3.new(0, 1.45, 0)
-    gui.AlwaysOnTop = true
-    gui.LightInfluence = 0
+    local docked = touch and SpatialRoot.IsCustom(player)
+    local gui: LayerCollector
+    local panelHeight = 12 + #actions * (if touch then 52 else 40)
+    if docked then
+        local screen = Instance.new("ScreenGui")
+        screen.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+        screen.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+        screen.DisplayOrder = 16
+        gui = screen
+    else
+        local billboard = Instance.new("BillboardGui")
+        billboard.Adornee = socket
+        billboard.Size = UDim2.fromOffset(272, panelHeight)
+        billboard.Active = touch
+        billboard.StudsOffsetWorldSpace = Vector3.new(0, 1.45, 0)
+        billboard.AlwaysOnTop = true
+        billboard.LightInfluence = 0
+        gui = billboard
+    end
+    gui.Name = "Game1HousePrompt"
     gui.ResetOnSpawn = false
     gui.Parent = player:WaitForChild("PlayerGui")
     local background = Instance.new("Frame")
@@ -153,6 +219,17 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): Billboar
     background.BackgroundTransparency = 0.06
     background.Size = UDim2.fromScale(1, 1)
     background.Parent = gui
+    if gui:IsA("ScreenGui") then
+        local screen = gui
+        local function layout()
+            local bounds = MobileLayout.Context(screen.AbsoluteSize.X, screen.AbsoluteSize.Y, panelHeight)
+            background.AnchorPoint = Vector2.new(1, 1)
+            background.Size = UDim2.fromOffset(bounds.width, panelHeight)
+            background.Position = UDim2.new(1, -bounds.x, 1, -bounds.y)
+        end
+        screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
+        layout()
+    end
     rounded(background, 11)
     local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.fromRGB(75, 91, 104)
@@ -160,23 +237,29 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): Billboar
     stroke.Transparency = 0.12
     stroke.Parent = background
     for index, prompt in actions do
-        local y = 6 + (index - 1) * (if touch then 48 else 40)
+        local y = 6 + (index - 1) * (if touch then 52 else 40)
         if touch then
             -- One large direct-tap target for every available action, no E/F.
             local action = Instance.new("TextButton")
             action.Name = "TouchAction_" .. prompt.KeyboardKeyCode.Name
             action.Position = UDim2.fromOffset(6, y)
-            action.Size = UDim2.new(1, -12, 0, 42)
+            action.Size = UDim2.new(1, -12, 0, 46)
             action.BackgroundColor3 = Color3.fromRGB(37, 51, 62)
             action.TextColor3 = Color3.fromRGB(244, 246, 249)
             action.Font = Enum.Font.GothamSemibold
             action.TextSize = 14
+            action.TextWrapped = true
             action.Text = prompt.ActionText
             action.AutoButtonColor = true
             action.Active = true
             action.Parent = background
             rounded(action, 8)
             action.Activated:Connect(function()
+                if docked then
+                    local root = SpatialRoot.Get(player)
+                    local selected = if root then nearestCustomPrompt(root, false) else nil
+                    if not selected or selected.Parent ~= socket then return end
+                end
                 requestAction(prompt)
             end)
             continue
@@ -237,62 +320,11 @@ local function nativeActive(socket: Attachment): boolean
     return false
 end
 
--- The same reticle ray as headshot aim (viewport center) selects AIM-enabled
--- sockets. Do not raycast the camera/mouse cursor or spawn queryable aim Parts:
--- queryable proxies would interfere with combat rays. After the mathematical
--- ray/sphere contact, a real Workspace raycast rejects occluded targets.
--- Both custom and standard characters use this path for AIM sockets. Others
--- retain the existing proximity behavior on custom characters.
-local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): ProximityPrompt?
-    local camera = Workspace.CurrentCamera
-    if not camera then return nil end
-    local cursor = CameraController.CursorPoint()
-    local viewport = camera.ViewportSize
-    local ray = camera:ViewportPointToRay(viewport.X * cursor.X, viewport.Y * cursor.Y)
-    local selectedAim: ProximityPrompt? = nil
-    local aimEntry = math.huge
-    local selectedOther: ProximityPrompt? = nil
-    local otherDistance = math.huge
-    for prompt in prompts do
-        if not prompt.Enabled or not prompt:IsDescendantOf(Workspace) then continue end
-        local socket = prompt.Parent
-        if not socket or not socket:IsA("Attachment") then continue end
-        local name = prompt:GetAttribute("Game1HouseSocketName")
-        if typeof(name) ~= "string" then continue end
-        local definition = Contract.Get(name)
-        if not definition or not definition.interact then continue end
-        local frame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
-        local distance = (frame.Position - root.Position).Magnitude
-        -- USE always uses the character root, not the camera.
-        if distance > radius(name) then continue end
-        if definition.hoverRadius then
-            local hit = Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, hoverRadius(name))
-            if hit == nil then continue end
-            if hit < aimEntry - 0.001 or (math.abs(hit - aimEntry) <= 0.001
-                and prompt.KeyboardKeyCode == Enum.KeyCode.E
-                and (not selectedAim or selectedAim.KeyboardKeyCode ~= Enum.KeyCode.E)) then
-                selectedAim, aimEntry = prompt, hit
-            end
-        elseif not aimedOnly then
-            local projected, onScreen = camera:WorldToViewportPoint(frame.Position)
-            if not onScreen or projected.Z <= 0 then continue end
-            if distance < otherDistance - 0.01 or (math.abs(distance - otherDistance) <= 0.01
-                and prompt.KeyboardKeyCode == Enum.KeyCode.E
-                and (not selectedOther or selectedOther.KeyboardKeyCode ~= Enum.KeyCode.E)) then
-                selectedOther, otherDistance = prompt, distance
-            end
-        end
-    end
-    if selectedAim and Occlusion.IsClear(ray.Origin, ray.Direction, aimEntry, player.Character) then
-        return selectedAim
-    end
-    return selectedOther
-end
-
 local function updateCustomPrompt()
     local custom = SpatialRoot.IsCustom(player)
     local root = SpatialRoot.Get(player)
-    local nextPrompt = if root then nearestCustomPrompt(root, not custom) else nil
+    local alive = not custom or (player.Character and player.Character:GetAttribute("LifeState") == "Alive")
+    local nextPrompt = if root and alive then nearestCustomPrompt(root, not custom) else nil
     selectedCustom = nextPrompt
     local anchor = if nextPrompt then nextPrompt.Parent else nil
     local selectedSocket = if anchor and anchor:IsA("Attachment") then anchor :: Attachment else nil

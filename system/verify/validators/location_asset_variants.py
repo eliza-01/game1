@@ -70,7 +70,7 @@ def check_location_asset_variants(root: Path, report_error: Callable[[str], None
         'decoration="Decoration"',
         'ladder="Ladder"',
         'flower="Flower"',
-        'local CATEGORY_ORDER = { "tree", "bush", "flower", "rock",',
+        'local CATEGORY_ORDER = { "tree", "bush", "ivy", "flower", "leaf", "rock",',
         'local row = math.floor((index - 1) / 4)',
     ]:
         if required not in deco_manager_text:

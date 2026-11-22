@@ -18,8 +18,18 @@
             "group": "flora"
           },
           {
+            "id": "ivy",
+            "label": "Ivy",
+            "group": "flora"
+          },
+          {
             "id": "flower",
             "label": "Flower",
+            "group": "flora"
+          },
+          {
+            "id": "leaf",
+            "label": "Leaf",
             "group": "flora"
           },
           {
@@ -99,8 +109,18 @@
         "group": "flora"
       },
       {
+        "id": "ivy",
+        "label": "Ivy",
+        "group": "flora"
+      },
+      {
         "id": "flower",
         "label": "Flower",
+        "group": "flora"
+      },
+      {
+        "id": "leaf",
+        "label": "Leaf",
         "group": "flora"
       },
       {
@@ -3811,534 +3831,6 @@
         {
           "meshId": "99690489780806",
           "name": "tripo_node_5814630f-2705-4abf-904c-e29110ce44e8"
-        }
-      ],
-      "aliases": []
-    },
-    {
-      "slug": "ivy_02",
-      "name_en": "Ivy 02",
-      "category": "bush",
-      "model_path": "assets/source/location-assets/bush/ivy_02/model/ivy_02.fbx",
-      "model_sha256": "f18f6cf3c95ba96b377d04344247e130fa1d24b5d0428d9ab8374f9a0ceb0cd1",
-      "model_asset_id": "132393421464750",
-      "model_published_sha256": "f18f6cf3c95ba96b377d04344247e130fa1d24b5d0428d9ab8374f9a0ceb0cd1",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 1,
-      "created_at": 1794276051.857426,
-      "updated_at": 1794276073.532448,
-      "published_at": 1794276073.532448,
-      "surface_material": "grass",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": {
-        "schemaVersion": 1,
-        "meshes": [
-          {
-            "name": "ivy_02",
-            "armature": "",
-            "vertices": 405,
-            "bones": [],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          }
-        ],
-        "hasCollider": false,
-        "armatures": [],
-        "unassignedArmatures": []
-      },
-      "rigManifest": {
-        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "bones": [],
-        "carrierName": null,
-        "inventoryHash": "4a0044f8a167dbbf06d8b530690183d1f1da2525b49f094b6ff6c6575e01269d",
-        "parts": [
-          {
-            "name": "ivy_02",
-            "role": "visual",
-            "vertices": 405
-          }
-        ],
-        "rigKind": "static",
-        "schemaVersion": 2,
-        "sourceSha256": "",
-        "structuralHash": "0f2e1ddf745e46ec6bff4c8cb976d7c9dc87179532ae82efec8408eceaa82867"
-      },
-      "needsFbxInspection": false,
-      "legacyStaticPublication": false,
-      "meshOptions": {
-        "ivy_02": {
-          "collisionFidelity": "Box",
-          "doubleSided": true,
-          "glass": false,
-          "noCollide": true
-        }
-      },
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "grass",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "grass",
-        "label": "Grass",
-        "robloxMaterial": "Grass",
-        "soundFamily": "foliage"
-      },
-      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
-      "texture_filename": "leaves_n_flowers_256x256_atlas.png",
-      "texture_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-      "texture_asset_id": "82028913618222",
-      "texture_published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 71,
-      "atlasFamily": "leaves_n_flowers",
-      "atlasResolution": "256x256",
-      "bindingRevision": 2,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 43,
-          "family_id": 34,
-          "width": 1024,
-          "height": 1024,
-          "filename": "leaves_n_flowers_1024x1024_atlas.png",
-          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
-          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
-          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
-          "uses_alpha": true,
-          "published_id": "83232615212572",
-          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
-          "moderation_state": "Reviewing",
-          "published_at": 1794272123.260854,
-          "created_at": 1794268719.8272274,
-          "retired_at": null,
-          "atlas_key": "leaves_n_flowers",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "1024x1024",
-          "baseKey": "leaves_n_flowers",
-          "version": ""
-        },
-        {
-          "id": 71,
-          "family_id": 34,
-          "width": 256,
-          "height": 256,
-          "filename": "leaves_n_flowers_256x256_atlas.png",
-          "original_filename": "leaves_n_flowers_256x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
-          "source_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-          "uses_alpha": true,
-          "published_id": "82028913618222",
-          "published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-          "moderation_state": "Reviewing",
-          "published_at": 1794527000.2748997,
-          "created_at": 1794526996.656138,
-          "retired_at": null,
-          "atlas_key": "leaves_n_flowers",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "256x256",
-          "baseKey": "leaves_n_flowers",
-          "version": ""
-        }
-      ],
-      "textureUsesAlpha": true,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
-      "status": "PUBLISHED",
-      "category_label": "Bush",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "96395292520138",
-          "name": "ivy_02"
-        }
-      ],
-      "aliases": []
-    },
-    {
-      "slug": "ivy_03",
-      "name_en": "Ivy 03",
-      "category": "bush",
-      "model_path": "assets/source/location-assets/bush/ivy_03/model/ivy_03.fbx",
-      "model_sha256": "cd41e2343dba31d6a6b256fce12112ff7956dd6cfab3e9ac878533cede948c4a",
-      "model_asset_id": "123907031275738",
-      "model_published_sha256": "cd41e2343dba31d6a6b256fce12112ff7956dd6cfab3e9ac878533cede948c4a",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 2,
-      "created_at": 1794268720.0646126,
-      "updated_at": 1794271502.612349,
-      "published_at": 1794271502.612349,
-      "surface_material": "grass",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": {
-        "schemaVersion": 1,
-        "meshes": [
-          {
-            "name": "ivy_03",
-            "armature": "",
-            "vertices": 657,
-            "bones": [],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          }
-        ],
-        "hasCollider": false,
-        "armatures": [],
-        "unassignedArmatures": []
-      },
-      "rigManifest": {
-        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "bones": [],
-        "carrierName": null,
-        "inventoryHash": "e6f4eb046ec58a43661537c129937a0767301b56385748119b82280c6ccf0a38",
-        "parts": [
-          {
-            "name": "ivy_03",
-            "role": "visual",
-            "vertices": 657
-          }
-        ],
-        "rigKind": "static",
-        "schemaVersion": 2,
-        "sourceSha256": "",
-        "structuralHash": "647299c9213f24235f63d1b9b0951fd8287fd754f94f440ae63424a32d16951b"
-      },
-      "needsFbxInspection": false,
-      "legacyStaticPublication": false,
-      "meshOptions": {
-        "ivy_03": {
-          "collisionFidelity": "Box",
-          "doubleSided": true,
-          "glass": false,
-          "noCollide": true
-        }
-      },
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "grass",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "grass",
-        "label": "Grass",
-        "robloxMaterial": "Grass",
-        "soundFamily": "foliage"
-      },
-      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
-      "texture_filename": "leaves_n_flowers_256x256_atlas.png",
-      "texture_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-      "texture_asset_id": "82028913618222",
-      "texture_published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 71,
-      "atlasFamily": "leaves_n_flowers",
-      "atlasResolution": "256x256",
-      "bindingRevision": 3,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 43,
-          "family_id": 34,
-          "width": 1024,
-          "height": 1024,
-          "filename": "leaves_n_flowers_1024x1024_atlas.png",
-          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
-          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
-          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
-          "uses_alpha": true,
-          "published_id": "83232615212572",
-          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
-          "moderation_state": "Reviewing",
-          "published_at": 1794272123.260854,
-          "created_at": 1794268719.8272274,
-          "retired_at": null,
-          "atlas_key": "leaves_n_flowers",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "1024x1024",
-          "baseKey": "leaves_n_flowers",
-          "version": ""
-        },
-        {
-          "id": 71,
-          "family_id": 34,
-          "width": 256,
-          "height": 256,
-          "filename": "leaves_n_flowers_256x256_atlas.png",
-          "original_filename": "leaves_n_flowers_256x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
-          "source_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-          "uses_alpha": true,
-          "published_id": "82028913618222",
-          "published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-          "moderation_state": "Reviewing",
-          "published_at": 1794527000.2748997,
-          "created_at": 1794526996.656138,
-          "retired_at": null,
-          "atlas_key": "leaves_n_flowers",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "256x256",
-          "baseKey": "leaves_n_flowers",
-          "version": ""
-        }
-      ],
-      "textureUsesAlpha": true,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
-      "status": "PUBLISHED",
-      "category_label": "Bush",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "129286240339384",
-          "name": "ivy_03"
-        }
-      ],
-      "aliases": []
-    },
-    {
-      "slug": "ivy_05",
-      "name_en": "Ivy 05",
-      "category": "bush",
-      "model_path": "assets/source/location-assets/bush/ivy_05/model/ivy_05.fbx",
-      "model_sha256": "d2de444737ca78fca79532388bf7a399d3ccae1c611156bd5454e61173502dfa",
-      "model_asset_id": "122555277961937",
-      "model_published_sha256": "d2de444737ca78fca79532388bf7a399d3ccae1c611156bd5454e61173502dfa",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 2,
-      "created_at": 1794276114.6875803,
-      "updated_at": 1794276177.1030004,
-      "published_at": 1794276130.6505659,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": {
-        "schemaVersion": 1,
-        "meshes": [
-          {
-            "name": "ivy_05",
-            "armature": "",
-            "vertices": 391,
-            "bones": [],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          }
-        ],
-        "hasCollider": false,
-        "armatures": [],
-        "unassignedArmatures": []
-      },
-      "rigManifest": {
-        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-        "bones": [],
-        "carrierName": null,
-        "inventoryHash": "f7f6ef0a994cfa1910dcfb470189da08af078e1f9e05961a7b28bdf505fb9c6b",
-        "parts": [
-          {
-            "name": "ivy_05",
-            "role": "visual",
-            "vertices": 391
-          }
-        ],
-        "rigKind": "static",
-        "schemaVersion": 2,
-        "sourceSha256": "",
-        "structuralHash": "047bcb1434104afd569689f9d51f409460c480a6633c8c1ea221f62a74c79eb4"
-      },
-      "needsFbxInspection": false,
-      "legacyStaticPublication": false,
-      "meshOptions": {
-        "ivy_05": {
-          "collisionFidelity": "Box",
-          "doubleSided": true,
-          "glass": false,
-          "noCollide": true
-        }
-      },
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "default",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
-      "texture_filename": "leaves_n_flowers_256x256_atlas.png",
-      "texture_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-      "texture_asset_id": "82028913618222",
-      "texture_published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 71,
-      "atlasFamily": "leaves_n_flowers",
-      "atlasResolution": "256x256",
-      "bindingRevision": 2,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 43,
-          "family_id": 34,
-          "width": 1024,
-          "height": 1024,
-          "filename": "leaves_n_flowers_1024x1024_atlas.png",
-          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
-          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
-          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
-          "uses_alpha": true,
-          "published_id": "83232615212572",
-          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
-          "moderation_state": "Reviewing",
-          "published_at": 1794272123.260854,
-          "created_at": 1794268719.8272274,
-          "retired_at": null,
-          "atlas_key": "leaves_n_flowers",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "1024x1024",
-          "baseKey": "leaves_n_flowers",
-          "version": ""
-        },
-        {
-          "id": 71,
-          "family_id": 34,
-          "width": 256,
-          "height": 256,
-          "filename": "leaves_n_flowers_256x256_atlas.png",
-          "original_filename": "leaves_n_flowers_256x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
-          "source_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-          "uses_alpha": true,
-          "published_id": "82028913618222",
-          "published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
-          "moderation_state": "Reviewing",
-          "published_at": 1794527000.2748997,
-          "created_at": 1794526996.656138,
-          "retired_at": null,
-          "atlas_key": "leaves_n_flowers",
-          "replacement_sha256": null,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "256x256",
-          "baseKey": "leaves_n_flowers",
-          "version": ""
-        }
-      ],
-      "textureUsesAlpha": true,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
-      "status": "PUBLISHED",
-      "category_label": "Bush",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "121501655225543",
-          "name": "ivy_05"
         }
       ],
       "aliases": []
@@ -9089,6 +8581,534 @@
         {
           "meshId": "100119295242562",
           "name": "wooden_fence_03"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "ivy_02",
+      "name_en": "Ivy 02",
+      "category": "ivy",
+      "model_path": "assets/source/location-assets/bush/ivy_02/model/ivy_02.fbx",
+      "model_sha256": "f18f6cf3c95ba96b377d04344247e130fa1d24b5d0428d9ab8374f9a0ceb0cd1",
+      "model_asset_id": "132393421464750",
+      "model_published_sha256": "f18f6cf3c95ba96b377d04344247e130fa1d24b5d0428d9ab8374f9a0ceb0cd1",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 2,
+      "created_at": 1794276051.857426,
+      "updated_at": 1795362161.1181345,
+      "published_at": 1794276073.532448,
+      "surface_material": "grass",
+      "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "ivy_02",
+            "armature": "",
+            "vertices": 405,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "4a0044f8a167dbbf06d8b530690183d1f1da2525b49f094b6ff6c6575e01269d",
+        "parts": [
+          {
+            "name": "ivy_02",
+            "role": "visual",
+            "vertices": 405
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "0f2e1ddf745e46ec6bff4c8cb976d7c9dc87179532ae82efec8408eceaa82867"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "ivy_02": {
+          "collisionFidelity": "Box",
+          "doubleSided": true,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "grass",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "grass",
+        "label": "Grass",
+        "robloxMaterial": "Grass",
+        "soundFamily": "foliage"
+      },
+      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
+      "texture_filename": "leaves_n_flowers_256x256_atlas.png",
+      "texture_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+      "texture_asset_id": "82028913618222",
+      "texture_published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "atlasVariantId": 71,
+      "atlasFamily": "leaves_n_flowers",
+      "atlasResolution": "256x256",
+      "bindingRevision": 2,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 43,
+          "family_id": 34,
+          "width": 1024,
+          "height": 1024,
+          "filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "uses_alpha": true,
+          "published_id": "83232615212572",
+          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "moderation_state": "Reviewing",
+          "published_at": 1794272123.260854,
+          "created_at": 1794268719.8272274,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x1024",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        },
+        {
+          "id": 71,
+          "family_id": 34,
+          "width": 256,
+          "height": 256,
+          "filename": "leaves_n_flowers_256x256_atlas.png",
+          "original_filename": "leaves_n_flowers_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
+          "source_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+          "uses_alpha": true,
+          "published_id": "82028913618222",
+          "published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+          "moderation_state": "Reviewing",
+          "published_at": 1794527000.2748997,
+          "created_at": 1794526996.656138,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        }
+      ],
+      "textureUsesAlpha": true,
+      "meshAtlasesCurrent": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Ivy",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "96395292520138",
+          "name": "ivy_02"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "ivy_03",
+      "name_en": "Ivy 03",
+      "category": "ivy",
+      "model_path": "assets/source/location-assets/bush/ivy_03/model/ivy_03.fbx",
+      "model_sha256": "cd41e2343dba31d6a6b256fce12112ff7956dd6cfab3e9ac878533cede948c4a",
+      "model_asset_id": "123907031275738",
+      "model_published_sha256": "cd41e2343dba31d6a6b256fce12112ff7956dd6cfab3e9ac878533cede948c4a",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 4,
+      "created_at": 1794268720.0646126,
+      "updated_at": 1795362161.1181345,
+      "published_at": 1794271502.612349,
+      "surface_material": "grass",
+      "alpha_enabled": 0,
+      "appearance_mode": "material_atlas",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "ivy_03",
+            "armature": "",
+            "vertices": 657,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "e6f4eb046ec58a43661537c129937a0767301b56385748119b82280c6ccf0a38",
+        "parts": [
+          {
+            "name": "ivy_03",
+            "role": "visual",
+            "vertices": 657
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "647299c9213f24235f63d1b9b0951fd8287fd754f94f440ae63424a32d16951b"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "ivy_03": {
+          "collisionFidelity": "Box",
+          "doubleSided": true,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "grass",
+      "appearanceMode": "material_atlas",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "grass",
+        "label": "Grass",
+        "robloxMaterial": "Grass",
+        "soundFamily": "foliage"
+      },
+      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
+      "texture_filename": "leaves_n_flowers_256x256_atlas.png",
+      "texture_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+      "texture_asset_id": "82028913618222",
+      "texture_published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "atlasVariantId": 71,
+      "atlasFamily": "leaves_n_flowers",
+      "atlasResolution": "256x256",
+      "bindingRevision": 3,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 43,
+          "family_id": 34,
+          "width": 1024,
+          "height": 1024,
+          "filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "uses_alpha": true,
+          "published_id": "83232615212572",
+          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "moderation_state": "Reviewing",
+          "published_at": 1794272123.260854,
+          "created_at": 1794268719.8272274,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x1024",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        },
+        {
+          "id": 71,
+          "family_id": 34,
+          "width": 256,
+          "height": 256,
+          "filename": "leaves_n_flowers_256x256_atlas.png",
+          "original_filename": "leaves_n_flowers_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
+          "source_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+          "uses_alpha": true,
+          "published_id": "82028913618222",
+          "published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+          "moderation_state": "Reviewing",
+          "published_at": 1794527000.2748997,
+          "created_at": 1794526996.656138,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        }
+      ],
+      "textureUsesAlpha": true,
+      "meshAtlasesCurrent": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Ivy",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "129286240339384",
+          "name": "ivy_03"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "ivy_05",
+      "name_en": "Ivy 05",
+      "category": "ivy",
+      "model_path": "assets/source/location-assets/bush/ivy_05/model/ivy_05.fbx",
+      "model_sha256": "d2de444737ca78fca79532388bf7a399d3ccae1c611156bd5454e61173502dfa",
+      "model_asset_id": "122555277961937",
+      "model_published_sha256": "d2de444737ca78fca79532388bf7a399d3ccae1c611156bd5454e61173502dfa",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 3,
+      "created_at": 1794276114.6875803,
+      "updated_at": 1795362161.1181345,
+      "published_at": 1794276130.6505659,
+      "surface_material": "default",
+      "alpha_enabled": 0,
+      "appearance_mode": "atlas",
+      "visual_material": "SmoothPlastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "ivy_05",
+            "armature": "",
+            "vertices": 391,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "f7f6ef0a994cfa1910dcfb470189da08af078e1f9e05961a7b28bdf505fb9c6b",
+        "parts": [
+          {
+            "name": "ivy_05",
+            "role": "visual",
+            "vertices": 391
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "047bcb1434104afd569689f9d51f409460c480a6633c8c1ea221f62a74c79eb4"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "ivy_05": {
+          "collisionFidelity": "Box",
+          "doubleSided": true,
+          "glass": false,
+          "noCollide": true
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "default",
+      "appearanceMode": "atlas",
+      "visualMaterial": "SmoothPlastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
+      "texture_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
+      "texture_filename": "leaves_n_flowers_256x256_atlas.png",
+      "texture_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+      "texture_asset_id": "82028913618222",
+      "texture_published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+      "texture_moderation_state": "Reviewing",
+      "texture_reference_slug": "",
+      "atlasVariantId": 71,
+      "atlasFamily": "leaves_n_flowers",
+      "atlasResolution": "256x256",
+      "bindingRevision": 2,
+      "studioSyncStatus": "synced",
+      "atlasVariants": [
+        {
+          "id": 43,
+          "family_id": 34,
+          "width": 1024,
+          "height": 1024,
+          "filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "original_filename": "leaves_n_flowers_1024x1024_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/1024x1024/revisions/2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717/leaves_n_flowers_1024x1024_atlas.png",
+          "source_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "uses_alpha": true,
+          "published_id": "83232615212572",
+          "published_sha256": "2a643745da71da498da1da33036db0eb6aec918d3283c6057095e85013105717",
+          "moderation_state": "Reviewing",
+          "published_at": 1794272123.260854,
+          "created_at": 1794268719.8272274,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "1024x1024",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        },
+        {
+          "id": 71,
+          "family_id": 34,
+          "width": 256,
+          "height": 256,
+          "filename": "leaves_n_flowers_256x256_atlas.png",
+          "original_filename": "leaves_n_flowers_256x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/leaves_n_flowers/256x256/leaves_n_flowers_256x256_atlas.png",
+          "source_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+          "uses_alpha": true,
+          "published_id": "82028913618222",
+          "published_sha256": "36f836bb558cd32692a65f322a4b9718fef4d2d0eac26ffa1fe120fe5f7c39d1",
+          "moderation_state": "Reviewing",
+          "published_at": 1794527000.2748997,
+          "created_at": 1794526996.656138,
+          "retired_at": null,
+          "atlas_key": "leaves_n_flowers",
+          "replacement_sha256": null,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "256x256",
+          "baseKey": "leaves_n_flowers",
+          "version": ""
+        }
+      ],
+      "textureUsesAlpha": true,
+      "meshAtlasesCurrent": true,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Ivy",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "121501655225543",
+          "name": "ivy_05"
         }
       ],
       "aliases": []

@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CAMERA = (ROOT / "src/client/character/CameraController.luau").read_text(encoding="utf-8")
 MOBILE = (ROOT / "src/client/character/MobileInputController.luau").read_text(encoding="utf-8")
+VIEW = (ROOT / "src/client/character/mobile/MobileControlsView.luau").read_text(encoding="utf-8")
+LAYOUT = (ROOT / "src/client/character/mobile/MobileLayout.luau").read_text(encoding="utf-8")
 CONFIG = (ROOT / "src/shared/character/CharacterConfig.luau").read_text(encoding="utf-8")
 
 
@@ -24,15 +26,15 @@ class ClassicCameraM330(unittest.TestCase):
         self.assertIn("GetRenderCFrame()", CAMERA)
         self.assertIn("GetMouseDelta()", CAMERA)
 
-    def test_right_joystick_removed_and_left_halved(self):
-        self.assertIn('makeStick(gui, "MoveStick")', MOBILE)
-        self.assertNotIn('makeStick(gui, "LookStick")', MOBILE)
+    def test_no_right_joystick_and_discoverable_floating_left(self):
+        self.assertIn('makeStick(gui, "MoveStick")', VIEW)
+        self.assertNotIn('makeStick(gui, "LookStick")', VIEW)
         self.assertNotIn('right.pad', MOBILE)
-        self.assertIn("stickSize = math.floor(math.clamp(short * 0.17, 58, 74))", MOBILE)
-        self.assertIn("stick.pad.Visible = false", MOBILE)
+        self.assertIn("stick = math.floor(math.clamp(short * 0.25, 76, 112))", LAYOUT)
+        self.assertIn("pad.Visible = true", VIEW)
         self.assertIn("movementController.SetTouchMovement(left.axis, true)", MOBILE)
-        self.assertIn('makeAction(gui, "Jump")', MOBILE)
-        self.assertIn('makeAction(gui, "Attack")', MOBILE)
+        self.assertIn('makeAction(gui, "Jump")', VIEW)
+        self.assertIn('makeAction(gui, "Attack")', VIEW)
 
     def test_touch_look_is_delta_based_and_ui_safe(self):
         self.assertIn("UiInputGuard.BlocksWorldInput(input, gameProcessed)", MOBILE)

@@ -9,28 +9,29 @@ def source(path):
     return (ROOT / path).read_text(encoding='utf-8')
 
 class MobileControlsM334(unittest.TestCase):
-    def test_left_analog_touch_area_not_constant_visible_stick(self):
+    def test_left_analog_touch_area_with_passive_home_hint(self):
         s = source('src/client/character/MobileInputController.luau')
-        self.assertIn('local function moveTouchZone(position: Vector2)', s)
-        self.assertIn('position.X <= size.X / 3 and position.Y >= size.Y * 0.5', s)
-        self.assertIn('left.pad.Visible = true', s)
-        self.assertIn('stick.pad.Visible = false', s)
-        self.assertIn('left.center = getTouchPosition(input)', s)
-        self.assertIn('gui.IgnoreGuiInset = true', s)
-        self.assertIn('stick.axis = if strength > 0', s)
+        view = source('src/client/character/mobile/MobileControlsView.luau')
+        layout = source('src/client/character/mobile/MobileLayout.luau')
+        self.assertIn('Layout.IsMoveZone(point.X, point.Y, size.X, size.Y)', s)
+        self.assertIn('y >= height * 0.52 and x <= width * 0.43', layout)
+        self.assertIn('pad:SetAttribute("WorldInputPassthrough", true)', view)
+        self.assertIn('left.center = position', s)
+        self.assertIn('gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets', view)
+        self.assertIn('local axis = if strength > 0', s)
         self.assertIn('movementController.SetTouchMovement(Vector2.zero, false)', s)
-        self.assertIn('not UiInputGuard.BlocksWorldInput(input, gameProcessed)', s)
+        self.assertIn('UiInputGuard.BlocksWorldInput(input, gameProcessed)', s)
         self.assertNotIn('touchStartsOn(left, input)', s)
 
-    def test_right_invisible_look_zone_and_buttons_outside_it(self):
+    def test_free_look_outside_move_area_and_compact_action_cluster(self):
         s = source('src/client/character/MobileInputController.luau')
-        self.assertIn('position.X >= camera.ViewportSize.X / 3', s)
-        self.assertIn('local virtualRadius = oldStickSize * 0.55', s)
-        self.assertIn('local buttonDistance = virtualRadius + actionSize * 0.5 + 12', s)
-        self.assertIn('put(aim, centerX + buttonDistance', s)
-        self.assertIn('put(attack, centerX - buttonDistance', s)
-        self.assertIn('put(jump, centerX, centerY - buttonDistance)', s)
-        self.assertNotIn('makeStick(gui, "LookStick")', s)
+        view = source('src/client/character/mobile/MobileControlsView.luau')
+        layout = source('src/client/character/mobile/MobileLayout.luau')
+        self.assertIn('elseif not pinchLocked and #lookFingers < 2 then', s)
+        self.assertIn('attack = {size = attack, x = margin + secondary + gap', layout)
+        self.assertIn('jump = {size = secondary, x = margin, y = margin}', layout)
+        self.assertIn('aim = {size = secondary, x = margin, y = margin + secondary + gap}', layout)
+        self.assertNotIn('makeStick(gui, "LookStick")', view)
         self.assertIn('if #lookFingers == 1 and not pinchLocked then', s)
         self.assertIn('if #lookFingers == 0 then', s)
 

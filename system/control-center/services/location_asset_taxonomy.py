@@ -6,7 +6,7 @@ explicit authoring presentation, not a database identity or Workspace path.
 from __future__ import annotations
 
 CATEGORY_GROUPS = (
-    ('flora', 'Flora', ('tree', 'bush', 'flower', 'rock')),
+    ('flora', 'Flora', ('tree', 'bush', 'ivy', 'flower', 'leaf', 'rock')),
     ('structure', 'Structure', ('light', 'fence', 'ladder', 'bridge', 'pillar', 'post')),
     ('prop', 'Prop', ('prop', 'decoration', 'building')),
 )

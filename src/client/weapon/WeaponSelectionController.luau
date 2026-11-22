@@ -170,8 +170,9 @@ function Controller.Start()
                 end
             end
             for index, kind in ipairs(kinds) do
-                local button = makeButton(categories, categoryLabels[kind] or kind, 30)
-                button.Size = UDim2.fromOffset(math.clamp(30 + #button.Text * 8, 70, 144), 30)
+                local height = if UserInputService.TouchEnabled then 44 else 30
+                local button = makeButton(categories, categoryLabels[kind] or kind, height)
+                button.Size = UDim2.fromOffset(math.clamp(30 + #button.Text * 8, 70, 144), height)
                 button.BackgroundColor3 = if activeCategory == kind then Color3.fromRGB(31, 94, 81) else SURFACE
                 button.TextSize = 12
                 button.LayoutOrder = index
@@ -240,10 +241,24 @@ function Controller.Start()
             end)
         end
         local function resize()
-            local camera = workspace.CurrentCamera
-            if not camera then return end
-            local viewport = camera.ViewportSize
-            panel.Size = UDim2.fromOffset(math.min(294, math.max(220, viewport.X - 28)), math.min(365, math.max(218, viewport.Y - 158)))
+            local viewport = gui.AbsoluteSize
+            if UserInputService.TouchEnabled then
+                -- The old testing menu extended below short landscape screens.
+                panel.AnchorPoint = Vector2.new(0.5, 0.5)
+                panel.Position = UDim2.fromScale(0.5, 0.5)
+                panel.Size = UDim2.fromOffset(math.min(340, math.max(0, viewport.X - 24)),
+                    math.min(365, math.max(0, viewport.Y - 24)))
+                close.Size = UDim2.fromOffset(44, 44)
+                close.Position = UDim2.new(1, -50, 0, 4)
+                categories.Position = UDim2.fromOffset(10, 52)
+                categories.Size = UDim2.new(1, -20, 0, 46)
+                list.Position = UDim2.fromOffset(10, 104)
+                list.Size = UDim2.new(1, -20, 1, -145)
+            else
+                local camera = workspace.CurrentCamera
+                local desktop = if camera then camera.ViewportSize else viewport
+                panel.Size = UDim2.fromOffset(math.min(294, math.max(220, desktop.X - 28)), math.min(365, math.max(218, desktop.Y - 158)))
+            end
             status.Position = UDim2.new(0, 13, 1, -31)
         end
         resize()
@@ -252,8 +267,7 @@ function Controller.Start()
             if panel.Visible then refresh() end
         end)
         close.Activated:Connect(function() panel.Visible = false end)
-        local camera = workspace.CurrentCamera
-        if camera then camera:GetPropertyChangedSignal("ViewportSize"):Connect(resize) end
+        gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize)
         player.CharacterAdded:Connect(function() if panel.Visible then refresh() end end)
     end)
 end

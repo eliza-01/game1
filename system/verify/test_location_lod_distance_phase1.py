@@ -20,19 +20,14 @@ class LodDistancePhase1(unittest.TestCase):
                        'cutoffs[index - 1] - h'):
             self.assertIn(marker, text)
 
-    def test_studio_probe_is_non_destructive_and_opt_in(self):
-        text = (ROOT/'src/client/world/LocationLodStudioProbe.luau').read_text()
-        self.assertIn('not RunService:IsStudio()', text)
-        self.assertIn('CollectionService:GetTagged(TAG)', text)
-        self.assertIn('Policy.WithHysteresis(spec.distances, profile.hysteresis)', text)
-        self.assertIn('LocationLodStudioProbe', (ROOT/'src/lod-probe/init.client.luau').read_text())
-        self.assertNotIn('LocationLodStudioProbe', (ROOT/'src/client/init.client.luau').read_text())
+    def test_debug_probe_and_studio_hud_are_retired(self):
+        self.assertFalse((ROOT/'src/client/world/LocationLodStudioProbe.luau').exists())
+        self.assertFalse((ROOT/'src/lod-probe').exists())
         project = (ROOT/'default.project.json').read_text()
-        self.assertIn('Game1LodProbeClient', project)
-        self.assertIn('src/lod-probe', project)
-        self.assertIn('Game1LodProbeStatus', text)
-        for unsafe in (':Destroy() --delete model', 'model:Destroy()', 'model:PivotTo(',
-                       'model:ScaleTo(', 'LocalTransparencyModifier =', 'model.Parent = nil'):
-            self.assertNotIn(unsafe, text)
+        self.assertNotIn('Game1LodProbeClient', project)
+        streamer = (ROOT/'src/client/world/LocationWorldStreamer.luau').read_text()
+        self.assertNotIn('Game1RuntimeLodStatus', streamer)
+        self.assertNotIn('preview:Stats()', streamer)
+        self.assertIn('preview:Resolve(cameraPosition)', streamer)
 
 if __name__ == '__main__': unittest.main()

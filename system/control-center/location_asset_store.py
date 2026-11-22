@@ -17,6 +17,7 @@ from services.location_fbx_inspection import inspect as inspect_location_fbx
 from services.mesh_authoring_policy import normalize_location_options
 from services.retired_col_mesh import strip_options
 from services import location_asset_taxonomy as taxonomy
+from services.location_asset_category_migration import migrate_ivy_category
 from services import location_asset_alpha
 from services import mesh_visual_appearance as appearance
 from services import location_collision_blueprint
@@ -71,6 +72,7 @@ class LocationAssetStore:
         self.runtime.mkdir(parents=True, exist_ok=True)
         self.db = self.runtime / "game1.db"
         self._init()
+        migrate_ivy_category(self)
         location_lod_resource.ensure_schema(self)
         self.atlases = AtlasRegistry(self.root)
         self._index_legacy_texture_publications()

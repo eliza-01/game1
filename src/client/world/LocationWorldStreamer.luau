@@ -3,7 +3,6 @@
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
 local World = ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world")
 local Registry = require(World:WaitForChild("LocationAssetRegistry"))
@@ -83,30 +82,6 @@ local function paint(mesh, asset)
     if not ok then warn("[game1][LOD] invalid runtime visual appearance: " .. mesh.Name) end
 end
 
-local function makeStatus()
-    if not RunService:IsStudio() then return nil end
-    local player = Players.LocalPlayer
-    if not player then return nil end
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "Game1RuntimeLodStatus"
-    screen.ResetOnSpawn = false
-    screen.DisplayOrder = 110
-    local label = Instance.new("TextLabel")
-    label.Name = "Status"
-    label.Position = UDim2.fromOffset(12, 138)
-    label.Size = UDim2.fromOffset(430, 49)
-    label.BackgroundTransparency = 0.2
-    label.BackgroundColor3 = Color3.fromRGB(17, 23, 31)
-    label.TextColor3 = Color3.fromRGB(230, 243, 255)
-    label.TextSize = 14
-    label.TextWrapped = true
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Text = "Runtime LOD | awaiting templates..."
-    label.Parent = screen
-    screen.Parent = player:WaitForChild("PlayerGui")
-    return label
-end
-
 function Streamer.Start()
     if started then return end
     started = true
@@ -132,14 +107,12 @@ function Streamer.Start()
     end
 
     local folder = nil
-    local status = nil
     local records = {}
     local cache = nil
     if manifest then
         folder = Instance.new("Folder")
         folder.Name = Contract.VisualFolder
         folder.Parent = Workspace -- locally created; never server-owned
-        status = makeStatus()
         for _, row in ipairs(manifest.placements) do
             table.insert(records, {
                 id = row.id, slug = row.slug, pivot = Vector3.new(row.pivot[1], row.pivot[2], row.pivot[3]),
@@ -151,7 +124,6 @@ function Streamer.Start()
         cache = ReplicatedStorage:WaitForChild(Contract.TemplateFolder, 30)
         if not cache then
             warn("[game1][LOD] server template cache missing; runtime visuals disabled")
-            if status then status.Text = "Runtime LOD | no server templates" end
             manifest = nil
         end
     end
@@ -165,7 +137,6 @@ function Streamer.Start()
             local record = visuals[part]
             return if record then record.original else part.LocalTransparencyModifier
         end)
-        status = makeStatus()
     end
     local elapsed = 0
     local visualElapsed = VISUAL_INTERVAL -- first distance test immediately
@@ -189,13 +160,6 @@ function Streamer.Start()
         if preview then
             preview:FollowMoving()
             preview:Step(MAX_CHANGES_PER_TICK)
-            if status then
-                local counts = preview:Stats()
-                status.Text = if preview.digest then
-                    ("Studio LOD preview | FULL %d · LOD1 %d · LOD2 %d · UNLOADED %d\nVisual only · profile %s")
-                        :format(counts.FULL, counts.LOD1, counts.LOD2, counts.UNLOADED, preview.digest:sub(1,12))
-                    else "Studio LOD preview | waiting for local Bridge / Control Center"
-            end
         end
         if not manifest then return end
         -- Reserve half the existing shared budget for houses so dense Location
@@ -276,18 +240,6 @@ function Streamer.Start()
         end
         if houseAdapter and changes < MAX_CHANGES_PER_TICK then
             changes += houseAdapter:Step(MAX_CHANGES_PER_TICK - changes)
-        end
-        if status then
-            local counts = {FULL = 0, LOD1 = 0, LOD2 = 0, UNLOADED = 0}
-            for _, record in ipairs(records) do counts[record.actual] += 1 end
-            local houseText = ""
-            if houseAdapter then
-                local full, lod, unloaded = houseAdapter:Stats()
-                houseText = (" | Houses %d / %d / %d"):format(full, lod, unloaded)
-            end
-            status.Text = ("Runtime LOD | FULL %d · LOD1 %d · LOD2 %d · UNLOADED %d%s\nTemplates %d/%d · operations/tick %d")
-                :format(counts.FULL, counts.LOD1, counts.LOD2, counts.UNLOADED, houseText,
-                    cache:GetAttribute("Loaded") or 0, cache:GetAttribute("Expected") or 0, changes)
         end
         if cache:GetAttribute("Ready") ~= true and os.clock() - lastWarning > 15 then
             lastWarning = os.clock()

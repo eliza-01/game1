@@ -9,6 +9,7 @@ from unittest import TestCase
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'system/control-center'))
 from location_asset_store import LocationAssetStore
+from sqlite_connection import connect as connect_sqlite
 from services import location_asset_taxonomy as taxonomy
 from services.place_registry.catalog import build_catalog
 
@@ -17,11 +18,11 @@ class LocationTaxonomySurfaceM249(TestCase):
     def test_groups_are_stable_singular_and_complete(self):
         self.assertEqual([group[0] for group in taxonomy.CATEGORY_GROUPS], ['flora','structure','prop'])
         self.assertEqual(taxonomy.CATEGORIES, (
-            'tree','bush','flower','rock','light','fence','ladder','bridge','pillar','post',
+            'tree','bush','ivy','flower','leaf','rock','light','fence','ladder','bridge','pillar','post',
             'prop','decoration','building'))
         opts=taxonomy.options()
         self.assertEqual(len(opts['categories']), len(set(c['id'] for c in opts['categories'])))
-        self.assertEqual([len(group['categories']) for group in opts['categoryGroups']], [4,6,3])
+        self.assertEqual([len(group['categories']) for group in opts['categoryGroups']], [6,6,3])
         self.assertEqual([m['id'] for m in opts['surfaceMaterials']],list(taxonomy.MATERIAL_BY_ID))
         self.assertEqual(taxonomy.MATERIAL_BY_ID['foliage']['soundFamily'],'foliage')
         self.assertEqual(taxonomy.MATERIAL_BY_ID['wood']['robloxMaterial'],'Wood')
@@ -36,7 +37,7 @@ class LocationTaxonomySurfaceM249(TestCase):
                 db.execute('''INSERT INTO location_assets(slug,name_en,category,revision,created_at,updated_at)
                     VALUES('wooden_post','Wooden Post','post',1,1,1)''')
             self.assertEqual(store.get('wooden_post')['surfaceMaterial'],'default')
-            self.assertEqual(store.options()['categories'][9]['id'],'post')
+            self.assertEqual(store.options()['categories'][11]['id'],'post')
             changed=store.rename_identity('wooden_post',{
                 'slug':'wooden_post', 'nameEn':'Wooden Post', 'category':'post',
                 'surfaceMaterial':'wood', 'destructible':False, 'expectedRevision':1})
@@ -55,11 +56,10 @@ class LocationTaxonomySurfaceM249(TestCase):
             self.assertEqual(store.aliases_for('post_01'),['wooden_post'])
 
     def test_additive_upgrade_preserves_existing_asset_ids(self):
-        import sqlite3
         with TemporaryDirectory() as tmp:
             root=Path(tmp)
             directory=root/'.control-center';directory.mkdir()
-            with sqlite3.connect(directory/'game1.db') as db:
+            with connect_sqlite(directory/'game1.db') as db:
                 db.execute("""CREATE TABLE location_assets (
                     slug TEXT PRIMARY KEY,name_en TEXT NOT NULL,category TEXT NOT NULL,
                     model_path TEXT NOT NULL DEFAULT '',model_sha256 TEXT NOT NULL DEFAULT '',

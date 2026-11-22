@@ -48,7 +48,7 @@ class LocationAssetPropsCategoryTests(unittest.TestCase):
 
     def test_existing_categories_stay_available(self):
         self.assertEqual(CATEGORIES, (
-            "tree", "bush", "flower", "rock", "light", "fence", "ladder",
+            "tree", "bush", "ivy", "flower", "leaf", "rock", "light", "fence", "ladder",
             "bridge", "pillar", "post", "prop", "decoration", "building"
         ))
 

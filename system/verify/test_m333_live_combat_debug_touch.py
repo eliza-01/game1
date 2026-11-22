@@ -41,10 +41,10 @@ class PublishedRuntimeM333(unittest.TestCase):
                      'src/server/dev/HouseSocketDebugService.luau','src/server/weapon/WeaponSelectionService.luau']:
             self.assertIn('ServerAllowed(',source(path))
 
-    def test_right_two_thirds_and_pinch_lock(self):
+    def test_free_look_and_pinch_lock(self):
         touch=source('src/client/character/MobileInputController.luau')
         camera=source('src/client/character/CameraController.luau')
-        self.assertIn('position.X >= camera.ViewportSize.X / 3',touch)
+        self.assertIn('elseif not pinchLocked and #lookFingers < 2 then',touch)
         self.assertIn('if #lookFingers == 1 and not pinchLocked then',touch)
         self.assertIn('if #lookFingers == 0 then',touch)
         self.assertIn('pinchLocked = false',touch)

@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TOUCH = (ROOT / "src/client/character/MobileInputController.luau").read_text(encoding="utf-8")
+VIEW = (ROOT / "src/client/character/mobile/MobileControlsView.luau").read_text(encoding="utf-8")
 MOVEMENT = (ROOT / "src/client/character/MovementController.luau").read_text(encoding="utf-8")
 CAMERA = (ROOT / "src/client/character/CameraController.luau").read_text(encoding="utf-8")
 ATTACK = (ROOT / "src/client/combat/AttackController.luau").read_text(encoding="utf-8")
@@ -42,8 +43,8 @@ class MobileTouchControlsM287(unittest.TestCase):
         self.assertIn('UserInputService.WindowFocusReleased:Connect(resetTouch)', TOUCH)
         self.assertIn('movementController.SetTouchMovement(Vector2.zero, false)', TOUCH)
         self.assertIn('table.clear(lookPositions)', TOUCH)
-        self.assertIn('gui.ResetOnSpawn = false', TOUCH)
-        self.assertIn('GetPropertyChangedSignal("ViewportSize")', TOUCH)
+        self.assertIn('gui.ResetOnSpawn = false', VIEW)
+        self.assertIn('GetPropertyChangedSignal("AbsoluteSize")', TOUCH)
 
     def test_touch_backwards_is_camera_relative_not_keyboard_backpedal(self):
         self.assertIn('if touchMovementActive then\n\t\treturn touchAxis', MOVEMENT)
@@ -80,7 +81,7 @@ class MobileTouchControlsM287(unittest.TestCase):
         self.assertAlmostEqual(axis(500, 0)[0], 1)
         self.assertAlmostEqual(math.hypot(*axis(30, 30)), (math.hypot(30, 30) / 50 - 0.12) / .88)
         self.assertIn('local strength = math.clamp((normalized.Magnitude - DEADZONE) / (1 - DEADZONE), 0, 1)', TOUCH)
-        self.assertIn('stick.axis = if strength > 0 then', TOUCH)
+        self.assertIn('local axis = if strength > 0 then', TOUCH)
 
 
 if __name__ == '__main__':

@@ -66,7 +66,7 @@ class HouseSocketM159(unittest.TestCase):
 
     def test_client_one_badge_per_socket_with_colored_key(self):
         client = src('src/client/world/HouseSocketPromptController.luau')
-        self.assertIn('local visible: {[Attachment]: BillboardGui} = {}', client)
+        self.assertIn('local visible: {[Attachment]: LayerCollector} = {}', client)
         self.assertIn('Game1HouseInteractionAlternate', client)
         self.assertIn('for _, name in {"Game1HouseInteraction", "Game1HouseInteractionAlternate"}', client)
         self.assertIn('text.RichText = true', client)

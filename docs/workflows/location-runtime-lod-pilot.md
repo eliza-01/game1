@@ -39,8 +39,8 @@ This is a **draft-only** first client FULL / LOD1 / UNLOADED implementation for
 3. Open a **copy** of the new `runtime_place.rbxlx` in Roblox Studio. Do not
    overwrite the editable original or publish it. Connect Rojo to current project.
 4. Run Studio Play (prefer **Test → Server & Clients**, two clients). The
-   Studio-only `Game1RuntimeLodStatus` overlay should display FULL / LOD1 /
-   UNLOADED. Check Output for `[game1][LOD]` template load failures. If the
+   Check visual FULL / LOD1 / UNLOADED transitions by moving the camera.
+   The debug counters were retired in M434. Check Output for `[game1][LOD]` template load failures. If the
    cache fails, halt; do not silently accept disappearing visuals.
 5. Approach and retreat from fences/pillars; verify their world orientation,
    physical size and textures match the authoring Place; confirm no extra

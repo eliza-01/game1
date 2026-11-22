@@ -670,9 +670,9 @@ local History = require(script.Parent.StudioPublishedMeshHistory)
 local DecoManager = {}
 DecoManager.__index = DecoManager
 
-local CATEGORY_ORDER = { "tree", "bush", "flower", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building" }
+local CATEGORY_ORDER = { "tree", "bush", "ivy", "flower", "leaf", "rock", "light", "fence", "ladder", "bridge", "pillar", "post", "prop", "decoration", "building" }
 local CATEGORY_LABELS = {
-    tree="Tree", bush="Bush", flower="Flower", rock="Rock",
+    tree="Tree", bush="Bush", ivy="Ivy", flower="Flower", leaf="Leaf", rock="Rock",
     light="Light", fence="Fence", ladder="Ladder", bridge="Bridge",
     pillar="Pillar", post="Post", prop="Prop", decoration="Decoration", building="Building",
 }
@@ -782,7 +782,7 @@ function DecoManager:_buildUI()
 
     local categoryHost = Instance.new("Frame")
     categoryHost.BackgroundTransparency = 1
-    categoryHost.Size = UDim2.new(1, -24, 0, 106)
+    categoryHost.Size = UDim2.new(1, -24, 0, 140)
     categoryHost.Position = UDim2.new(0, 12, 0, 68)
     categoryHost.Parent = root
     self.categoryButtons = {}
@@ -797,7 +797,7 @@ function DecoManager:_buildUI()
     local navHost = Instance.new("Frame")
     navHost.BackgroundTransparency = 1
     navHost.Size = UDim2.new(1, -24, 0, 40)
-    navHost.Position = UDim2.new(0, 12, 0, 181)
+    navHost.Position = UDim2.new(0, 12, 0, 213)
     navHost.Parent = root
     self.previous = newButton(navHost, "‹", UDim2.new(0, 44, 1, 0), UDim2.new(0, 0, 0, 0))
     self.next = newButton(navHost, "›", UDim2.new(0, 44, 1, 0), UDim2.new(1, -44, 0, 0))
@@ -807,8 +807,8 @@ function DecoManager:_buildUI()
     self.viewport = Instance.new("ViewportFrame")
     self.viewport.BackgroundColor3 = Color3.fromRGB(11, 16, 22)
     self.viewport.BorderSizePixel = 0
-    self.viewport.Size = UDim2.new(1, -24, 0, 276)
-    self.viewport.Position = UDim2.new(0, 12, 0, 229)
+    self.viewport.Size = UDim2.new(1, -24, 0, 244)
+    self.viewport.Position = UDim2.new(0, 12, 0, 261)
     self.viewport.Ambient = Color3.fromRGB(180, 180, 180)
     self.viewport.LightColor = Color3.fromRGB(255, 255, 255)
     self.viewport.LightDirection = Vector3.new(-1, -1, -1)
@@ -2099,6 +2099,8 @@ local ROOT_NAME = "Game1DecoAssets"
 local CATEGORY_FOLDERS = {
     tree = "Trees",
     bush = "Bushes",
+    ivy = "Ivy",
+    leaf = "Leaves",
     rock = "Rocks",
     light = "Lights",
     fence = "Fences",

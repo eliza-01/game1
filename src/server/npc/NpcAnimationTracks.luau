@@ -106,11 +106,13 @@ function NpcAnimationTracks.Play(entity: Model, clip: any?, channel: string, fad
     local percent = if isCustom
         then AnimationSpeedScaling.ResolveForAnimation(entity, channel, clip.row and clip.row.animationId)
         else (speedPercentOverride or AnimationSpeedScaling.ResolveForModel(entity, channel))
-    entity:SetAttribute("AnimationPlaybackSpeedPercent", percent)
+    if entity:GetAttribute("AnimationPlaybackSpeedPercent") ~= percent then
+        entity:SetAttribute("AnimationPlaybackSpeedPercent", percent)
+    end
     local speed = percent / 100
     local success, failure = pcall(function()
         if clip.track.IsPlaying then
-            clip.track:AdjustSpeed(speed)
+            if clip.playbackSpeed ~= speed then clip.track:AdjustSpeed(speed) end
         else
             clip.track:Play(fade or NpcConfig.TransitionSeconds, 1, speed)
         end

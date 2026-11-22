@@ -26,6 +26,12 @@ def route(path, body, deps):
         except (ValueError, OSError, RuntimeError, KeyError) as error:
             return 400, {"error": str(error)}
 
+    if path == '/api/lod-manager/reveal-build':
+        try:
+            return 200, deps['lod_manager'].reveal_build(body())
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return 400, {'error': str(error)}
+
     if path in ('/api/lod-manager/preflight', '/api/lod-manager/prepare'):
         try:
             manager = deps['lod_manager']

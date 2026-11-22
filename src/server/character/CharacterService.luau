@@ -10,6 +10,7 @@ local CharacterShared = Shared:WaitForChild("character")
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 local CharacterRegistry = require(CharacterShared:WaitForChild("CharacterRegistry"))
 
+local CharacterCameraSync = require(script.Parent:WaitForChild("CharacterCameraSync"))
 local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigService"))
 local CharacterAssemblyBuilder = require(script.Parent:WaitForChild("CharacterAssemblyBuilder"))
 local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
@@ -353,6 +354,7 @@ function CharacterService.Start()
     local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes") or Instance.new("Folder")
     remotes.Name = "Game1Remotes"
     remotes.Parent = ReplicatedStorage
+    CharacterCameraSync.Start(remotes)
     local deathTerminalReached = remotes:FindFirstChild("DeathTerminalReached") or Instance.new("RemoteEvent")
     deathTerminalReached.Name = "DeathTerminalReached"
     deathTerminalReached.Parent = remotes

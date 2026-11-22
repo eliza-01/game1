@@ -17244,68 +17244,68 @@
         "chimney": {
           "part_name": "chimney",
           "lod1": 50,
-          "hide": 400,
-          "revision": 1
+          "hide": 350,
+          "revision": 2
         },
         "door": {
           "part_name": "door",
           "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "hide": 350,
+          "revision": 2
         },
         "door_handles": {
           "part_name": "door_handles",
-          "lod1": 29,
+          "lod1": 25,
           "hide": 50,
           "revision": 2
         },
         "fireplace": {
           "part_name": "fireplace",
-          "lod1": 29,
+          "lod1": 25,
           "hide": 50,
           "revision": 2
         },
         "floors": {
           "part_name": "floors",
           "lod1": 20,
-          "hide": 41,
+          "hide": 45,
           "revision": 2
         },
         "flowerbed": {
           "part_name": "flowerbed",
-          "lod1": 79,
+          "lod1": 75,
           "hide": 100,
           "revision": 2
         },
         "foundation": {
           "part_name": "foundation",
           "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "hide": 200,
+          "revision": 3
         },
         "ground": {
           "part_name": "ground",
-          "lod1": 30,
-          "hide": 400,
-          "revision": 1
+          "lod1": 25,
+          "hide": 50,
+          "revision": 2
         },
         "plants": {
           "part_name": "plants",
-          "lod1": 79,
+          "lod1": 75,
           "hide": 100,
           "revision": 3
         },
         "roof": {
           "part_name": "roof",
           "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "hide": 350,
+          "revision": 2
         },
         "stone_structures": {
           "part_name": "stone_structures",
           "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "hide": 200,
+          "revision": 2
         },
         "walls_inside": {
           "part_name": "walls_inside",
@@ -17316,8 +17316,8 @@
         "walls_outside": {
           "part_name": "walls_outside",
           "lod1": 150,
-          "hide": 400,
-          "revision": 1
+          "hide": 350,
+          "revision": 2
         },
         "window_frames": {
           "part_name": "window_frames",
@@ -17327,15 +17327,15 @@
         },
         "window_frames_glass": {
           "part_name": "window_frames_glass",
-          "lod1": 39,
+          "lod1": 35,
           "hide": 60,
           "revision": 2
         },
         "wooden_structures": {
           "part_name": "wooden_structures",
-          "lod1": 99,
+          "lod1": 95,
           "hide": 120,
-          "revision": 2
+          "revision": 4
         }
       },
       "textures": {

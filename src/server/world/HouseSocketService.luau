@@ -14,6 +14,7 @@ local SpawnOrientation = require(Shared:WaitForChild("world"):WaitForChild("Hous
 local Door = require(script.Parent:WaitForChild("HouseDoorService"))
 local Padlock = require(script.Parent:WaitForChild("HousePadlockService"))
 local Elevator = require(script.Parent:WaitForChild("HouseElevatorService"))
+local CameraSync = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterCameraSync"))
 local Effects = require(script.Parent:WaitForChild("HouseSocketEffects"))
 local Discovery = require(script.Parent:WaitForChild("HouseSocketDiscovery"))
 
@@ -398,6 +399,7 @@ function Service.TeleportDebug(player: Player, name: any): any
     end
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
+    CameraSync.Align(player, character, targetFrame)
     return {ok = true, house = house.Name, socket = name}
 end
 

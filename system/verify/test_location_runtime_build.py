@@ -3,6 +3,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -83,6 +84,40 @@ class RuntimeBuildTests(unittest.TestCase):
         manifest=json.loads(Path(result['manifestPath']).read_text(encoding='utf-8'))
         self.assertEqual(manifest['removedVisualMeshParts'],2)
         self.assertFalse(manifest['publishAllowed'])
+
+    def test_reveal_completed_runtime_from_actual_build_result(self):
+        from services.location_lod_manager import LocationLodManager
+        from api.write_dispatch import dispatch_post
+        inspected = self.builder.inspect(self.rows)
+        result = self.builder.prepare(self.rows, expected_sha=inspected['sourceSha256'],
+                                      snapshot_id=133, catalog_digest='digest')
+        manager = LocationLodManager.__new__(LocationLodManager)
+        manager.builder = self.builder
+        deps = {'lod_manager': manager}
+        def reveal(payload):
+            return dispatch_post('/api/lod-manager/reveal-build', lambda: payload, deps)
+        with patch('services.windows_explorer.reveal_folder') as explorer:
+            self.assertEqual(reveal({'buildId': result['buildId']}), (200, {'opened': True}))
+            explorer.assert_called_once_with(Path(result['runtimePath']).parent)
+            for invalid in ({}, {'buildId': '../outside'}, {'buildId': str(self.root)},
+                            {'buildId': 'runtime_20000101T000000_deadbeef'},
+                            {'buildId': result['buildId'], 'path': str(self.root)}):
+                self.assertEqual(reveal(invalid)[0], 400)
+            Path(result['reportPath']).unlink()
+            self.assertEqual(reveal({'buildId': result['buildId']})[0], 400)
+            self.assertEqual(explorer.call_count, 1)
+
+    def test_reveal_refuses_redirected_folder(self):
+        folder = self.builder.destination / 'runtime_20261122T025510_1d8c6a6d'
+        folder.parent.mkdir(parents=True)
+        outside = self.root / 'outside'
+        outside.mkdir()
+        try:
+            folder.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            self.skipTest('Directory symlink unavailable')
+        with self.assertRaisesRegex(ValueError, 'redirected'):
+            self.builder.completed_build_folder(folder.name)
 
     def test_legacy_mesh_id_and_mesh_id_caps_remain_supported(self):
         for legacy in ('MeshId', 'MeshID'):

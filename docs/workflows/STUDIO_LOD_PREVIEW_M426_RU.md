@@ -2,8 +2,8 @@
 
 LOD Manager остаётся единственным владельцем дистанций. Запись в SQLite и
 `config/location_streaming.json` не меняется. Аутентифицированный GET
-`/api/lod-manager/studio-preview` возвращает полный ограниченный профиль v1:
-`distances`, `locations` (mode, lod1/lod2 ID), `houses` (mode, per-part lod1/hide
+`/api/lod-manager/studio-preview` возвращает полный ограниченный профиль v2 (M427):
+`hysteresis`, `locations` (mode, индивидуальные distances, lod1/lod2 ID), `houses` (mode, per-part lod1/hide
 и опубликованный assetId), SHA256 digest. Никаких авторских путей или токенов.
 Новый digest означает изменение эффективного профиля, а не новый Scan.
 
@@ -11,6 +11,8 @@ Game1Bridge опрашивает локальный Host Agent каждые 3 с
 серверной симуляции авторского Place. Реплицирует один StringValue
 `Game1StudioLodPreview`; при выходе из симуляции удаляет его. При сетевой ошибке
 сохраняется последний полученный профиль, ошибка сообщается в Output.
+M429: Bridge принимает v2; несовместимая версия сообщается в Output без
+повторения одинакового предупреждения каждые 3 секунды.
 `StudioLodPreviewTemplates` использует существующий loader прототипов Runtime,
 один экземпляр на опубликованный Model ID, до 256 активных ID.
 
@@ -35,10 +37,10 @@ Workspace Streaming, изменение состава Place и реальная
 2. Запустить Play, дождаться строки Studio LOD preview с хэшем профиля.
 3. В LOD Manager сохранить UNLOADED одной части дома в активном FULL режиме;
    без нового Scan/Preflight и без Stop/Play проверить смену хэша и переход по
-   дистанции камеры (с учётом гистерезиса 10 studs).
+   дистанции камеры (с учётом сохранённого общего гистерезиса).
 4. Включить LOD1 для части с опубликованным прототипом и проверить обе границы;
    проверить дом без LOD1 и OFF, удостовериться, что коллизии не меняются.
-5. Проверить общие дистанции и режимы Location Assets. Остановить Play:
+5. Проверить индивидуальные дистанции и режимы Location Assets. Остановить Play:
    сохранённый авторский Place не должен получить preview-объекты.
 6. Отдельно проверить Runtime Draft: никаких запросов live preview, манифест
    и production template cache прежние.

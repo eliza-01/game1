@@ -218,6 +218,13 @@ local function attackReady(agent: any, target: Model): boolean
         and Queries.Visible(agent.model, origin + Vector3.new(0, 0.6, 0), target)
 end
 
+local function chaseTarget(agent: any, targetRoot: BasePart)
+    setState(agent, "Chase")
+    agent.presentation.SetCombatMoving(true)
+    local speed = NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Combat")
+    agent.navigator:Chase(targetRoot.Position, speed)
+end
+
 local function beginAttack(agent: any, target: Model, continuing: boolean?)
     if agent.attacking or (not continuing and os.clock() < agent.nextAttackAt) then return end
     local row
@@ -311,10 +318,20 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
                 agent.pursuit:Stop()
                 agent.pursuitMoving = false
                 agent.model:SetAttribute("NpcAttackPursuitActive", false)
+                -- Hand off pursuit in this callback, rather than stopping at
+                -- combat_idle until the next (100 ms) AI decision. Mark the
+                -- movement intent while the presentation still owns the attack.
+                local targetRoot = if agent.target == target and Queries.Valid(target) then Queries.Root(target) else nil
+                if targetRoot and not HomeLeash.Outside(agent.home.Position, targetRoot.Position, agent.homeRadius)
+                    and not HomeLeash.Outside(agent.home.Position, agent.root.Position, agent.homeRadius)
+                    and not HomeLeash.NoDamageTimeout(agent.lastDamageAt, os.clock(), GameOptions.HostileNoDamageReturnSeconds()) then
+                    chaseTarget(agent, targetRoot)
+                else
+                    setState(agent, "Aggro")
+                end
                 agent.presentation.EndAttack()
                 agent.currentAttackTrack = nil
                 agent.currentAttackRow = nil
-                setState(agent, "Aggro")
             end
         end)
     end)
@@ -374,10 +391,7 @@ local function tickAgent(agent: any, now: number)
         setState(agent, "AttackReady")
         beginAttack(agent, target)
     else
-        setState(agent, "Chase")
-        agent.presentation.SetCombatMoving(true)
-        local speed = NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Combat")
-        agent.navigator:Chase(targetRoot.Position, speed)
+        chaseTarget(agent, targetRoot)
     end
 end
 

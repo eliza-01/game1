@@ -30,7 +30,17 @@ end
 
 function BoneModelMount.Place(model: Model, grip: Attachment, socketFrame: CFrame)
     -- Exact weapon alignment: world-grip -> target socket, applied to whole Model.
-    local delta = socketFrame * grip.WorldCFrame:Inverse()
+    -- Do not dirty anchored parts when the socket is already aligned (e.g.
+    -- parked/dead actors). Compare the actual grip, not a cached target: a
+    -- streamed/replaced or externally repositioned mount must be corrected.
+    local gripFrame = grip.WorldCFrame
+    local errorFrame = socketFrame:ToObjectSpace(gripFrame)
+    if errorFrame.Position.Magnitude <= 0.0001
+        and errorFrame.LookVector:Dot(Vector3.new(0, 0, -1)) >= 0.9999999
+        and errorFrame.UpVector:Dot(Vector3.yAxis) >= 0.9999999 then
+        return
+    end
+    local delta = socketFrame * gripFrame:Inverse()
     model:PivotTo(delta * model:GetPivot())
 end
 

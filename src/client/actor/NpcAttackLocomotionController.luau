@@ -27,6 +27,7 @@ local function release(entry)
     if not entry.sampler then return end
     entry.sampler.users = math.max(0, entry.sampler.users - 1)
     entry.sampler:Touch()
+    entry.sampler:Suspend()
     entry.sampler = nil
 end
 
@@ -41,6 +42,7 @@ end
 
 local function acquire(entry): boolean
     if entry.sampler then return true end
+    if os.clock() < (entry.retrySamplerAt or 0) then return false end
     local animationId = tostring(entry.model:GetAttribute("NpcAttackPursuitAnimationId") or "")
     if not animationId:match("^%d+$") or animationId == "0" then return false end
     local key = tostring(entry.model:GetAttribute("NpcSlug")) .. "|" .. animationId
@@ -57,6 +59,7 @@ local function acquire(entry): boolean
         local created, err = Sampler.new(entry.visual, animationId, speed, phase)
         if not created then
             warnOnce(key, tostring(err or "cannot sample locomotion"))
+            entry.retrySamplerAt = os.clock() + 2
             return false
         end
         sampler = created
@@ -64,8 +67,7 @@ local function acquire(entry): boolean
         serial += 1
         recycled[key .. "#" .. tostring(serial)] = sampler
     else
-        sampler:SetPhase(phase)
-        sampler:SetPlaybackSpeed(speed)
+        sampler:Resume(speed, phase)
     end
     sampler.users = 1
     sampler:Touch()
@@ -128,19 +130,26 @@ end
 local function step(dt: number)
     local camera = Workspace.CurrentCamera
     if not camera then return end
+    -- Count all existing leases before issuing new ones: iteration order
+    -- must not let early entries exceed the budget while later leases exist.
     local composed = 0
     for entry in pairs(active) do
+        if entry.sampler then composed += 1 end
+    end
+    for entry in pairs(active) do
         if not entry.model.Parent or not entry.root.Parent or not entry.visual.Parent then
+            if entry.sampler then composed -= 1 end
             unbind(entry.model)
             continue
         end
         local wants = entry.model:GetAttribute("NpcAttackPursuitActive") == true
             and entry.model:GetAttribute("LifeState") == "Alive"
             and (entry.root.Position - camera.CFrame.Position).Magnitude <= Config.MaxDistance
-        if wants and not entry.sampler and composed < Config.MaxComposedActors then acquire(entry) end
+        if wants and not entry.sampler and composed < Config.MaxComposedActors then
+            if acquire(entry) then composed += 1 end
+        end
         local sampler = entry.sampler
         if sampler then
-            composed += 1
             sampler:AnchorNear(camera.CFrame, os.clock(), Config.SamplerAnchorInterval)
             local goal = if wants then 1 else 0
             local duration = if goal == 1 then Config.EntryBlendSeconds else Config.ExitBlendSeconds
@@ -159,9 +168,14 @@ local function step(dt: number)
             if entry.weight < 0.01 and not wants then
                 entry.weight = 0
                 release(entry)
-                active[entry] = nil
+                composed -= 1
+                -- Keep distant pursuit entries eligible when the camera returns;
+                -- the server attribute may remain true without another event.
+                if entry.model:GetAttribute("NpcAttackPursuitActive") ~= true
+                    or entry.model:GetAttribute("LifeState") ~= "Alive" then active[entry] = nil end
             end
-        elseif not wants then
+        elseif entry.model:GetAttribute("NpcAttackPursuitActive") ~= true
+            or entry.model:GetAttribute("LifeState") ~= "Alive" then
             active[entry] = nil
         end
     end

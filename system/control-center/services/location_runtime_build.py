@@ -590,6 +590,18 @@ class RuntimePlaceBuilder:
         self.source = self.root / 'place' / 'game1_runtime_source.rbxlx'
         self.destination = self.root / '.control-center' / 'runtime-builds'
 
+    def completed_build_folder(self, build_id):
+        if not isinstance(build_id, str) or not re.fullmatch(r'runtime_\d{8}T\d{6}_[0-9a-f]{8}', build_id):
+            raise ValueError('Invalid Runtime build ID')
+        folder = self.destination / build_id
+        if folder.resolve() != folder or not folder.is_dir():
+            raise ValueError('Runtime build folder missing or redirected')
+        for name in ('authoring_backup.rbxlx', 'runtime_place.rbxlx', 'placement_manifest.json', 'build_report.json'):
+            artifact = folder / name
+            if artifact.resolve() != artifact or not artifact.is_file():
+                raise ValueError('Runtime build is incomplete or redirected')
+        return folder
+
     def inspect(self, rows, settings=None, house_inputs=None):
         source = self.source.resolve(strict=True)
         if source != self.source or source.suffix.lower() != '.rbxlx':
@@ -782,7 +794,7 @@ class RuntimePlaceBuilder:
                 'publishAllowed': False,
                 'note': 'Draft only: bounded client FULL/LOD1 pilot embedded; Studio and mobile validation NOT_RUN; publish gate closed',
             }, ensure_ascii=False, indent=2), encoding='utf-8')
-            return {'backupPath': str(backup), 'runtimePath': str(runtime),
+            return {'buildId': build_dir.name, 'backupPath': str(backup), 'runtimePath': str(runtime),
                     'manifestPath': str(build_dir / 'placement_manifest.json'),
                     'reportPath': str(build_dir / 'build_report.json'),
                     'removedVisualMeshParts': sum(len(x) if isinstance(x, list) else 1 for _row, _model, x in matched), 'convertedHouseVisualMeshParts': converted_house_parts,

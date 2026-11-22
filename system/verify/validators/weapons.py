@@ -74,7 +74,7 @@ def check_weapon_registration(
     for required in ["Game1WeaponAttachment", "Game1WeaponGrip", "BoneModelMount.Place", "BoneModelMount.SocketFrame"]:
         if required not in weapon_attach_text:
             err(f"unified attachment runtime missing {required}")
-    for required in ["parent.TransformedWorldCFrame * targetBone.CFrame", "model:PivotTo(delta * model:GetPivot())", "grip.WorldCFrame:Inverse()"]:
+    for required in ["parent.TransformedWorldCFrame * targetBone.CFrame", "model:PivotTo(delta * model:GetPivot())", "gripFrame:Inverse()"]:
         if required not in mount_text:
             err(f"shared bone model mount missing {required}")
     if "WeaponEquipService.EquipStartup(character)" not in character_service_text:
@@ -138,7 +138,7 @@ def check_weapon_registration(
     for required in ["Game1WeaponGrip", "ensureWeaponGrip", "canonicalGripWorld", "referencePart.CFrame:ToObjectSpace"]:
         if required not in plugin_text:
             err(f"studio bridge canonical weapon grip is missing {required}")
-    for required in ["WEAPON_ROTATION", "CFrame.Angles(math.rad(-90), 0, 0)", "grip.WorldCFrame:Inverse()"]:
+    for required in ["WEAPON_ROTATION", "CFrame.Angles(math.rad(-90), 0, 0)", "gripFrame:Inverse()"]:
         if required not in mount_text:
             err(f"shared weapon mount must preserve canonical -90deg X basis and exact grip: {required}")
     if "CFrame.new(grip.WorldPosition)" in weapon_attach_text:

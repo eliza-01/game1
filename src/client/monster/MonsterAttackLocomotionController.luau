@@ -81,6 +81,7 @@ local function releaseSampler(entry)
 	end
 	sampler.users = math.max(0, sampler.users - 1)
 	sampler:Touch()
+	sampler:Suspend()
 	entry.sampler = nil
 	entry.samplerKey = nil
 end
@@ -121,8 +122,7 @@ local function acquireSampler(entry): boolean
 		cacheKey = baseKey .. "#" .. tostring(samplerSerial)
 		samplers[cacheKey] = sampler
 	else
-		sampler:SetPhase(phase)
-		sampler:SetPlaybackSpeed(tonumber(entry.model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1)
+		sampler:Resume(tonumber(entry.model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1, phase)
 	end
 	sampler.users = 1
 	sampler:Touch()

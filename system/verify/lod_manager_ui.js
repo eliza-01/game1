@@ -34,7 +34,8 @@ const response = {
   revisions:[{id:12,recordedUtc:1784160000,placeId:99,total:52}],
   build:{enabled:false,canPreflight:false, sourceFile:'place/game1_runtime_source.rbxlx'}
 };
-let preparePayload=null, savedSettings=null;
+let preparePayload=null, savedSettings=null, revealPayload=null, revealError=false;
+const buildId="runtime_20261122T025510_1d8c6a6d";
 const clipboard = {value:'',writeText:async value => {clipboard.value=value}};
 const ctx = {document:{getElementById:get},window:{},navigator:{clipboard},request:async (path,opts)=> {
   if (path === '/api/lod-manager/settings') {savedSettings=JSON.parse(opts.body); return {...response,settings:{...response.settings,...savedSettings},items:response.items.map(row=>({...row,distances:savedSettings.assetDistances?.[row.slug]||row.distances}))};}
@@ -44,8 +45,9 @@ const ctx = {document:{getElementById:get},window:{},navigator:{clipboard},reque
   if (path === '/api/lod-manager/preflight') return {token:'token1',snapshotRevision:13,eligible:52,
     counts:{stone_fence_02:52}, protectedNotModified:4, sourceSha256:'a'.repeat(64),
     assetDistances:{},workspace:response.settings.workspace};
-  if (path === '/api/lod-manager/prepare') {preparePayload=JSON.parse(opts.body);return {backupPath:'backup',runtimePath:'runtime',
+  if (path === '/api/lod-manager/prepare') {preparePayload=JSON.parse(opts.body);return {buildId,backupPath:'backup',runtimePath:'runtime<&',
     manifestPath:'manifest',reportPath:'report',removedVisualMeshParts:52,publishAllowed:false};}
+  if (path === '/api/lod-manager/reveal-build') {revealPayload=JSON.parse(opts.body);if(revealError)throw Error('missing folder');return {opened:true};}
   return response;
 }};
 vm.runInNewContext(fs.readFileSync('system/control-center/static/lod-manager.js','utf8'),ctx);
@@ -77,7 +79,17 @@ vm.runInNewContext(fs.readFileSync('system/control-center/static/lod-manager.js'
   assert.strictEqual(get('lod-build-execute').disabled,false);
   await get('lod-build-execute').on_click();
   assert(get('lod-build-status').textContent.includes('ЗАБЛОКИРОВАНА'));
-  assert(get('lod-build-preview').textContent.includes('runtime'));
+  assert(get('lod-build-preview').innerHTML.includes('Runtime: runtime&lt;&amp;'));
+  assert(get('lod-build-preview').innerHTML.includes(`data-runtime-reveal="${buildId}"`));
+  const revealButton={dataset:{runtimeReveal:buildId},disabled:false};
+  const clickReveal=()=>get('lod-build-preview').on_click({target:{closest:()=>revealButton}});
+  await clickReveal();
+  assert.deepStrictEqual(revealPayload,{buildId});
+  assert(get('lod-build-reveal-status').textContent.includes('Папка открыта'));
+  revealError=true;
+  await clickReveal();
+  assert(get('lod-build-reveal-status').textContent.includes('missing folder'));
+  assert(!revealButton.disabled);
   assert.deepStrictEqual(preparePayload,{token:'token1'},'prepare sends token only');
   await get('lod-copy-workspace').on_click();
   assert(clipboard.value.includes('StreamingTargetRadius=1024'));

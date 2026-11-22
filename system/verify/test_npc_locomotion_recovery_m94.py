@@ -75,7 +75,9 @@ class NpcMovementM94Tests(unittest.TestCase):
         return_home = ai.split('local function returnHome(', 1)[1].split('local function attackCanConnect(', 1)[0]
         self.assertIn('NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Peace")', return_home)
         tick = ai.split('local function tickAgent(', 1)[1].split('local function onDamage(', 1)[0]
-        self.assertIn('NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Combat")', tick)
+        self.assertIn('chaseTarget(agent, targetRoot)', tick)
+        chase = ai.split('local function chaseTarget(', 1)[1].split('local function beginAttack(', 1)[0]
+        self.assertIn('NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Combat")', chase)
         self.assertIn('NpcMovementPolicy.ModeFor("Combat")', ai)
         self.assertIn('policy.runSpeedMultiplier', ai)  # authored attack-speed multiplier retained
         self.assertIn('movementSlot = "walk"', ai)  # missing Run clip fallback only

@@ -80,6 +80,12 @@ end
 function Navigator:Chase(position: Vector3, speed: number)
     if not self.active or not self.root.Parent or not self.humanoid.Parent then return end
     local now = os.clock()
+    -- The first movement command owns a fresh progress window. Time spent
+    -- idle/attacking must not count as time stuck in navigation.
+    if self.mode == "" then
+        self.progressAt = now
+        self.progressPosition = self.root.Position
+    end
     local progressed = flatDistance(self.root.Position, self.progressPosition) >= STUCK_DISTANCE
     if progressed then
         self.progressAt = now

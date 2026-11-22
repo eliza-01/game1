@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Game1Shared:WaitForChild("character")
 local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
+local CameraHeading = require(CharacterShared:WaitForChild("CharacterCameraHeading"))
 local GameOptions = require(Game1Shared:WaitForChild("GameOptions"))
 local PublishedDebugAccess = require(Game1Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
@@ -21,6 +22,7 @@ local character: Model? = nil
 local root: BasePart? = nil
 local rotating = false
 local targetYaw = 0
+local pendingAlignment: {character: Model, yaw: number}? = nil
 local cameraSettings = GameOptions.CameraSettings()
 local targetPitch = math.rad(cameraSettings.pitchDegrees)
 local distance = cameraSettings.distance
@@ -44,16 +46,36 @@ local function clearAutoAim()
 end
 
 
+-- Apply to orbit state, not Camera.CFrame: the existing render step owns
+-- the camera and would otherwise overwrite an external one-shot CFrame.
+local function alignAfterTeleport(movedCharacter: Model, forward: Vector3)
+    if typeof(movedCharacter) ~= "Instance" or not movedCharacter:IsA("Model")
+        or movedCharacter ~= localPlayer.Character or typeof(forward) ~= "Vector3" then return end
+    local yaw = CameraHeading.Yaw(forward)
+    if yaw == nil then return end
+    if character ~= movedCharacter or not root then
+        pendingAlignment = {character = movedCharacter, yaw = yaw}
+        return
+    end
+    pendingAlignment = nil
+    clearAutoAim()
+    targetYaw = yaw
+    discardNextMouseDelta = rotating
+end
+
 local function setCharacter(newCharacter: Model)
     clearAutoAim()
 	character = newCharacter
 	root = nil
 
 	local newRoot = newCharacter:WaitForChild("RootCollider", 10)
+	if character ~= newCharacter or localPlayer.Character ~= newCharacter then return end
 	if newRoot and newRoot:IsA("BasePart") then
 		root = newRoot
-		local look = newRoot.CFrame.LookVector
-		targetYaw = math.atan2(-look.X, -look.Z)
+		local pending = pendingAlignment
+		pendingAlignment = nil
+		targetYaw = if pending and pending.character == newCharacter then pending.yaw
+			else CameraHeading.Yaw(newRoot.CFrame.LookVector) or 0
 		raycastParameters.FilterDescendantsInstances = { newCharacter }
 	end
 end
@@ -313,6 +335,7 @@ function CameraController.Start()
 
 	localPlayer.CharacterAdded:Connect(setCharacter)
 	localPlayer.CharacterRemoving:Connect(function(removingCharacter)
+		if pendingAlignment and pendingAlignment.character == removingCharacter then pendingAlignment = nil end
 		if removingCharacter == character then
 			character = nil
 			root = nil
@@ -324,6 +347,16 @@ function CameraController.Start()
 	if localPlayer.Character then
 		task.spawn(setCharacter, localPlayer.Character)
 	end
+
+    task.spawn(function()
+        local remotes = ReplicatedStorage:WaitForChild("Game1Remotes", 30)
+        local event = remotes and remotes:WaitForChild(CameraHeading.RemoteName, 30)
+        if not event or not event:IsA("RemoteEvent") then
+            warn("[game1][camera] camera alignment remote unavailable")
+            return
+        end
+        event.OnClientEvent:Connect(alignAfterTeleport)
+    end)
 
 	RunService:BindToRenderStep(
 		"game1CameraInput",

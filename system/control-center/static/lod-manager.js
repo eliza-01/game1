@@ -417,10 +417,11 @@
       $('lod-build-status').textContent = `Runtime draft создан: Location ${result.removedVisualMeshParts} MeshParts удалены · Real Estate ${result.housePlacements||0} домов / ${result.convertedHouseVisualMeshParts||0} MeshParts заменены прокси.` +
         (remaining.length ? ` ВНИМАНИЕ: ${remaining.map(([slug,n])=>`${slug} × ${n}`).join(', ')} остались FULL в Workspace.` : '') +
         ' Публикация ЗАБЛОКИРОВАНА до Studio / мобильной проверки.';
-      $('lod-build-preview').textContent = `Backup: ${result.backupPath}
-Runtime: ${result.runtimePath}
-Placement manifest: ${result.manifestPath}
-Build report: ${result.reportPath}`;
+      $('lod-build-preview').innerHTML = `<div>Backup: ${escape(result.backupPath)}</div>
+        <div class="lm-runtime-path-row"><span>Runtime: ${escape(result.runtimePath)}</span><button type="button" data-runtime-reveal="${escape(result.buildId)}" ${result.buildId?'':'disabled'}>Открыть папку</button></div>
+        <div>Placement manifest: ${escape(result.manifestPath)}</div>
+        <div>Build report: ${escape(result.reportPath)}</div>
+        <div class="lm-note" id="lod-build-reveal-status" role="status"></div>`;
       $('lod-build-preview').hidden = false;
     } catch(error) { $('lod-build-status').textContent = `Runtime build остановлен: ${error.message}`; }
     finally {
@@ -588,6 +589,20 @@ Build report: ${result.reportPath}`;
     }
   });
   for(const id of helpIds){$(id).addEventListener('input',()=>{$('lod-settings-status').textContent='Настройки изменены. Нажми Save settings.';});}
+  $('lod-build-preview').addEventListener('click', async event=>{
+    const button=event.target.closest?.('button[data-runtime-reveal]');
+    if(!button || button.disabled || !button.dataset.runtimeReveal)return;
+    const status=$('lod-build-reveal-status');
+    button.disabled=true;
+    status.textContent='Открываем Explorer…';
+    try {
+      const result=await request('/api/lod-manager/reveal-build',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({buildId:button.dataset.runtimeReveal})});
+      if(result?.opened!==true)throw Error('Сервер не подтвердил открытие папки');
+      status.textContent='Папка открыта.';
+    }catch(error){status.textContent=`Не удалось открыть папку: ${error.message}`;}
+    finally{button.disabled=false;}
+  });
   $('lod-prepare').addEventListener('click', preflight);
   $('lod-build-execute').addEventListener('click', prepare);
   $('lod-scan').addEventListener('click',scan);

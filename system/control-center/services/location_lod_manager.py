@@ -112,6 +112,13 @@ class LocationLodManager:
                 catalog_digest=overview['snapshot']['catalogDigest'], settings=settings,
                 house_inputs=selected_houses)
 
+    def reveal_build(self, payload: dict) -> dict:
+        if not isinstance(payload, dict) or set(payload) != {'buildId'}:
+            raise ValueError('Runtime folder request requires buildId only')
+        from .windows_explorer import reveal_folder
+        reveal_folder(self.builder.completed_build_folder(payload['buildId']))
+        return {'opened': True}
+
     def house_selection(self) -> dict:
         if not self.houses or not self.house_placements:
             return {}

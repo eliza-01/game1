@@ -1,15 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "modes": {
     "stone_fence_02": "lod1",
     "stone_pillar_03": "lod1",
     "stone_ladder_02": "lod1"
-  },
-  "distances": {
-    "lod1": 120,
-    "lod2": 260,
-    "hide": 300,
-    "hysteresis": 12
   },
   "workspace": {
     "streamingEnabled": true,
@@ -18,5 +12,203 @@
     "modelStreamingBehavior": "Improved",
     "streamingIntegrityMode": "PauseOutsideLoadedArea",
     "streamOutBehavior": "Opportunistic"
+  },
+  "hysteresis": 12,
+  "assetDistances": {
+    "weapon_shop": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "wall_torch_03": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "stone_fence_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "ivy_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "stone_ladder_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "test_window_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "wooden_bar_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "christmas_tree_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "wall_torch_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "statue_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "wooden_fence_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "smithy_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "birch_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "lantern_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "stone_pillar_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "wall_torch_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "bush_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "ivy_05": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "ground_torch_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "wooden_fence_03": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "birch_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "ivy_03": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "stone_pillar_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "wooden_pillar_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "campfire_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "lantern_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "lantern_03": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "wooden_post_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "main_statue": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "ground_torch_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "big_tree_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "stone_fence_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "blossom_tree_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "pillar_with_lantern": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "stone_ladder_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "ground_torch_03": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "bush_01": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "smithy": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    },
+    "stone_pillar_03": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 300
+    }
   }
 }

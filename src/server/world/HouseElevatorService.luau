@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local Orientation = require(Shared:WaitForChild("world"):WaitForChild("HouseSpawnOrientation"))
 local Policy = require(Shared:WaitForChild("world"):WaitForChild("HouseElevatorPolicy"))
+local CameraSync = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterCameraSync"))
 
 local Elevator = {}
 
@@ -35,10 +36,8 @@ function Elevator.Move(player: Player, sockets: {[string]: Attachment}, name: st
     local character = player.Character
     local root = SpatialRoot.Get(player)
     if not character or not root then return false, "Персонаж не готов" end
-    -- Preserve the player's heading; elevator authoring bones are positions,
-    -- not avatar orientation frames. Reuse the shared upright conversion.
-    -- One orientation rule for every floor. The authored spawn controls the
-    -- location; the player's heading is independent of the elevator bone.
+    -- The destination spawn socket owns position and heading on every floor.
+    -- The elevator control socket itself is not an orientation frame.
     local targetFrame = Orientation.Upright(if target:IsA("Bone") then target.TransformedWorldCFrame
         else target.WorldCFrame, target:IsA("Bone"), 3)
     if not targetFrame then return false, "Не удалось определить направление персонажа" end
@@ -50,6 +49,7 @@ function Elevator.Move(player: Player, sockets: {[string]: Attachment}, name: st
     end
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
+    CameraSync.Align(player, character, targetFrame)
     return true, ("Лифт · этаж %d"):format(option.destination)
 end
 

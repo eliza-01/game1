@@ -166,7 +166,7 @@ class HairImportTests(unittest.TestCase):
         self.assertIn('joint.Attachment1 = anchor', source)
         self.assertIn('RunService.RenderStepped:Connect(update)', controller)
         self.assertIn('BoneModelMount.Place(model, state.grip, BoneModelMount.SocketFrame(state.bone, kind))', controller)
-        self.assertIn('grip.WorldCFrame:Inverse()', mount)
+        self.assertIn('gripFrame:Inverse()', mount)
         self.assertIn('object.Parent:GetAttribute("Game1HairCompound") == true', rig_service)
 
 

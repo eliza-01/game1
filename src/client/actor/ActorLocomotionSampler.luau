@@ -93,6 +93,16 @@ function ActorLocomotionSampler.new(visual: Model, animationId: string, playback
 end
 
 
+-- A cached proxy keeps the rig/loaded asset, not a live animation evaluator.
+function ActorLocomotionSampler:Suspend()
+	self.track:Stop(0)
+end
+
+function ActorLocomotionSampler:Resume(playbackSpeed: number, phase: number)
+	self.track:Play(0, 1, math.max(0.01, playbackSpeed))
+	self:SetPhase(phase)
+end
+
 function ActorLocomotionSampler:SetPlaybackSpeed(playbackSpeed: number)
 	if not self.track then
 		return
@@ -143,7 +153,12 @@ function ActorLocomotionSampler:AnchorNear(cameraCFrame: CFrame, now: number, in
 		return
 	end
 	self.lastAnchorAt = now
-	self.proxy:PivotTo(CFrame.new(cameraCFrame.Position + Vector3.new(0, -24, 0)))
+	local position = cameraCFrame.Position + Vector3.new(0, -24, 0)
+	-- Keep the hidden animator near the camera for evaluation, but do not
+	-- move an entire proxy rig just because the anchor timer expired.
+	if (self.proxy:GetPivot().Position - position).Magnitude >= 8 then
+		self.proxy:PivotTo(CFrame.new(position))
+	end
 end
 
 function ActorLocomotionSampler:Destroy()

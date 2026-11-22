@@ -1,5 +1,6 @@
 """Existing persisted settings feed the complete read-only Studio preview."""
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,6 +32,14 @@ class StudioPreview(unittest.TestCase):
                 self.assertEqual(status, 200, result)
                 return result
             first = read()
+            # The actual HTTP payload must be accepted by both Studio transport
+            # and shared client/server decoder. M427 updated only the latter.
+            bridge = (ROOT / 'system/studio-plugin/modules/StudioLodPreviewBridge.luau').read_text()
+            contract = (ROOT / 'src/shared/world/StudioLodPreviewContract.luau').read_text()
+            for source in (bridge, contract):
+                versions = re.findall(r'data\.schemaVersion\s*~=\s*(\d+)', source)
+                self.assertEqual(versions, [str(first['schemaVersion'])])
+            self.assertIn('warnOnce("unsupported profile schema ', bridge)
             self.assertEqual(first, read())
             self.assertEqual(first['locations']['stone_fence_02']['lod1'], '91896785734146')
             self.assertEqual(first['houses'][HOUSE]['parts']['roof']['hide'], 600)

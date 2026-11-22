@@ -33,7 +33,7 @@ class UnifiedBoneMountTests(unittest.TestCase):
             'parent.TransformedWorldCFrame * targetBone.CFrame',
             'SocketFacing.FullFrame(frame, true)',
             'CFrame.Angles(math.rad(-90), 0, 0)',
-            'local delta = socketFrame * grip.WorldCFrame:Inverse()',
+            'local delta = socketFrame * gripFrame:Inverse()',
             'model:PivotTo(delta * model:GetPivot())',
         ):
             self.assertIn(statement, shared)

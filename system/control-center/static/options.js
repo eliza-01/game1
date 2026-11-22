@@ -1,4 +1,4 @@
-const game1OptionsState={data:null,saving:false,debugStamp:0,hpDevice:"desktop",hpDrafts:null};
+const game1OptionsState={data:null,saving:false,debugStamp:0,hpDevice:"desktop",hpDrafts:null,uiDevice:"desktop",uiDrafts:null};
 const GAME1_CAMERA_FIELDS=[
   ['targetHeight','Target height','studs',0,12,0.25],
   ['distance','Camera distance','studs',4,18,0.25],
@@ -55,17 +55,19 @@ function game1OptionsRender(){
   game1CameraDraftStatus(data);
   game1HealthRender();
   game1HealthDraftStatus(data);
+  game1UiRender();
+  game1UiDraftStatus(data);
   $('option-world-streaming-radius').value=String(data.worldStreaming?.targetRadiusStuds??150);
   $('save-combat-options').disabled=game1OptionsState.saving;
   $('option-npc-overhead-save').disabled=game1OptionsState.saving;
   $('save-character-life-options').disabled=game1OptionsState.saving;
   $('save-player-jump-options').disabled=game1OptionsState.saving;
-  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save']){
+  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save']){
     $(id).disabled=game1OptionsState.saving;
   }
 }
 async function game1OptionsLoad(){
-  try{game1OptionsState.data=await request('/api/options');game1OptionsState.hpDrafts=null;game1OptionsRender()}catch(error){toast(error.message,true)}
+  try{game1OptionsState.data=await request('/api/options');game1OptionsState.hpDrafts=null;game1OptionsState.uiDrafts=null;game1OptionsRender()}catch(error){toast(error.message,true)}
 }
 async function game1OptionsSave(payload,message){
   game1HealthCapture();
@@ -167,8 +169,11 @@ setInterval(async()=>{
     game1OptionsState.data={...previous,cameraDebugDraft:data.cameraDebugDraft,cameraDebugDraftAt:data.cameraDebugDraftAt};
     game1OptionsState.data.healthUiDebugDraft=data.healthUiDebugDraft;
     game1OptionsState.data.healthUiDebugDraftAt=data.healthUiDebugDraftAt;
+    game1OptionsState.data.uiPresentationDebugDraft=data.uiPresentationDebugDraft;
+    game1OptionsState.data.uiPresentationDebugDraftAt=data.uiPresentationDebugDraftAt;
     game1CameraDraftStatus(game1OptionsState.data);
     game1HealthDraftStatus(game1OptionsState.data);
+    game1UiDraftStatus(game1OptionsState.data);
   }catch{}
 },2500);
 window.game1OptionsLoad=game1OptionsLoad;
@@ -266,4 +271,62 @@ $('health-ui-import').onclick=()=>{
 $('option-published-debug-save').onclick=()=>{
   const device=game1OptionsState.hpDevice;
   game1OptionsSave({debugUi:{[device]:{showPublishedControls:$('option-published-debug-buttons').checked}}},`${device} published TestPlace debug visibility saved`);
+};
+
+// M443 · editable device buffers; saving one does not overwrite the other.
+const GAME1_UI_FIELDS = {
+  interaction: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['widthPx','Window width · px',180,450,1],['fontPx','Button font · px',10,36,1]],
+  status: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['titleFontPx','Title font · px',10,36,1],['labelFontPx','Row font · px',10,36,1],['timerFontPx','Timer font · px',9,36,1]],
+  notification: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['fontPx','Message font · px',10,36,1],['durationSeconds','Hide after · sec',0.2,15,0.1]],
+  resource: [['offsetXPx','Horizontal offset · px',-500,500,1],['offsetYPx','Vertical offset · px',-500,500,1],['fontPx','Resource font · px',10,36,1],['risePx','Float distance · px',0,200,1],['durationSeconds','Fade time · sec',0.2,15,0.1]],
+};
+function game1UiEnsure(){
+  if(!game1OptionsState.uiDrafts)game1OptionsState.uiDrafts=JSON.parse(JSON.stringify(game1OptionsState.data?.uiPresentation||{}));
+}
+function game1UiCapture(){
+  if(!game1OptionsState.uiDrafts)return;
+  const profile=game1OptionsState.uiDrafts[game1OptionsState.uiDevice];if(!profile)return;
+  for(const [group,fields] of Object.entries(GAME1_UI_FIELDS))for(const [key] of fields){
+    const input=$(`option-ui-${group}-${key}`);
+    if(input)profile[group][key]=Number(input.value);
+  }
+}
+function game1UiRender(){
+  game1UiEnsure();
+  const device=game1OptionsState.uiDevice;
+  $('option-ui-desktop').classList.toggle('primary',device==='desktop');
+  $('option-ui-mobile').classList.toggle('primary',device==='mobile');
+  const profile=game1OptionsState.uiDrafts?.[device];if(!profile)return;
+  $('option-ui-fields').innerHTML=Object.entries(GAME1_UI_FIELDS).map(([group,fields])=>
+    `<section class="game1-ui-group"><h4>${({interaction:'01 · Interaction window',status:'02 · Fire & cooking status',notification:'03 · Notifications / transitions',resource:'04 · Resource spending'}[group])}</h4>`+
+    fields.map(([key,label,min,max,step])=>`<label>${label}<input type="number" id="option-ui-${group}-${key}" min="${min}" max="${max}" step="${step}" value="${Number(profile[group]?.[key]??0)}"></label>`).join('')+'</section>').join('');
+}
+function game1UiRead(){
+  game1UiCapture();
+  const profile=game1OptionsState.uiDrafts?.[game1OptionsState.uiDevice];
+  if(!profile)throw Error('UI profile unavailable');
+  for(const [group,fields] of Object.entries(GAME1_UI_FIELDS))for(const [key,,min,max] of fields){
+    const val=profile[group][key];
+    if(!Number.isFinite(val)||val<min||val>max||(!key.endsWith('Seconds')&&!Number.isInteger(val)))
+      throw Error(`${group}.${key}: expected ${min}..${max}`);
+  }
+  return JSON.parse(JSON.stringify(profile));
+}
+function game1UiDraftStatus(data){
+  const el=$('option-ui-draft-status');if(!el)return;
+  const draft=data?.uiPresentationDebugDraft;
+  el.textContent=draft?`Studio UI Debug (${draft.device}) · ${new Date((data.uiPresentationDebugDraftAt||0)*1000).toLocaleTimeString()} · Import then Save`:'No Studio UI draft yet.';
+}
+$('option-ui-desktop').onclick=()=>{game1UiCapture();game1OptionsState.uiDevice='desktop';game1UiRender()};
+$('option-ui-mobile').onclick=()=>{game1UiCapture();game1OptionsState.uiDevice='mobile';game1UiRender()};
+$('option-ui-save').onclick=()=>{
+  try{const device=game1OptionsState.uiDevice;game1OptionsSave({uiPresentation:{[device]:game1UiRead()}},`${device} UI settings saved · sync Rojo and restart Play`)}catch(e){toast(e.message,true)}
+};
+$('option-ui-import').onclick=()=>{
+  const draft=game1OptionsState.data?.uiPresentationDebugDraft;
+  if(!draft){toast('No Studio UI draft received yet',true);return;}
+  game1UiCapture();game1UiEnsure();
+  game1OptionsState.uiDrafts[draft.device]=JSON.parse(JSON.stringify(draft.settings));
+  game1OptionsState.uiDevice=draft.device;
+  game1UiRender();toast('Studio UI draft imported · Save to persist');
 };

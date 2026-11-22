@@ -31,6 +31,21 @@ local Config = {
         Range = 11.0,
         Color = Color3.fromRGB(255, 175, 70),
     }),
+    -- Authored campfire_01 Fire Tuner profile (distinct from House fireplace).
+    CampfireFire = table.freeze({
+        Size = 4.0,
+        Heat = 8.0,
+        TimeScale = 1.0,
+        Primary = Color3.fromRGB(255, 170, 65),
+        Secondary = Color3.fromRGB(255, 70, 20),
+    }),
+    CampfireLight = table.freeze({
+        Enabled = true,
+        Shadows = false,
+        Brightness = 2.0,
+        Range = 18.0,
+        Color = Color3.fromRGB(255, 145, 70),
+    }),
     Steam = table.freeze({
         Rate = 11,
         Lifetime = NumberRange.new(1.4, 2.4),

@@ -70,6 +70,57 @@ def normalize_health_ui(change, base=None):
             for device in ('desktop', 'mobile')}
 
 
+# M443: one generated visual contract for interactions, status, feedback, and spends.
+# Pixel coordinates are device-relative offsets from the authored anchor.
+UI_PROFILE_DEFAULTS = {
+    "desktop": {
+        "interaction": {"offsetXPx": 0, "offsetYPx": 0, "widthPx": 272, "fontPx": 14},
+        "status": {"offsetXPx": 0, "offsetYPx": 0, "titleFontPx": 13, "labelFontPx": 12, "timerFontPx": 11},
+        "notification": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 13, "durationSeconds": 2.7},
+        "resource": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 18, "risePx": 34, "durationSeconds": 0.9},
+    },
+    "mobile": {
+        "interaction": {"offsetXPx": 0, "offsetYPx": 0, "widthPx": 272, "fontPx": 14},
+        "status": {"offsetXPx": 0, "offsetYPx": 0, "titleFontPx": 13, "labelFontPx": 12, "timerFontPx": 11},
+        "notification": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 13, "durationSeconds": 2.7},
+        "resource": {"offsetXPx": 0, "offsetYPx": 0, "fontPx": 18, "risePx": 34, "durationSeconds": 0.9},
+    },
+}
+UI_FIELD_BOUNDS = {
+    'offsetXPx': (-500, 500), 'offsetYPx': (-500, 500),
+    'widthPx': (180, 450), 'fontPx': (10, 36),
+    'titleFontPx': (10, 36), 'labelFontPx': (10, 36),
+    'timerFontPx': (9, 36), 'risePx': (0, 200),
+    'durationSeconds': (0.2, 15),
+}
+
+
+def normalize_ui_profile(change, base):
+    import math
+    if not isinstance(change, dict) or set(change) - set(base):
+        raise ValueError('ui profile sections invalid')
+    result = deepcopy(base)
+    for group, fields in change.items():
+        if not isinstance(fields, dict) or set(fields) - set(base[group]):
+            raise ValueError(f'ui.{group}: unexpected fields')
+        for key, value in fields.items():
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ValueError(f'ui.{group}.{key} must be finite')
+            low, high = UI_FIELD_BOUNDS[key]
+            if value < low or value > high:
+                raise ValueError(f'ui.{group}.{key}: expected {low}..{high}')
+            result[group][key] = float(value) if key == 'durationSeconds' else int(value) if value == int(value) else (_ for _ in ()).throw(ValueError(f'ui.{group}.{key}: integer px required'))
+    return result
+
+
+def normalize_ui_presentation(change, base=None):
+    if not isinstance(change, dict) or set(change) - {'desktop', 'mobile'}:
+        raise ValueError('uiPresentation expects desktop/mobile profiles')
+    base = base or UI_PROFILE_DEFAULTS
+    return {device: normalize_ui_profile(change.get(device, {}), base[device])
+            for device in ('desktop', 'mobile')}
+
+
 # Streaming radii belong to Workspace / the published Place, not to a player.
 # The command-bar helper in Asset Manager applies this value in Studio Edit.
 def normalize_world_streaming(change, base=None):
@@ -163,6 +214,7 @@ DEFAULT_PAYLOAD = {
     },
     "camera": DEFAULT_CAMERA.copy(),
     "healthUi": deepcopy(HEALTH_UI_DEFAULTS),
+    "uiPresentation": deepcopy(UI_PROFILE_DEFAULTS),
     "npcOverhead": deepcopy(NPC_OVERHEAD_DEFAULTS),
     "monsterAi": {"noDamageReturnSeconds": 30},
     "worldStreaming": {"targetRadiusStuds": 150},
@@ -187,6 +239,8 @@ class OptionsStore:
         self._camera_draft_at = 0
         self._health_draft = None
         self._health_draft_at = 0
+        self._ui_draft = None
+        self._ui_draft_at = 0
         self._ensure()
 
     def _read(self) -> dict:
@@ -212,6 +266,7 @@ class OptionsStore:
             names.add(row['name'])
             normalize_camera(row.get('settings') or {})
         normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))
+        normalize_ui_presentation(payload.get('uiPresentation', UI_PROFILE_DEFAULTS))
         normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
         normalize_world_streaming(payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
@@ -239,6 +294,7 @@ class OptionsStore:
             *(f"\t\t{key} = {value:.12g}," for key,value in camera.items()),
             "\t}),",
             "\thealthUi = " + lua_literal(normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))) + ",",
+            "\tuiPresentation = " + lua_literal(normalize_ui_presentation(payload.get('uiPresentation', UI_PROFILE_DEFAULTS))) + ",",
             "\tnpcOverhead = " + lua_literal(normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))) + ",",
             "\tmonsterAi = " + lua_literal(normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))) + ",",
             "\tplayerJump = " + lua_literal(normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))) + ",",
@@ -273,7 +329,7 @@ class OptionsStore:
                 if key not in payload[group]:
                     payload[group][key] = value
                     changed = True
-        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump'):
+        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
@@ -321,6 +377,18 @@ class OptionsStore:
             self._health_draft_at = time.time()
         return {'saved': False, 'healthUiDebugDraftAt': self._health_draft_at}
 
+    def preview_ui(self, request: dict) -> dict:
+        if not isinstance(request, dict) or set(request) != {'device', 'settings'}:
+            raise ValueError('UI draft requires device and settings')
+        device = request['device']
+        if device not in UI_PROFILE_DEFAULTS:
+            raise ValueError('UI draft device unsupported')
+        checked = normalize_ui_profile(request['settings'], UI_PROFILE_DEFAULTS[device])
+        with self._debug_lock:
+            self._ui_draft = {'device': device, 'settings': checked}
+            self._ui_draft_at = time.time()
+        return {'saved': False, 'uiPresentationDebugDraftAt': self._ui_draft_at}
+
     def snapshot_with_debug(self) -> dict:
         payload = self.snapshot()
         with self._debug_lock:
@@ -328,6 +396,8 @@ class OptionsStore:
             payload['cameraDebugDraftAt'] = self._camera_draft_at
             payload['healthUiDebugDraft'] = deepcopy(self._health_draft)
             payload['healthUiDebugDraftAt'] = self._health_draft_at
+            payload['uiPresentationDebugDraft'] = deepcopy(self._ui_draft)
+            payload['uiPresentationDebugDraftAt'] = self._ui_draft_at
         return payload
 
     def update(self, request: dict) -> dict:
@@ -344,6 +414,9 @@ class OptionsStore:
             payload['npcOverhead'] = normalize_npc_overhead(request['npcOverhead'], payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         if 'monsterAi' in request:
             payload['monsterAi'] = normalize_monster_ai(request['monsterAi'], payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
+        if 'uiPresentation' in request:
+            payload['uiPresentation'] = normalize_ui_presentation(request['uiPresentation'],
+                payload.get('uiPresentation', UI_PROFILE_DEFAULTS))
         if 'healthUi' in request:
             payload['healthUi'] = normalize_health_ui(request['healthUi'],
                                                        payload.get('healthUi', HEALTH_UI_DEFAULTS))

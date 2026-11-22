@@ -85,6 +85,64 @@ return table.freeze({
 			}),
 		}),
 	}),
+	uiPresentation = table.freeze({
+		desktop = table.freeze({
+			interaction = table.freeze({
+				offsetXPx = 0,
+				offsetYPx = 0,
+				widthPx = 272,
+				fontPx = 14,
+			}),
+			status = table.freeze({
+				offsetXPx = 0,
+				offsetYPx = 20,
+				titleFontPx = 13,
+				labelFontPx = 12,
+				timerFontPx = 11,
+			}),
+			notification = table.freeze({
+				offsetXPx = 0,
+				offsetYPx = 30,
+				fontPx = 13,
+				durationSeconds = 2.7,
+			}),
+			resource = table.freeze({
+				offsetXPx = 0,
+				offsetYPx = 0,
+				fontPx = 18,
+				risePx = 34,
+				durationSeconds = 3,
+			}),
+		}),
+		mobile = table.freeze({
+			interaction = table.freeze({
+				offsetXPx = 0,
+				offsetYPx = 0,
+				widthPx = 272,
+				fontPx = 14,
+			}),
+			status = table.freeze({
+				offsetXPx = 0,
+				offsetYPx = 0,
+				titleFontPx = 13,
+				labelFontPx = 12,
+				timerFontPx = 11,
+			}),
+			notification = table.freeze({
+				offsetXPx = 0,
+				offsetYPx = 0,
+				fontPx = 13,
+				durationSeconds = 2.7,
+			}),
+			resource = table.freeze({
+				offsetXPx = 0,
+				offsetYPx = 0,
+				fontPx = 18,
+				risePx = 34,
+				durationSeconds = 0.9,
+			}),
+		}),
+	}),
 	npcOverhead = table.freeze({
 		desktop = table.freeze({
 			nameRadiusStuds = 70,

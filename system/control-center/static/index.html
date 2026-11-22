@@ -7,7 +7,7 @@
 <title>Characters</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
 <link rel="stylesheet" href="asset-manager.css?v=370">
-<link rel="stylesheet" href="m337-options.css?v=337">
+<link rel="stylesheet" href="m337-options.css?v=443">
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=435">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
@@ -439,6 +439,21 @@
   </div>
 </div>
 </details>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🪟</span><span><strong>UI</strong><small>Взаимодействия · прогресс · уведомления</small></span></summary>
+<div class="panel character-card game1-ui-layout-options">
+  <div class="section-title"><div><span>ПК / мобильные устройства · pixels</span><h3>Presentation UI</h3></div></div>
+  <small class="hint">Смещения от исходной позиции окна, в px. Отрицательные значения разрешены. Изменения в Studio Play → Import → Save; сохранённые настройки вступают в силу после Rojo Sync / нового Play.</small>
+  <div class="actions game1-hp-device-tabs">
+    <button id="option-ui-desktop" class="primary" type="button">PC</button>
+    <button id="option-ui-mobile" type="button">Mobile / Touch</button>
+  </div>
+  <div id="option-ui-fields" class="game1-ui-fields"></div>
+  <div class="actions">
+    <button id="option-ui-import" type="button">Import Studio UI Debug</button>
+    <button id="option-ui-save" class="primary" type="button">Save UI profile</button>
+  </div>
+  <div id="option-ui-draft-status" class="muted" role="status">No Studio UI draft yet.</div>
+</div></details>
 <details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">❤️</span><span><strong>Health UI</strong><small>Игрок, монстры, NPC · PC/Mobile</small></span></summary>
 <div class="panel character-card game1-health-ui-options">
   <div class="section-title"><div><span>combat appearance · separate PC / Mobile profiles</span><h3>Health bars</h3></div><span class="muted">Studio HP Debug → Import → Save</span></div>
@@ -1071,7 +1086,7 @@
 <script src="location-asset-workflow.js?v=411"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=337"></script>
+<script src="options.js?v=443"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=437"></script>
 <script src="weapon-workflow.js?v=309"></script>

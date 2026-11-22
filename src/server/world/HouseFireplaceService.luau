@@ -71,8 +71,8 @@ end
 
 local function ensureFireVisual(state: State, enabled: boolean)
     local fire = state.fire
-    -- Campfires may already have Fire/PointLight from Fire Tuner. Keep their
-    -- authored settings exactly; only change Enabled. Never double the effects.
+    -- Reuse authored Fire/PointLight from Fire Tuner when present; never
+    -- duplicate them. Gameplay mode owns the actual visual preset now.
     if state.kind == "campfire" and not fire then
         for _, child in ipairs(state.socket:GetDescendants()) do
             if child:IsA("Fire") and not state.fire then
@@ -85,32 +85,40 @@ local function ensureFireVisual(state: State, enabled: boolean)
         end
         fire = state.fire
     end
+    -- Campfire changes BOTH Fire and PointLight on the same live Instances:
+    -- no pot = reference profile; pot = house fireplace profile.
+    -- Mode changes never restart the heat timer or recreate the effects.
+    local referenceMode = state.kind == "campfire" and state.potInstance == nil
+    local firePreset = if referenceMode then Config.CampfireFire else Config.Fire
+    local lightPreset = if referenceMode then Config.CampfireLight else Config.Light
     local anchor = if not fire or not state.light then fireAnchor(state) else nil
     if not fire then
         fire = Instance.new("Fire")
-        fire.Name = "Game1FireplaceFlame"
-        fire.Size = Config.Fire.Size
-        fire.Heat = Config.Fire.Heat
-        fire.TimeScale = Config.Fire.TimeScale
-        fire.Color = Config.Fire.Primary
-        fire.SecondaryColor = Config.Fire.Secondary
+        fire.Name = if state.kind == "campfire" then "Game1CampfireFlame" else "Game1FireplaceFlame"
         fire.Parent = anchor
         state.fire = fire
     end
+    -- Apply the exact Fire Tuner profile for each source, even when a
+    -- pre-existing instance was discovered. That prevents the fallback path
+    -- from silently reusing the House fireplace's smaller, cooler flame.
+    fire.Size = firePreset.Size
+    fire.Heat = firePreset.Heat
+    fire.TimeScale = firePreset.TimeScale
+    fire.Color = firePreset.Primary
+    fire.SecondaryColor = firePreset.Secondary
     fire.Enabled = enabled
     local light = state.light
     if not light then
         light = Instance.new("PointLight")
-        light.Name = "Game1FireplaceLight"
-        light.Brightness = Config.Light.Brightness
-        light.Range = Config.Light.Range
-        light.Color = Config.Light.Color
-        light.Shadows = Config.Light.Shadows
-        light.Enabled = Config.Light.Enabled
+        light.Name = if state.kind == "campfire" then "Game1CampfireLight" else "Game1FireplaceLight"
         light.Parent = anchor
         state.light = light
     end
-    light.Enabled = enabled and Config.Light.Enabled
+    light.Brightness = lightPreset.Brightness
+    light.Range = lightPreset.Range
+    light.Color = lightPreset.Color
+    light.Shadows = lightPreset.Shadows
+    light.Enabled = enabled and lightPreset.Enabled
 end
 
 local function ensureSteam(state: State, enabled: boolean)
@@ -290,6 +298,7 @@ local function removePot(state: State)
     state.cookEndsAt = 0
     state.cookDuration = 0
     state.cookOwner = nil
+    if state.kind == "campfire" then ensureFireVisual(state, state.fuelStage == "fire") end
     syncAttributes(state)
 end
 
@@ -302,6 +311,7 @@ local function placePot(state: State): boolean
     state.potState = "idle"
     state.cookEndsAt = 0
     state.cookDuration = 0
+    if state.kind == "campfire" then ensureFireVisual(state, state.fuelStage == "fire") end
     syncAttributes(state)
     return true
 end

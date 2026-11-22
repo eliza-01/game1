@@ -52,6 +52,12 @@ function GameOptions.HealthUiSettings(device: string): {[string]: any}
     return profiles[device] or profiles.desktop or {}
 end
 
+function GameOptions.UiPresentationSettings(device: string): {[string]: any}
+    local profiles = Registry.uiPresentation or {}
+    local fallback = require(script.Parent:WaitForChild("world"):WaitForChild("UiPresentationContract")).Defaults
+    return profiles[device] or fallback[device] or fallback.desktop
+end
+
 function GameOptions.PlayerJumpSettings(): {[string]: number}
     local jump = Registry.playerJump or {}
     return {

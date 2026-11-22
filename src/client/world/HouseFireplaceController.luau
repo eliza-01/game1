@@ -10,6 +10,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local Config = require(Shared:WaitForChild("world"):WaitForChild("FireplaceMechanicsConfig"))
+local UiSettings = require(script.Parent:WaitForChild("UiPresentationSettings"))
 
 local player = Players.LocalPlayer
 local Controller = {}
@@ -123,7 +124,37 @@ local function ui(): (Frame, Frame, Frame)
         if selected then dismissed[selected] = true end
         panel.Visible = false
     end)
-    return panel, row(panel, 30, "FuelRow", "Огонь"), row(panel, 60, "CookRow", "Блюдо")
+    local fuelRow = row(panel, 30, "FuelRow", "Огонь")
+    local cookRow = row(panel, 60, "CookRow", "Блюдо")
+    local function applyStyle()
+        local cfg = UiSettings.Current().status
+        local barHeight = math.max(16, cfg.timerFontPx + 6)
+        local rowHeight = math.max(25, cfg.labelFontPx + 6, barHeight + 4)
+        local headerHeight = math.max(24, cfg.titleFontPx + 8)
+        local firstRowTop = headerHeight + 6
+        local panelHeight = firstRowTop + 2 * rowHeight + 4
+        panel.Position = UDim2.new(0.5, cfg.offsetXPx, 1, -24 + cfg.offsetYPx)
+        panel.Size = UDim2.new(0.9, 0, 0, panelHeight)
+        constraint.MaxSize = Vector2.new(340, panelHeight)
+        constraint.MinSize = Vector2.new(250, panelHeight)
+        title.TextSize = cfg.titleFontPx
+        title.Size = UDim2.new(1, -48, 0, headerHeight)
+        for index, entry in ipairs({fuelRow, cookRow}) do
+            entry.Position = UDim2.fromOffset(12, firstRowTop + (index - 1) * (rowHeight + 2))
+            entry.Size = UDim2.new(1, -24, 0, rowHeight)
+            local label = entry:FindFirstChildOfClass("TextLabel")
+            if label then
+                label.TextSize = cfg.labelFontPx
+                label.Size = UDim2.fromOffset(65, rowHeight)
+            end
+            entry.Bar.Position = UDim2.fromOffset(68, math.floor((rowHeight - barHeight) / 2))
+            entry.Bar.Size = UDim2.new(1, -68, 0, barHeight)
+            entry.Bar.Remaining.TextSize = cfg.timerFontPx
+        end
+    end
+    applyStyle()
+    UiSettings.Changed:Connect(applyStyle)
+    return panel, fuelRow, cookRow
 end
 
 local function listen(instance: Instance)

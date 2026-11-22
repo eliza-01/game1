@@ -11,3 +11,10 @@
 #options-view .game1-option-section label {font-size:12px}
 #options-view .game1-option-section .hint {font-size:11px;line-height:1.35;max-width:78ch}
 @media (max-width:750px){#options-view .game1-option-section > summary {padding:11px 12px}#options-view .game1-option-icon{width:32px;height:32px}}
+
+/* M443: dense, per-surface UI profile form. */
+.game1-ui-fields {display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:10px;margin:12px 0}
+.game1-ui-group{border:1px solid var(--line,#33404b);border-radius:9px;padding:10px;min-width:0}
+.game1-ui-group h4{margin:0 0 10px;font-size:12px;color:var(--text,#e8edf2)}
+.game1-ui-group label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0;font-size:11px}
+.game1-ui-group input{width:84px;min-width:84px;font-variant-numeric:tabular-nums}

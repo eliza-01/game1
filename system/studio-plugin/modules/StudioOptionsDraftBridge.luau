@@ -9,6 +9,7 @@ return function(services)
     local specs = {
         Game1CameraDebug = {route="/api/options/camera-draft", maxBytes=2000},
         Game1HealthUiDebug = {route="/api/options/health-ui-draft", maxBytes=8000},
+        Game1UiPresentationDebug = {route="/api/options/ui-presentation-draft", maxBytes=8000},
     }
     for name, spec in pairs(specs) do
         local current: Folder? = nil

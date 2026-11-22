@@ -10,6 +10,7 @@ local TweenService = game:GetService("TweenService")
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 
 local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
+local UiSettings = require(script.Parent:WaitForChild("UiPresentationSettings"))
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
@@ -113,23 +114,24 @@ local RESOURCE_ICONS = {
 local function showFloatingSpend(layer: ScreenGui, items: {any})
     local host = layer:FindFirstChild("SpendHost")
     if not host or not host:IsA("Frame") then return end
+    local cfg = UiSettings.Current().resource
     for index, item in ipairs(items) do
         local label = Instance.new("TextLabel")
         label.AnchorPoint = Vector2.new(0.5, 1)
-        label.Position = UDim2.new(0.5, 0, 0.78, -(index - 1) * 28)
-        label.Size = UDim2.fromOffset(240, 24)
+        label.Position = UDim2.new(0.5, cfg.offsetXPx, 0.78, cfg.offsetYPx - (index - 1) * (cfg.fontPx + 10))
+        label.Size = UDim2.fromOffset(math.max(240, cfg.fontPx * 16), math.max(24, cfg.fontPx + 8))
         label.BackgroundTransparency = 1
         label.TextColor3 = Color3.fromRGB(244, 246, 249)
         label.TextStrokeTransparency = 0.55
         label.Font = Enum.Font.GothamBold
-        label.TextSize = 18
+        label.TextSize = cfg.fontPx
         local icon = RESOURCE_ICONS[tostring(item.icon or "")] or "•"
         local amount = tonumber(item.amount) or 0
         local amountText = if amount > 0 then "+" .. tostring(amount) else tostring(amount)
         label.Text = string.format("%s  %s  %s", icon, amountText, tostring(item.label or ""))
         label.Parent = host
-        local tween = TweenService:Create(label, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Position = label.Position - UDim2.fromOffset(0, 34),
+        local tween = TweenService:Create(label, TweenInfo.new(cfg.durationSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = label.Position - UDim2.fromOffset(0, cfg.risePx),
             TextTransparency = 1,
             TextStrokeTransparency = 1,
         })
@@ -242,7 +244,8 @@ local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): Proximit
 end
 
 local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCollector
-    local touch = UserInputService.TouchEnabled
+    local touch = UiSettings.ActiveDevice() == "mobile"
+    local cfg = UiSettings.Current().interaction
     -- One input layout for desktop and mobile. Unlike the old BillboardGui,
     -- this never overlaps the world reticle/camera at the socket position.
     local gui = Instance.new("ScreenGui")
@@ -252,7 +255,8 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
     gui.DisplayOrder = 16
     gui.ResetOnSpawn = false
     gui.Parent = player:WaitForChild("PlayerGui")
-    local panelHeight = 12 + #actions * (if touch then 52 else 44)
+    local rowHeight = math.max(if touch then 52 else 44, cfg.fontPx + 19)
+    local panelHeight = 12 + #actions * rowHeight
     local background = Instance.new("Frame")
     background.Name = "Panel"
     background.BackgroundColor3 = Color3.fromRGB(18, 24, 31)
@@ -262,15 +266,15 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
         local function layout()
             local bounds = MobileLayout.Context(gui.AbsoluteSize.X, gui.AbsoluteSize.Y, panelHeight)
             background.AnchorPoint = Vector2.new(1, 1)
-            background.Size = UDim2.fromOffset(bounds.width, panelHeight)
-            background.Position = UDim2.new(1, -bounds.x, 1, -bounds.y)
+            background.Size = UDim2.fromOffset(math.min(cfg.widthPx, bounds.width), panelHeight)
+            background.Position = UDim2.new(1, -bounds.x + cfg.offsetXPx, 1, -bounds.y + cfg.offsetYPx)
         end
         gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
         layout()
     else
         background.AnchorPoint = Vector2.new(1, 0.5)
-        background.Size = UDim2.fromOffset(272, panelHeight)
-        background.Position = UDim2.new(1, -22, 0.5, 0)
+        background.Size = UDim2.fromOffset(cfg.widthPx, panelHeight)
+        background.Position = UDim2.new(1, -22 + cfg.offsetXPx, 0.5, cfg.offsetYPx)
     end
     rounded(background, 11)
     local stroke = Instance.new("UIStroke")
@@ -279,15 +283,15 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
     stroke.Transparency = 0.12
     stroke.Parent = background
     for index, prompt in ipairs(actions) do
-        local y = 6 + (index - 1) * (if touch then 52 else 44)
+        local y = 6 + (index - 1) * rowHeight
         local action = Instance.new("TextButton")
         action.Name = "InteractionAction_" .. prompt.KeyboardKeyCode.Name
         action.Position = UDim2.fromOffset(6, y)
-        action.Size = UDim2.new(1, -12, 0, if touch then 46 else 38)
+        action.Size = UDim2.new(1, -12, 0, rowHeight - 6)
         action.BackgroundColor3 = Color3.fromRGB(37, 51, 62)
         action.TextColor3 = Color3.fromRGB(244, 246, 249)
         action.Font = Enum.Font.GothamSemibold
-        action.TextSize = 14
+        action.TextSize = cfg.fontPx
         action.TextWrapped = true
         action.AutoButtonColor = true
         action.Active = true
@@ -339,6 +343,12 @@ end
 function Controller.Start()
     if started then return end
     started = true
+    UiSettings.Changed:Connect(function()
+        -- Recreate only visible panels; keyboard/gameplay authority is unaffected.
+        for socket in pairs(visible) do
+            hideSocket(socket)
+        end
+    end)
     for _, instance in Workspace:GetDescendants() do listen(instance) end
     Workspace.DescendantAdded:Connect(listen)
     for _, definition in Contract.Definitions do
@@ -365,7 +375,7 @@ function Controller.Start()
         message.BackgroundColor3 = Color3.fromRGB(22, 30, 39)
         message.TextColor3 = Color3.fromRGB(239, 245, 248)
         message.Font = Enum.Font.GothamMedium
-        message.TextSize = 13
+        message.TextSize = UiSettings.Current().notification.fontPx
         message.Visible = false
         message.Parent = gui
         rounded(message, 9)
@@ -375,13 +385,22 @@ function Controller.Start()
         spendHost.Active = false
         spendHost.Size = UDim2.fromScale(1, 1)
         spendHost.Parent = gui
+        local function applyFeedbackSettings()
+            local config = UiSettings.Current().notification
+            message.Position = UDim2.new(0.5, config.offsetXPx, 0.83, config.offsetYPx)
+            message.TextSize = config.fontPx
+            message.TextWrapped = true
+            message.Size = UDim2.fromOffset(math.clamp(config.fontPx * 21, 280, 550), math.max(42, config.fontPx + 22))
+        end
+        applyFeedbackSettings()
+        UiSettings.Changed:Connect(applyFeedbackSettings)
         local revision = 0
         local function showMessage(text: string)
             revision += 1
             local thisRevision = revision
             message.Text = text
             message.Visible = true
-            task.delay(2.7, function()
+            task.delay(UiSettings.Current().notification.durationSeconds, function()
                 if revision == thisRevision then message.Visible = false end
             end)
         end

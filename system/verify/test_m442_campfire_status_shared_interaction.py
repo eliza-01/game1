@@ -62,15 +62,18 @@ class CampfireAndFireplaceM442(unittest.TestCase):
         self.assertIn('if state.chimney then state.chimney.Enabled = state.fuelStage ~= "empty" end', engine)
         self.assertIn('emitter.Enabled = false', engine)
 
-    def test_authoring_effects_are_preserved_and_camera_is_not_blocked(self):
+    def test_authored_effects_are_reused_and_preset_switching_does_not_block_camera(self):
         engine = read('src/server/world/HouseFireplaceService.luau')
         prompt = read('src/client/world/HouseSocketPromptController.luau')
         self.assertIn('state.fireAuthored = true', engine)
         self.assertIn('state.lightAuthored = true', engine)
         self.assertIn('fire.Enabled = enabled', engine)
-        self.assertIn('light.Enabled = enabled and Config.Light.Enabled', engine)
+        self.assertIn('light.Enabled = enabled and lightPreset.Enabled', engine)
+        self.assertIn('local referenceMode = state.kind == "campfire" and state.potInstance == nil', engine)
+        self.assertIn('Config.CampfireFire else Config.Fire', engine)
+        self.assertIn('Config.CampfireLight else Config.Light', engine)
         self.assertIn('gui = Instance.new("ScreenGui")', prompt)
-        self.assertIn('background.Position = UDim2.new(1, -22, 0.5, 0)', prompt)
+        self.assertIn('background.Position = UDim2.new(1, -22 + cfg.offsetXPx, 0.5, cfg.offsetYPx)', prompt)
         self.assertIn('MobileLayout.Context(gui.AbsoluteSize.X, gui.AbsoluteSize.Y, panelHeight)', prompt)
         self.assertNotIn('Instance.new("BillboardGui")', prompt)
         self.assertIn('remoteName = if prompt:GetAttribute("Game1SocketDomain") == "campfire"', prompt)

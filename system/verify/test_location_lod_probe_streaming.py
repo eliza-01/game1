@@ -29,7 +29,7 @@ class LodProbeStreaming(unittest.TestCase):
         self.assertIn('0 tagged Models in Workspace', source)
         self.assertIn('0 with geometry', source)
         self.assertIn('%d tagged | %d ready', source)
-        self.assertIn('Policy.Resolve(distance, record.state)', source)
+        self.assertIn('Policy.WithHysteresis(spec.distances, profile.hysteresis)', source)
 
     def test_probe_remains_studio_only_and_non_destructive(self):
         source = PROBE.read_text()

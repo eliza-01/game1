@@ -10,7 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'system/control-center'))
-from services.location_streaming_config import LocationStreamingConfig, DEFAULT_SETTINGS
+from services.location_streaming_config import LocationStreamingConfig, DEFAULT_SETTINGS, distance_profile
 from services.location_runtime_build import RuntimePlaceBuilder, _runtime_payload, placement_shape_problem
 from test_location_runtime_build import fixture
 
@@ -28,7 +28,8 @@ class StreamingManagerSettingsTests(unittest.TestCase):
         config = self.config.read()
         self.assertEqual(config['modes'], {'stone_fence_02':'lod1', 'stone_pillar_03':'lod1'})
         self.assertEqual(config['workspace']['targetRadius'], 1024)
-        self.assertEqual(config['distances'], {'lod1':120,'lod2':260,'hide':400,'hysteresis':12})
+        self.assertEqual(distance_profile(config, 'stone_fence_02'), {'lod1':120,'lod2':260,'hide':400})
+        self.assertEqual(config['hysteresis'],10)
 
     def test_persistent_modes_validate_and_atomic_update(self):
         self.config.save({'modes':{'stone_pillar_03':'full','stone_fence_02':'off'}}, ['stone_fence_02','stone_pillar_03'])
@@ -37,8 +38,8 @@ class StreamingManagerSettingsTests(unittest.TestCase):
         current=self.config.path.read_bytes()
         with self.assertRaisesRegex(ValueError, 'Unknown'):
             self.config.save({'modes':{'nonregistered':'lod2'}},['stone_fence_02'])
-        with self.assertRaisesRegex(ValueError, 'hysteresis'):
-            self.config.save({'distances':{'lod1':20,'lod2':21,'hide':22,'hysteresis':12}}, ['stone_fence_02'])
+        with self.assertRaisesRegex(ValueError, 'Hysteresis'):
+            self.config.save({'hysteresis':101}, ['stone_fence_02'])
         self.assertEqual(self.config.path.read_bytes(), current)
 
     def test_workspace_is_changed_only_in_runtime_copy(self):
@@ -46,7 +47,7 @@ class StreamingManagerSettingsTests(unittest.TestCase):
         settings['modes']['stone_fence_02']='off'
         settings['modes']['stone_pillar_03']='full'
         settings['workspace']['targetRadius']=700
-        settings['distances']={'lod1':100,'lod2':240,'hide':480,'hysteresis':10}
+        settings['assetDistances']['stone_pillar_03']={'lod1':100,'lod2':240,'hide':480}
         rows=self.rows[1:]
         before=self.source.read_bytes()
         inspected=self.builder.inspect(rows, settings)
@@ -64,9 +65,9 @@ class StreamingManagerSettingsTests(unittest.TestCase):
         self.assertEqual(props['StreamingEnabled'].text,'true')
         marker=next(n for n in place.iter('Item') if n.get('class')=='StringValue')
         payload=json.loads(next(p.text for p in marker.findall('./Properties/string') if p.get('name')=='Value'))
-        self.assertEqual(payload['schemaVersion'],2)
+        self.assertEqual(payload['schemaVersion'],4)
         self.assertEqual(payload['modes'],{'stone_pillar_03':'full'})
-        self.assertEqual(payload['distances']['hide'],480)
+        self.assertEqual(payload['assetDistances']['stone_pillar_03']['hide'],480)
         self.assertEqual(len(payload['placements']),1)
         self.assertEqual([n.get('class') for n in place.iter('Item')].count('MeshPart'),1)
 

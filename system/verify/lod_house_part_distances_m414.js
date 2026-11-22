@@ -8,7 +8,7 @@ const node=id=>{
     value:'',addEventListener(type,handler){this['on_'+type]=handler;},setAttribute(){}});
   return nodes.get(id);
 };
-const settings={distances:{lod1:120,lod2:260,hide:400,hysteresis:12},
+const settings={hysteresis:10,
   workspace:{streamingEnabled:true,minRadius:64,targetRadius:1024,modelStreamingBehavior:'Improved',
     streamingIntegrityMode:'PauseOutsideLoadedArea',streamOutBehavior:'Opportunistic'}};
 const house={slug:'house_level5_01',count:40,mode:'lod1',fullStatus:'PUBLISHED',

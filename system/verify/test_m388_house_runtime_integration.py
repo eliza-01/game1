@@ -118,7 +118,7 @@ class HouseRuntimeIntegration(unittest.TestCase):
         self.assertEqual(nodes['RBX_DOOR_ASSEMBLY'].find("./Properties/Ref[@name='PrimaryPart']").text,'RBX_DOOR_PART')
         manifest=json.loads(next(n.find("./Properties/string[@name='Value']").text for n in tree.iter('Item')
             if n.get('class')=='StringValue'))
-        self.assertEqual(manifest['schemaVersion'],3)
+        self.assertEqual(manifest['schemaVersion'],4)
         self.assertFalse(manifest['publishAllowed'])
         self.assertEqual(manifest['houses']['types']['house_level5_01']['parts'][0]['meshId'],'902')
         self.assertEqual(manifest['houses']['types']['house_level5_01']['parts'][1]['lod1From'],50)

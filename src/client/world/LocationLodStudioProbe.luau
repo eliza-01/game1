@@ -51,6 +51,9 @@ function Probe.Start()
         return
     end
     local Policy = require(policyModule)
+    local Contract = require(world:WaitForChild("StudioLodPreviewContract"))
+    local Registry = require(world:WaitForChild("LocationAssetRegistry"))
+    local lastRaw, profile = nil, nil
     local monitored = {}
     local count = 0
 
@@ -124,6 +127,9 @@ function Probe.Start()
     task.spawn(function()
         while true do
             task.wait(INTERVAL)
+            local marker = ReplicatedStorage:FindFirstChild(Contract.Marker)
+            local raw = if marker and marker:IsA("StringValue") then marker.Value else nil
+            if raw ~= lastRaw then lastRaw = raw; profile = Contract.Read(marker) end
             local camera = Workspace.CurrentCamera
             local nearestDistance = math.huge
             local nearestState = nil
@@ -135,7 +141,11 @@ function Probe.Start()
                     ready += 1
                     if camera then
                         local distance = (camera.CFrame.Position - model:GetPivot().Position).Magnitude
-                        local nextState = Policy.Resolve(distance, record.state)
+                        local slug = model:GetAttribute("Game1DecoAssetSlug") or model:GetAttribute("LandscapeAssetSlug")
+                        local spec = profile and profile.locations[(Registry.aliases or {})[slug] or slug]
+                        if not spec then record.label.Text = "LOD profile unavailable"; continue end
+                        local nextState = if spec.mode == "off" then "FULL" else Policy.Resolve(distance, record.state,
+                            Policy.WithHysteresis(spec.distances, profile.hysteresis), spec.mode)
                         if record.state ~= nextState then
                             print(("[game1][LOD probe] %s: %s -> %s (%.1f studs)")
                                 :format(model:GetFullName(), record.state or "INITIAL", nextState, distance))

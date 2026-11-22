@@ -5,19 +5,18 @@
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const state = {overview:null, busy:false, filter:'all', term:'', preflight:null, domain:'location',
     expandedHouses:new Set(), collapsedGroups:new Set(), houseTerm:'', houseFilter:'all',
-    partEdits:new Map(), partMessages:new Map()};
+    partEdits:new Map(), partMessages:new Map(), assetEdits:new Map(), assetMessages:new Map()};
   const defaultSettings = {
-    distances:{lod1:120,lod2:260,hide:400,hysteresis:12},
+    hysteresis:10,
     workspace:{streamingEnabled:true,minRadius:64,targetRadius:1024,
       modelStreamingBehavior:'Improved',streamingIntegrityMode:'PauseOutsideLoadedArea',streamOutBehavior:'Opportunistic'}
   };
-  const helpIds = ['lod-distance-1','lod-distance-2','lod-distance-hide','lod-distance-hysteresis',
+  const helpIds = ['lod-distance-hysteresis',
     'lod-workspace-enabled','lod-workspace-min-radius','lod-workspace-target-radius',
     'lod-workspace-model','lod-workspace-integrity','lod-workspace-streamout'];
   function fillSettings(settings) {
-    const d=settings.distances,w=settings.workspace;
-    $('lod-distance-1').value=String(d.lod1); $('lod-distance-2').value=String(d.lod2);
-    $('lod-distance-hide').value=String(d.hide); $('lod-distance-hysteresis').value=String(d.hysteresis);
+    const w=settings.workspace;
+    $('lod-distance-hysteresis').value=String(settings.hysteresis);
     $('lod-workspace-enabled').checked=w.streamingEnabled;
     $('lod-workspace-min-radius').value=String(w.minRadius); $('lod-workspace-target-radius').value=String(w.targetRadius);
     $('lod-workspace-model').value=w.modelStreamingBehavior;
@@ -30,19 +29,15 @@
       if (!el.value.trim() || !Number.isSafeInteger(n)) throw Error(`${id}: введите целое число studs`);
       return n;
     };
-    const d={lod1:integer('lod-distance-1'),lod2:integer('lod-distance-2'),
-      hide:integer('lod-distance-hide'),hysteresis:integer('lod-distance-hysteresis')};
-    if(!(d.lod1>=16 && d.lod1<d.lod2 && d.lod2<d.hide && d.hide<=10000 &&
-         d.hysteresis>=0 && d.hysteresis<=100 && d.lod1>d.hysteresis &&
-         d.lod2-d.lod1>2*d.hysteresis && d.hide-d.lod2>2*d.hysteresis))
-      throw Error('LOD1 < LOD2 < Hide и между порогами нужен запас для гистерезиса');
+    const hysteresis=integer('lod-distance-hysteresis');
+    if(hysteresis<0 || hysteresis>100)throw Error('Гистерезис: 0–100 studs');
     const w={streamingEnabled:$('lod-workspace-enabled').checked,
       minRadius:integer('lod-workspace-min-radius'),targetRadius:integer('lod-workspace-target-radius'),
       modelStreamingBehavior:$('lod-workspace-model').value,
       streamingIntegrityMode:$('lod-workspace-integrity').value,streamOutBehavior:$('lod-workspace-streamout').value};
     if(w.minRadius<32 || w.minRadius>512 || w.targetRadius<96 || w.targetRadius>4096 || w.targetRadius<=w.minRadius)
       throw Error('Workspace: Min 32–512, Target 96–4096 и Target > Min');
-    return {distances:d,workspace:w};
+    return {hysteresis,workspace:w};
   }
   async function saveSettings(payload) {
     if (state.busy) return;
@@ -57,8 +52,14 @@
       $('lod-build-status').textContent='Настройки изменены. Запусти Preflight по новому профилю.';
       $('lod-settings-status').textContent='Сохранено. Studio Play получает визуальные LOD-настройки автоматически; для Runtime нужен новый Preflight.';
       fillSettings(view.settings);
+      for(const [slug, mode] of Object.entries(payload.modes||{})){
+        if(state.assetEdits.has(slug))state.assetEdits.set(slug,{...state.assetEdits.get(slug),mode});
+      }
+      if(Object.hasOwn(payload,'hysteresis'))state.partMessages.clear();
+      return true;
     } catch(error) {
       $('lod-settings-status').textContent=`Не сохранено: ${error.message}`;
+      return false;
     } finally {state.busy=false;render();}
   }
 
@@ -118,8 +119,10 @@
       throw Error('Введи целые числа studs.');
     if(values.lod1<20 || values.hide<1 || values.hide>10000)
       throw Error('LOD1 ≥ 20; UNLOADED от 1 до 10000 studs.');
-    values.hide=Math.max(41,values.hide);
-    values.lod1=Math.min(values.lod1,values.hide-21);
+    const h=state.overview?.settings?.hysteresis??10;
+    const minimum=Math.max(20,h+1), gap=Math.max(21,2*h+1);
+    values.hide=Math.max(minimum+gap,values.hide);
+    values.lod1=Math.max(minimum,Math.min(values.lod1,values.hide-gap));
     return values;
   }
   function normalizePartFields(section, raw) {
@@ -219,6 +222,8 @@
       const flags = Object.entries(item.issues || {}).filter(([,count])=>count>0)
         .map(([key,count]) => `${({missingId:'Нет ID',duplicateId:'Повтор ID',ambiguous:'Неоднозначно',noModel:'Нет Model',collisionReview:'Collision',truncated:'Иерархия обрезана'})[key]}: ${count}`);
       const lod1 = item.lod1Status === 'PUBLISHED' ? `LOD1 · ${escape(item.lod1ModelId)}` : `LOD1 · ${escape(item.lod1Status)}`;
+      const draft=state.assetEdits.get(item.slug)||{...item.distances,mode:item.streamingMode};
+      const canEdit=Boolean(item.distances);
       return `<tr><td><strong class="lm-slug">${escape(item.slug)}</strong><small>${escape(item.category||'Location Asset')}${!item.recognizedByCatalog ? ' · нет в актуальном опубликованном каталоге':''}</small></td>
         <td class="lm-count">${compact(item.count)} <small>pcs</small>${item.protectedCount ? `<small class="lm-protected-count">+${compact(item.protectedCount)} Painter/other (${compact(item.runtimePainterCount||0)} ready)</small>` : ''}</td>
         <td><span class="lm-dot lm-${item.indicator}" title="${escape(indicators[item.indicator])}"></span>
@@ -235,11 +240,14 @@
               <small>${escape(p.issues?.join(' · ') || (p.placementId ? 'Placement ID: ' + p.placementId : 'Нет Placement ID'))}</small></div>`).join('')}
             </details>` : ''}</td>
         <td><select class="lm-stream-mode" data-stream-slug="${escape(item.slug)}"
-          aria-label="Streaming mode ${escape(item.slug)}" ${state.busy ? 'disabled' : ''}>
+          aria-label="Streaming mode ${escape(item.slug)}" ${state.busy || !canEdit ? 'disabled' : ''}>
           ${[['auto','Auto · FULL → Hide'],['off','Off · Workspace'],['full','FULL → Hide'],['lod1','FULL / LOD1'],['lod2','FULL / LOD1 / LOD2']]
-            .map(([mode,label])=>`<option value="${mode}" ${item.streamingMode===mode?'selected':''}
+            .map(([mode,label])=>`<option value="${mode}" ${draft.mode===mode?'selected':''}
               ${(mode!=='off' && mode!=='auto' && !item.streamingEligible) || (mode==='lod1' && item.lod1Status!=='PUBLISHED') || (mode==='lod2' && item.lod2Status!=='PUBLISHED')?'disabled':''}>${label}</option>`).join('')}
-          </select><div class="lm-stream-status">${escape(item.streamingReason || (item.streamingMode==='auto' ? 'По умолчанию FULL; все размещения данного типа' : 'Выбор сохранён'))}</div></td></tr>`;
+          </select><div class="lm-stream-status">${escape(item.streamingReason || (item.streamingMode==='auto' ? 'По умолчанию FULL; все размещения данного типа' : 'Выбор сохранён'))}</div></td></tr>${canEdit?`<tr class="lm-asset-distance-row"><td colspan="5"><div class="lm-asset-distances" data-asset-distance-slug="${escape(item.slug)}">
+          ${[['lod1','LOD1'],['lod2','LOD2'],['hide','UNLOADED']].map(([key,label])=>`<label>${label} · studs<input type="number" min="1" max="10000" step="1" data-asset-distance="${key}" value="${escape(draft[key])}" ${state.busy?'disabled':''}></label>`).join('')}
+          <button type="button" data-asset-distance-save="${escape(item.slug)}" ${state.busy?'disabled':''}>Сохранить</button>
+          <small class="lm-asset-feedback" role="status">${escape(state.assetMessages.get(item.slug)||'Индивидуальный профиль')}</small></div></td></tr>`:''}`;
     }).join('') : '<tr><td colspan="5" class="lm-empty">Нет записей с такими условиями.</td></tr>';
     const houses=data.realEstate?.items || [];
     const visibleHouses=houses.filter(h=>{
@@ -276,9 +284,9 @@
                 ${published?'LOD1 опубликован':'Без опубликованного LOD1'}</span></div>
             <p class="lm-part-path">${sequence}</p>
             <div class="lm-house-profile-fields" data-part-distance-panel="${escape(part.name)}">
-              <label>LOD1 от · studs<input type="number" min="20" max="9979" step="1" data-part-distance="lod1"
+              <label>LOD1 от · studs<input type="number" min="20" max="10000" step="1" data-part-distance="lod1"
                 value="${escape(fields.lod1)}" ${disabled?'disabled':''}></label>
-              <label>UNLOADED от · studs<input type="number" min="41" max="10000" step="1" data-part-distance="hide"
+              <label>UNLOADED от · studs<input type="number" min="1" max="10000" step="1" data-part-distance="hide"
                 value="${escape(fields.hide)}" ${disabled?'disabled':''}></label>
               <button type="button" class="lm-part-save" data-part-distance-save="${escape(part.name)}"
                 data-part-house="${escape(h.slug)}" ${disabled?'disabled':''}>Сохранить</button>
@@ -381,7 +389,7 @@
         Object.entries(plan.counts || {}).map(([slug,count])=>`${slug}: ${count}`).join(' · ') +
         ` · зарегистрированные Plot-пивоты не требуют совпадения с домами Workspace` +
         ` · защищённых объектов не трогаем: ${plan.protectedNotModified}` +
-        ` · LOD1 ${plan.distances.lod1} / LOD2 ${plan.distances.lod2} / Hide ${plan.distances.hide} studs` +
+        ` · Индивидуальные дистанции: ${Object.keys(plan.assetDistances||{}).length} типов` +
         ` · Workspace Target ${plan.workspace.targetRadius} studs · SHA256 исходника: ${plan.sourceSha256}` +
         (exclusions.length ? `\nНЕ ВКЛЮЧЕНЫ В RUNTIME STREAMING (${omitted} домов, ${unselectedLocations.reduce((n,x)=>n+x.count,0)} Location):\n${exclusions.join('\n')}` : '');
       $('lod-build-preview').hidden = false;
@@ -487,10 +495,49 @@ Build report: ${result.reportPath}`;
   $('lod-house-filter').addEventListener('change',event=>{
     state.houseFilter=event.target.value;render();
   });
+  function assetDraft(slug) {
+    const item=state.overview?.items.find(row=>row.slug===slug);
+    return state.assetEdits.get(slug)||{...item?.distances,mode:item?.streamingMode};
+  }
+  function normalizeAssetDraft(draft) {
+    const d={};
+    for(const key of ['lod1','lod2','hide']){
+      const n=Number(draft[key]);
+      if(!String(draft[key]??'').trim()||!Number.isSafeInteger(n)||n<1||n>10000)
+        throw Error('Дистанции: целые числа от 1 до 10000 studs');
+      d[key]=n;
+    }
+    const h=state.overview.settings.hysteresis, min=Math.max(16,h+1), gap=2*h+1;
+    const active=draft.mode==='lod2'?['lod1','lod2']:draft.mode==='lod1'?['lod1']:[];
+    d.hide=Math.max(d.hide,min+gap*active.length);
+    let ceiling=d.hide;
+    for(let i=active.length-1;i>=0;i--){const key=active[i];d[key]=Math.max(min+i*gap,Math.min(d[key],ceiling-gap));ceiling=d[key];}
+    return d;
+  }
+  $('lod-rows').addEventListener('input', event => {
+    const el=event.target, key=el?.dataset?.assetDistance;
+    const slug=el?.closest?.('[data-asset-distance-slug]')?.dataset?.assetDistanceSlug;
+    if(key&&slug){state.assetEdits.set(slug,{...assetDraft(slug),[key]:el.value});state.assetMessages.set(slug,'Не сохранено');const feedback=el.closest('[data-asset-distance-slug]').querySelector('.lm-asset-feedback');if(feedback)feedback.textContent='Не сохранено';}
+  });
   $('lod-rows').addEventListener('change', event => {
     const el=event.target, slug=el?.dataset?.streamSlug;
-    if(!slug || !state.overview)return;
-    saveSettings({modes:{[slug]:el.value}});
+    if(slug){state.assetEdits.set(slug,{...assetDraft(slug),mode:el.value});state.assetMessages.set(slug,'Не сохранено');render();}
+    const panel=el?.closest?.('[data-asset-distance-slug]');
+    if(panel&&el.dataset.assetDistance){
+      const id=panel.dataset.assetDistanceSlug;
+      try{const draft=assetDraft(id), values=normalizeAssetDraft(draft);state.assetEdits.set(id,{...values,mode:draft.mode});for(const key of Object.keys(values))panel.querySelector(`[data-asset-distance="${key}"]`).value=String(values[key]);const feedback=panel.querySelector('.lm-asset-feedback');if(feedback)feedback.textContent='Не сохранено';}catch(error){/* Save reports invalid input. */}
+    }
+  });
+  $('lod-rows').addEventListener('click', async event => {
+    const button=event.target.closest?.('[data-asset-distance-save]'),slug=button?.dataset.assetDistanceSave;
+    if(!slug||state.busy)return;
+    try{
+      const draft=assetDraft(slug), distances=normalizeAssetDraft(draft);
+      const ok=await saveSettings({modes:{[slug]:draft.mode},assetDistances:{[slug]:distances}});
+      if(ok){state.assetEdits.delete(slug);state.assetMessages.set(slug,'Сохранено · Studio Play Sync');}
+      else state.assetMessages.set(slug,$('lod-settings-status').textContent);
+    }catch(error){state.assetMessages.set(slug,error.message);}
+    render();
   });
   $('lod-enable-ready').addEventListener('click', () => {
     if(!state.overview || state.busy)return;

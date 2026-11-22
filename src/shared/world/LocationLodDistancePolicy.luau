@@ -2,17 +2,27 @@
 -- All thresholds are authored in LOD Manager and embedded in Runtime manifest.
 local Policy = {}
 Policy.States = table.freeze({FULL = "FULL", LOD1 = "LOD1", LOD2 = "LOD2", UNLOADED = "UNLOADED"})
-Policy.Defaults = table.freeze({lod1 = 120, lod2 = 260, hide = 400, hysteresis = 12})
-Policy.HouseHysteresis = 10 -- shared technical hysteresis for every house MeshPart
+function Policy.ValidHysteresis(h)
+    return type(h) == "number" and h % 1 == 0 and h >= 0 and h <= 100
+end
 
-function Policy.Valid(config)
+function Policy.WithHysteresis(config, h)
+    if type(config) ~= "table" then return nil end
+    return {lod1=config.lod1, lod2=config.lod2, hide=config.hide, hysteresis=h}
+end
+
+function Policy.Valid(config, mode)
     if type(config) ~= "table" then return false end
     local a, b, c, h = config.lod1, config.lod2, config.hide, config.hysteresis
-    if type(a) ~= "number" or type(b) ~= "number" or type(c) ~= "number" or type(h) ~= "number" then
-        return false
+    for _, key in ipairs({"lod1", "lod2", "hide", "hysteresis"}) do
+        local v = config[key]
+        if type(v) ~= "number" or v % 1 ~= 0 or v < 0 or v > 10000 then return false end
     end
-    return a == a and b == b and c == c and h == h and a >= 16 and a < b and b < c
-        and c <= 10000 and h >= 0 and h <= 100 and a > h and b - a > 2 * h and c - b > 2 * h
+    if a < 1 or b < 1 or c < math.max(16, h+1) or h > 100 then return false end
+    if mode == "full" or mode == "off" then return true end
+    if a < math.max(16, h+1) or c-a <= 2*h then return false end
+    if mode == "lod2" then return b-a > 2*h and c-b > 2*h end
+    return true
 end
 
 local function tiers(config, mode)
@@ -21,7 +31,6 @@ local function tiers(config, mode)
     elseif mode == "lod2" then
         return {"FULL", "LOD1", "LOD2", "UNLOADED"}, {config.lod1, config.lod2, config.hide}
     end
-    -- Default to the LOD1 mode used by the original independent Studio probe.
     return {"FULL", "LOD1", "UNLOADED"}, {config.lod1, config.hide}
 end
 
@@ -41,11 +50,10 @@ local function resolveBands(distance, previousState, states, cutoffs, h)
 end
 
 function Policy.Resolve(distance, previousState, config, mode)
-    config = config or Policy.Defaults
-    assert(Policy.Valid(config), "invalid LOD distances / hysteresis")
+    assert(Policy.Valid(config, mode), "invalid LOD distances / hysteresis")
     assert(type(distance) == "number" and distance == distance and distance >= 0,
         "distance must be nonnegative")
-    assert(mode == nil or mode == "full" or mode == "lod1" or mode == "lod2", "invalid LOD mode")
+    assert(mode == "full" or mode == "lod1" or mode == "lod2", "invalid LOD mode")
     local states, cutoffs = tiers(config, mode)
     return resolveBands(distance, previousState, states, cutoffs, config.hysteresis)
 end

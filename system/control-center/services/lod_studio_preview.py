@@ -3,7 +3,7 @@
 No placement snapshot, authoring paths, credentials or mutable runtime state.
 The compiler remains the authority for actual Runtime Place preparation.
 """
-from .location_streaming_config import runtime_mode
+from .location_streaming_config import runtime_mode, distance_profile
 from .house_part_distances import validate
 import hashlib
 import json
@@ -15,11 +15,12 @@ def published_id(resource):
 
 
 def snapshot(manager):
-    settings = manager.streaming_config.read()
+    settings = manager.read_settings()
     locations = {}
     for asset in manager.assets.snapshot()['items']:
         slug = asset['slug']
         locations[slug] = {'mode': runtime_mode(settings, slug),
+                           'distances': distance_profile(settings, slug),
                            'lod1': published_id(asset.get('lod1')),
                            'lod2': published_id(asset.get('lod2'))}
     houses = {}
@@ -37,7 +38,7 @@ def snapshot(manager):
                       for part in row['parts'].values() if part['assetId'])
     if len(active_ids) > 256:
         raise ValueError('Studio LOD preview exceeds 256 active LOD prototypes')
-    payload = {'schemaVersion': 1, 'distances': settings['distances'],
+    payload = {'schemaVersion': 2, 'hysteresis': settings['hysteresis'],
                'locations': locations, 'houses': houses}
     encoded = json.dumps(payload, sort_keys=True, separators=(',', ':'))
     payload['digest'] = hashlib.sha256(encoded.encode()).hexdigest()

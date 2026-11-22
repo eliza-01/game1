@@ -2,6 +2,7 @@
 -- Runtime marker is compiler-authored, not supplied by clients/remotes.
 local HttpService = game:GetService("HttpService")
 local Contract = {}
+local Policy = require(script.Parent:WaitForChild("LocationLodDistancePolicy"))
 Contract.Kind = "game1-location-visual-stream-v1"
 Contract.MarkerName = "Game1LocationRuntimeManifest"
 Contract.TemplateFolder = "Game1LocationLodTemplates"
@@ -81,14 +82,6 @@ local function numbers(values, count, positive)
     end
     return true
 end
-local function distancesValid(value)
-    if type(value) ~= "table" then return false end
-    local a, b, c, h = value.lod1, value.lod2, value.hide, value.hysteresis
-    return finite(a) and finite(b) and finite(c) and finite(h)
-        and a >= 16 and a < b and b < c and c <= 10000
-        and h >= 0 and h <= 100 and a > h and b-a > 2*h and c-b > 2*h
-end
-
 function Contract.Variants(mode)
     if mode == "full" then return {"FULL"} end
     if mode == "lod1" then return {"FULL", "LOD1"} end
@@ -104,7 +97,7 @@ local function paths(value, limit)
     end
     return true
 end
-local function validHouseData(houses)
+local function validHouseData(houses, h)
     if type(houses) ~= "table" or type(houses.types) ~= "table"
         or type(houses.placements) ~= "table" or #houses.placements < 1
         or #houses.placements > Contract.MaxPlacements then
@@ -129,7 +122,7 @@ local function validHouseData(houses)
                 or part.lod1From ~= math.floor(part.lod1From)
                 or type(part.hideFrom) ~= "number" or part.hideFrom > 10000
                 or part.hideFrom ~= math.floor(part.hideFrom)
-                or part.hideFrom - part.lod1From <= 20
+                or part.lod1From <= h or part.hideFrom - part.lod1From <= math.max(20, 2*h)
                 or type(part.moving) ~= "boolean" or type(part.alpha) ~= "boolean"
                 or type(part.doubleSided) ~= "boolean"
                 or type(part.lod1ModelAssetId) ~= "string"
@@ -166,19 +159,20 @@ local function validHouseData(houses)
 end
 function Contract.Validate(manifest, registry)
     if type(manifest) ~= "table" or manifest.kind ~= Contract.Kind
-        or (manifest.schemaVersion ~= 2 and manifest.schemaVersion ~= 3) or manifest.publishAllowed ~= false
-        or type(manifest.placements) ~= "table" or not distancesValid(manifest.distances)
+        or not Policy.ValidHysteresis(manifest.hysteresis)
+        or manifest.schemaVersion ~= 4 or manifest.publishAllowed ~= false
+        or type(manifest.placements) ~= "table" or type(manifest.assetDistances) ~= "table"
         or #manifest.placements > Contract.MaxPlacements
         or type(manifest.targets) ~= "table"
         or #manifest.targets > Contract.MaxTargets
         or type(manifest.modes) ~= "table" then
         return false, "invalid runtime manifest envelope"
     end
-    if manifest.schemaVersion == 3 then
-        local okay, why = validHouseData(manifest.houses)
+    if manifest.houses ~= nil then
+        local okay, why = validHouseData(manifest.houses, manifest.hysteresis)
         if not okay then return false, why end
-    elseif #manifest.targets == 0 or #manifest.placements == 0 or manifest.houses ~= nil then
-        return false, "legacy runtime manifest needs Location placements only"
+    elseif #manifest.targets == 0 or #manifest.placements == 0 then
+        return false, "runtime manifest needs Location or House placements"
     end
     if #manifest.targets == 0 and #manifest.placements > 0 then
         return false, "Location placements without Location targets"
@@ -189,6 +183,7 @@ function Contract.Validate(manifest, registry)
             return false, "duplicate or invalid target"
         end
         local mode = manifest.modes[slug]
+        if not Policy.Valid(Policy.WithHysteresis(manifest.assetDistances[slug], manifest.hysteresis), mode) then return false, "invalid asset distances: " .. slug end
         if not Contract.Variants(mode) then return false, "unsupported target mode: " .. tostring(slug) end
         local asset = registry.assets[slug]
         if not asset or asset.status ~= "PUBLISHED" or tonumber(asset.modelAssetId) == nil then
@@ -203,6 +198,9 @@ function Contract.Validate(manifest, registry)
             return false, "missing published LOD2: " .. slug
         end
         allowed[slug] = true
+    end
+    for slug in pairs(manifest.assetDistances) do
+        if not allowed[slug] then return false, "unexpected asset distances" end
     end
     local ids, used = {}, {}
     for _, row in ipairs(manifest.placements) do

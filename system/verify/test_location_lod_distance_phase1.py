@@ -24,7 +24,7 @@ class LodDistancePhase1(unittest.TestCase):
         text = (ROOT/'src/client/world/LocationLodStudioProbe.luau').read_text()
         self.assertIn('not RunService:IsStudio()', text)
         self.assertIn('CollectionService:GetTagged(TAG)', text)
-        self.assertIn('Policy.Resolve(distance, record.state)', text)
+        self.assertIn('Policy.WithHysteresis(spec.distances, profile.hysteresis)', text)
         self.assertIn('LocationLodStudioProbe', (ROOT/'src/lod-probe/init.client.luau').read_text())
         self.assertNotIn('LocationLodStudioProbe', (ROOT/'src/client/init.client.luau').read_text())
         project = (ROOT/'default.project.json').read_text()

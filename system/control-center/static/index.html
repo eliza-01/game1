@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="location-instance-manager.css?v=353">
 <link rel="stylesheet" href="place-registry.css?v=405">
-<link rel="stylesheet" href="lod-manager.css?v=424">
+<link rel="stylesheet" href="lod-manager.css?v=427">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=5">
 <link rel="stylesheet" href="character-armor.css?v=1">
@@ -689,11 +689,8 @@
       <div class="actions"><button id="lod-preset-default" type="button">Default · Roblox recommended</button>
         <button id="lod-save-settings" class="primary" type="button">Save settings</button></div></div>
     <p class="lm-note">Visual LOD создаётся локально по расстоянию от камеры; Roblox Workspace Streaming доставляет серверную геометрию относительно персонажа. Это независимые механизмы.</p>
-    <h4 class="lm-settings-title">Location Assets · client visual distance · studs</h4>
+    <h4 class="lm-settings-title">Общий гистерезис · Location Assets + Real Estate</h4>
     <div class="lm-setting-grid">
-      <label>LOD1 от <span class="lm-help" tabindex="0" role="button" title="Переход с FULL на LOD1 при удалении камеры. Если LOD1 нет, режим FULL-only использует FULL до Hide.">?</span><input id="lod-distance-1" type="number" min="16" max="10000" step="1"></label>
-      <label>LOD2 от <span class="lm-help" tabindex="0" role="button" title="Порог для LOD2, только если LOD2 опубликован и выбран режим LOD2. Иначе LOD1 остаётся до Hide.">?</span><input id="lod-distance-2" type="number" min="16" max="10000" step="1"></label>
-      <label>Hide / UNLOADED от <span class="lm-help" tabindex="0" role="button" title="После этой дистанции клиент удаляет визуальный MeshPart. Серверная коллизия не зависит от LOD.">?</span><input id="lod-distance-hide" type="number" min="16" max="10000" step="1"></label>
       <label>Гистерезис ± <span class="lm-help" tabindex="0" role="button" title="Запас в studs вокруг перехода. Предотвращает мигание при колебании камеры около границы.">?</span><input id="lod-distance-hysteresis" type="number" min="0" max="100" step="1"></label>
     </div>
     <h4 class="lm-settings-title">Roblox Workspace · Instance Streaming</h4>
@@ -1045,7 +1042,7 @@
 <script src="location-collision.js?v=385"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=405"></script>
-<script src="lod-manager.js?v=426"></script>
+<script src="lod-manager.js?v=427"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="lod-reuse-picker.js?v=411"></script>

@@ -144,7 +144,7 @@ function Streamer.Start()
             table.insert(records, {
                 id = row.id, slug = row.slug, pivot = Vector3.new(row.pivot[1], row.pivot[2], row.pivot[3]),
                 cframe = transform(row.cframe), size = Vector3.new(table.unpack(row.size)),
-                mode = manifest.modes[row.slug], desired = nil, actual = "UNLOADED", part = nil, distance = math.huge,
+                mode = manifest.modes[row.slug], distances = Policy.WithHysteresis(manifest.assetDistances[row.slug], manifest.hysteresis), desired = nil, actual = "UNLOADED", part = nil, distance = math.huge,
                 modelPath = row.modelPath, components = row.components,
             })
         end
@@ -157,7 +157,7 @@ function Streamer.Start()
     end
     local houseAdapter = nil
     if manifest and manifest.houses then
-        houseAdapter = HouseVisualAdapter.new(manifest.houses, cache)
+        houseAdapter = HouseVisualAdapter.new(manifest.houses, cache, manifest.hysteresis)
     end
     local preview = nil
     if not marker and RunService:IsStudio() then
@@ -204,7 +204,7 @@ function Streamer.Start()
         for _, record in ipairs(records) do
             local distance = (cameraPosition - record.pivot).Magnitude
             record.distance = distance
-            record.desired = Policy.Resolve(distance, record.desired, manifest.distances, record.mode)
+            record.desired = Policy.Resolve(distance, record.desired, record.distances, record.mode)
         end
         -- Release stale distant visuals first, then prioritize nearest loads.
         -- Both phases share the same MAX_CHANGES_PER_TICK budget.

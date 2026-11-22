@@ -16,7 +16,7 @@ const node=id=>{
    addEventListener(kind,fn){this['on_'+kind]=fn;},setAttribute(name,value){this[name]=value;}});
  return nodes.get(id);
 };
-const settings={distances:{lod1:120,lod2:260,hide:400,hysteresis:12},
+const settings={hysteresis:10,
   workspace:{streamingEnabled:true,minRadius:64,targetRadius:1024,modelStreamingBehavior:'Improved',
     streamingIntegrityMode:'PauseOutsideLoadedArea',streamOutBehavior:'Opportunistic'}};
 const data={snapshot:{revisionId:3,recordedUtc:1,fingerprint:'a'.repeat(64),placeId:0, freshness:'NOT_LIVE_VERIFIED',catalogMatches:true,warnings:[]},

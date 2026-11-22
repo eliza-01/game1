@@ -18,16 +18,14 @@ class RuntimeStreamingPilot(unittest.TestCase):
     def test_shared_state_policy_and_local_only_visual_owner(self):
         client = (ROOT / 'src/client/world/LocationWorldStreamer.luau').read_text(encoding='utf-8')
         policy = (ROOT / 'src/shared/world/LocationLodDistancePolicy.luau').read_text(encoding='utf-8')
-        for expected in ('Policy.Resolve(distance, record.desired, manifest.distances, record.mode)',
+        for expected in ('Policy.Resolve(distance, record.desired, record.distances, record.mode)',
                          'MAX_CHANGES_PER_TICK = 8', 'CanCollide = false',
                          'CanQuery = false', 'CanTouch = false',
                          'record.cframe', 'record.size', 'cameraPosition - record.pivot',
                          'record.part:Destroy()', 'RunService.Heartbeat'):
             self.assertIn(expected, client)
-        self.assertIn('hysteresis = 12', policy)
-        self.assertIn('lod1 = 120', policy)
-        self.assertIn('hide = 400', policy)
-        self.assertIn('lod2 = 260', policy)
+        self.assertIn('Policy.WithHysteresis', policy)
+        self.assertNotIn('Policy.Defaults', policy)
         for forbidden in ('remote:FireServer', 'RemoteEvent', 'SetNetworkOwner',
                           'model:Destroy()', 'CollisionGroup ='):
             self.assertNotIn(forbidden, client)

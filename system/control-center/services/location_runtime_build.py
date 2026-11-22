@@ -411,7 +411,7 @@ def _runtime_payload(rows, *, snapshot_id, catalog_digest, settings=None, houses
 
     This remains compiler-owned data. A runtime client never chooses cloud IDs.
     """
-    from .location_streaming_config import DEFAULT_SETTINGS, validate_settings, runtime_mode
+    from .location_streaming_config import DEFAULT_SETTINGS, validate_settings, runtime_mode, distance_profile
     settings = validate_settings(settings or DEFAULT_SETTINGS)
     targets = sorted({row['slug'] for row in rows})
     if (not targets and not houses) or len(targets) > 64 or any(runtime_mode(settings, slug) == 'off' for slug in targets):
@@ -452,11 +452,11 @@ def _runtime_payload(rows, *, snapshot_id, catalog_digest, settings=None, houses
     if len(placements) > 5000:
         raise ValueError('Runtime manifest exceeds 5000 placements')
     payload = {
-        'schemaVersion': 3 if houses else 2, 'kind': RUNTIME_MANIFEST_KIND,
+        'schemaVersion': 4, 'hysteresis': settings['hysteresis'], 'kind': RUNTIME_MANIFEST_KIND,
         'snapshotRevision': snapshot_id, 'catalogDigest': catalog_digest,
         'publishAllowed': False, 'targets': targets,
         'modes': {slug: runtime_mode(settings, slug) for slug in targets},
-        'distances': dict(settings['distances']),
+        'assetDistances': {slug: distance_profile(settings, slug) for slug in targets},
         'placements': placements,
     }
     if houses:
@@ -758,7 +758,7 @@ class RuntimePlaceBuilder:
                 'snapshotRevision': snapshot_id, 'catalogDigest': catalog_digest,
                 'sourceSha256': expected_sha, 'runtimeSha256': _sha(runtime),
                 'targets': runtime_payload['targets'], 'modes': runtime_payload['modes'],
-                'distances': settings['distances'], 'workspace': settings['workspace'],
+                'assetDistances': runtime_payload['assetDistances'], 'hysteresis': settings['hysteresis'], 'workspace': settings['workspace'],
                 'removedVisualMeshParts': sum(len(x) if isinstance(x, list) else 1 for _row, _model, x in matched),
                 'convertedHouseVisualMeshParts': converted_house_parts,
                 'housePlacements': len(selected_houses),

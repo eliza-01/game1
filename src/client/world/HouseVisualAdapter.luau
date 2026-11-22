@@ -40,9 +40,10 @@ local function resolvePath(start: Instance, path: {string}): Instance?
     return node
 end
 
-function Adapter.new(houses: any, cache: Instance)
+function Adapter.new(houses: any, cache: Instance, hysteresis: number)
     local self = setmetatable({}, Adapter)
     self.cache = cache
+    self.hysteresis = hysteresis
     self.folder = Instance.new("Folder")
     self.folder.Name = "Game1HouseClientVisuals"
     self.folder.Parent = Workspace
@@ -112,7 +113,7 @@ function Adapter:Resolve(cameraPosition: Vector3)
                 then "lod1" else "full"
             local nextState = Policy.ResolveHouse(distance, visual.desired, {
                 mode = mode, lod1 = spec.lod1From, hide = spec.hideFrom,
-                hysteresis = Policy.HouseHysteresis,
+                hysteresis = self.hysteresis,
             })
             if nextState ~= visual.desired then
                 visual.desired = nextState

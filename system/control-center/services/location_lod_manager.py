@@ -12,7 +12,7 @@ from secrets import token_urlsafe
 from threading import RLock
 
 from .location_runtime_build import RuntimePlaceBuilder, build_rows, placement_shape_problem
-from .location_streaming_config import LocationStreamingConfig, settings_digest, runtime_mode
+from .location_streaming_config import LocationStreamingConfig, settings_digest, runtime_mode, distance_profile
 
 from .place_registry.catalog import build_catalog
 
@@ -29,6 +29,9 @@ class LocationLodManager:
         self.streaming_config = LocationStreamingConfig(root)
         self._preflight = None
         self._build_lock = RLock()
+
+    def read_settings(self):
+        return self.streaming_config.read([row['slug'] for row in self.assets.snapshot()['items']])
 
     def save_settings(self, payload: dict) -> dict:
         # Persistent runtime mode overrides only. Do not mutate Studio or the saved Place.
@@ -59,7 +62,7 @@ class LocationLodManager:
             overview = self.overview()
             if not overview['snapshot'] or overview['snapshot']['freshness'] != 'SCANNED_THIS_SESSION':
                 raise ValueError('Scan Place again in this session before Runtime preflight')
-            settings = self.streaming_config.read()
+            settings = self.read_settings()
             rows = self.location_rows(overview, settings)
             selected_houses = self.house_selection()
             inspected = self.builder.inspect(rows, settings, selected_houses)
@@ -72,7 +75,7 @@ class LocationLodManager:
                     'catalogDigest': overview['snapshot']['catalogDigest'],
                     'streamingModes': {slug: runtime_mode(settings, slug) for slug in inspected['counts']},
                     'houseModes': {slug: data['profile']['mode'] for slug,data in selected_houses.items()},
-                    'distances': settings['distances'], 'workspace': settings['workspace'],
+                    'assetDistances': {slug: distance_profile(settings, slug) for slug in inspected['counts']}, 'workspace': settings['workspace'],
                     **inspected, 'backupRequired': True, 'publishAllowed': False,
                     'protectedNotModified': overview['summary']['protectedExternal'],
                     'untouchedLocations': [
@@ -91,7 +94,7 @@ class LocationLodManager:
             if not self._preflight or payload['token'] != self._preflight[0]:
                 raise ValueError('Preflight expired; run Preflight again')
             overview = self.overview()
-            settings = self.streaming_config.read()
+            settings = self.read_settings()
             if settings_digest(settings) != self._preflight[3]:
                 raise ValueError('Streaming settings changed since Preflight; run it again')
             rows = self.location_rows(overview, settings)
@@ -124,7 +127,7 @@ class LocationLodManager:
         return build_rows(overview, self.registry, settings)
 
     def overview(self) -> dict:
-        settings = self.streaming_config.read()
+        settings = self.read_settings()
         catalog = build_catalog(self.assets)
         published = {row['slug'] for row in catalog['items']}
         assets = self.assets.snapshot()['items']
@@ -192,6 +195,7 @@ class LocationLodManager:
                 'Ошибки Place Registry' if problem_rows else
                 structural_issues[0] if structural_issues else '')
             items.append({
+                'distances': distance_profile(settings, slug) if asset else None,
                 'streamingMode': mode, 'resolvedStreamingMode': runtime_mode(settings, slug),
                 'streamingEligible': eligible, 'streamingReason': reason,
                 'slug': slug, 'category': (asset or {}).get('category') or '',

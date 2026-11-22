@@ -10,10 +10,11 @@ from datetime import datetime, timezone
 from sqlite_connection import connect as connect_sqlite
 from real_estate.contracts import HOUSE_NAME, present_parts
 from real_estate.rig_publication_policy import publication_analysis
+from .location_streaming_config import DEFAULT_HYSTERESIS, shared_hysteresis
 
 DEFAULT_LOD1 = 150
 DEFAULT_HIDE = 400
-HYSTERESIS = 10  # One shared client LOD policy, not an editor field.
+HYSTERESIS = DEFAULT_HYSTERESIS  # Baseline minimum spacing for existing authored parts.
 MIN_LOD1 = 20
 MIN_GAP = 2 * HYSTERESIS + 1
 MAX_HIDE = 10000
@@ -30,15 +31,16 @@ def validate(value: dict) -> dict:
     return {'lod1': a, 'hide': b}
 
 
-def normalize_edit(value: dict) -> dict:
+def normalize_edit(value: dict, hysteresis=HYSTERESIS) -> dict:
     """UNLOADED is authoritative; project the edit onto valid runtime thresholds."""
     if not isinstance(value, dict) or set(value) != {'lod1', 'hide'}:
         raise ValueError('expected per-part lod1 / hide distances')
     a, b = value['lod1'], value['hide']
     if type(a) is not int or type(b) is not int or a < MIN_LOD1 or not 1 <= b <= MAX_HIDE:
         raise ValueError('part distances must be positive integers: LOD1 >= 20; Unloaded <= 10000')
-    b = max(b, MIN_LOD1 + MIN_GAP)
-    return validate({'lod1': min(a, b - MIN_GAP), 'hide': b})
+    minimum, gap = max(MIN_LOD1, hysteresis + 1), max(MIN_GAP, 2 * hysteresis + 1)
+    b = max(b, minimum + gap)
+    return validate({'lod1': max(minimum, min(a, b - gap)), 'hide': b})
 
 
 def ensure_schema(store):
@@ -96,8 +98,12 @@ def describe_all(store, slug, parts):
             'SELECT part_name,lod1,hide,revision FROM real_estate_part_distances WHERE house_slug=?', (slug,))}
     # Newly added visual meshes get a neutral default; unlike legacy values
     # these settings never come from the Real Estate appearance editor.
-    return {part: (rows.get(part) or {'part_name':part, 'lod1':DEFAULT_LOD1,
-        'hide':DEFAULT_HIDE, 'revision':0}) for part in parts}
+    h = shared_hysteresis(store.root)
+    result = {}
+    for part in parts:
+        row = rows.get(part) or {'part_name':part, 'lod1':DEFAULT_LOD1, 'hide':DEFAULT_HIDE, 'revision':0}
+        result[part] = {**row, **normalize_edit({'lod1':row['lod1'], 'hide':row['hide']}, h)}
+    return result
 
 
 def save(store, slug, part, value, expected_revision):
@@ -106,7 +112,7 @@ def save(store, slug, part, value, expected_revision):
     house=store.get(slug)
     if not house or part not in house['meshParts']:
         raise ValueError('unknown visual MeshPart')
-    value=normalize_edit(value)
+    value=normalize_edit(value, shared_hysteresis(store.root))
     if type(expected_revision) is not int or expected_revision < 0:
         raise ValueError('part distances revision required')
     with store.connect() as db:

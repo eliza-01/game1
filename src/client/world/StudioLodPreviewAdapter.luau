@@ -136,7 +136,7 @@ function Adapter:Resolve(cameraPosition)
             local spec = record.spec
             local mode = if record.mode == "lod1" and spec.assetId ~= "" then "lod1" else "full"
             record.desired = Policy.ResolveHouse(record.distance, record.desired, {
-                mode=mode, lod1=spec.lod1, hide=spec.hide, hysteresis=Policy.HouseHysteresis})
+                mode=mode, lod1=spec.lod1, hide=spec.hide, hysteresis=self.data.hysteresis})
         else
             record.distance = (cameraPosition - record.root:GetPivot().Position).Magnitude
             -- Composite FULL meshes cannot safely be replaced by an arbitrary
@@ -144,7 +144,7 @@ function Adapter:Resolve(cameraPosition)
             local mode = record.mode
             if not record.source or record.spec.lod1 == "" then mode = "full"
             elseif mode == "lod2" and record.spec.lod2 == "" then mode = "lod1" end
-            record.desired = Policy.Resolve(record.distance, record.desired, self.data.distances, mode)
+            record.desired = Policy.Resolve(record.distance, record.desired, Policy.WithHysteresis(record.spec.distances, self.data.hysteresis), mode)
         end
     end
 end

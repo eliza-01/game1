@@ -125,3 +125,11 @@
 #lod-manager-view .lm-part-feedback{font-size:11px;line-height:1.4;margin:0;color:var(--muted);overflow-wrap:anywhere}
 #lod-manager-view .lm-part-feedback.error{color:var(--orange)}
 #lod-manager-view .lm-part-feedback.saved{color:var(--mint)}
+
+/* Per-type distance editor, separate from inventory cells. */
+.lm-asset-distance-row td {padding: 4px 12px 12px; background: var(--panel, transparent);}
+.lm-asset-distances {display:grid; grid-template-columns:repeat(3,minmax(85px,1fr)) auto;gap:8px;align-items:end;}
+.lm-asset-distances label {display:grid;gap:4px;font-size:11px;}
+.lm-asset-distances input {width:100%;min-width:0;}
+.lm-asset-feedback {grid-column:1/-1;}
+@media(max-width:680px){.lm-asset-distances{grid-template-columns:repeat(2,minmax(85px,1fr));}}

@@ -50,13 +50,13 @@ class StudioPreview(unittest.TestCase):
                               {'real_estate': houses})
             self.assertEqual(status, 200)
             manager.streaming_config.save({'modes': {'stone_fence_02': 'off'},
-                'distances': {'lod1': 100, 'lod2': 200, 'hide': 500, 'hysteresis': 10}},
+                'assetDistances': {'stone_fence_02': {'lod1': 100, 'lod2': 200, 'hide': 500}}, 'hysteresis': 10},
                 [a['slug'] for a in assets.items])
             latest = read()
             self.assertEqual(latest['houses'][HOUSE]['mode'], 'off')
             self.assertEqual(latest['houses'][HOUSE]['parts']['roof']['hide'], 41)
             self.assertEqual(latest['locations']['stone_fence_02']['mode'], 'off')
-            self.assertEqual(latest['distances']['hide'], 500)
+            self.assertEqual(latest['locations']['stone_fence_02']['distances']['hide'], 500)
             self.assertEqual(registry.calls, 0)
             self.assertIsNone(manager._preflight)
             self.assertFalse(manager.builder.source.exists())

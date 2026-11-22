@@ -9,8 +9,9 @@ end
 function Contract.Read(marker)
     if not marker or not marker:IsA("StringValue") or #marker.Value >= 180000 then return nil end
     local ok, data = pcall(HttpService.JSONDecode, HttpService, marker.Value)
-    if not ok or type(data) ~= "table" or data.schemaVersion ~= 1
-        or type(data.digest) ~= "string" or not Policy.Valid(data.distances)
+    if not ok or type(data) ~= "table" or data.schemaVersion ~= 2
+        or not Policy.ValidHysteresis(data.hysteresis)
+        or type(data.digest) ~= "string"
         or type(data.locations) ~= "table" or type(data.houses) ~= "table" then return nil end
     local ids = {}
     local function add(value)
@@ -18,6 +19,7 @@ function Contract.Read(marker)
     end
     for slug, row in pairs(data.locations) do
         if type(slug) ~= "string" or type(row) ~= "table" or not id(row.lod1) or not id(row.lod2)
+            or not Policy.Valid(Policy.WithHysteresis(row.distances, data.hysteresis), row.mode)
             or not ({off=true, full=true, lod1=true, lod2=true})[row.mode] then return nil end
         if row.mode == "lod1" or row.mode == "lod2" then add(row.lod1) end
         if row.mode == "lod2" then add(row.lod2) end
@@ -29,7 +31,7 @@ function Contract.Read(marker)
             if type(name) ~= "string" or type(part) ~= "table" or not id(part.assetId)
                 or type(part.lod1) ~= "number" or type(part.hide) ~= "number"
                 or part.lod1 % 1 ~= 0 or part.hide % 1 ~= 0
-                or part.lod1 < 20 or part.hide > 10000 or part.hide - part.lod1 <= 2 * Policy.HouseHysteresis then return nil end
+                or part.lod1 < 20 or part.hide > 10000 or part.lod1 <= data.hysteresis or part.hide - part.lod1 <= math.max(20, 2 * data.hysteresis) then return nil end
             if row.mode == "lod1" then add(part.assetId) end
         end
     end

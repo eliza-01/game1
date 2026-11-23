@@ -141,6 +141,15 @@ def route(parsed, sources, info):
         snapshot["publication"] = sources["publication_config"]()
         return 200, snapshot
 
+    if path == "/api/options/languages":
+        # Read-only localization inspector: game-owned catalog, no edit/publish
+        # side effects and no duplication in options.json.
+        try:
+            from localization.catalog import read_catalog
+            return 200, read_catalog(sources["options"].root)
+        except (ValueError, OSError) as error:
+            return 400, {"error": str(error)}
+
     if path == "/api/options":
         try:
             return 200, sources["options"].snapshot_with_debug()

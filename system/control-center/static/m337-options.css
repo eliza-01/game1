@@ -32,3 +32,14 @@
 .game1-socket-range-row small {display:block;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
 .game1-socket-range-row input {min-width:0;width:100%;margin:0!important;font-variant-numeric:tabular-nums}
 @media (max-width:550px){.game1-socket-range-fields{grid-template-columns:1fr}.game1-socket-range-head,.game1-socket-range-row{grid-template-columns:minmax(100px,1fr) 74px 74px;gap:5px}}
+/* M455 · Read-only game localization catalog */
+#options-view .game1-language-filters {display:grid;grid-template-columns:minmax(120px,1fr) minmax(140px,1fr) minmax(180px,2fr);gap:12px;margin:14px 0}
+#options-view .game1-language-filters label {display:flex;flex-direction:column;gap:5px}
+#options-view .game1-language-group h4 {font-size:13px;color:var(--text,#d5e0e8);padding:10px 0 5px;margin:0}
+#options-view .game1-language-item {border:1px solid var(--line,#374652);border-radius:8px;margin:5px 0;background:rgba(18,24,32,.35)}
+#options-view .game1-language-item summary {cursor:pointer;display:flex;align-items:center;gap:18px;padding:9px 12px;flex-wrap:wrap}
+#options-view .game1-language-item summary code {font-size:11px;color:#9fd2c5;min-width:200px;flex:0 0 30%}
+#options-view .game1-language-item summary span {font-size:12px;flex:1;overflow-wrap:anywhere}
+#options-view .game1-language-translations {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;padding:12px;border-top:1px solid var(--line,#374652)}
+#options-view .game1-language-translation {display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(90,110,130,.09);border-radius:6px;font-size:12px;overflow-wrap:anywhere}
+@media(max-width:700px){#options-view .game1-language-filters{grid-template-columns:1fr}#options-view .game1-language-item summary code{min-width:0;flex:0 1 100%}}

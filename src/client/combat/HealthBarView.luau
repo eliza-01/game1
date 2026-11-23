@@ -1,5 +1,6 @@
 -- Overhead HP view: no combat state or damage calculation; style is client-only.
 local TweenService = game:GetService("TweenService")
+local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 local HealthBarView = {}
 local TWEEN = TweenInfo.new(0.23, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
@@ -40,6 +41,12 @@ local function visualTopOffset(model: Model, anchor: BasePart): number
 end
 
 local function displayName(model: Model, monster: boolean): string
+    if monster then
+        local slug = model:GetAttribute("NpcSlug") or model:GetAttribute("MonsterSlug")
+        if typeof(slug) == "string" and Language.Has("actors." .. slug) then
+            return Language.Translate("actors." .. slug)
+        end
+    end
     local text = if monster then tostring(model:GetAttribute("NpcDisplayName")
         or model:GetAttribute("MonsterDisplayName")
         or model:GetAttribute("NpcSlug")
@@ -183,6 +190,8 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     end
     function view.ApplyStyle(settings: {[string]: any})
         currentStyle = settings
+        nameText = displayName(model, monster)
+        title.Text = nameText
         local spec = settings[layout]
         local width, height = spec.width, spec.height
         local titleSize = spec.nameSize
@@ -235,6 +244,9 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         gui:Destroy()
     end
     view.ApplyStyle(style)
+    table.insert(connections, Language.Changed:Connect(function()
+        view.ApplyStyle(currentStyle)
+    end))
     table.insert(connections, model:GetAttributeChangedSignal("HP"):Connect(update))
     table.insert(connections, model:GetAttributeChangedSignal("MaxHP"):Connect(update))
     if model:GetAttribute("Game1MonsterRuntime") == true then

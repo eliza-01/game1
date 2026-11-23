@@ -18525,6 +18525,39 @@
       ]
     },
     {
+      "atlasKey": "dry_tree_02",
+      "baseKey": "dry_tree",
+      "version": "02",
+      "variants": [
+        {
+          "id": 86,
+          "family_id": 61,
+          "width": 128,
+          "height": 128,
+          "filename": "dry_tree_02_128x128_atlas.png",
+          "original_filename": "dry_tree_02_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/dry_tree_02/128x128/dry_tree_02_128x128_atlas.png",
+          "source_sha256": "e3bcd95c7a861df50aa6a97b667f9665d385414680c283340d7ed2200bdc4dd7",
+          "uses_alpha": true,
+          "published_id": "105914573093195",
+          "published_sha256": "e3bcd95c7a861df50aa6a97b667f9665d385414680c283340d7ed2200bdc4dd7",
+          "moderation_state": "Reviewing",
+          "published_at": 1795456253.5275118,
+          "created_at": 1795456238.5595977,
+          "retired_at": null,
+          "atlas_key": "dry_tree_02",
+          "replacement_sha256": null,
+          "favorite": false,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "dry_tree",
+          "version": "02"
+        }
+      ]
+    },
+    {
       "atlasKey": "glass_01",
       "baseKey": "glass",
       "version": "01",
@@ -20714,6 +20747,22 @@
       "atlasName": "dion_partisan_s_dn_par_campfire01_atlas_material",
       "atlasVersion": "",
       "atlasResolution": "1024×512"
+    },
+    {
+      "reference": "atlas:86",
+      "label": "dry_tree_02",
+      "slug": "",
+      "filename": "dry_tree_02_128x128_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/dry_tree_02/128x128/dry_tree_02_128x128_atlas.png",
+      "sha256": "e3bcd95c7a861df50aa6a97b667f9665d385414680c283340d7ed2200bdc4dd7",
+      "assetId": "105914573093195",
+      "atlasKey": "dry_tree_02",
+      "atlasName": "dry_tree",
+      "atlasVersion": "02",
+      "atlasResolution": "128×128"
     },
     {
       "reference": "atlas:82",

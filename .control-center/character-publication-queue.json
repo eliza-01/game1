@@ -458,6 +458,25 @@
           "asset_id": "118444107940356"
         }
       ]
+    },
+    {
+      "schema_version": 1,
+      "id": "55c72819-2e5b-4090-8f13-7015ae22a516",
+      "status": "completed",
+      "started_at": 1795466540.6679027,
+      "finished_at": 1795466556.6083796,
+      "items": [
+        {
+          "kind": "part",
+          "id": "human_female_m003_hair",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "122803353972225"
+        }
+      ]
     }
   ]
 }

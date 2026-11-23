@@ -456,6 +456,19 @@
   <div id="option-sockets-fields" class="game1-socket-range-fields" aria-label="Socket interaction radius settings"></div>
   <div class="actions"><button id="option-sockets-save" class="primary" type="button">Save Socket Ranges</button></div>
 </div></details>
+<details class="game1-option-section" id="game1-language-options">
+  <summary><span class="game1-option-icon" aria-hidden="true">🌐</span><span><strong>Languages</strong><small>Игровой интерфейс · каталог · переводы всех языков</small></span></summary>
+  <div class="panel character-card game1-languages-options">
+    <div class="section-title"><div><span>Game Runtime only · Localization v1</span><h3>UI translations</h3></div><span id="game1-languages-status" class="muted" role="status">Открой раздел для загрузки каталога.</span></div>
+    <small class="hint">Переводы относятся только к игре. Выбор языка выполняет игрок при входе или в игровом меню. Источник: assets/manifests/game-localization.json. Здесь можно проверить каждую строку на всех языках, не меняя настройки Studio.</small>
+    <div class="game1-language-filters">
+      <label>Раздел<select id="game1-language-group"><option value="">Все разделы</option></select></label>
+      <label>Просмотр<select id="game1-language-locale"><option value="">Все языки</option></select></label>
+      <label>Поиск<input id="game1-language-search" type="search" placeholder="ключ, исходный текст или перевод"></label>
+    </div>
+    <div id="game1-language-items" class="game1-language-items"></div>
+  </div>
+</details>
 <details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🪟</span><span><strong>UI</strong><small>Взаимодействия · прогресс · уведомления</small></span></summary>
 <div class="panel character-card game1-ui-layout-options">
   <div class="section-title"><div><span>ПК / мобильные устройства · pixels</span><h3>Presentation UI</h3></div></div>
@@ -1104,6 +1117,7 @@
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=435"></script>
 <script src="options.js?v=452"></script>
+<script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=437"></script>
 <script src="weapon-workflow.js?v=309"></script>

@@ -10018,6 +10018,128 @@
       ]
     },
     {
+      "slug": "leaf_01",
+      "name_en": "Leaf 01",
+      "category": "leaf",
+      "model_path": "assets/source/location-assets/leaf/leaf_01/model/leaf_01.fbx",
+      "model_sha256": "e920c94197c4be1d05458bd3aab6e60e315d520654ba3f1bd3eeec629ee6830f",
+      "model_asset_id": "83994549867046",
+      "model_published_sha256": "e920c94197c4be1d05458bd3aab6e60e315d520654ba3f1bd3eeec629ee6830f",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1795468855.2278883,
+      "updated_at": 1795468958.0803287,
+      "published_at": 1795468958.0803287,
+      "surface_material": "grass",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "leaf_01",
+            "armature": "",
+            "vertices": 10,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "e5427b264e0e44218175d297231e7c6bc23ce845cbc205febe0041916bca339f",
+        "parts": [
+          {
+            "name": "leaf_01",
+            "role": "visual",
+            "vertices": 10
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "cad0d8dbb5132d2dabd52d7a25e7694ce2353b0c4e5bae9879e45465e742a034"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "leaf_01": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 71,
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "82028913618222"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "grass",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "grass",
+        "label": "Grass",
+        "robloxMaterial": "Grass",
+        "soundFamily": "foliage"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 1,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Leaf",
+      "publishedVisualMeshes": [],
+      "aliases": []
+    },
+    {
       "slug": "campfire_01",
       "name_en": "Campfire 01",
       "category": "light",
@@ -18459,8 +18581,8 @@
     }
   ],
   "summary": {
-    "registered": 40,
-    "published": 40,
+    "registered": 41,
+    "published": 41,
     "changed": 0
   }
 }

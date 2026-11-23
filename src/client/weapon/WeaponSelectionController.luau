@@ -10,6 +10,7 @@ local Config = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponSelecti
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
 local PublishedDebugAccess = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 
+local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 local Controller = {}
 local started = false
 local DARK = Color3.fromRGB(18, 22, 29)
@@ -192,7 +193,9 @@ function Controller.Start()
                 if activeCategory ~= "all" and activeCategory ~= kind then continue end
                 index += 1
                 local slug = tostring(row.slug or "")
-                local title = tostring(row.label or slug)
+                local title = if Language.Has("items." .. slug) then Language.Translate("items." .. slug)
+                    else tostring((if Language.Current() == "ru-ru" then (row.labelRu or row.label)
+                        else (row.labelEn or row.label)) or slug)
                 local chosen = selectedSlug == slug
                 local button = makeButton(list, (if chosen then "✓  " else "     ") .. title, 45)
                 button.Name = if slug == "" then "Unarmed" else slug
@@ -262,6 +265,7 @@ function Controller.Start()
             status.Position = UDim2.new(0, 13, 1, -31)
         end
         resize()
+        Language.Changed:Connect(function() drawCategories(); renderRows() end)
         launcher.Activated:Connect(function()
             panel.Visible = not panel.Visible
             if panel.Visible then refresh() end

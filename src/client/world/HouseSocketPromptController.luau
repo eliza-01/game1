@@ -12,6 +12,7 @@ local CameraController = require(script.Parent.Parent:WaitForChild("character"):
 local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
 local UiSettings = require(script.Parent:WaitForChild("UiPresentationSettings"))
 local ResourceFeedback = require(script.Parent:WaitForChild("FloatingResourceFeedback"))
+local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
@@ -143,11 +144,17 @@ local function keyOwned(): boolean
 end
 
 local function actionLabel(action: string): string
-    local escaped = action:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+    local localized = Language.FromSource(action)
+    local escaped = localized:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
     local color = if keyOwned() then "#4DD8A8" else "#FF6E6E"
-    -- Only the actual word key is colored, never the whole action.
-    local colored = escaped:gsub("ключ", '<font color="' .. color .. '">ключ</font>')
-    return colored
+    local token = Language.Translate("hud.key")
+    local first, last = nil, nil
+    if token then first, last = string.find(escaped, token, 1, true) end
+    if first and last then
+        return string.sub(escaped, 1, first - 1) .. '<font color="' .. color .. '">' .. token .. '</font>'
+            .. string.sub(escaped, last + 1)
+    end
+    return escaped
 end
 
 local function signature(actions: {ProximityPrompt}): string
@@ -330,6 +337,9 @@ end
 function Controller.Start()
     if started then return end
     started = true
+    Language.Changed:Connect(function()
+        for socket in pairs(visible) do hideSocket(socket) end
+    end)
     UiSettings.Changed:Connect(function()
         -- Recreate only visible panels; keyboard/gameplay authority is unaffected.
         for socket in pairs(visible) do
@@ -393,8 +403,10 @@ function Controller.Start()
         local function showMessage(text: string)
             revision += 1
             local thisRevision = revision
-            currentText = text
-            message.Text = text
+            local floor = string.match(text, "^Лифт · этаж (%d+)$")
+            currentText = if floor then Language.Translate("hud.elevator_floor", {floor = floor})
+                else Language.FromSource(text)
+            message.Text = currentText
             applyFeedbackSettings()
             notification.Visible = true
             task.delay(UiSettings.Current().notification.durationSeconds, function()

@@ -21080,6 +21080,64 @@
     },
     {
       "kind": "part",
+      "id": "human_female_m003_hair",
+      "rig_id": "human_female",
+      "slot": "hair",
+      "set_id": "",
+      "gender": "female",
+      "role": "part",
+      "revision": 1,
+      "content_sha256": "bba0a859f6e4b49ebca52bf65bac971a2979e5e4fcf2b275eb803733957019ab",
+      "source_path": "assets\\source\\character_components\\imports\\d1440a34fd4a4fbc89737a8aa8fb15f8\\source.fbx",
+      "prepared_path": "assets\\source\\character_components\\d1440a34fd4a4fbc89737a8aa8fb15f8\\human_female_m003_hair.fbx",
+      "prepared_sha256": "5105ee45db9e80c446811f755d18cbbdb1f79d5a66c7f1deea8e82ca490fde15",
+      "model_asset_id": "122803353972225",
+      "published_revision": 1,
+      "pending_operation": "",
+      "created_at": 1795466537.5429535,
+      "mesh_family_id": "human_female_m003",
+      "metadata": {
+        "name": "human_female_m003_hair",
+        "armature": "",
+        "content_sha256": "bba0a859f6e4b49ebca52bf65bac971a2979e5e4fcf2b275eb803733957019ab",
+        "vertices": 1269,
+        "triangles": 2454,
+        "used_bones": [],
+        "normalized_vertices": 0,
+        "skeleton": [],
+        "attachment": "hair_mount",
+        "attachment_mode": "pivot",
+        "extras": [
+          {
+            "name": "human_female_m003_hair_extra_01",
+            "content_sha256": "4db34af43b17532d028e57b829ffff9a4b07751adfe45a686e016afd97817a9b",
+            "vertices": 246,
+            "triangles": 446
+          }
+        ],
+        "materials": [
+          "human_female_m003_hair"
+        ],
+        "id": "human_female_m003_hair",
+        "slot": "hair",
+        "set_id": "",
+        "mesh_family_id": "human_female_m003",
+        "rig_profile_id": "human",
+        "gender": "female",
+        "role": "part",
+        "rig_id": "human_female",
+        "allowed_genders": [
+          "female"
+        ]
+      },
+      "allowedGenders": [
+        "female"
+      ],
+      "status": "published",
+      "atlas": null
+    },
+    {
+      "kind": "part",
       "id": "human_female_m004_hair",
       "rig_id": "human_female",
       "slot": "hair",
@@ -21147,6 +21205,11 @@
       "id": "human_female_m001",
       "rig_profile_id": "human_female",
       "created_at": 1794272821.2032304
+    },
+    {
+      "id": "human_female_m003",
+      "rig_profile_id": "human_female",
+      "created_at": 1795466537.5412543
     },
     {
       "id": "human_female_m004",

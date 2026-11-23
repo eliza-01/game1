@@ -17,6 +17,7 @@ local CameraController = require(script.Parent.Parent:WaitForChild("character"):
 local Occlusion = require(script.Parent:WaitForChild("HouseSocketAimOcclusion"))
 local UiSettings = require(script.Parent:WaitForChild("UiPresentationSettings"))
 local InfoDock = require(script.Parent:WaitForChild("InformativeWindowDock"))
+local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 
 local player = Players.LocalPlayer
 local Controller = {}
@@ -161,10 +162,11 @@ function Controller.Start()
         if fuel == "firewood" or fuel == "fire" or fuel == "embers" then
             local remaining = math.max(0, fuelEnd - timeNow)
             setBar(fuelRow, if fuelDuration > 0 then remaining / fuelDuration else 0,
-                (if fuel == "embers" then "Угли · " else "Огонь · ") .. tostring(math.ceil(remaining)) .. "с",
+                (if fuel == "embers" then (Language.Translate("hud.embers") .. " · ") else (Language.Translate("hud.fire") .. " · "))
+                    .. tostring(math.ceil(remaining)) .. Language.Translate("hud.seconds"),
                 if fuel == "embers" then Color3.fromRGB(192, 76, 67) else Color3.fromRGB(235, 145, 55))
         else
-            setBar(fuelRow, 0, "Не горит", Color3.fromRGB(105, 116, 126))
+            setBar(fuelRow, 0, Language.Translate("hud.not_burning"), Color3.fromRGB(105, 116, 126))
         end
         fuelRow.Visible = true
 
@@ -173,16 +175,18 @@ function Controller.Start()
             local remaining = math.max(0, cookEnd - timeNow)
             setBar(cookRow,
                 if cook == "ready" then 1 else if cookDuration > 0 then 1 - remaining / cookDuration else 0,
-                if cook == "ready" then "Готово" else tostring(math.ceil(remaining)) .. "с",
+                if cook == "ready" then Language.Translate("feedback.ready")
+                    else tostring(math.ceil(remaining)) .. Language.Translate("hud.seconds"),
                 Color3.fromRGB(92, 171, 116))
         elseif potPresent then
-            setBar(cookRow, 0, "Пустой котёл", Color3.fromRGB(105, 116, 126))
+            setBar(cookRow, 0, Language.Translate("hud.empty_pot"), Color3.fromRGB(105, 116, 126))
         end
 
         local contentHeight = rowHeight + (if cookRow.Visible then rowHeight + 2 else 0)
         dock:Fit(contentHeight)
         dock:Present("fireplace", socket,
-            if socket.Name == "fire_socket" then "Костёр" else "Камин", true)
+            if socket.Name == "fire_socket" then Language.Translate("hud.campfire")
+                else Language.Translate("action.fireplace"), true)
     end
 
     for _, descendant in ipairs(Workspace:GetDescendants()) do listen(descendant) end

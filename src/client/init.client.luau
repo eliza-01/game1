@@ -1,6 +1,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+-- Language selection is mounted before the gameplay surfaces. It is optional
+-- to gameplay boot and its preference load does not block movement or combat.
+local LanguageState = require(script:WaitForChild("localization"):WaitForChild("LanguageState"))
+LanguageState.Start()
+require(script:WaitForChild("localization"):WaitForChild("LanguageMenuController")).Start()
 local ProjectInfo = require(Shared:WaitForChild("ProjectInfo"))
 local RuntimeVersion = require(Shared:WaitForChild("RuntimeVersion"))
 

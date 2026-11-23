@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "leaf_01",
+  "sourceSha256": "e920c94197c4be1d05458bd3aab6e60e315d520654ba3f1bd3eeec629ee6830f",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "leaf_01",
+        "armature": "",
+        "vertices": 10,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

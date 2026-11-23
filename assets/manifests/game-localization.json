@@ -1,0 +1,1757 @@
+{
+  "schemaVersion": 1,
+  "defaultLocale": "en-us",
+  "locales": {
+    "ru-ru": "Русский",
+    "en-us": "English",
+    "de-de": "Deutsch",
+    "zh-cn": "简体中文",
+    "it-it": "Italiano",
+    "es-es": "Español",
+    "fr-fr": "Français",
+    "pt-br": "Português (Brasil)",
+    "ja-jp": "日本語",
+    "ko-kr": "한국어"
+  },
+  "groups": {
+    "language": {
+      "language.title": {
+        "source": "Выберите язык",
+        "translations": {
+          "ru-ru": "Выберите язык",
+          "en-us": "Choose language",
+          "de-de": "Sprache wählen",
+          "zh-cn": "选择语言",
+          "it-it": "Scegli la lingua",
+          "es-es": "Elige idioma",
+          "fr-fr": "Choisir la langue",
+          "pt-br": "Escolha o idioma",
+          "ja-jp": "言語を選択",
+          "ko-kr": "언어 선택"
+        }
+      },
+      "language.subtitle": {
+        "source": "Вы сможете изменить язык позже",
+        "translations": {
+          "ru-ru": "Вы сможете изменить язык позже",
+          "en-us": "You can change the language later",
+          "de-de": "Du kannst die Sprache später ändern",
+          "zh-cn": "稍后可以更改语言",
+          "it-it": "Puoi cambiare lingua più tardi",
+          "es-es": "Puedes cambiar el idioma más tarde",
+          "fr-fr": "Vous pourrez changer de langue plus tard",
+          "pt-br": "Você pode mudar o idioma depois",
+          "ja-jp": "言語は後から変更できます",
+          "ko-kr": "언어는 나중에 변경할 수 있습니다"
+        }
+      },
+      "language.confirm": {
+        "source": "Продолжить",
+        "translations": {
+          "ru-ru": "Продолжить",
+          "en-us": "Continue",
+          "de-de": "Weiter",
+          "zh-cn": "继续",
+          "it-it": "Continua",
+          "es-es": "Continuar",
+          "fr-fr": "Continuer",
+          "pt-br": "Continuar",
+          "ja-jp": "続ける",
+          "ko-kr": "계속"
+        }
+      },
+      "language.button": {
+        "source": "Язык",
+        "translations": {
+          "ru-ru": "Язык",
+          "en-us": "Language",
+          "de-de": "Sprache",
+          "zh-cn": "语言",
+          "it-it": "Lingua",
+          "es-es": "Idioma",
+          "fr-fr": "Langue",
+          "pt-br": "Idioma",
+          "ja-jp": "言語",
+          "ko-kr": "언어"
+        }
+      },
+      "language.saved": {
+        "source": "Язык сохранён",
+        "translations": {
+          "ru-ru": "Язык сохранён",
+          "en-us": "Language saved",
+          "de-de": "Sprache gespeichert",
+          "zh-cn": "语言已保存",
+          "it-it": "Lingua salvata",
+          "es-es": "Idioma guardado",
+          "fr-fr": "Langue enregistrée",
+          "pt-br": "Idioma salvo",
+          "ja-jp": "言語を保存しました",
+          "ko-kr": "언어가 저장되었습니다"
+        }
+      },
+      "language.unsaved": {
+        "source": "Язык выбран, но сохранить не удалось",
+        "translations": {
+          "ru-ru": "Язык выбран, но сохранить не удалось",
+          "en-us": "Language selected, but saving failed",
+          "de-de": "Sprache gewählt, Speichern fehlgeschlagen",
+          "zh-cn": "语言已选择，但保存失败",
+          "it-it": "Lingua scelta, salvataggio non riuscito",
+          "es-es": "Idioma elegido, no se pudo guardar",
+          "fr-fr": "Langue choisie, échec de l'enregistrement",
+          "pt-br": "Idioma escolhido, falha ao salvar",
+          "ja-jp": "言語を選択しましたが保存できませんでした",
+          "ko-kr": "언어 선택됨, 저장 실패"
+        }
+      },
+      "language.loading": {
+        "source": "Загружаем настройки…",
+        "translations": {
+          "ru-ru": "Загружаем настройки…",
+          "en-us": "Loading preferences…",
+          "de-de": "Einstellungen werden geladen…",
+          "zh-cn": "正在加载偏好设置…",
+          "it-it": "Caricamento preferenze…",
+          "es-es": "Cargando preferencias…",
+          "fr-fr": "Chargement des préférences…",
+          "pt-br": "Carregando preferências…",
+          "ja-jp": "設定を読み込み中…",
+          "ko-kr": "설정 불러오는 중…"
+        }
+      }
+    },
+    "action": {
+      "action.open_door": {
+        "source": "Открыть дверь",
+        "translations": {
+          "ru-ru": "Открыть дверь",
+          "en-us": "Open door",
+          "de-de": "Tür öffnen",
+          "zh-cn": "开门",
+          "it-it": "Apri porta",
+          "es-es": "Abrir puerta",
+          "fr-fr": "Ouvrir la porte",
+          "pt-br": "Abrir porta",
+          "ja-jp": "ドアを開ける",
+          "ko-kr": "문 열기"
+        }
+      },
+      "action.close_door": {
+        "source": "Закрыть дверь",
+        "translations": {
+          "ru-ru": "Закрыть дверь",
+          "en-us": "Close door",
+          "de-de": "Tür schließen",
+          "zh-cn": "关门",
+          "it-it": "Chiudi porta",
+          "es-es": "Cerrar puerta",
+          "fr-fr": "Fermer la porte",
+          "pt-br": "Fechar porta",
+          "ja-jp": "ドアを閉める",
+          "ko-kr": "문 닫기"
+        }
+      },
+      "action.unlock": {
+        "source": "Снять замок",
+        "translations": {
+          "ru-ru": "Снять замок",
+          "en-us": "Remove lock",
+          "de-de": "Schloss entfernen",
+          "zh-cn": "取下锁",
+          "it-it": "Rimuovi lucchetto",
+          "es-es": "Quitar candado",
+          "fr-fr": "Retirer le cadenas",
+          "pt-br": "Remover cadeado",
+          "ja-jp": "錠を外す",
+          "ko-kr": "자물쇠 제거"
+        }
+      },
+      "action.lock": {
+        "source": "Навесить замок · ключ",
+        "translations": {
+          "ru-ru": "Навесить замок · ключ",
+          "en-us": "Attach lock · key",
+          "de-de": "Schloss anbringen · Schlüssel",
+          "zh-cn": "挂锁 · 钥匙",
+          "it-it": "Metti lucchetto · chiave",
+          "es-es": "Poner candado · llave",
+          "fr-fr": "Poser cadenas · clé",
+          "pt-br": "Colocar cadeado · chave",
+          "ja-jp": "施錠 · 鍵",
+          "ko-kr": "자물쇠 걸기 · 열쇠"
+        }
+      },
+      "action.unlock_key": {
+        "source": "Снять замок · ключ",
+        "translations": {
+          "ru-ru": "Снять замок · ключ",
+          "en-us": "Remove lock · key",
+          "de-de": "Schloss entfernen · Schlüssel",
+          "zh-cn": "取锁 · 钥匙",
+          "it-it": "Rimuovi lucchetto · chiave",
+          "es-es": "Quitar candado · llave",
+          "fr-fr": "Retirer cadenas · clé",
+          "pt-br": "Remover cadeado · chave",
+          "ja-jp": "解錠 · 鍵",
+          "ko-kr": "자물쇠 제거 · 열쇠"
+        }
+      },
+      "action.open_chest": {
+        "source": "Открыть сундук",
+        "translations": {
+          "ru-ru": "Открыть сундук",
+          "en-us": "Open chest",
+          "de-de": "Truhe öffnen",
+          "zh-cn": "打开宝箱",
+          "it-it": "Apri forziere",
+          "es-es": "Abrir cofre",
+          "fr-fr": "Ouvrir le coffre",
+          "pt-br": "Abrir baú",
+          "ja-jp": "宝箱を開ける",
+          "ko-kr": "상자 열기"
+        }
+      },
+      "action.up_second": {
+        "source": "Подняться на 2 этаж",
+        "translations": {
+          "ru-ru": "Подняться на 2 этаж",
+          "en-us": "Go to floor 2",
+          "de-de": "In den 2. Stock",
+          "zh-cn": "前往二楼",
+          "it-it": "Vai al 2° piano",
+          "es-es": "Subir al piso 2",
+          "fr-fr": "Monter au 2e étage",
+          "pt-br": "Subir ao 2º andar",
+          "ja-jp": "2階へ上がる",
+          "ko-kr": "2층으로 이동"
+        }
+      },
+      "action.down_first": {
+        "source": "Спуститься на 1 этаж",
+        "translations": {
+          "ru-ru": "Спуститься на 1 этаж",
+          "en-us": "Go to floor 1",
+          "de-de": "In den 1. Stock",
+          "zh-cn": "前往一楼",
+          "it-it": "Vai al 1° piano",
+          "es-es": "Bajar al piso 1",
+          "fr-fr": "Descendre au 1er étage",
+          "pt-br": "Descer ao 1º andar",
+          "ja-jp": "1階へ下りる",
+          "ko-kr": "1층으로 이동"
+        }
+      },
+      "action.down_second": {
+        "source": "Спуститься на 2 этаж",
+        "translations": {
+          "ru-ru": "Спуститься на 2 этаж",
+          "en-us": "Go to floor 2",
+          "de-de": "In den 2. Stock",
+          "zh-cn": "前往二楼",
+          "it-it": "Vai al 2° piano",
+          "es-es": "Bajar al piso 2",
+          "fr-fr": "Descendre au 2e étage",
+          "pt-br": "Descer ao 2º andar",
+          "ja-jp": "2階へ下りる",
+          "ko-kr": "2층으로 이동"
+        }
+      },
+      "action.light_fire": {
+        "source": "Разжечь огонь",
+        "translations": {
+          "ru-ru": "Разжечь огонь",
+          "en-us": "Light fire",
+          "de-de": "Feuer entzünden",
+          "zh-cn": "点火",
+          "it-it": "Accendi il fuoco",
+          "es-es": "Encender fuego",
+          "fr-fr": "Allumer le feu",
+          "pt-br": "Acender fogo",
+          "ja-jp": "火をつける",
+          "ko-kr": "불 피우기"
+        }
+      },
+      "action.remove_pot": {
+        "source": "Убрать котел",
+        "translations": {
+          "ru-ru": "Убрать котел",
+          "en-us": "Remove pot",
+          "de-de": "Kessel entfernen",
+          "zh-cn": "移开锅",
+          "it-it": "Rimuovi pentola",
+          "es-es": "Quitar caldero",
+          "fr-fr": "Retirer la marmite",
+          "pt-br": "Remover caldeirão",
+          "ja-jp": "鍋を外す",
+          "ko-kr": "솥 치우기"
+        }
+      },
+      "action.place_pot": {
+        "source": "Поставить котел",
+        "translations": {
+          "ru-ru": "Поставить котел",
+          "en-us": "Place pot",
+          "de-de": "Kessel aufstellen",
+          "zh-cn": "放置锅",
+          "it-it": "Metti pentola",
+          "es-es": "Poner caldero",
+          "fr-fr": "Poser la marmite",
+          "pt-br": "Colocar caldeirão",
+          "ja-jp": "鍋を置く",
+          "ko-kr": "솥 놓기"
+        }
+      },
+      "action.add_ingredients": {
+        "source": "Добавить ингредиенты",
+        "translations": {
+          "ru-ru": "Добавить ингредиенты",
+          "en-us": "Add ingredients",
+          "de-de": "Zutaten hinzufügen",
+          "zh-cn": "添加食材",
+          "it-it": "Aggiungi ingredienti",
+          "es-es": "Añadir ingredientes",
+          "fr-fr": "Ajouter des ingrédients",
+          "pt-br": "Adicionar ingredientes",
+          "ja-jp": "材料を加える",
+          "ko-kr": "재료 추가"
+        }
+      },
+      "action.take_meal": {
+        "source": "Забрать блюдо",
+        "translations": {
+          "ru-ru": "Забрать блюдо",
+          "en-us": "Collect meal",
+          "de-de": "Gericht nehmen",
+          "zh-cn": "领取食物",
+          "it-it": "Ritira piatto",
+          "es-es": "Recoger comida",
+          "fr-fr": "Récupérer le plat",
+          "pt-br": "Pegar refeição",
+          "ja-jp": "料理を受け取る",
+          "ko-kr": "음식 받기"
+        }
+      },
+      "action.cooking": {
+        "source": "Блюдо готовится",
+        "translations": {
+          "ru-ru": "Блюдо готовится",
+          "en-us": "Meal cooking",
+          "de-de": "Gericht kocht",
+          "zh-cn": "正在烹饪",
+          "it-it": "Piatto in cottura",
+          "es-es": "Comida cocinándose",
+          "fr-fr": "Cuisson en cours",
+          "pt-br": "Refeição cozinhando",
+          "ja-jp": "調理中",
+          "ko-kr": "요리 중"
+        }
+      },
+      "action.fireplace": {
+        "source": "Камин",
+        "translations": {
+          "ru-ru": "Камин",
+          "en-us": "Fireplace",
+          "de-de": "Kamin",
+          "zh-cn": "壁炉",
+          "it-it": "Camino",
+          "es-es": "Chimenea",
+          "fr-fr": "Cheminée",
+          "pt-br": "Lareira",
+          "ja-jp": "暖炉",
+          "ko-kr": "벽난로"
+        }
+      },
+      "action.windmill": {
+        "source": "Мельница",
+        "translations": {
+          "ru-ru": "Мельница",
+          "en-us": "Windmill",
+          "de-de": "Windmühle",
+          "zh-cn": "风车",
+          "it-it": "Mulino a vento",
+          "es-es": "Molino de viento",
+          "fr-fr": "Moulin à vent",
+          "pt-br": "Moinho de vento",
+          "ja-jp": "風車",
+          "ko-kr": "풍차"
+        }
+      },
+      "action.chimney": {
+        "source": "Дымоход",
+        "translations": {
+          "ru-ru": "Дымоход",
+          "en-us": "Chimney",
+          "de-de": "Schornstein",
+          "zh-cn": "烟囱",
+          "it-it": "Camino",
+          "es-es": "Chimenea",
+          "fr-fr": "Cheminée",
+          "pt-br": "Chaminé",
+          "ja-jp": "煙突",
+          "ko-kr": "굴뚝"
+        }
+      },
+      "action.plant": {
+        "source": "Растение",
+        "translations": {
+          "ru-ru": "Растение",
+          "en-us": "Plant",
+          "de-de": "Pflanze",
+          "zh-cn": "植物",
+          "it-it": "Pianta",
+          "es-es": "Planta",
+          "fr-fr": "Plante",
+          "pt-br": "Planta",
+          "ja-jp": "植物",
+          "ko-kr": "식물"
+        }
+      },
+      "action.floor1": {
+        "source": "Этаж 1",
+        "translations": {
+          "ru-ru": "Этаж 1",
+          "en-us": "Floor 1",
+          "de-de": "Etage 1",
+          "zh-cn": "一楼",
+          "it-it": "Piano 1",
+          "es-es": "Piso 1",
+          "fr-fr": "Étage 1",
+          "pt-br": "Andar 1",
+          "ja-jp": "1階",
+          "ko-kr": "1층"
+        }
+      },
+      "action.floor2": {
+        "source": "Этаж 2",
+        "translations": {
+          "ru-ru": "Этаж 2",
+          "en-us": "Floor 2",
+          "de-de": "Etage 2",
+          "zh-cn": "二楼",
+          "it-it": "Piano 2",
+          "es-es": "Piso 2",
+          "fr-fr": "Étage 2",
+          "pt-br": "Andar 2",
+          "ja-jp": "2階",
+          "ko-kr": "2층"
+        }
+      },
+      "action.floor3": {
+        "source": "Этаж 3",
+        "translations": {
+          "ru-ru": "Этаж 3",
+          "en-us": "Floor 3",
+          "de-de": "Etage 3",
+          "zh-cn": "三楼",
+          "it-it": "Piano 3",
+          "es-es": "Piso 3",
+          "fr-fr": "Étage 3",
+          "pt-br": "Andar 3",
+          "ja-jp": "3階",
+          "ko-kr": "3층"
+        }
+      }
+    },
+    "hud": {
+      "hud.info": {
+        "source": "Инфо",
+        "translations": {
+          "ru-ru": "Инфо",
+          "en-us": "Info",
+          "de-de": "Info",
+          "zh-cn": "信息",
+          "it-it": "Info",
+          "es-es": "Info",
+          "fr-fr": "Infos",
+          "pt-br": "Info",
+          "ja-jp": "情報",
+          "ko-kr": "정보"
+        }
+      },
+      "hud.fire": {
+        "source": "Огонь",
+        "translations": {
+          "ru-ru": "Огонь",
+          "en-us": "Fire",
+          "de-de": "Feuer",
+          "zh-cn": "火焰",
+          "it-it": "Fuoco",
+          "es-es": "Fuego",
+          "fr-fr": "Feu",
+          "pt-br": "Fogo",
+          "ja-jp": "火",
+          "ko-kr": "불"
+        }
+      },
+      "hud.meal": {
+        "source": "Блюдо",
+        "translations": {
+          "ru-ru": "Блюдо",
+          "en-us": "Meal",
+          "de-de": "Gericht",
+          "zh-cn": "食物",
+          "it-it": "Piatto",
+          "es-es": "Comida",
+          "fr-fr": "Repas",
+          "pt-br": "Refeição",
+          "ja-jp": "料理",
+          "ko-kr": "음식"
+        }
+      },
+      "hud.wood": {
+        "source": "Дерево",
+        "translations": {
+          "ru-ru": "Дерево",
+          "en-us": "Wood",
+          "de-de": "Holz",
+          "zh-cn": "木材",
+          "it-it": "Legno",
+          "es-es": "Madera",
+          "fr-fr": "Bois",
+          "pt-br": "Madeira",
+          "ja-jp": "木材",
+          "ko-kr": "나무"
+        }
+      },
+      "hud.carrot": {
+        "source": "Морковь",
+        "translations": {
+          "ru-ru": "Морковь",
+          "en-us": "Carrot",
+          "de-de": "Karotte",
+          "zh-cn": "胡萝卜",
+          "it-it": "Carota",
+          "es-es": "Zanahoria",
+          "fr-fr": "Carotte",
+          "pt-br": "Cenoura",
+          "ja-jp": "ニンジン",
+          "ko-kr": "당근"
+        }
+      },
+      "hud.onion": {
+        "source": "Лук",
+        "translations": {
+          "ru-ru": "Лук",
+          "en-us": "Onion",
+          "de-de": "Zwiebel",
+          "zh-cn": "洋葱",
+          "it-it": "Cipolla",
+          "es-es": "Cebolla",
+          "fr-fr": "Oignon",
+          "pt-br": "Cebola",
+          "ja-jp": "タマネギ",
+          "ko-kr": "양파"
+        }
+      },
+      "hud.potato": {
+        "source": "Картофель",
+        "translations": {
+          "ru-ru": "Картофель",
+          "en-us": "Potato",
+          "de-de": "Kartoffel",
+          "zh-cn": "土豆",
+          "it-it": "Patata",
+          "es-es": "Patata",
+          "fr-fr": "Pomme de terre",
+          "pt-br": "Batata",
+          "ja-jp": "ジャガイモ",
+          "ko-kr": "감자"
+        }
+      },
+      "hud.critical": {
+        "source": "Critical!",
+        "translations": {
+          "ru-ru": "Critical!",
+          "en-us": "Critical!",
+          "de-de": "Kritisch!",
+          "zh-cn": "暴击！",
+          "it-it": "Critico!",
+          "es-es": "¡Crítico!",
+          "fr-fr": "Critique !",
+          "pt-br": "Crítico!",
+          "ja-jp": "クリティカル！",
+          "ko-kr": "치명타!"
+        }
+      },
+      "hud.headshot": {
+        "source": "Headshot!",
+        "translations": {
+          "ru-ru": "Headshot!",
+          "en-us": "Headshot!",
+          "de-de": "Kopftreffer!",
+          "zh-cn": "爆头！",
+          "it-it": "Colpo alla testa!",
+          "es-es": "¡Tiro a la cabeza!",
+          "fr-fr": "Tir à la tête !",
+          "pt-br": "Tiro na cabeça!",
+          "ja-jp": "ヘッドショット！",
+          "ko-kr": "헤드샷!"
+        }
+      },
+      "hud.too_far": {
+        "source": "Far",
+        "translations": {
+          "ru-ru": "Far",
+          "en-us": "Too far",
+          "de-de": "Zu weit weg",
+          "zh-cn": "距离太远",
+          "it-it": "Troppo lontano",
+          "es-es": "Demasiado lejos",
+          "fr-fr": "Trop loin",
+          "pt-br": "Longe demais",
+          "ja-jp": "遠すぎます",
+          "ko-kr": "너무 멉니다"
+        }
+      },
+      "hud.death": {
+        "source": "Персонаж погиб",
+        "translations": {
+          "ru-ru": "Персонаж погиб",
+          "en-us": "Character defeated",
+          "de-de": "Charakter besiegt",
+          "zh-cn": "角色已死亡",
+          "it-it": "Personaggio sconfitto",
+          "es-es": "Personaje derrotado",
+          "fr-fr": "Personnage vaincu",
+          "pt-br": "Personagem derrotado",
+          "ja-jp": "キャラクターが倒れました",
+          "ko-kr": "캐릭터 사망"
+        }
+      },
+      "hud.town": {
+        "source": "В город",
+        "translations": {
+          "ru-ru": "В город",
+          "en-us": "Return to town",
+          "de-de": "Zurück in die Stadt",
+          "zh-cn": "返回城镇",
+          "it-it": "Torna in città",
+          "es-es": "Volver a la ciudad",
+          "fr-fr": "Retour en ville",
+          "pt-br": "Voltar à cidade",
+          "ja-jp": "街に戻る",
+          "ko-kr": "마을로 돌아가기"
+        }
+      },
+      "hud.returning": {
+        "source": "Возвращение...",
+        "translations": {
+          "ru-ru": "Возвращение...",
+          "en-us": "Returning…",
+          "de-de": "Rückkehr…",
+          "zh-cn": "正在返回…",
+          "it-it": "Ritorno…",
+          "es-es": "Regresando…",
+          "fr-fr": "Retour…",
+          "pt-br": "Voltando…",
+          "ja-jp": "帰還中…",
+          "ko-kr": "귀환 중…"
+        }
+      },
+      "hud.campfire": {
+        "source": "Костёр",
+        "translations": {
+          "ru-ru": "Костёр",
+          "en-us": "Campfire",
+          "de-de": "Lagerfeuer",
+          "zh-cn": "篝火",
+          "it-it": "Falò",
+          "es-es": "Hoguera",
+          "fr-fr": "Feu de camp",
+          "pt-br": "Fogueira",
+          "ja-jp": "たき火",
+          "ko-kr": "모닥불"
+        }
+      },
+      "hud.embers": {
+        "source": "Угли",
+        "translations": {
+          "ru-ru": "Угли",
+          "en-us": "Embers",
+          "de-de": "Glut",
+          "zh-cn": "余烬",
+          "it-it": "Braci",
+          "es-es": "Brasas",
+          "fr-fr": "Braises",
+          "pt-br": "Brasas",
+          "ja-jp": "残り火",
+          "ko-kr": "잿불"
+        }
+      },
+      "hud.not_burning": {
+        "source": "Не горит",
+        "translations": {
+          "ru-ru": "Не горит",
+          "en-us": "Not burning",
+          "de-de": "Brennt nicht",
+          "zh-cn": "未点燃",
+          "it-it": "Spento",
+          "es-es": "Apagado",
+          "fr-fr": "Éteint",
+          "pt-br": "Apagado",
+          "ja-jp": "消火中",
+          "ko-kr": "꺼짐"
+        }
+      },
+      "hud.empty_pot": {
+        "source": "Пустой котёл",
+        "translations": {
+          "ru-ru": "Пустой котёл",
+          "en-us": "Empty pot",
+          "de-de": "Leerer Kessel",
+          "zh-cn": "空锅",
+          "it-it": "Pentola vuota",
+          "es-es": "Caldero vacío",
+          "fr-fr": "Marmite vide",
+          "pt-br": "Caldeirão vazio",
+          "ja-jp": "空の鍋",
+          "ko-kr": "빈 솥"
+        }
+      },
+      "hud.seconds": {
+        "source": "с",
+        "translations": {
+          "ru-ru": "с",
+          "en-us": "s",
+          "de-de": "s",
+          "zh-cn": "秒",
+          "it-it": "s",
+          "es-es": "s",
+          "fr-fr": "s",
+          "pt-br": "s",
+          "ja-jp": "秒",
+          "ko-kr": "초"
+        }
+      },
+      "hud.miss": {
+        "source": "Miss",
+        "translations": {
+          "ru-ru": "Miss",
+          "en-us": "Miss",
+          "de-de": "Verfehlt",
+          "zh-cn": "未命中",
+          "it-it": "Mancato",
+          "es-es": "Falló",
+          "fr-fr": "Raté",
+          "pt-br": "Errou",
+          "ja-jp": "ミス",
+          "ko-kr": "빗나감"
+        }
+      },
+      "hud.door_opened": {
+        "source": "Дверь открыта",
+        "translations": {
+          "ru-ru": "Дверь открыта",
+          "en-us": "Door opened",
+          "de-de": "Tür geöffnet",
+          "zh-cn": "门已打开",
+          "it-it": "Porta aperta",
+          "es-es": "Puerta abierta",
+          "fr-fr": "Porte ouverte",
+          "pt-br": "Porta aberta",
+          "ja-jp": "ドアを開けました",
+          "ko-kr": "문이 열렸습니다"
+        }
+      },
+      "hud.door_closed": {
+        "source": "Дверь закрыта",
+        "translations": {
+          "ru-ru": "Дверь закрыта",
+          "en-us": "Door closed",
+          "de-de": "Tür geschlossen",
+          "zh-cn": "门已关闭",
+          "it-it": "Porta chiusa",
+          "es-es": "Puerta cerrada",
+          "fr-fr": "Porte fermée",
+          "pt-br": "Porta fechada",
+          "ja-jp": "ドアを閉めました",
+          "ko-kr": "문이 닫혔습니다"
+        }
+      },
+      "hud.door_unavailable": {
+        "source": "Дверь недоступна",
+        "translations": {
+          "ru-ru": "Дверь недоступна",
+          "en-us": "Door unavailable",
+          "de-de": "Tür nicht verfügbar",
+          "zh-cn": "无法使用门",
+          "it-it": "Porta non disponibile",
+          "es-es": "Puerta no disponible",
+          "fr-fr": "Porte indisponible",
+          "pt-br": "Porta indisponível",
+          "ja-jp": "ドアを操作できません",
+          "ko-kr": "문을 사용할 수 없음"
+        }
+      },
+      "hud.chest_unavailable": {
+        "source": "Сундук пока недоступен",
+        "translations": {
+          "ru-ru": "Сундук пока недоступен",
+          "en-us": "Chest not available yet",
+          "de-de": "Truhe noch nicht verfügbar",
+          "zh-cn": "宝箱暂不可用",
+          "it-it": "Forziere non ancora disponibile",
+          "es-es": "Cofre aún no disponible",
+          "fr-fr": "Coffre pas encore disponible",
+          "pt-br": "Baú ainda indisponível",
+          "ja-jp": "宝箱はまだ使えません",
+          "ko-kr": "상자를 아직 사용할 수 없음"
+        }
+      },
+      "hud.meal_ready": {
+        "source": "Блюдо готово",
+        "translations": {
+          "ru-ru": "Блюдо готово",
+          "en-us": "Meal ready",
+          "de-de": "Gericht fertig",
+          "zh-cn": "食物已做好",
+          "it-it": "Piatto pronto",
+          "es-es": "Comida lista",
+          "fr-fr": "Repas prêt",
+          "pt-br": "Refeição pronta",
+          "ja-jp": "料理ができました",
+          "ko-kr": "음식이 준비되었습니다"
+        }
+      },
+      "hud.pot_removed": {
+        "source": "Котел убран",
+        "translations": {
+          "ru-ru": "Котел убран",
+          "en-us": "Pot removed",
+          "de-de": "Kessel entfernt",
+          "zh-cn": "锅已移开",
+          "it-it": "Pentola rimossa",
+          "es-es": "Caldero retirado",
+          "fr-fr": "Marmite retirée",
+          "pt-br": "Caldeirão removido",
+          "ja-jp": "鍋を外しました",
+          "ko-kr": "솥을 치웠습니다"
+        }
+      },
+      "hud.wood_missing": {
+        "source": "Дрова недоступны: проверь опубликованный firewood_01",
+        "translations": {
+          "ru-ru": "Дрова недоступны: проверь опубликованный firewood_01",
+          "en-us": "Firewood unavailable: check published firewood_01",
+          "de-de": "Brennholz fehlt: firewood_01 prüfen",
+          "zh-cn": "木柴不可用：请检查已发布的 firewood_01",
+          "it-it": "Legna non disponibile: verifica firewood_01",
+          "es-es": "Leña no disponible: revisa firewood_01",
+          "fr-fr": "Bois indisponible : vérifier firewood_01",
+          "pt-br": "Lenha indisponível: verifique firewood_01",
+          "ja-jp": "薪がありません：firewood_01 を確認",
+          "ko-kr": "장작을 사용할 수 없음: firewood_01 확인"
+        }
+      },
+      "hud.fire_lit": {
+        "source": "Огонь разожжён",
+        "translations": {
+          "ru-ru": "Огонь разожжён",
+          "en-us": "Fire lit",
+          "de-de": "Feuer entzündet",
+          "zh-cn": "已点火",
+          "it-it": "Fuoco acceso",
+          "es-es": "Fuego encendido",
+          "fr-fr": "Feu allumé",
+          "pt-br": "Fogo aceso",
+          "ja-jp": "火をつけました",
+          "ko-kr": "불을 피웠습니다"
+        }
+      },
+      "hud.pot_placed": {
+        "source": "Котел установлен",
+        "translations": {
+          "ru-ru": "Котел установлен",
+          "en-us": "Pot placed",
+          "de-de": "Kessel aufgestellt",
+          "zh-cn": "锅已放置",
+          "it-it": "Pentola posizionata",
+          "es-es": "Caldero colocado",
+          "fr-fr": "Marmite posée",
+          "pt-br": "Caldeirão colocado",
+          "ja-jp": "鍋を置きました",
+          "ko-kr": "솥을 놓았습니다"
+        }
+      },
+      "hud.pot_missing": {
+        "source": "Котел недоступен: проверь модель и cooking_pot_socket",
+        "translations": {
+          "ru-ru": "Котел недоступен: проверь модель и cooking_pot_socket",
+          "en-us": "Pot unavailable: check model and cooking_pot_socket",
+          "de-de": "Kessel fehlt: Modell und cooking_pot_socket prüfen",
+          "zh-cn": "锅不可用：请检查模型和 cooking_pot_socket",
+          "it-it": "Pentola non disponibile: verifica modello e cooking_pot_socket",
+          "es-es": "Caldero no disponible: revisa modelo y cooking_pot_socket",
+          "fr-fr": "Marmite indisponible : vérifier le modèle et cooking_pot_socket",
+          "pt-br": "Caldeirão indisponível: verifique modelo e cooking_pot_socket",
+          "ja-jp": "鍋がありません：モデルと cooking_pot_socket を確認",
+          "ko-kr": "솥을 사용할 수 없음: 모델과 cooking_pot_socket 확인"
+        }
+      },
+      "hud.need_fuel": {
+        "source": "Нужны дрова или угли",
+        "translations": {
+          "ru-ru": "Нужны дрова или угли",
+          "en-us": "Need firewood or embers",
+          "de-de": "Brennholz oder Glut benötigt",
+          "zh-cn": "需要木柴或余烬",
+          "it-it": "Servono legna o braci",
+          "es-es": "Se necesita leña o brasas",
+          "fr-fr": "Bois ou braises nécessaires",
+          "pt-br": "Precisa de lenha ou brasas",
+          "ja-jp": "薪か残り火が必要です",
+          "ko-kr": "장작 또는 잿불이 필요합니다"
+        }
+      },
+      "hud.ingredients_added": {
+        "source": "Ингредиенты добавлены",
+        "translations": {
+          "ru-ru": "Ингредиенты добавлены",
+          "en-us": "Ingredients added",
+          "de-de": "Zutaten hinzugefügt",
+          "zh-cn": "已添加食材",
+          "it-it": "Ingredienti aggiunti",
+          "es-es": "Ingredientes añadidos",
+          "fr-fr": "Ingrédients ajoutés",
+          "pt-br": "Ingredientes adicionados",
+          "ja-jp": "材料を加えました",
+          "ko-kr": "재료 추가 완료"
+        }
+      },
+      "hud.elevator_floor": {
+        "source": "Лифт · этаж {floor}",
+        "translations": {
+          "ru-ru": "Лифт · этаж {floor}",
+          "en-us": "Elevator · floor {floor}",
+          "de-de": "Aufzug · Etage {floor}",
+          "zh-cn": "电梯 · {floor} 楼",
+          "it-it": "Ascensore · piano {floor}",
+          "es-es": "Ascensor · piso {floor}",
+          "fr-fr": "Ascenseur · étage {floor}",
+          "pt-br": "Elevador · andar {floor}",
+          "ja-jp": "エレベーター · {floor}階",
+          "ko-kr": "엘리베이터 · {floor}층"
+        }
+      },
+      "hud.elevator_start_unavailable": {
+        "source": "Исходный этаж недоступен",
+        "translations": {
+          "ru-ru": "Исходный этаж недоступен",
+          "en-us": "Starting floor unavailable",
+          "de-de": "Startetage nicht verfügbar",
+          "zh-cn": "起始楼层不可用",
+          "it-it": "Piano iniziale non disponibile",
+          "es-es": "Piso inicial no disponible",
+          "fr-fr": "Étage de départ indisponible",
+          "pt-br": "Andar inicial indisponível",
+          "ja-jp": "出発階を利用できません",
+          "ko-kr": "출발 층을 사용할 수 없음"
+        }
+      },
+      "hud.elevator_direction_unavailable": {
+        "source": "Это направление лифта недоступно",
+        "translations": {
+          "ru-ru": "Это направление лифта недоступно",
+          "en-us": "This elevator direction is unavailable",
+          "de-de": "Aufzugrichtung nicht verfügbar",
+          "zh-cn": "该电梯方向不可用",
+          "it-it": "Direzione ascensore non disponibile",
+          "es-es": "Esta dirección no está disponible",
+          "fr-fr": "Direction de l'ascenseur indisponible",
+          "pt-br": "Direção do elevador indisponível",
+          "ja-jp": "この方向には移動できません",
+          "ko-kr": "이 방향으로 이동할 수 없음"
+        }
+      },
+      "hud.elevator_target_unavailable": {
+        "source": "Целевой этаж недоступен",
+        "translations": {
+          "ru-ru": "Целевой этаж недоступен",
+          "en-us": "Destination floor unavailable",
+          "de-de": "Ziel-Etage nicht verfügbar",
+          "zh-cn": "目标楼层不可用",
+          "it-it": "Piano di destinazione non disponibile",
+          "es-es": "Piso de destino no disponible",
+          "fr-fr": "Étage de destination indisponible",
+          "pt-br": "Andar de destino indisponível",
+          "ja-jp": "目的階を利用できません",
+          "ko-kr": "목적 층을 사용할 수 없음"
+        }
+      },
+      "hud.character_unready": {
+        "source": "Персонаж не готов",
+        "translations": {
+          "ru-ru": "Персонаж не готов",
+          "en-us": "Character not ready",
+          "de-de": "Charakter nicht bereit",
+          "zh-cn": "角色尚未准备好",
+          "it-it": "Personaggio non pronto",
+          "es-es": "Personaje no listo",
+          "fr-fr": "Personnage pas prêt",
+          "pt-br": "Personagem não está pronto",
+          "ja-jp": "キャラクターの準備中",
+          "ko-kr": "캐릭터 준비되지 않음"
+        }
+      },
+      "hud.orientation_failed": {
+        "source": "Не удалось определить направление персонажа",
+        "translations": {
+          "ru-ru": "Не удалось определить направление персонажа",
+          "en-us": "Cannot determine character facing",
+          "de-de": "Blickrichtung nicht ermittelbar",
+          "zh-cn": "无法确定角色朝向",
+          "it-it": "Impossibile determinare l'orientamento",
+          "es-es": "No se pudo determinar la orientación",
+          "fr-fr": "Orientation impossible à déterminer",
+          "pt-br": "Não foi possível determinar a direção",
+          "ja-jp": "キャラクターの向きを判定できません",
+          "ko-kr": "캐릭터 방향 확인 실패"
+        }
+      },
+      "hud.no_padlock": {
+        "source": "В доме нет навесного замка",
+        "translations": {
+          "ru-ru": "В доме нет навесного замка",
+          "en-us": "No padlock in this house",
+          "de-de": "Kein Vorhängeschloss im Haus",
+          "zh-cn": "房屋没有挂锁",
+          "it-it": "Nessun lucchetto in casa",
+          "es-es": "No hay candado en la casa",
+          "fr-fr": "Aucun cadenas dans la maison",
+          "pt-br": "Não há cadeado nesta casa",
+          "ja-jp": "この家に南京錠はありません",
+          "ko-kr": "집에 자물쇠 없음"
+        }
+      },
+      "hud.key_required": {
+        "source": "Нужен ключ",
+        "translations": {
+          "ru-ru": "Нужен ключ",
+          "en-us": "Key required",
+          "de-de": "Schlüssel benötigt",
+          "zh-cn": "需要钥匙",
+          "it-it": "Serve una chiave",
+          "es-es": "Se necesita llave",
+          "fr-fr": "Clé requise",
+          "pt-br": "Chave necessária",
+          "ja-jp": "鍵が必要です",
+          "ko-kr": "열쇠가 필요합니다"
+        }
+      },
+      "hud.padlock_removed": {
+        "source": "Замок снят · дверь разблокирована",
+        "translations": {
+          "ru-ru": "Замок снят · дверь разблокирована",
+          "en-us": "Lock removed · door unlocked",
+          "de-de": "Schloss entfernt · Tür offen",
+          "zh-cn": "锁已取下 · 门已解锁",
+          "it-it": "Lucchetto rimosso · porta sbloccata",
+          "es-es": "Candado retirado · puerta desbloqueada",
+          "fr-fr": "Cadenas retiré · porte déverrouillée",
+          "pt-br": "Cadeado removido · porta destrancada",
+          "ja-jp": "解錠しました · ドアのロック解除",
+          "ko-kr": "자물쇠 제거 · 문 잠금 해제"
+        }
+      },
+      "hud.padlock_moving": {
+        "source": "Нельзя навесить замок на открытую или движущуюся дверь",
+        "translations": {
+          "ru-ru": "Нельзя навесить замок на открытую или движущуюся дверь",
+          "en-us": "Cannot lock an open or moving door",
+          "de-de": "Offene oder bewegte Tür nicht abschließbar",
+          "zh-cn": "无法锁住打开或移动中的门",
+          "it-it": "Impossibile bloccare una porta aperta o in movimento",
+          "es-es": "No se puede cerrar una puerta abierta o en movimiento",
+          "fr-fr": "Impossible de verrouiller une porte ouverte ou mobile",
+          "pt-br": "Não é possível trancar porta aberta ou em movimento",
+          "ja-jp": "開いているか動いているドアは施錠できません",
+          "ko-kr": "열려 있거나 움직이는 문은 잠글 수 없음"
+        }
+      },
+      "hud.padlock_attached": {
+        "source": "Замок навешен · дверь заперта",
+        "translations": {
+          "ru-ru": "Замок навешен · дверь заперта",
+          "en-us": "Lock attached · door locked",
+          "de-de": "Schloss angebracht · Tür verriegelt",
+          "zh-cn": "锁已挂上 · 门已锁住",
+          "it-it": "Lucchetto inserito · porta bloccata",
+          "es-es": "Candado puesto · puerta cerrada",
+          "fr-fr": "Cadenas posé · porte verrouillée",
+          "pt-br": "Cadeado colocado · porta trancada",
+          "ja-jp": "施錠しました · ドアをロック",
+          "ko-kr": "자물쇠 설치 · 문 잠김"
+        }
+      },
+      "hud.carrot_small": {
+        "source": "Морковка",
+        "translations": {
+          "ru-ru": "Морковка",
+          "en-us": "Carrot",
+          "de-de": "Karotte",
+          "zh-cn": "胡萝卜",
+          "it-it": "Carota",
+          "es-es": "Zanahoria",
+          "fr-fr": "Carotte",
+          "pt-br": "Cenoura",
+          "ja-jp": "ニンジン",
+          "ko-kr": "당근"
+        }
+      },
+      "hud.player_unavailable": {
+        "source": "player unavailable",
+        "translations": {
+          "ru-ru": "player unavailable",
+          "en-us": "Player unavailable",
+          "de-de": "Spieler nicht verfügbar",
+          "zh-cn": "玩家不可用",
+          "it-it": "Giocatore non disponibile",
+          "es-es": "Jugador no disponible",
+          "fr-fr": "Joueur indisponible",
+          "pt-br": "Jogador indisponível",
+          "ja-jp": "プレイヤーを利用できません",
+          "ko-kr": "플레이어 이용 불가"
+        }
+      },
+      "hud.character_unavailable": {
+        "source": "character unavailable",
+        "translations": {
+          "ru-ru": "character unavailable",
+          "en-us": "Character unavailable",
+          "de-de": "Charakter nicht verfügbar",
+          "zh-cn": "角色不可用",
+          "it-it": "Personaggio non disponibile",
+          "es-es": "Personaje no disponible",
+          "fr-fr": "Personnage indisponible",
+          "pt-br": "Personagem indisponível",
+          "ja-jp": "キャラクターを利用できません",
+          "ko-kr": "캐릭터 이용 불가"
+        }
+      },
+      "hud.return_not_allowed": {
+        "source": "return to town is only available after death animation",
+        "translations": {
+          "ru-ru": "return to town is only available after death animation",
+          "en-us": "Return to town after death animation",
+          "de-de": "Rückkehr erst nach Todesanimation",
+          "zh-cn": "死亡动画结束后才能返回城镇",
+          "it-it": "Rientro in città dopo l'animazione di morte",
+          "es-es": "Regresar tras la animación de muerte",
+          "fr-fr": "Retour après l'animation de mort",
+          "pt-br": "Volte após a animação de morte",
+          "ja-jp": "死亡アニメーション後に帰還可能",
+          "ko-kr": "사망 애니메이션 후 귀환 가능"
+        }
+      },
+      "hud.respawn_failed": {
+        "source": "respawn failed",
+        "translations": {
+          "ru-ru": "respawn failed",
+          "en-us": "Respawn failed",
+          "de-de": "Wiederbelebung fehlgeschlagen",
+          "zh-cn": "重生失败",
+          "it-it": "Rigenerazione fallita",
+          "es-es": "Reaparición fallida",
+          "fr-fr": "Réapparition impossible",
+          "pt-br": "Reaparecimento falhou",
+          "ja-jp": "復活に失敗しました",
+          "ko-kr": "부활 실패"
+        }
+      },
+      "hud.key": {
+        "source": "ключ",
+        "translations": {
+          "ru-ru": "ключ",
+          "en-us": "key",
+          "de-de": "Schlüssel",
+          "zh-cn": "钥匙",
+          "it-it": "chiave",
+          "es-es": "llave",
+          "fr-fr": "clé",
+          "pt-br": "chave",
+          "ja-jp": "鍵",
+          "ko-kr": "열쇠"
+        }
+      }
+    },
+    "weapon": {
+      "weapon.title": {
+        "source": "Выбор оружия",
+        "translations": {
+          "ru-ru": "Выбор оружия",
+          "en-us": "Choose weapon",
+          "de-de": "Waffe wählen",
+          "zh-cn": "选择武器",
+          "it-it": "Scegli arma",
+          "es-es": "Elegir arma",
+          "fr-fr": "Choisir une arme",
+          "pt-br": "Escolher arma",
+          "ja-jp": "武器を選択",
+          "ko-kr": "무기 선택"
+        }
+      },
+      "weapon.button": {
+        "source": "⚔  ОРУЖИЕ",
+        "translations": {
+          "ru-ru": "⚔  ОРУЖИЕ",
+          "en-us": "⚔  WEAPONS",
+          "de-de": "⚔  WAFFEN",
+          "zh-cn": "⚔  武器",
+          "it-it": "⚔  ARMI",
+          "es-es": "⚔  ARMAS",
+          "fr-fr": "⚔  ARMES",
+          "pt-br": "⚔  ARMAS",
+          "ja-jp": "⚔  武器",
+          "ko-kr": "⚔  무기"
+        }
+      },
+      "weapon.all": {
+        "source": "Все",
+        "translations": {
+          "ru-ru": "Все",
+          "en-us": "All",
+          "de-de": "Alle",
+          "zh-cn": "全部",
+          "it-it": "Tutte",
+          "es-es": "Todas",
+          "fr-fr": "Toutes",
+          "pt-br": "Todas",
+          "ja-jp": "すべて",
+          "ko-kr": "전체"
+        }
+      },
+      "weapon.hands": {
+        "source": "Руки",
+        "translations": {
+          "ru-ru": "Руки",
+          "en-us": "Unarmed",
+          "de-de": "Unbewaffnet",
+          "zh-cn": "空手",
+          "it-it": "Mani nude",
+          "es-es": "Sin armas",
+          "fr-fr": "À mains nues",
+          "pt-br": "Desarmado",
+          "ja-jp": "素手",
+          "ko-kr": "맨손"
+        }
+      },
+      "weapon.dagger": {
+        "source": "Кинжалы",
+        "translations": {
+          "ru-ru": "Кинжалы",
+          "en-us": "Daggers",
+          "de-de": "Dolche",
+          "zh-cn": "匕首",
+          "it-it": "Pugnali",
+          "es-es": "Dagas",
+          "fr-fr": "Dagues",
+          "pt-br": "Adagas",
+          "ja-jp": "短剣",
+          "ko-kr": "단검"
+        }
+      },
+      "weapon.sword": {
+        "source": "Мечи",
+        "translations": {
+          "ru-ru": "Мечи",
+          "en-us": "Swords",
+          "de-de": "Schwerter",
+          "zh-cn": "剑",
+          "it-it": "Spade",
+          "es-es": "Espadas",
+          "fr-fr": "Épées",
+          "pt-br": "Espadas",
+          "ja-jp": "剣",
+          "ko-kr": "검"
+        }
+      },
+      "weapon.bigsword": {
+        "source": "Двуручные",
+        "translations": {
+          "ru-ru": "Двуручные",
+          "en-us": "Two-handed",
+          "de-de": "Zweihänder",
+          "zh-cn": "双手剑",
+          "it-it": "A due mani",
+          "es-es": "Dos manos",
+          "fr-fr": "À deux mains",
+          "pt-br": "Duas mãos",
+          "ja-jp": "両手武器",
+          "ko-kr": "양손 무기"
+        }
+      },
+      "weapon.bow": {
+        "source": "Луки",
+        "translations": {
+          "ru-ru": "Луки",
+          "en-us": "Bows",
+          "de-de": "Bögen",
+          "zh-cn": "弓",
+          "it-it": "Archi",
+          "es-es": "Arcos",
+          "fr-fr": "Arcs",
+          "pt-br": "Arcos",
+          "ja-jp": "弓",
+          "ko-kr": "활"
+        }
+      },
+      "weapon.unarmed": {
+        "source": "Без оружия",
+        "translations": {
+          "ru-ru": "Без оружия",
+          "en-us": "Unarmed",
+          "de-de": "Unbewaffnet",
+          "zh-cn": "无武器",
+          "it-it": "Disarmato",
+          "es-es": "Sin armas",
+          "fr-fr": "Sans arme",
+          "pt-br": "Desarmado",
+          "ja-jp": "武器なし",
+          "ko-kr": "무기 없음"
+        }
+      },
+      "weapon.applying": {
+        "source": "Применяем…",
+        "translations": {
+          "ru-ru": "Применяем…",
+          "en-us": "Equipping…",
+          "de-de": "Wird ausgerüstet…",
+          "zh-cn": "正在装备…",
+          "it-it": "Equipaggiamento…",
+          "es-es": "Equipando…",
+          "fr-fr": "Équipement…",
+          "pt-br": "Equipando…",
+          "ja-jp": "装備中…",
+          "ko-kr": "장착 중…"
+        }
+      },
+      "weapon.equipped": {
+        "source": "Оружие экипировано",
+        "translations": {
+          "ru-ru": "Оружие экипировано",
+          "en-us": "Weapon equipped",
+          "de-de": "Waffe ausgerüstet",
+          "zh-cn": "武器已装备",
+          "it-it": "Arma equipaggiata",
+          "es-es": "Arma equipada",
+          "fr-fr": "Arme équipée",
+          "pt-br": "Arma equipada",
+          "ja-jp": "武器を装備しました",
+          "ko-kr": "무기 장착 완료"
+        }
+      },
+      "weapon.loading": {
+        "source": "Загружаем оружие…",
+        "translations": {
+          "ru-ru": "Загружаем оружие…",
+          "en-us": "Loading weapons…",
+          "de-de": "Waffen werden geladen…",
+          "zh-cn": "正在加载武器…",
+          "it-it": "Caricamento armi…",
+          "es-es": "Cargando armas…",
+          "fr-fr": "Chargement des armes…",
+          "pt-br": "Carregando armas…",
+          "ja-jp": "武器を読み込み中…",
+          "ko-kr": "무기 불러오는 중…"
+        }
+      },
+      "weapon.unavailable": {
+        "source": "Каталог недоступен",
+        "translations": {
+          "ru-ru": "Каталог недоступен",
+          "en-us": "Catalog unavailable",
+          "de-de": "Katalog nicht verfügbar",
+          "zh-cn": "目录不可用",
+          "it-it": "Catalogo non disponibile",
+          "es-es": "Catálogo no disponible",
+          "fr-fr": "Catalogue indisponible",
+          "pt-br": "Catálogo indisponível",
+          "ja-jp": "一覧を利用できません",
+          "ko-kr": "목록을 사용할 수 없음"
+        }
+      },
+      "weapon.choose": {
+        "source": "Выбери оружие для теста",
+        "translations": {
+          "ru-ru": "Выбери оружие для теста",
+          "en-us": "Choose a weapon to test",
+          "de-de": "Waffe zum Testen wählen",
+          "zh-cn": "选择测试武器",
+          "it-it": "Scegli arma da provare",
+          "es-es": "Elige arma para probar",
+          "fr-fr": "Choisir une arme à tester",
+          "pt-br": "Escolha arma para testar",
+          "ja-jp": "テストする武器を選択",
+          "ko-kr": "시험할 무기 선택"
+        }
+      },
+      "weapon.disabled": {
+        "source": "Выбор оружия отключён",
+        "translations": {
+          "ru-ru": "Выбор оружия отключён",
+          "en-us": "Weapon selection disabled",
+          "de-de": "Waffenauswahl deaktiviert",
+          "zh-cn": "武器选择已禁用",
+          "it-it": "Selezione armi disattivata",
+          "es-es": "Selección de armas desactivada",
+          "fr-fr": "Sélection d'arme désactivée",
+          "pt-br": "Seleção de armas desativada",
+          "ja-jp": "武器選択は無効です",
+          "ko-kr": "무기 선택 비활성화"
+        }
+      },
+      "weapon.invalid": {
+        "source": "Некорректный ID оружия",
+        "translations": {
+          "ru-ru": "Некорректный ID оружия",
+          "en-us": "Invalid weapon ID",
+          "de-de": "Ungültige Waffen-ID",
+          "zh-cn": "武器 ID 无效",
+          "it-it": "ID arma non valido",
+          "es-es": "ID de arma no válido",
+          "fr-fr": "ID d'arme invalide",
+          "pt-br": "ID de arma inválido",
+          "ja-jp": "武器IDが無効です",
+          "ko-kr": "잘못된 무기 ID"
+        }
+      },
+      "weapon.too_fast": {
+        "source": "Слишком частая смена оружия",
+        "translations": {
+          "ru-ru": "Слишком частая смена оружия",
+          "en-us": "Changing weapons too quickly",
+          "de-de": "Waffenwechsel zu schnell",
+          "zh-cn": "切换武器过于频繁",
+          "it-it": "Cambio armi troppo rapido",
+          "es-es": "Cambio de arma demasiado rápido",
+          "fr-fr": "Changement d'arme trop rapide",
+          "pt-br": "Troca rápida demais",
+          "ja-jp": "武器変更が速すぎます",
+          "ko-kr": "무기 교체가 너무 빠름"
+        }
+      },
+      "weapon.not_ready": {
+        "source": "Персонаж ещё не готов",
+        "translations": {
+          "ru-ru": "Персонаж ещё не готов",
+          "en-us": "Character not ready",
+          "de-de": "Charakter noch nicht bereit",
+          "zh-cn": "角色尚未准备好",
+          "it-it": "Personaggio non pronto",
+          "es-es": "Personaje aún no listo",
+          "fr-fr": "Personnage pas encore prêt",
+          "pt-br": "Personagem ainda não está pronto",
+          "ja-jp": "キャラクターの準備中",
+          "ko-kr": "캐릭터가 아직 준비되지 않음"
+        }
+      },
+      "weapon.unpublished": {
+        "source": "Оружие не опубликовано",
+        "translations": {
+          "ru-ru": "Оружие не опубликовано",
+          "en-us": "Weapon not published",
+          "de-de": "Waffe nicht veröffentlicht",
+          "zh-cn": "武器尚未发布",
+          "it-it": "Arma non pubblicata",
+          "es-es": "Arma no publicada",
+          "fr-fr": "Arme non publiée",
+          "pt-br": "Arma não publicada",
+          "ja-jp": "武器は未公開です",
+          "ko-kr": "무기가 게시되지 않음"
+        }
+      },
+      "weapon.failed": {
+        "source": "Не удалось применить оружие",
+        "translations": {
+          "ru-ru": "Не удалось применить оружие",
+          "en-us": "Could not equip weapon",
+          "de-de": "Waffe konnte nicht angelegt werden",
+          "zh-cn": "无法装备武器",
+          "it-it": "Impossibile equipaggiare l'arma",
+          "es-es": "No se pudo equipar el arma",
+          "fr-fr": "Impossible d'équiper l'arme",
+          "pt-br": "Não foi possível equipar",
+          "ja-jp": "武器を装備できませんでした",
+          "ko-kr": "무기 장착 실패"
+        }
+      },
+      "weapon.unavailable_item": {
+        "source": "Оружие недоступно",
+        "translations": {
+          "ru-ru": "Оружие недоступно",
+          "en-us": "Weapon unavailable",
+          "de-de": "Waffe nicht verfügbar",
+          "zh-cn": "武器不可用",
+          "it-it": "Arma non disponibile",
+          "es-es": "Arma no disponible",
+          "fr-fr": "Arme indisponible",
+          "pt-br": "Arma indisponível",
+          "ja-jp": "武器を使用できません",
+          "ko-kr": "무기를 사용할 수 없음"
+        }
+      },
+      "weapon.equip_failed": {
+        "source": "Не удалось экипировать",
+        "translations": {
+          "ru-ru": "Не удалось экипировать",
+          "en-us": "Could not equip",
+          "de-de": "Ausrüsten fehlgeschlagen",
+          "zh-cn": "装备失败",
+          "it-it": "Equipaggiamento fallito",
+          "es-es": "No se pudo equipar",
+          "fr-fr": "Équipement impossible",
+          "pt-br": "Falha ao equipar",
+          "ja-jp": "装備できませんでした",
+          "ko-kr": "장착 실패"
+        }
+      },
+      "weapon.no_response": {
+        "source": "Нет ответа сервера",
+        "translations": {
+          "ru-ru": "Нет ответа сервера",
+          "en-us": "Server not responding",
+          "de-de": "Server antwortet nicht",
+          "zh-cn": "服务器无响应",
+          "it-it": "Nessuna risposta dal server",
+          "es-es": "El servidor no responde",
+          "fr-fr": "Le serveur ne répond pas",
+          "pt-br": "Servidor sem resposta",
+          "ja-jp": "サーバーから応答がありません",
+          "ko-kr": "서버 응답 없음"
+        }
+      }
+    },
+    "feedback": {
+      "feedback.ready": {
+        "source": "Готово",
+        "translations": {
+          "ru-ru": "Готово",
+          "en-us": "Ready",
+          "de-de": "Bereit",
+          "zh-cn": "准备就绪",
+          "it-it": "Pronto",
+          "es-es": "Listo",
+          "fr-fr": "Prêt",
+          "pt-br": "Pronto",
+          "ja-jp": "準備完了",
+          "ko-kr": "준비 완료"
+        }
+      },
+      "feedback.cancel": {
+        "source": "Отмена",
+        "translations": {
+          "ru-ru": "Отмена",
+          "en-us": "Cancel",
+          "de-de": "Abbrechen",
+          "zh-cn": "取消",
+          "it-it": "Annulla",
+          "es-es": "Cancelar",
+          "fr-fr": "Annuler",
+          "pt-br": "Cancelar",
+          "ja-jp": "キャンセル",
+          "ko-kr": "취소"
+        }
+      },
+      "feedback.confirm": {
+        "source": "Подтвердить",
+        "translations": {
+          "ru-ru": "Подтвердить",
+          "en-us": "Confirm",
+          "de-de": "Bestätigen",
+          "zh-cn": "确认",
+          "it-it": "Conferma",
+          "es-es": "Confirmar",
+          "fr-fr": "Confirmer",
+          "pt-br": "Confirmar",
+          "ja-jp": "確認",
+          "ko-kr": "확인"
+        }
+      }
+    },
+    "actors": {
+      "actors.guard_02": {
+        "source": "Охранник 02",
+        "translations": {
+          "ru-ru": "Охранник 02",
+          "en-us": "Guard 02",
+          "de-de": "Wache 02",
+          "zh-cn": "守卫 02",
+          "it-it": "Guardia 02",
+          "es-es": "Guardia 02",
+          "fr-fr": "Garde 02",
+          "pt-br": "Guarda 02",
+          "ja-jp": "衛兵 02",
+          "ko-kr": "경비병 02"
+        }
+      },
+      "actors.warsmith": {
+        "source": "Кузнец",
+        "translations": {
+          "ru-ru": "Кузнец",
+          "en-us": "Warsmith",
+          "de-de": "Schmied",
+          "zh-cn": "铁匠",
+          "it-it": "Fabbro",
+          "es-es": "Herrero",
+          "fr-fr": "Forgeron",
+          "pt-br": "Ferreiro",
+          "ja-jp": "鍛冶師",
+          "ko-kr": "대장장이"
+        }
+      },
+      "actors.guard_01": {
+        "source": "Гвард 01",
+        "translations": {
+          "ru-ru": "Гвард 01",
+          "en-us": "Guard 01",
+          "de-de": "Wache 01",
+          "zh-cn": "守卫 01",
+          "it-it": "Guardia 01",
+          "es-es": "Guardia 01",
+          "fr-fr": "Garde 01",
+          "pt-br": "Guarda 01",
+          "ja-jp": "衛兵 01",
+          "ko-kr": "경비병 01"
+        }
+      },
+      "actors.gremlin": {
+        "source": "Гремлин",
+        "translations": {
+          "ru-ru": "Гремлин",
+          "en-us": "Gremlin",
+          "de-de": "Gremlin",
+          "zh-cn": "小妖精",
+          "it-it": "Gremlin",
+          "es-es": "Gremlin",
+          "fr-fr": "Gremlin",
+          "pt-br": "Gremlin",
+          "ja-jp": "グレムリン",
+          "ko-kr": "그렘린"
+        }
+      }
+    },
+    "items": {
+      "items.newbie_bow": {
+        "source": "Лук Новичка",
+        "translations": {
+          "ru-ru": "Лук Новичка",
+          "en-us": "Novice Bow",
+          "de-de": "Anfängerbogen",
+          "zh-cn": "新手弓",
+          "it-it": "Arco del principiante",
+          "es-es": "Arco de principiante",
+          "fr-fr": "Arc du débutant",
+          "pt-br": "Arco de iniciante",
+          "ja-jp": "初心者の弓",
+          "ko-kr": "초보자의 활"
+        }
+      },
+      "items.newbie_dagger": {
+        "source": "Кинжал Новичка",
+        "translations": {
+          "ru-ru": "Кинжал Новичка",
+          "en-us": "Novice Dagger",
+          "de-de": "Anfängerdolch",
+          "zh-cn": "新手匕首",
+          "it-it": "Pugnale del principiante",
+          "es-es": "Daga de principiante",
+          "fr-fr": "Dague du débutant",
+          "pt-br": "Adaga de iniciante",
+          "ja-jp": "初心者の短剣",
+          "ko-kr": "초보자의 단검"
+        }
+      },
+      "items.newbie_axe": {
+        "source": "Топор Новичка",
+        "translations": {
+          "ru-ru": "Топор Новичка",
+          "en-us": "Novice Axe",
+          "de-de": "Anfängeraxt",
+          "zh-cn": "新手斧",
+          "it-it": "Ascia del principiante",
+          "es-es": "Hacha de principiante",
+          "fr-fr": "Hache du débutant",
+          "pt-br": "Machado de iniciante",
+          "ja-jp": "初心者の斧",
+          "ko-kr": "초보자의 도끼"
+        }
+      },
+      "items.newbie_saber_01": {
+        "source": "Сабля Новичка 01",
+        "translations": {
+          "ru-ru": "Сабля Новичка 01",
+          "en-us": "Novice Saber 01",
+          "de-de": "Anfängersäbel 01",
+          "zh-cn": "新手军刀 01",
+          "it-it": "Sciabola del principiante 01",
+          "es-es": "Sable de principiante 01",
+          "fr-fr": "Sabre du débutant 01",
+          "pt-br": "Sabre de iniciante 01",
+          "ja-jp": "初心者のサーベル 01",
+          "ko-kr": "초보자의 사브르 01"
+        }
+      },
+      "items.newbie_sword_01": {
+        "source": "Меч Новичка 01",
+        "translations": {
+          "ru-ru": "Меч Новичка 01",
+          "en-us": "Novice Sword 01",
+          "de-de": "Anfängerschwert 01",
+          "zh-cn": "新手剑 01",
+          "it-it": "Spada del principiante 01",
+          "es-es": "Espada de principiante 01",
+          "fr-fr": "Épée du débutant 01",
+          "pt-br": "Espada de iniciante 01",
+          "ja-jp": "初心者の剣 01",
+          "ko-kr": "초보자의 검 01"
+        }
+      },
+      "items.dragon_divider": {
+        "source": "Рассекатель Драконов",
+        "translations": {
+          "ru-ru": "Рассекатель Драконов",
+          "en-us": "Dragon Divider",
+          "de-de": "Drachenspalter",
+          "zh-cn": "屠龙者",
+          "it-it": "Divisore di draghi",
+          "es-es": "Cortador de dragones",
+          "fr-fr": "Pourfendeur de dragons",
+          "pt-br": "Divisor de dragões",
+          "ja-jp": "竜断ち",
+          "ko-kr": "용 가르개"
+        }
+      },
+      "items.guards_sword_01": {
+        "source": "Меч Гварда 01",
+        "translations": {
+          "ru-ru": "Меч Гварда 01",
+          "en-us": "Guard's Sword 01",
+          "de-de": "Wachenschwert 01",
+          "zh-cn": "守卫之剑 01",
+          "it-it": "Spada della guardia 01",
+          "es-es": "Espada del guardia 01",
+          "fr-fr": "Épée du garde 01",
+          "pt-br": "Espada do guarda 01",
+          "ja-jp": "衛兵の剣 01",
+          "ko-kr": "경비병의 검 01"
+        }
+      },
+      "items.warsmiths_hummer_01": {
+        "source": "Молот Кузнеца 01",
+        "translations": {
+          "ru-ru": "Молот Кузнеца 01",
+          "en-us": "Warsmith's Hammer 01",
+          "de-de": "Schmiedehammer 01",
+          "zh-cn": "铁匠之锤 01",
+          "it-it": "Martello del fabbro 01",
+          "es-es": "Martillo del herrero 01",
+          "fr-fr": "Marteau du forgeron 01",
+          "pt-br": "Martelo do ferreiro 01",
+          "ja-jp": "鍛冶師のハンマー 01",
+          "ko-kr": "대장장이 망치 01"
+        }
+      }
+    }
+  }
+}

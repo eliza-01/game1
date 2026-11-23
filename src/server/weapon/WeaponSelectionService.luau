@@ -29,7 +29,7 @@ local function catalogFor(player: Player)
     if not Config.Enabled then return { enabled = false, weapons = {} } end
     local character = player.Character
     local rows = {
-        { slug = "", label = "Без оружия", weaponType = "hands" },
+        { slug = "", label = "Без оружия", labelRu = "Без оружия", labelEn = "Unarmed", weaponType = "hands" },
     }
     for _, row in ipairs(WeaponEquipService.ListAvailable()) do
         -- The catalog is server-owned; never trust names/slugs sent from UI.
@@ -37,6 +37,8 @@ local function catalogFor(player: Player)
         table.insert(rows, {
             slug = tostring(row.slug),
             label = if russian ~= "" then russian else tostring(row.nameEn),
+            labelRu = if russian ~= "" then russian else tostring(row.nameEn),
+            labelEn = tostring(row.nameEn or row.slug),
             weaponType = tostring(row.weaponType or ""),
         })
     end

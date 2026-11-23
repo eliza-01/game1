@@ -18,7 +18,7 @@
       "race": "human",
       "gender": "female",
       "status": "ASSEMBLY_READY",
-      "revision": 18,
+      "revision": 19,
       "visualMode": "assembly",
       "assembly": {
         "schema_version": 2,
@@ -314,29 +314,29 @@
             "color": "#000000"
           },
           "hair": {
-            "id": "human_female_m004_hair",
-            "asset_id": "115395555838720",
+            "id": "human_female_m003_hair",
+            "asset_id": "122803353972225",
             "revision": 1,
-            "mesh_family_id": "human_female_m004",
+            "mesh_family_id": "human_female_m003",
             "appearance_id": "",
             "used_bones": [],
             "attachment": "hair_mount",
             "attachment_mode": "pivot",
             "socket_bone": "",
             "extras": [
-              "human_female_m004_hair_extra_01"
+              "human_female_m003_hair_extra_01"
             ],
             "atlas_image_id": "",
             "colors": {
-              "primary": "#FEE1F9",
+              "primary": "#FFF0F0",
               "extra_01": "#FEA9E7"
             },
-            "material": "SmoothPlastic"
+            "material": "Sand"
           }
         },
         "ready": true,
         "missing": [],
-        "fingerprint": "d61d06cae72215c84e13b42e"
+        "fingerprint": "b6021528bc2b522adb92b4bf"
       },
       "stats": {
         "Level": 2,

@@ -10,6 +10,7 @@ local TweenService = game:GetService("TweenService")
 local SpatialRoot = require(ReplicatedStorage:WaitForChild("Game1Shared")
     :WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local UiSettings = require(script.Parent:WaitForChild("UiPresentationSettings"))
+local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 
 local player = Players.LocalPlayer
 local Feedback = {}
@@ -129,7 +130,7 @@ function Feedback.Show(items: {any})
         local icon = ICONS[tostring(item.icon or "")] or "•"
         local count = math.max(1, math.floor(math.abs(amount) + 0.5))
         local text = string.format("%s  %s%d  %s", icon, if amount > 0 then "+" else "−",
-            count, tostring(item.label or ""))
+            count, Language.FromSource(tostring(item.label or "")))
         index += 1
         showLine(anchor, offset, text, amount > 0, index, cfg, true)
         if index >= 8 then break end

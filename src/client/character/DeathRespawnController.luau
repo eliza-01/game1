@@ -2,6 +2,7 @@
 -- the explicit Return to Town action once the authored death animation reached DeathIdle.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 
 local Controller = {}
 local started = false
@@ -116,7 +117,7 @@ local function ensureGui()
             returnButton.AutoButtonColor = true
             returnButton.Text = "В город"
             if statusLabel then
-                statusLabel.Text = tostring(if ok then errorMessage else accepted)
+                statusLabel.Text = Language.FromSource(tostring(if ok then errorMessage else accepted))
                 statusLabel.Visible = true
             end
         end

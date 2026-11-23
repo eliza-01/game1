@@ -13,6 +13,9 @@ function ServiceCatalog.Build(root: Instance)
     local world = root:WaitForChild("world")
 
     return {
+        {name = "PlayerLanguageService", critical = false, start = function()
+            require(root:WaitForChild("localization"):WaitForChild("PlayerLanguageService")).Start()
+        end},
         {name = "Game1AuthoringCleanupService", critical = false, start = function()
             require(world:WaitForChild("Game1AuthoringCleanupService")).Start()
         end},

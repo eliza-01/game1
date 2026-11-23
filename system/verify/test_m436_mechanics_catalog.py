@@ -31,9 +31,13 @@ class MechanicsM436(unittest.TestCase):
             for source in card['sources']:
                 self.assertTrue((ROOT/source['path']).is_file(), (card['id'], source['path']))
                 self.assertEqual(permitted_source(card['id'], source['id'])[0], source['path'])
-        # Per NPC/monster script registration is per item, not global to the domain.
-        self.assertEqual(DOMAINS[1]['items'], [])
-        self.assertEqual(DOMAINS[2]['items'], [])
+        # M447: NPC/Monster/Character share service-level cards, not per-slug claims.
+        self.assertEqual([len(d['items']) for d in DOMAINS], [10, 3, 3, 5])
+        for domain in self.catalog['domains']:
+            for item in domain['items']:
+                for source in item['sources']:
+                    self.assertTrue((ROOT/source['path']).is_file(), (item['id'], source['path']))
+                    self.assertEqual(permitted_source(item['id'], source['id'])[0], source['path'])
 
     def test_socket_names_and_roles_match_the_real_luau_contract(self):
         contract = (ROOT/'src/shared/world/HouseSocketContract.luau').read_text('utf-8')

@@ -1,14 +1,14 @@
 
 # Навигация по документации game1
 
-**Последняя редакторская сверка:** 22 ноября 2026 (M439, исходники после M438a). Основной подробный список M188–M189 ниже является историческим срезом соответствующих workflow.
+**Последняя редакторская сверка:** 23 ноября 2026 (M447 Mechanics audit поверх M446; общий справочник M439). Основной подробный список M188–M189 ниже является историческим срезом соответствующих workflow.
 **Правило:** читать актуальные контракты прежде, чем исторические milestone-отчёты. Старые тексты оставлены для причин, миграций и отладки, **не** как одновременно действующие ТЗ.
 
 ## Наиболее актуальная точка входа
 
 - **[Kanban · актуальное состояние 17 карточек](kanban/STATUS_2026-11-22_M439.md)** — проверка источников и открытая Studio/Android-приёмка; [спецификации карточек](kanban/README.md).
 - **[Текущее ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md)** и **[Архитектурная карта](architecture/CURRENT_ARCHITECTURE_RU.md)** — текущие приоритеты и реальные границы сервера, клиента, систем авторинга.
-- **[Mechanics House](workflows/MECHANICS_HOUSE_CATALOG_M436_RU.md)** — просмотр техкарт с дополнением M438a о Fireplace.
+- **[Mechanics · аудит всех четырёх разделов M447](workflows/MECHANICS_RUNTIME_GAPS_M447_RU.md)** — House/NPC/Monster/Character, незавершённые механики, persistence, Runtime/Studio критерии; [как устроен каталог](workflows/MECHANICS_HOUSE_CATALOG_M436_RU.md).
 - **[Камин и костёр · M442](workflows/CAMPFIRE_AND_FIREPLACE_M442_RU.md)** — единая механика готовки, условный дым, мобильный/ПК dock, HUD и редактируемые параметры.
 - Для LOD использовать текущие контрактные модули `location_streaming_config.py`, `LocationWorldStreamer.luau`, `lod_studio_preview.py`, а не общие пороги из исторического M355.
 
@@ -72,3 +72,5 @@
 - [M233 · Location Assets Model-only publication isolation](workflows/LOCATION_ASSETS_MODEL_ONLY_PUBLICATION_M233_RU.md) — модельный FBX без встроенных атласов; отдельный API и запрет неявного Image upload.
 
 - [M234 · Shared Atlas Editor / Apply Changes / Studio Sync](workflows/SHARED_ATLAS_EDITOR_APPLY_M234_RU.md) — CURRENT: единый редактор атласов для Real Estate и Location Assets, сохранение привязанных вариантов, предпросмотр совместного republish, только явный Studio Sync.
+
+- [**M449 · Options → Sockets, постоянные USE/AIM зоны**](workflows/SOCKET_RANGES_OPTIONS_M449_RU.md) — House/Campfire, валидация и HS Studio Debug override.

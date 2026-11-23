@@ -8,6 +8,8 @@ local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitFo
 local Workspace = game:GetService("Workspace")
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local Contract = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world"):WaitForChild("HouseSocketContract"))
+local CampfireContract = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world"):WaitForChild("CampfireSocketContract"))
+local SpatialRoot = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local PromptController = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("HouseSocketPromptController"))
 
 local Debug = {}
@@ -58,25 +60,36 @@ local function clearPreview()
     for socket, part in aimPreviews do part:Destroy(); aimPreviews[socket] = nil end
 end
 
-local function isManaged(socket: Attachment): boolean
+-- Never classify an arbitrary fire_socket (including one inside an
+-- inventory asset) as a placed campfire. Locate its registered Location root.
+local function domainFor(socket: Attachment): string?
     local ancestor: Instance? = socket.Parent
     while ancestor and ancestor ~= Workspace do
         if ancestor:IsA("Model") then
-            if ancestor:GetAttribute("Game1RealEstateTemplate") ~= true
-                and ancestor:GetAttribute("Game1RealEstateSlug") ~= nil then return true end
-            -- In Studio an authored house copy may still carry a template tag.
-            -- Match the server's preview policy by checking a real HouseRig.
-            if RunService:IsStudio() and ancestor:FindFirstChild("HouseRig") ~= nil then
-                return true
+            if CampfireContract.Get(socket.Name)
+                and ancestor:GetAttribute("Game1DecoAssetSlug") == "campfire_01" then
+                return "campfire"
+            end
+            if Contract.Get(socket.Name) then
+                if ancestor:GetAttribute("Game1RealEstateTemplate") ~= true
+                    and ancestor:GetAttribute("Game1RealEstateSlug") ~= nil then return "house" end
+                -- In Studio an authored house copy may still carry a template tag.
+                if RunService:IsStudio() and ancestor:FindFirstChild("HouseRig") ~= nil then
+                    return "house"
+                end
             end
         end
         ancestor = ancestor.Parent
     end
-    return false
+    return nil
+end
+
+local function isManaged(socket: Attachment): boolean
+    return domainFor(socket) ~= nil
 end
 
 local function track(instance: Instance)
-    if not instance:IsA("Attachment") or not Contract.Get(instance.Name) then return end
+    if not instance:IsA("Attachment") or not (Contract.Get(instance.Name) or CampfireContract.Get(instance.Name)) then return end
     if isManaged(instance) then tracked[instance] = true end
 end
 
@@ -93,10 +106,26 @@ end
 local function updatePreview()
     local count = 0
     local active: {[Attachment]: boolean} = {}
+    -- Prioritize nearest sockets instead of picking the first 100 hash keys;
+    -- otherwise houses could consume the budget and hide every campfire.
+    local options: {{socket: Attachment, distance: number, domain: string}} = {}
+    local root = SpatialRoot.Get(player)
     for socket in tracked do
+        if socket:IsDescendantOf(Workspace) then
+            local domain = domainFor(socket)
+            if domain then
+                local frame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
+                local distance = if root then (root.Position - frame.Position).Magnitude else 0
+                table.insert(options, {socket = socket, distance = distance, domain = domain})
+            end
+        end
+    end
+    table.sort(options, function(a, b) return a.distance < b.distance end)
+    for _, item in ipairs(options) do
         if count >= MAX_PREVIEWS then break end
-        local spec = Contract.Get(socket.Name)
-        if spec and socket:IsDescendantOf(Workspace) and isManaged(socket) then
+        local socket = item.socket
+        local spec = if item.domain == "campfire" then CampfireContract.Get(socket.Name) else Contract.Get(socket.Name)
+        if spec then
             active[socket] = true
             count += 1
             local part = previews[socket]
@@ -111,13 +140,18 @@ local function updatePreview()
                 part.CastShadow = false
                 part.Material = Enum.Material.Neon
                 part.Transparency = 0.9
-                part.Color = if spec.interact then COLORS.accent else COLORS.muted
+                part.Color = if spec.role == "pot_mount" then Color3.fromRGB(121, 185, 255)
+                    else if spec.interact then COLORS.accent else COLORS.muted
                 part.Parent = Workspace.CurrentCamera
                 previews[socket] = part
             end
-            local override = player:GetAttribute(Contract.RadiusAttribute(spec.name))
+            local radiusAttribute = if item.domain == "campfire"
+                then CampfireContract.RadiusAttribute(spec.name) else Contract.RadiusAttribute(spec.name)
+            local override = player:GetAttribute(radiusAttribute)
             local r = if typeof(override) == "number" then override else spec.radius
-            part.Size = Vector3.new(r * 2, r * 2, r * 2)
+            -- Non-interactive cooking_pot_01_socket is a HEAD point marker.
+            local diameter = if spec.role == "pot_mount" then 0.6 else r * 2
+            part.Size = Vector3.new(diameter, diameter, diameter)
             part.CFrame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
             if spec.hoverRadius then
                 local aim = aimPreviews[socket]
@@ -136,8 +170,10 @@ local function updatePreview()
                     aim.Parent = Workspace.CurrentCamera
                     aimPreviews[socket] = aim
                 end
-                local overrideAim = previewHoverOverrides[spec.name]
-                    or player:GetAttribute(Contract.HoverRadiusAttribute(spec.name))
+                local hoverAttribute = if item.domain == "campfire"
+                    then CampfireContract.HoverRadiusAttribute(spec.name) else Contract.HoverRadiusAttribute(spec.name)
+                local overrideAim = previewHoverOverrides[item.domain .. ":" .. spec.name]
+                    or player:GetAttribute(hoverAttribute)
                 local aimRadius = if typeof(overrideAim) == "number" then overrideAim else spec.hoverRadius
                 aim.Size = Vector3.new(aimRadius * 2, aimRadius * 2, aimRadius * 2)
                 aim.CFrame = part.CFrame
@@ -176,7 +212,7 @@ local function mountPanel(gui: ScreenGui)
     panel.Parent = gui
     local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0, 10); corner.Parent = panel
     local border = Instance.new("UIStroke"); border.Color = COLORS.line; border.Parent = panel
-    local title = label(panel, "HOUSE SOCKETS · STUDIO", 245, 30)
+    local title = label(panel, "HOUSE / CAMPFIRE SOCKETS", 290, 30)
     title.Position = UDim2.fromOffset(12, 7)
     title.ZIndex = 81
     local close = control(panel, "×", 30, 27)
@@ -233,10 +269,24 @@ local function mountPanel(gui: ScreenGui)
         end
         local result = invoke("GetTestHouseSockets")
         if not result.ok then info.Text = tostring(result.error); return end
+        local campfires = invoke("GetTestCampfireSockets")
+        local campfireError: string? = nil
+        if not campfires.ok then
+            campfireError = tostring(campfires.error)
+            campfires = {ok = false, sockets = {}, total = 0, bound = 0}
+        end
         showKeyState(result.keyOwned ~= false)
+        local rows = {}
+        for _, row in ipairs(result.sockets) do
+            table.insert(rows, row)
+        end
+        for _, row in ipairs(campfires.sockets) do
+            table.insert(rows, row)
+        end
         local missing = 0
-        for index, row in result.sockets do
-            local spec = Contract.Get(row.name)
+        for index, row in ipairs(rows) do
+            local campfire = row.domain == "campfire"
+            local spec = if campfire then CampfireContract.Get(row.name) else Contract.Get(row.name)
             if not spec then continue end
             if not row.found then missing += 1 end
             local entry = Instance.new("Frame")
@@ -246,11 +296,20 @@ local function mountPanel(gui: ScreenGui)
             entry.ZIndex = 82
             entry.Parent = scroll
             local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 7); c.Parent = entry
-            local titleText = label(entry, (if row.found then "● " else "○ ") .. row.name, 340, 22)
+            local titleText = label(entry, (if row.found then "● " else "○ ")
+                .. (if campfire then "[CAMPFIRE] " else "") .. row.name
+                .. (if campfire and row.house ~= "" then " · " .. row.house else ""), 340, 22)
             titleText.Position = UDim2.fromOffset(8, 2)
             titleText.TextSize = 10
             titleText.TextColor3 = if row.found then COLORS.accent else COLORS.muted
             titleText.ZIndex = 83
+            if not spec.interact and campfire then
+                local markerInfo = label(entry, "HEAD · точка установки котла (без USE/AIM)", 340, 23)
+                markerInfo.Position = UDim2.fromOffset(8, 26)
+                markerInfo.TextColor3 = Color3.fromRGB(121, 185, 255)
+                markerInfo.ZIndex = 83
+                continue
+            end
             local minus = control(entry, "−", 30, 23)
             minus.Position = UDim2.fromOffset(8, 26)
             minus.ZIndex = 83
@@ -262,10 +321,11 @@ local function mountPanel(gui: ScreenGui)
             plus.ZIndex = 83
             local function set(delta: number)
                 local current = tonumber(valueLabel.Text:match("[%d%.]+")) or spec.radius
-                local response = invoke("SetTestHouseSocketRadius", row.name, current + delta)
+                local response = invoke(if campfire then "SetTestCampfireSocketRadius"
+                    else "SetTestHouseSocketRadius", row.name, current + delta)
                 if not response.ok then info.Text = tostring(response.error); return end
                 valueLabel.Text = tostring(response.radius) .. " studs"
-                PromptController.SetRadius(row.name, response.radius)
+                if not campfire then PromptController.SetRadius(row.name, response.radius) end
                 if visualize then updatePreview() end
             end
             minus.Activated:Connect(function() set(-1) end)
@@ -290,10 +350,11 @@ local function mountPanel(gui: ScreenGui)
                 aimLabel.ZIndex = 83
                 local function setAim(delta: number)
                     local current = tonumber(aimValue.Text:match("[%d%.]+")) or spec.hoverRadius or 5
-                    local response = invoke("SetTestHouseSocketHoverRadius", row.name, current + delta)
+                    local response = invoke(if campfire then "SetTestCampfireSocketHoverRadius"
+                        else "SetTestHouseSocketHoverRadius", row.name, current + delta)
                     if not response.ok then info.Text = tostring(response.error); return end
                     aimValue.Text = tostring(response.hoverRadius) .. " studs"
-                    previewHoverOverrides[row.name] = response.hoverRadius
+                    previewHoverOverrides[(if campfire then "campfire:" else "house:") .. row.name] = response.hoverRadius
                     if visualize then updatePreview() end
                 end
                 aimMinus.Activated:Connect(function() setAim(-1) end)
@@ -310,12 +371,14 @@ local function mountPanel(gui: ScreenGui)
             end
         end
         local metrics = result.metrics
-        if typeof(metrics) == "table" then
-            info.Text = ("%d/%d types · %d homes · %d prompts · %d authored")
-                :format(#result.sockets - missing, #result.sockets,
-                    metrics.houses or 0, metrics.prompts or 0, metrics.authored or 0)
+        if campfireError then
+            info.Text = "House OK · Campfire: " .. campfireError
+        elseif typeof(metrics) == "table" then
+            info.Text = ("%d/%d · homes %d · prompts %d · authored %d · fires %d/%d")
+                :format(#rows - missing, #rows, metrics.houses or 0, metrics.prompts or 0,
+                    metrics.authored or 0, campfires.bound or 0, campfires.total or 0)
         else
-            info.Text = tostring(#result.sockets - missing) .. "/" .. tostring(#result.sockets) .. " socket types present in placed houses"
+            info.Text = tostring(#rows - missing) .. "/" .. tostring(#rows) .. " house + campfire sockets"
         end
     end
     local function hide()
@@ -388,7 +451,7 @@ end
 -- A second entry point in the existing Test Loadout; only ONE panel owns state.
 function Debug.AttachLauncher(body: Frame, y: number)
     if not PublishedDebugAccess.ClientAllowed() then return end
-    local opener = control(body, "HOUSE SOCKETS  ·  DEBUG", 288, 32)
+    local opener = control(body, "HOUSE + CAMPFIRE SOCKETS", 288, 32)
     opener.Position = UDim2.fromOffset(0, y)
     opener.Activated:Connect(function()
         if togglePanel then togglePanel() else warn("[game1][house-socket] HS launcher not ready") end

@@ -38,7 +38,7 @@ class FireplaceStatusCollapseRestoreM445(unittest.TestCase):
 
     def test_idle_registered_source_is_visible_in_range(self):
         self.assertIn('Game1FireplaceFuelState', self.ui)
-        self.assertIn('elseif registered(socket) and distance < minDistance then', self.ui)
+        self.assertIn('elseif registered(socket) and ray and hoverRadius > 0 then', self.ui)
         self.assertIn('setBar(fuelRow, 0, "Не горит"', self.ui)
         self.assertIn('dock:Present("fireplace", socket,', self.ui)
 

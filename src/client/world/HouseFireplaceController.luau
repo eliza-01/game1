@@ -10,6 +10,11 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local Config = require(Shared:WaitForChild("world"):WaitForChild("FireplaceMechanicsConfig"))
+local HouseContract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
+local CampfireContract = require(Shared:WaitForChild("world"):WaitForChild("CampfireSocketContract"))
+local Aim = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketAimPolicy"))
+local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
+local Occlusion = require(script.Parent:WaitForChild("HouseSocketAimOcclusion"))
 local UiSettings = require(script.Parent:WaitForChild("UiPresentationSettings"))
 local InfoDock = require(script.Parent:WaitForChild("InformativeWindowDock"))
 
@@ -82,6 +87,31 @@ local function registered(socket: Attachment): boolean
     -- Unmanaged authoring Bones/Attachments must not create empty status HUDs.
     -- A recognized server source writes this attribute on registration.
     return typeof(socket:GetAttribute("Game1FireplaceFuelState")) == "string"
+end
+
+local function useAndHover(socket: Attachment): (number, number)
+    if socket.Name == "fire_socket" then
+        local use = player:GetAttribute(CampfireContract.RadiusAttribute("fire_socket"))
+        local hover = player:GetAttribute(CampfireContract.HoverRadiusAttribute("fire_socket"))
+        local useRadius = if typeof(use) == "number"
+            then math.clamp(use, HouseContract.MinDebugRadius, HouseContract.MaxDebugRadius)
+            else CampfireContract.Fire.radius
+        local aimRadius = if typeof(hover) == "number"
+            then math.clamp(hover, HouseContract.MinHoverRadius, HouseContract.MaxHoverRadius)
+            else CampfireContract.Fire.hoverRadius
+        return useRadius, aimRadius
+    end
+    local definition = HouseContract.Get(socket.Name)
+    if not definition then return 0, 0 end
+    local use = player:GetAttribute(HouseContract.RadiusAttribute(socket.Name))
+    local hover = player:GetAttribute(HouseContract.HoverRadiusAttribute(socket.Name))
+    local useRadius = if typeof(use) == "number"
+        then math.clamp(use, HouseContract.MinDebugRadius, HouseContract.MaxDebugRadius)
+        else definition.radius
+    local aimRadius = if typeof(hover) == "number"
+        then math.clamp(hover, HouseContract.MinHoverRadius, HouseContract.MaxHoverRadius)
+        else (definition.hoverRadius or 0)
+    return useRadius, aimRadius
 end
 
 local function setBar(entry: Frame, ratio: number, caption: string, color: Color3)
@@ -164,21 +194,41 @@ function Controller.Start()
         elapsed = 0
         local root = SpatialRoot.Get(player)
         local closest: Attachment? = nil
-        local minDistance = math.huge
+        local firstHit = math.huge
+        -- Information is displayed by the same center-reticle AIM sphere as
+        -- interaction, AND while the player is inside USE reach. The wider
+        -- ProgressVisibleRadius is an additional visibility ceiling, not a
+        -- replacement for interaction range. A disabled action (e.g. while
+        -- cooking) does not hide the read-only information.
+        local camera = Workspace.CurrentCamera
+        local ray: Ray? = nil
+        if camera and root then
+            local cursor = CameraController.CursorPoint()
+            local viewport = camera.ViewportSize
+            ray = camera:ViewportPointToRay(viewport.X * cursor.X, viewport.Y * cursor.Y)
+        end
         for socket in pairs(tracked) do
             if not socket:IsDescendantOf(Workspace) then
                 tracked[socket] = nil
                 dock:Forget(socket)
             elseif root then
-                local radius = tonumber(socket:GetAttribute("Game1FireplaceVisibleRadius")) or Config.ProgressVisibleRadius
+                local useRadius, hoverRadius = useAndHover(socket)
+                local visibleRadius = tonumber(socket:GetAttribute("Game1FireplaceVisibleRadius")) or Config.ProgressVisibleRadius
                 local distance = (socketPosition(socket) - root.Position).Magnitude
-                if distance > radius then
+                if distance > math.min(visibleRadius, useRadius) then
                     dock:Forget(socket)
-                elseif registered(socket) and distance < minDistance then
-                    minDistance = distance
-                    closest = socket
+                elseif registered(socket) and ray and hoverRadius > 0 then
+                    local entry = Aim.RaySphereEntry(ray.Origin, ray.Direction,
+                        socketPosition(socket), hoverRadius)
+                    if entry and entry < firstHit then
+                        firstHit = entry
+                        closest = socket
+                    end
                 end
             end
+        end
+        if closest and ray and not Occlusion.IsClear(ray.Origin, ray.Direction, firstHit, player.Character) then
+            closest = nil
         end
         if closest then
             render(closest, Workspace:GetServerTimeNow())

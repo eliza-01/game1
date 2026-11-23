@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "slug": "padlock_02",
+  "sourceSha256": "3451a931241eeb4097b7dcac88c8add0b156294a113d6f34564d31daa9414fe3",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "padlock_02",
+        "armature": "padlock_02_armature",
+        "vertices": 172,
+        "bones": [
+          {
+            "name": "padlock_01_hole_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              -1.1e-06,
+              0.0056046,
+              0.0,
+              -1.0,
+              0.0,
+              -0.0590142,
+              -1.1e-06,
+              0.0,
+              -1.0,
+              -0.3079156,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "padlock_01_hole_socket"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "padlock_02_armature",
+        "vertices": 3,
+        "bones": [
+          {
+            "name": "padlock_01_hole_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              -1.1e-06,
+              0.0056046,
+              0.0,
+              -1.0,
+              0.0,
+              -0.0590142,
+              -1.1e-06,
+              0.0,
+              -1.0,
+              -0.3079156,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "padlock_01_hole_socket"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": true
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [
+      "padlock_02_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

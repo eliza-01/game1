@@ -121,6 +121,52 @@ def normalize_ui_presentation(change, base=None):
             for device in ('desktop', 'mobile')}
 
 
+# M449: one persisted per-socket reach/reticle contract for House and Campfire.
+# Noninteractive authoring/HEAD sockets are deliberately excluded from editing.
+# The defaults mirror existing Luau contracts; save only changes via Options.
+SOCKET_RANGE_DEFAULTS = {
+    'house': {
+        'door_01_handle_outside_socket': {'useRadius': 8},
+        'door_01_handle_inside_socket': {'useRadius': 8},
+        'door_01_padlock_01_outside_socket': {'useRadius': 6},
+        'door_01_padlock_01_inside_socket': {'useRadius': 6},
+        'chest_01_socket': {'useRadius': 8, 'aimRadius': 4},
+        'elevator_01_socket': {'useRadius': 10, 'aimRadius': 5},
+        'elevator_02_socket': {'useRadius': 10, 'aimRadius': 5},
+        'elevator_03_socket': {'useRadius': 10, 'aimRadius': 5},
+        'fireplace_01_socket': {'useRadius': 8, 'aimRadius': 4},
+    },
+    'campfire': {'fire_socket': {'useRadius': 8, 'aimRadius': 4}},
+}
+
+
+def normalize_socket_ranges(change, base=None):
+    """Whitelist only actionable authored sockets. USE and AIM are server limits."""
+    import math
+    if not isinstance(change, dict) or set(change) - set(SOCKET_RANGE_DEFAULTS):
+        raise ValueError('socketRanges: unknown domain')
+    base = base or SOCKET_RANGE_DEFAULTS
+    result = deepcopy(base)
+    for domain, sockets in change.items():
+        if not isinstance(sockets, dict) or set(sockets) - set(SOCKET_RANGE_DEFAULTS[domain]):
+            raise ValueError(f'socketRanges.{domain}: unknown socket')
+        for name, fields in sockets.items():
+            template = SOCKET_RANGE_DEFAULTS[domain][name]
+            if not isinstance(fields, dict) or set(fields) - set(template):
+                raise ValueError(f'socketRanges.{domain}.{name}: unknown field')
+            for field, value in fields.items():
+                if type(value) not in (int, float) or not math.isfinite(value):
+                    raise ValueError(f'{name}.{field} must be a finite number')
+                low, high = (2, 30) if field == 'useRadius' else (1, 16)
+                if not low <= value <= high:
+                    raise ValueError(f'{name}.{field} must be {low}..{high} studs')
+                result[domain][name][field] = float(value)
+            row = result[domain][name]
+            if row.get('aimRadius', 0) > row['useRadius']:
+                raise ValueError(f'{name}: AIM must not exceed USE')
+    return result
+
+
 # Streaming radii belong to Workspace / the published Place, not to a player.
 # The command-bar helper in Asset Manager applies this value in Studio Edit.
 def normalize_world_streaming(change, base=None):
@@ -215,6 +261,7 @@ DEFAULT_PAYLOAD = {
     "camera": DEFAULT_CAMERA.copy(),
     "healthUi": deepcopy(HEALTH_UI_DEFAULTS),
     "uiPresentation": deepcopy(UI_PROFILE_DEFAULTS),
+    "socketRanges": deepcopy(SOCKET_RANGE_DEFAULTS),
     "npcOverhead": deepcopy(NPC_OVERHEAD_DEFAULTS),
     "monsterAi": {"noDamageReturnSeconds": 30},
     "worldStreaming": {"targetRadiusStuds": 150},
@@ -267,6 +314,7 @@ class OptionsStore:
             normalize_camera(row.get('settings') or {})
         normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))
         normalize_ui_presentation(payload.get('uiPresentation', UI_PROFILE_DEFAULTS))
+        normalize_socket_ranges(payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))
         normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
         normalize_world_streaming(payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
@@ -295,6 +343,7 @@ class OptionsStore:
             "\t}),",
             "\thealthUi = " + lua_literal(normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))) + ",",
             "\tuiPresentation = " + lua_literal(normalize_ui_presentation(payload.get('uiPresentation', UI_PROFILE_DEFAULTS))) + ",",
+            "\tsocketRanges = " + lua_literal(normalize_socket_ranges(payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))) + ",",
             "\tnpcOverhead = " + lua_literal(normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))) + ",",
             "\tmonsterAi = " + lua_literal(normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))) + ",",
             "\tplayerJump = " + lua_literal(normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))) + ",",
@@ -329,7 +378,29 @@ class OptionsStore:
                 if key not in payload[group]:
                     payload[group][key] = value
                     changed = True
-        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation'):
+        # One-time M449 migration: honor an already-authored campfire USE/AIM
+        # profile from Mechanics, then make Options the only runtime authority.
+        if 'socketRanges' not in payload:
+            initial = deepcopy(SOCKET_RANGE_DEFAULTS)
+            legacy_path = self.root / 'config/mechanics/fireplace.json'
+            if legacy_path.is_file():
+                try:
+                    legacy = json.loads(legacy_path.read_text(encoding='utf-8'))
+                    if not isinstance(legacy, dict):
+                        raise ValueError('expected an object')
+                    if 'CampfireInteractionRadius' in legacy and 'CampfireAimRadius' in legacy:
+                        imported = {'campfire': {'fire_socket': {
+                            'useRadius': legacy['CampfireInteractionRadius'],
+                            'aimRadius': legacy['CampfireAimRadius'],
+                        }}}
+                        initial = normalize_socket_ranges(imported, initial)
+                except (OSError, ValueError, TypeError) as error:
+                    # An unrelated, damaged Mechanics file must not prevent
+                    # Options and the rest of Control Center from starting.
+                    print(f'[options] M449 campfire range migration skipped: {error}')
+            payload['socketRanges'] = normalize_socket_ranges(initial)
+            changed = True
+        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
@@ -420,6 +491,9 @@ class OptionsStore:
             payload['npcOverhead'] = normalize_npc_overhead(request['npcOverhead'], payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         if 'monsterAi' in request:
             payload['monsterAi'] = normalize_monster_ai(request['monsterAi'], payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
+        if 'socketRanges' in request:
+            payload['socketRanges'] = normalize_socket_ranges(request['socketRanges'],
+                payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))
         if 'uiPresentation' in request:
             payload['uiPresentation'] = normalize_ui_presentation(request['uiPresentation'],
                 payload.get('uiPresentation', UI_PROFILE_DEFAULTS))

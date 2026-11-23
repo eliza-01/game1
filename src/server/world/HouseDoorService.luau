@@ -2,20 +2,24 @@
 -- Server-authoritative rigid door movement. The hinge is the Model pivot;
 -- never animate skin Bones or modify an imported FBX pose.
 local TweenService = game:GetService("TweenService")
+local Collision = require(script.Parent:WaitForChild("HouseDoorCollision"))
 
 local Doors = {}
-local active: {[Model]: {tween: Tween?, value: CFrameValue?, connection: RBXScriptConnection?}} = {}
+local active: {[Model]: {tween: Tween?, value: CFrameValue?, connection: RBXScriptConnection?, collisionSnapshot: Collision.Snapshot?}} = {}
 local ANGLE = math.rad(90)
 local DURATION = 0.42
 
 local function clearAnimation(door: Model)
     local entry = active[door]
     if not entry then return end
+    -- Cancel/cleanup can happen while an opening tween is in flight. Restore
+    -- authored door collisions on *every* exit path before declaring it idle.
     active[door] = nil
-    door:SetAttribute("Game1DoorMoving", false)
     if entry.tween then entry.tween:Cancel() end
     if entry.connection then entry.connection:Disconnect() end
     if entry.value then entry.value:Destroy() end
+    if entry.collisionSnapshot then Collision.Restore(entry.collisionSnapshot) end
+    door:SetAttribute("Game1DoorMoving", false)
 end
 
 function Doors.Toggle(house: Model): (boolean, string)
@@ -23,14 +27,14 @@ function Doors.Toggle(house: Model): (boolean, string)
     if not door or not door:IsA("Model") or door:GetAttribute("Game1DoorPivotMode") ~= "rigid_model" then
         return false, "DoorAssembly with authored hinge is unavailable"
     end
+    -- A second player cannot reverse a door mid-animation: predictable,
+    -- single-writer transition even in a crowded multiplayer house.
+    if active[door] then return false, "door is already moving" end
     -- Move an anchored rigid assembly rather than fighting physics on an
     -- otherwise decorative MeshPart while a tween is in progress.
     for _, descendant in door:GetDescendants() do
         if descendant:IsA("BasePart") then descendant.Anchored = true end
     end
-    -- A second player cannot reverse a door mid-animation: predictable,
-    -- single-writer transition even in a crowded multiplayer house.
-    if active[door] then return false, "door is already moving" end
     local open = door:GetAttribute("Game1DoorOpen") == true
     -- Keep a stable closed pivot even during repeated actions. The original
     -- pivot is captured once for each placed instance; rotations accumulate
@@ -48,7 +52,12 @@ function Doors.Toggle(house: Model): (boolean, string)
         if door.Parent then door:PivotTo(frame) end
     end)
     local tween = TweenService:Create(value, TweenInfo.new(DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Value = target})
-    active[door] = {tween = tween, value = value, connection = connection}
+    active[door] = {tween = tween, value = value, connection = connection, collisionSnapshot = nil}
+    -- Opening: avoid pushing the player with the swinging leaf. Closing:
+    -- collision stays as authored throughout the entire animation.
+    if not open then
+        active[door].collisionSnapshot = Collision.Suspend(door)
+    end
     door:SetAttribute("Game1DoorMoving", true)
     door:SetAttribute("Game1DoorOpen", not open)
     tween.Completed:Connect(function()

@@ -15,8 +15,8 @@ local ResourceFeedback = require(script.Parent:WaitForChild("FloatingResourceFee
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
+local CampfireContract = require(Shared:WaitForChild("world"):WaitForChild("CampfireSocketContract"))
 local Aim = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketAimPolicy"))
-local FireplaceConfig = require(Shared:WaitForChild("world"):WaitForChild("FireplaceMechanicsConfig"))
 local Occlusion = require(script.Parent:WaitForChild("HouseSocketAimOcclusion"))
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local player = Players.LocalPlayer
@@ -29,17 +29,25 @@ local visibleSignature: {[Attachment]: string} = {}
 
 -- Campfire interaction is a separate Location-domain contract; the House
 -- registry must never treat fire_socket as a House socket.
-local CAMPFIRE_DEFINITION = {
-    name = "fire_socket", interact = true,
-    radius = FireplaceConfig.CampfireInteractionRadius,
-    hoverRadius = FireplaceConfig.CampfireAimRadius,
-}
+local CAMPFIRE_DEFINITION = CampfireContract.Fire
 local function definitionFor(prompt: ProximityPrompt): any?
     if prompt:GetAttribute("Game1SocketDomain") == "campfire" then
         return if prompt:GetAttribute("Game1SocketName") == "fire_socket" then CAMPFIRE_DEFINITION else nil
     end
     local name = prompt:GetAttribute("Game1HouseSocketName")
     return if typeof(name) == "string" then Contract.Get(name) else nil
+end
+
+local function campfireRadius(): number
+    local override = player:GetAttribute(CampfireContract.RadiusAttribute("fire_socket"))
+    return if typeof(override) == "number" then math.clamp(override, Contract.MinDebugRadius, Contract.MaxDebugRadius)
+        else CAMPFIRE_DEFINITION.radius
+end
+
+local function campfireHoverRadius(): number
+    local override = player:GetAttribute(CampfireContract.HoverRadiusAttribute("fire_socket"))
+    return if typeof(override) == "number" then math.clamp(override, Contract.MinHoverRadius, Contract.MaxHoverRadius)
+        else CAMPFIRE_DEFINITION.hoverRadius
 end
 
 local function radius(name: string): number
@@ -181,10 +189,10 @@ local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): Proximit
         local frame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
         local distance = (frame.Position - root.Position).Magnitude
         -- USE always uses the character root, not the camera.
-        local maxDistance = if definition == CAMPFIRE_DEFINITION then definition.radius else radius(name)
+        local maxDistance = if definition == CAMPFIRE_DEFINITION then campfireRadius() else radius(name)
         if distance > maxDistance then continue end
         if definition.hoverRadius then
-            local aimRadius = if definition == CAMPFIRE_DEFINITION then definition.hoverRadius else hoverRadius(name)
+            local aimRadius = if definition == CAMPFIRE_DEFINITION then campfireHoverRadius() else hoverRadius(name)
             local hit = Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, aimRadius)
             if hit == nil then continue end
             if hit < aimEntry - 0.001 or (math.abs(hit - aimEntry) <= 0.001

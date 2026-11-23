@@ -147,6 +147,48 @@ return table.freeze({
 			}),
 		}),
 	}),
+	socketRanges = table.freeze({
+		house = table.freeze({
+			door_01_handle_outside_socket = table.freeze({
+				useRadius = 8,
+			}),
+			door_01_handle_inside_socket = table.freeze({
+				useRadius = 8,
+			}),
+			door_01_padlock_01_outside_socket = table.freeze({
+				useRadius = 6,
+			}),
+			door_01_padlock_01_inside_socket = table.freeze({
+				useRadius = 6,
+			}),
+			chest_01_socket = table.freeze({
+				useRadius = 11,
+				aimRadius = 6,
+			}),
+			elevator_01_socket = table.freeze({
+				useRadius = 12,
+				aimRadius = 6,
+			}),
+			elevator_02_socket = table.freeze({
+				useRadius = 12,
+				aimRadius = 6,
+			}),
+			elevator_03_socket = table.freeze({
+				useRadius = 12,
+				aimRadius = 6,
+			}),
+			fireplace_01_socket = table.freeze({
+				useRadius = 13,
+				aimRadius = 7,
+			}),
+		}),
+		campfire = table.freeze({
+			fire_socket = table.freeze({
+				useRadius = 14,
+				aimRadius = 8,
+			}),
+		}),
+	}),
 	npcOverhead = table.freeze({
 		desktop = table.freeze({
 			nameRadiusStuds = 70,

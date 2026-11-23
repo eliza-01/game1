@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "slug": "windmill_02",
+  "sourceSha256": "eb196722137b851e729dd2f61c2ef0852b7406a536d47cc8eb58677fde80b43e",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "blades",
+        "armature": "",
+        "vertices": 344,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "body",
+        "armature": "",
+        "vertices": 70,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "door",
+        "armature": "windmill_armature",
+        "vertices": 34,
+        "bones": [
+          {
+            "name": "windmill_door_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              2.7204952,
+              0.0,
+              0.0,
+              -1.0,
+              -6.2024255,
+              0.0,
+              1.0,
+              0.0,
+              3.0508738,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "windmill_door_socket"
+        ],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "fabric",
+        "armature": "",
+        "vertices": 80,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "rig_carrier",
+        "armature": "windmill_armature",
+        "vertices": 3,
+        "bones": [
+          {
+            "name": "windmill_door_socket",
+            "parent": "",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              2.7204952,
+              0.0,
+              0.0,
+              -1.0,
+              -6.2024255,
+              0.0,
+              1.0,
+              0.0,
+              3.0508738,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          }
+        ],
+        "influencedBones": [
+          "windmill_door_socket"
+        ],
+        "role": "carrier",
+        "physics": {
+          "role": "carrier",
+          "canCollide": false,
+          "canQuery": false,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": "Box",
+          "physicsOnly": true
+        }
+      },
+      {
+        "name": "roof",
+        "armature": "",
+        "vertices": 74,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "wood",
+        "armature": "",
+        "vertices": 28,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [
+      "windmill_armature"
+    ],
+    "unassignedArmatures": []
+  }
+}

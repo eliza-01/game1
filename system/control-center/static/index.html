@@ -7,7 +7,7 @@
 <title>Characters</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
 <link rel="stylesheet" href="asset-manager.css?v=370">
-<link rel="stylesheet" href="m337-options.css?v=443">
+<link rel="stylesheet" href="m337-options.css?v=449">
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=435">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
@@ -439,6 +439,13 @@
   </div>
 </div>
 </details>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🎯</span><span><strong>Sockets · USE / AIM</strong><small>House &amp; Campfire · интерактивные зоны</small></span></summary>
+<div class="panel character-card game1-socket-range-options">
+  <div class="section-title"><div><span>authoritative socket reach · studs</span><h3>House &amp; Campfire</h3></div></div>
+  <small class="hint">USE — дистанция персонажа до сокета; AIM — радиус сферы наведения центральным прицелом. «—» означает, что AIM не используется. Точки HEAD / spawn / дым не интерактивны и не имеют редактируемых зон. Studio HS Debug меняет зоны временно; Save здесь сохраняет значения для опубликованной игры после Rojo Sync и нового Play.</small>
+  <div id="option-sockets-fields" class="game1-socket-range-fields" aria-label="Socket interaction radius settings"></div>
+  <div class="actions"><button id="option-sockets-save" class="primary" type="button">Save Socket Ranges</button></div>
+</div></details>
 <details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🪟</span><span><strong>UI</strong><small>Взаимодействия · прогресс · уведомления</small></span></summary>
 <div class="panel character-card game1-ui-layout-options">
   <div class="section-title"><div><span>ПК / мобильные устройства · pixels</span><h3>Presentation UI</h3></div></div>
@@ -1086,7 +1093,7 @@
 <script src="location-asset-workflow.js?v=411"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=443"></script>
+<script src="options.js?v=449"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=437"></script>
 <script src="weapon-workflow.js?v=309"></script>

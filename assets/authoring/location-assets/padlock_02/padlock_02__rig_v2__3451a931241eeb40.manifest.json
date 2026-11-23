@@ -1,0 +1,58 @@
+{
+  "boneHash": "6a5715cf4a64fd1c058afbf514ed5ecd0708d4994bd74c185d6f9b2f934f6f4e",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        -1.1e-06,
+        0.0056046,
+        0.0,
+        -1.0,
+        0.0,
+        -0.0590142,
+        -1.1e-06,
+        0.0,
+        -1.0,
+        -0.3079156,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "padlock_01_hole_socket",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "600049212fd480b7e9aacfb87f587ee09c7bc59632425d216174f1684ef80dff",
+  "parts": [
+    {
+      "name": "padlock_02",
+      "role": "visual",
+      "vertices": 172
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 3
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 1,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 0,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "3451a931241eeb4097b7dcac88c8add0b156294a113d6f34564d31daa9414fe3",
+  "structuralHash": "4d383d33ad9c6253029697591e7f6aee8cd27171ed8ba6ad1b0ca1724a924354"
+}

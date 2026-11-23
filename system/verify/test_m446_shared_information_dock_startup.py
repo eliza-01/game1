@@ -59,7 +59,7 @@ class SharedInformativeDockM446(unittest.TestCase):
         presenter = read('src/client/world/HouseFireplaceController.luau')
         dock = read('src/client/world/InformativeWindowDock.luau')
         self.assertIn('setBar(fuelRow, 0, "Не горит"', presenter)
-        self.assertIn('registered(socket) and distance < minDistance', presenter)
+        self.assertIn('registered(socket) and ray and hoverRadius > 0', presenter)
         self.assertIn('dock:Present("fireplace", socket,', presenter)
         self.assertIn('collapsed[currentSource] = nil', dock)
         self.assertIn('collapsed[source] = nil', dock)

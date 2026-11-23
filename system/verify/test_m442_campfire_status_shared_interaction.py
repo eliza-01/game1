@@ -91,8 +91,10 @@ class CampfireAndFireplaceM442(unittest.TestCase):
         self.assertIn('collapsed[currentSource] = true', dock)
         self.assertIn('collapsed[currentSource] = nil', dock)
         self.assertIn('collapsed[source] = nil', dock)
-        self.assertIn('if distance > radius then', client)
-        self.assertIn('elseif registered(socket) and distance < minDistance then', client)
+        self.assertIn('distance > math.min(visibleRadius, useRadius)', client)
+        self.assertIn('elseif registered(socket) and ray and hoverRadius > 0 then', client)
+        self.assertIn('Aim.RaySphereEntry(ray.Origin, ray.Direction,', client)
+        self.assertIn('Occlusion.IsClear(ray.Origin, ray.Direction, firstHit, player.Character)', client)
         self.assertIn('if fuel == "firewood" or fuel == "fire" or fuel == "embers"', client)
         self.assertNotIn('BillboardGui', client + dock)
 

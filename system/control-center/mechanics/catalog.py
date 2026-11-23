@@ -1,17 +1,65 @@
 """One mechanics documentation schema for shared rules and future per-asset scripts."""
 from .house import ITEMS as HOUSE_ITEMS
+from .npc import ITEMS as NPC_ITEMS
+from .monster import ITEMS as MONSTER_ITEMS
+from .character import ITEMS as CHARACTER_ITEMS
 
 DOMAINS = (
     {'id': 'house', 'label': 'House', 'description': 'Сокеты, взаимодействия и правила домов', 'items': HOUSE_ITEMS},
-    {'id': 'npc', 'label': 'NPC', 'description': 'Технические карты по каждому NPC и его собственным скриптам', 'items': []},
-    {'id': 'monster', 'label': 'Monster', 'description': 'Технические карты по каждому монстру и его собственным скриптам', 'items': []},
-    {'id': 'character', 'label': 'Character', 'description': 'Механики персонажа и общий контракт управления', 'items': []},
+    {'id': 'npc', 'label': 'NPC', 'description': 'Технические карты по каждому NPC и его собственным скриптам', 'items': NPC_ITEMS},
+    {'id': 'monster', 'label': 'Monster', 'description': 'Технические карты по каждому монстру и его собственным скриптам', 'items': MONSTER_ITEMS},
+    {'id': 'character', 'label': 'Character', 'description': 'Механики персонажа и общий контракт управления', 'items': CHARACTER_ITEMS},
 )
 
 # Keys are the only legal way to read source text through this API. Future
 # actor-specific scripts belong to a distinct item's sources list, never an
 # arbitrary file path supplied by the browser.
 SOURCES = {
+    'npc-spawner': ('src/server/npc/NpcSpawnerService.luau', 'NPC · spawn и lifecycle'),
+    'npc-spawns': ('src/server/npc/NpcSpawnRegistry.luau', 'NPC · записи spawn'),
+    'npc-registry': ('src/shared/npc/NpcRegistry.luau', 'NPC · опубликованный реестр'),
+    'npc-death': ('src/server/combat/DeathLifecycleService.luau', 'Общий death lifecycle'),
+    'npc-ai': ('src/server/npc/NpcCombatAIService.luau', 'NPC · боевой AI'),
+    'actor-home': ('src/server/actor/ActorHomeLeash.luau', 'Общий leash'),
+    'actor-nav': ('src/server/actor/ActorChaseNavigator.luau', 'Навигация акторов'),
+    'damage-service': ('src/server/combat/DamageService.luau', 'Серверный урон'),
+    'npc-policy': ('src/shared/npc/NpcMovementPolicy.luau', 'NPC · движение'),
+    'npc-animation': ('src/server/npc/NpcAnimationService.luau', 'NPC · анимации'),
+    'npc-equipment': ('src/server/npc/NpcEquipmentService.luau', 'NPC · экипировка'),
+    'npc-animation-registry': ('src/shared/npc/NpcAnimationRegistry.luau', 'NPC · клипы'),
+    'npc-overhead': ('src/client/combat/NpcOverheadController.luau', 'NPC · имя и здоровье'),
+    'weapon-equip': ('src/server/weapon/WeaponEquipService.luau', 'Оружие · монтаж'),
+    'monster-spawner': ('src/server/monster/MonsterSpawnerService.luau', 'Monster · spawn'),
+    'monster-population': ('src/server/monster/MonsterPopulationController.luau', 'Monster · слоты и respawn'),
+    'monster-death': ('src/server/monster/MonsterDeathLifecycle.luau', 'Monster · смерть'),
+    'monster-spawns': ('src/server/monster/MonsterSpawnRegistry.luau', 'Monster · записи spawn'),
+    'monster-registry': ('src/shared/monster/MonsterRegistry.luau', 'Monster · типы'),
+    'monster-ai': ('src/server/monster/MonsterAIService.luau', 'Monster · AI'),
+    'monster-target': ('src/server/monster/MonsterTargetPolicy.luau', 'Monster · приоритет цели'),
+    'monster-nav': ('src/server/monster/MonsterChaseNavigation.luau', 'Monster · погоня'),
+    'monster-attack': ('src/server/monster/MonsterAttackExecutor.luau', 'Monster · атака'),
+    'monster-client-attack': ('src/client/monster/MonsterAttackLocomotionController.luau', 'Monster · клиентская анимация'),
+    'entity-hitbox': ('src/server/combat/EntityHitboxService.luau', 'Hitbox · авторитет сервера'),
+    'character-service': ('src/server/character/CharacterService.luau', 'Персонаж · жизненный цикл'),
+    'character-stats': ('src/server/character/CharacterStatsService.luau', 'Статистика'),
+    'character-registry': ('src/shared/character/CharacterRegistry.luau', 'Персонажи · реестр'),
+    'character-rig': ('src/server/character/CharacterRigService.luau', 'Сборка рига'),
+    'movement-client': ('src/client/character/MovementController.luau', 'Движение · клиент'),
+    'camera-client': ('src/client/character/CameraController.luau', 'Камера · клиент'),
+    'mobile-client': ('src/client/character/MobileInputController.luau', 'Мобильное управление'),
+    'movement-config': ('src/shared/character/CharacterMovementConfig.luau', 'Параметры движения'),
+    'attack-service': ('src/server/combat/AttackService.luau', 'Melee · сервер'),
+    'bow-hitscan': ('src/server/combat/BowHitscanService.luau', 'Bow · серверный hitscan'),
+    'weapon-select': ('src/server/weapon/WeaponSelectionService.luau', 'Выбор оружия в Play'),
+    'bone-mount': ('src/shared/rig/BoneModelMount.luau', 'Монтирование на кость'),
+    'character-regeneration': ('src/server/character/CharacterRegenerationService.luau', 'HP regeneration'),
+    'death-service': ('src/server/combat/DeathLifecycleService.luau', 'Death lifecycle'),
+    'character-animation': ('src/client/character/animation/CharacterAnimationController.luau', 'Анимации персонажа'),
+    'bone-client': ('src/client/character/BoneMountedAttachmentController.luau', 'Следование за костью'),
+    'info-dock': ('src/client/world/InformativeWindowDock.luau', 'Информативные окна'),
+    'resource-feedback': ('src/client/world/FloatingResourceFeedback.luau', 'Получение и расход'),
+    'ui-settings': ('src/client/world/UiPresentationSettings.luau', 'UI-профили'),
+    'health-ui': ('src/client/combat/PlayerHealthHudController.luau', 'HP-интерфейс'),
     'socket-contract': ('src/shared/world/HouseSocketContract.luau', 'Контракт сокетов'),
     'socket-service': ('src/server/world/HouseSocketService.luau', 'Реестр и валидация'),
     'socket-discovery': ('src/server/world/HouseSocketDiscovery.luau', 'Обнаружение домов'),
@@ -28,6 +76,9 @@ SOURCES = {
     'fireplace-service': ('src/server/world/HouseFireplaceService.luau', 'Камин и готовка'),
     'fireplace-mount': ('src/server/world/HouseSocketAssetMount.luau', 'Монтаж и Appearance'),
     'campfire-service': ('src/server/world/LocationCampfireService.luau', 'Костры · размещения и доступ'),
+    'campfire-socket-contract': ('src/shared/world/CampfireSocketContract.luau', 'Костёр · отдельный USE/AIM контракт'),
+    'socket-debug-server': ('src/server/dev/HouseSocketDebugService.luau', 'House + Campfire Studio Debug · сервер'),
+    'socket-debug-client': ('src/client/dev/HouseSocketDebugController.luau', 'House + Campfire Studio Debug · клиент'),
     'fireplace-config': ('src/shared/world/FireplaceMechanicsConfig.luau', 'Огонь, ресурсы и таймеры'),
     'fireplace-tuning': ('src/shared/world/FireplaceMechanicsTuning.luau', 'Генерируемые параметры'),
     'fireplace-status': ('src/client/world/HouseFireplaceController.luau', 'Индикаторы огня и готовки'),

@@ -54,6 +54,10 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 
 Эта таблица проверена по проектным файлам на срезе M438a; ей **не** присваивается статус Studio Play/полевого теста. См. [актуальный Kanban](../kanban/STATUS_2026-11-22_M439.md).
 
+## M449 · единый контракт радиусов сокетов
+
+`OptionsStore` — единственный writer постоянных `socketRanges` (`options.json` → `GameOptionsRegistry`). `HouseSocketContract` и `CampfireSocketContract` применяют их к серверному USE и клиентскому AIM через существующие сервисы; HS Studio Debug использует только временные атрибуты игрока. В Mechanics остаются тайминги и эффекты камина/костра, но не редактируемые диапазоны взаимодействия. См. [M449](../workflows/SOCKET_RANGES_OPTIONS_M449_RU.md).
+
 ## Опасные устаревшие предположения
 
 - **Не считать** `StudioRealEstateSocketRecovery` действующим механизмом: M133 описывает удалённый в M153 workaround. Текущий Studio Bridge проверяет фактические Bones.
@@ -105,3 +109,8 @@ MySQL 8.4. `SqliteAssetAuditImporter` проецирует store-owned publicati
 IDs). Ошибка MySQL блокирует audit-sensitive publish/delete/Sync, но не запуск
 остальных Host Agent сервисов. См.
 `docs/workflows/ASSET_REPLACEMENT_AUDIT_M217_RU.md`.
+
+
+## M447 · Граница авторского хранения и runtime state (23.11.2026)
+
+[Матрица всех Mechanic-карт и их долгов](../workflows/MECHANICS_RUNTIME_GAPS_M447_RU.md) уточняет ownership без изменения кода: Project Stores/генераторы (`OptionsStore`, `mechanics.settings`, реестры и spawn manifests) владеют **authoring**; серверные `HouseFireplaceService`, `NpcSpawnerService`, `MonsterPopulationController`, `CharacterService` владеют **live session**; клиентские `InformativeWindowDock` и feedback-контроллеры владеют только представлением. Наличие первого слоя не означает DataStore для второго. Будущий persistent world/player adapter должен быть отдельной ответственностью, с безопасным восстановлением при новом Server/Streaming/re-register, без копирования save-кода в каждый service. Studio Play и compiled Runtime Build acceptance остаются открытыми.

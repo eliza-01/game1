@@ -1,0 +1,100 @@
+{
+  "boneHash": "220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        2.7204952,
+        0.0,
+        0.0,
+        -1.0,
+        -6.2024255,
+        0.0,
+        1.0,
+        0.0,
+        3.0508738,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "windmill_door_socket",
+      "parent": ""
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0176226,
+        0.0,
+        0.0,
+        -1.0,
+        -8.6503077,
+        0.0,
+        1.0,
+        0.0,
+        15.2668781,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "windmill_rotation_socket",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "a4d56e178a7f0971b351aa88bbea5a1405bd72e878d10e4c3a093db57f42ffd8",
+  "parts": [
+    {
+      "name": "body",
+      "role": "visual",
+      "vertices": 70
+    },
+    {
+      "name": "door",
+      "role": "visual",
+      "vertices": 34
+    },
+    {
+      "name": "fabric",
+      "role": "visual",
+      "vertices": 80
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 6
+    },
+    {
+      "name": "roof",
+      "role": "visual",
+      "vertices": 74
+    },
+    {
+      "name": "wood",
+      "role": "visual",
+      "vertices": 372
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 2,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 28,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "d28c38304e3653b949eb227e0b21fe5208f76f3b314996ab2399d7e02db1c9ba",
+  "structuralHash": "080b5edbf9d7444e5706cab6ead22311fc2f55c1328c04b4dec454c54c5762ae"
+}

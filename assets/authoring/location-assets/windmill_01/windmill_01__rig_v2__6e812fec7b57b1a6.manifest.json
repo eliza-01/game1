@@ -1,0 +1,105 @@
+{
+  "boneHash": "220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        2.7204952,
+        0.0,
+        0.0,
+        -1.0,
+        -6.2024255,
+        0.0,
+        1.0,
+        0.0,
+        3.0508738,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "windmill_door_socket",
+      "parent": ""
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0176226,
+        0.0,
+        0.0,
+        -1.0,
+        -8.6503077,
+        0.0,
+        1.0,
+        0.0,
+        15.2668781,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "windmill_rotation_socket",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "1070a4a753e35a3d87e98c3c36301f1275ae964d7f4007c46a72849a38c39615",
+  "parts": [
+    {
+      "name": "blades",
+      "role": "visual",
+      "vertices": 344
+    },
+    {
+      "name": "body",
+      "role": "visual",
+      "vertices": 70
+    },
+    {
+      "name": "door",
+      "role": "visual",
+      "vertices": 34
+    },
+    {
+      "name": "fabric",
+      "role": "visual",
+      "vertices": 80
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 6
+    },
+    {
+      "name": "roof",
+      "role": "visual",
+      "vertices": 74
+    },
+    {
+      "name": "wood",
+      "role": "visual",
+      "vertices": 28
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 2,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 28,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "6e812fec7b57b1a61c9e4ca8de9b096422e9f81e4d3c413a3de63c83ca26dbdd",
+  "structuralHash": "496da9e3111131db7c0b9ad68030bb5f650e0ca10f26cbd31d62da5efe2d9363"
+}

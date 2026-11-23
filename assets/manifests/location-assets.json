@@ -3811,6 +3811,821 @@
       "aliases": []
     },
     {
+      "slug": "windmill_01",
+      "name_en": "Windmill 01",
+      "category": "building",
+      "model_path": "assets/source/location-assets/building/windmill_01/model/windmill_01.fbx",
+      "model_sha256": "2c812dd23bea262e0c9f05cae276f1a7a1066592a910cb75688c7ee71f3ff6f1",
+      "model_asset_id": "125638050890051",
+      "model_published_sha256": "686d8817c8c57c7dc467296e12f585e4b92d2274b9fdf6f08d2da687c66d1c99",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 14,
+      "created_at": 1795442312.933316,
+      "updated_at": 1795446930.15916,
+      "published_at": 1795445442.6951785,
+      "surface_material": "default",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "blades",
+            "armature": "windmill_armature",
+            "vertices": 344,
+            "bones": [
+              {
+                "name": "windmill_door_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7204952,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.2024255,
+                  0.0,
+                  1.0,
+                  0.0,
+                  3.0508738,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "body",
+            "armature": "",
+            "vertices": 70,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "door",
+            "armature": "windmill_armature",
+            "vertices": 34,
+            "bones": [
+              {
+                "name": "windmill_door_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7204952,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.2024255,
+                  0.0,
+                  1.0,
+                  0.0,
+                  3.0508738,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "windmill_door_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "fabric",
+            "armature": "windmill_armature",
+            "vertices": 80,
+            "bones": [
+              {
+                "name": "windmill_door_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7204952,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.2024255,
+                  0.0,
+                  1.0,
+                  0.0,
+                  3.0508738,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "roof",
+            "armature": "",
+            "vertices": 74,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "wood",
+            "armature": "windmill_armature",
+            "vertices": 28,
+            "bones": [
+              {
+                "name": "windmill_door_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7204952,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.2024255,
+                  0.0,
+                  1.0,
+                  0.0,
+                  3.0508738,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [
+          "windmill_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac",
+        "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              2.7204952,
+              0.0,
+              0.0,
+              -1.0,
+              -6.2024255,
+              0.0,
+              1.0,
+              0.0,
+              3.0508738,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "windmill_door_socket",
+            "parent": ""
+          },
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0176226,
+              0.0,
+              0.0,
+              -1.0,
+              -8.6503077,
+              0.0,
+              1.0,
+              0.0,
+              15.2668781,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "windmill_rotation_socket",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "1070a4a753e35a3d87e98c3c36301f1275ae964d7f4007c46a72849a38c39615",
+        "parts": [
+          {
+            "name": "blades",
+            "role": "visual",
+            "vertices": 344
+          },
+          {
+            "name": "body",
+            "role": "visual",
+            "vertices": 70
+          },
+          {
+            "name": "door",
+            "role": "visual",
+            "vertices": 34
+          },
+          {
+            "name": "fabric",
+            "role": "visual",
+            "vertices": 80
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 6
+          },
+          {
+            "name": "roof",
+            "role": "visual",
+            "vertices": 74
+          },
+          {
+            "name": "wood",
+            "role": "visual",
+            "vertices": 28
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "496da9e3111131db7c0b9ad68030bb5f650e0ca10f26cbd31d62da5efe2d9363"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "blades": {
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": false
+        },
+        "body": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#AF9797",
+          "visualMaterial": "Brick"
+        },
+        "door": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#985234",
+          "visualMaterial": "Wood"
+        },
+        "fabric": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": true,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFCAAD",
+          "visualMaterial": "Sand"
+        },
+        "roof": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#8E2E2E",
+          "visualMaterial": "ClayRoofTiles"
+        },
+        "wood": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#985234",
+          "visualMaterial": "Wood"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "default",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 14,
+      "atlasLegacyWarning": false,
+      "status": "UPDATE_AVAILABLE",
+      "category_label": "Building",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "108432647489107",
+          "name": "door"
+        },
+        {
+          "meshId": "121576725105866",
+          "name": "body"
+        },
+        {
+          "meshId": "140241783046226",
+          "name": "blades"
+        },
+        {
+          "meshId": "73114642413219",
+          "name": "roof"
+        },
+        {
+          "meshId": "87688304810047",
+          "name": "fabric"
+        },
+        {
+          "meshId": "97601098543144",
+          "name": "wood"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "windmill_02",
+      "name_en": "Windmill 02",
+      "category": "building",
+      "model_path": "assets/source/location-assets/building/windmill_02/model/windmill_02.fbx",
+      "model_sha256": "eb196722137b851e729dd2f61c2ef0852b7406a536d47cc8eb58677fde80b43e",
+      "model_asset_id": "86999805819635",
+      "model_published_sha256": "eb196722137b851e729dd2f61c2ef0852b7406a536d47cc8eb58677fde80b43e",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 6,
+      "created_at": 1795447168.342814,
+      "updated_at": 1795447923.7782152,
+      "published_at": 1795447923.7782152,
+      "surface_material": "stone",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "blades",
+            "armature": "",
+            "vertices": 344,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "body",
+            "armature": "",
+            "vertices": 70,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "door",
+            "armature": "windmill_armature",
+            "vertices": 34,
+            "bones": [
+              {
+                "name": "windmill_door_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7204952,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.2024255,
+                  0.0,
+                  1.0,
+                  0.0,
+                  3.0508738,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "windmill_door_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "fabric",
+            "armature": "",
+            "vertices": 80,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "windmill_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "windmill_door_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  2.7204952,
+                  0.0,
+                  0.0,
+                  -1.0,
+                  -6.2024255,
+                  0.0,
+                  1.0,
+                  0.0,
+                  3.0508738,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "windmill_door_socket"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          },
+          {
+            "name": "roof",
+            "armature": "",
+            "vertices": 74,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "wood",
+            "armature": "",
+            "vertices": 28,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [
+          "windmill_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "20374dfedbb7c77ce9cb7c8e99c902cfa7ed54f5d10068ad0a9daafcbde88f6e",
+        "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              2.7204952,
+              0.0,
+              0.0,
+              -1.0,
+              -6.2024255,
+              0.0,
+              1.0,
+              0.0,
+              3.0508738,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "windmill_door_socket",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "77b2ae260e3ef98b2023e52983a99430bdee28c81a453597036a2072ffdefb3c",
+        "parts": [
+          {
+            "name": "blades",
+            "role": "visual",
+            "vertices": 344
+          },
+          {
+            "name": "body",
+            "role": "visual",
+            "vertices": 70
+          },
+          {
+            "name": "door",
+            "role": "visual",
+            "vertices": 34
+          },
+          {
+            "name": "fabric",
+            "role": "visual",
+            "vertices": 80
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          },
+          {
+            "name": "roof",
+            "role": "visual",
+            "vertices": 74
+          },
+          {
+            "name": "wood",
+            "role": "visual",
+            "vertices": 28
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "2ca84fc8519007613ec87523e74de53d393047ecdcb49d427b46b2764025cb65"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "blades": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#805442",
+          "visualMaterial": "Wood"
+        },
+        "body": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FEE0BE",
+          "visualMaterial": "Brick"
+        },
+        "door": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#805442",
+          "visualMaterial": "Wood"
+        },
+        "fabric": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFDFC2",
+          "visualMaterial": "Fabric"
+        },
+        "roof": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FE5448",
+          "visualMaterial": "RoofShingles"
+        },
+        "wood": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#805442",
+          "visualMaterial": "Wood"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "stone",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "stone",
+        "label": "Stone",
+        "robloxMaterial": "Slate",
+        "soundFamily": "stone"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 6,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Building",
+      "publishedVisualMeshes": [],
+      "aliases": []
+    },
+    {
       "slug": "smithy",
       "name_en": "smithy",
       "category": "building",
@@ -13499,6 +14314,225 @@
       "aliases": []
     },
     {
+      "slug": "padlock_02",
+      "name_en": "Padlock 02",
+      "category": "prop",
+      "model_path": "assets/source/location-assets/prop/padlock_02/model/padlock_02.fbx",
+      "model_sha256": "3451a931241eeb4097b7dcac88c8add0b156294a113d6f34564d31daa9414fe3",
+      "model_asset_id": "92574610508351",
+      "model_published_sha256": "3451a931241eeb4097b7dcac88c8add0b156294a113d6f34564d31daa9414fe3",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 2,
+      "created_at": 1795431820.9461956,
+      "updated_at": 1795431847.7777019,
+      "published_at": 1795431847.7777019,
+      "surface_material": "metal",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "padlock_02",
+            "armature": "padlock_02_armature",
+            "vertices": 172,
+            "bones": [
+              {
+                "name": "padlock_01_hole_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  -1.1e-06,
+                  0.0056046,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -0.0590142,
+                  -1.1e-06,
+                  0.0,
+                  -1.0,
+                  -0.3079156,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "padlock_01_hole_socket"
+            ],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "rig_carrier",
+            "armature": "padlock_02_armature",
+            "vertices": 3,
+            "bones": [
+              {
+                "name": "padlock_01_hole_socket",
+                "parent": "",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  -1.1e-06,
+                  0.0056046,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  -0.0590142,
+                  -1.1e-06,
+                  0.0,
+                  -1.0,
+                  -0.3079156,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              }
+            ],
+            "influencedBones": [
+              "padlock_01_hole_socket"
+            ],
+            "role": "carrier",
+            "physics": {
+              "role": "carrier",
+              "canCollide": false,
+              "canQuery": false,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": "Box",
+              "physicsOnly": true
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [
+          "padlock_02_armature"
+        ],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "6a5715cf4a64fd1c058afbf514ed5ecd0708d4994bd74c185d6f9b2f934f6f4e",
+        "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              -1.1e-06,
+              0.0056046,
+              0.0,
+              -1.0,
+              0.0,
+              -0.0590142,
+              -1.1e-06,
+              0.0,
+              -1.0,
+              -0.3079156,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "padlock_01_hole_socket",
+            "parent": ""
+          }
+        ],
+        "carrierName": "rig_carrier",
+        "inventoryHash": "600049212fd480b7e9aacfb87f587ee09c7bc59632425d216174f1684ef80dff",
+        "parts": [
+          {
+            "name": "padlock_02",
+            "role": "visual",
+            "vertices": 172
+          },
+          {
+            "name": "rig_carrier",
+            "role": "rig_carrier",
+            "vertices": 3
+          }
+        ],
+        "rigKind": "skinned",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "4d383d33ad9c6253029697591e7f6aee8cd27171ed8ba6ad1b0ca1724a924354"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "padlock_02": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 81,
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "121111101046810"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "metal",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "metal",
+        "label": "Metal",
+        "robloxMaterial": "Metal",
+        "soundFamily": "metal"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 2,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Prop",
+      "publishedVisualMeshes": [],
+      "aliases": []
+    },
+    {
       "slug": "test_window_01",
       "name_en": "Test Window 01",
       "category": "prop",
@@ -18787,8 +19821,8 @@
     }
   ],
   "summary": {
-    "registered": 42,
-    "published": 42,
-    "changed": 0
+    "registered": 45,
+    "published": 44,
+    "changed": 1
   }
 }

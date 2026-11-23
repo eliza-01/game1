@@ -66,8 +66,6 @@
     CookingSecondsOnFire: ['Готовка на огне · сек', 'Cooking'],
     CookingSecondsOnEmbers: ['Готовка на углях · сек', 'Cooking'],
     ProgressVisibleRadius: ['Индикаторы · studs', 'UI'],
-    CampfireInteractionRadius: ['Дистанция действий костра · studs', 'Campfire'],
-    CampfireAimRadius: ['Наведение костра · studs', 'Campfire'],
   };
   async function loadSettings(item, body) {
     if (state.fireplaceSettings || state.fireplaceBusy) return;
@@ -114,12 +112,12 @@
     const save = element('button','primary','Сохранить настройки');
     save.type = 'submit';
     actions.append(save);
-    actions.append(element('p','mx-footnote','После сохранения обнови Studio Sync и перезапусти Play. Fire Tuner на существующих кострах сохраняет свои настройки.'));
+    actions.append(element('p','mx-footnote','После сохранения обнови Studio Sync и перезапусти Play. Fire Tuner на существующих кострах сохраняет свои настройки. Дистанции USE/AIM сокетов настраиваются в Options → Sockets.'));
     form.append(actions);
     form.addEventListener('submit', async event => {
       event.preventDefault();
       if (state.fireplaceBusy || !form.reportValidity()) return;
-      const values = Object.fromEntries(entries.map(([key]) => [key,Number(form.elements.namedItem(key).value)]));
+      const values = Object.fromEntries(entries.map(([key,value]) => [key,form.elements.namedItem(key) ? Number(form.elements.namedItem(key).value) : value]));
       save.disabled = true;
       state.fireplaceBusy = true;
       try {

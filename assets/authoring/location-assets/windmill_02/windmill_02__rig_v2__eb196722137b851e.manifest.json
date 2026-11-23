@@ -1,0 +1,83 @@
+{
+  "boneHash": "20374dfedbb7c77ce9cb7c8e99c902cfa7ed54f5d10068ad0a9daafcbde88f6e",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        2.7204952,
+        0.0,
+        0.0,
+        -1.0,
+        -6.2024255,
+        0.0,
+        1.0,
+        0.0,
+        3.0508738,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "windmill_door_socket",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "77b2ae260e3ef98b2023e52983a99430bdee28c81a453597036a2072ffdefb3c",
+  "parts": [
+    {
+      "name": "blades",
+      "role": "visual",
+      "vertices": 344
+    },
+    {
+      "name": "body",
+      "role": "visual",
+      "vertices": 70
+    },
+    {
+      "name": "door",
+      "role": "visual",
+      "vertices": 34
+    },
+    {
+      "name": "fabric",
+      "role": "visual",
+      "vertices": 80
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 3
+    },
+    {
+      "name": "roof",
+      "role": "visual",
+      "vertices": 74
+    },
+    {
+      "name": "wood",
+      "role": "visual",
+      "vertices": 28
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 1,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 0,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "eb196722137b851e729dd2f61c2ef0852b7406a536d47cc8eb58677fde80b43e",
+  "structuralHash": "2ca84fc8519007613ec87523e74de53d393047ecdcb49d427b46b2764025cb65"
+}

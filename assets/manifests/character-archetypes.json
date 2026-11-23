@@ -18,7 +18,7 @@
       "race": "human",
       "gender": "female",
       "status": "ASSEMBLY_READY",
-      "revision": 16,
+      "revision": 18,
       "visualMode": "assembly",
       "assembly": {
         "schema_version": 2,
@@ -233,8 +233,8 @@
           },
           "head": {
             "id": "human_female_m001_head",
-            "asset_id": "120680843372006",
-            "revision": 1,
+            "asset_id": "118444107940356",
+            "revision": 2,
             "mesh_family_id": "human_female_m001",
             "appearance_id": "atlas_78",
             "used_bones": [
@@ -282,10 +282,10 @@
             "material": "Metal"
           },
           "eyebrow_l": {
-            "id": "human_common_m001_eyebrow_l",
-            "asset_id": "96041697638875",
+            "id": "human_female_m001_eyebrow_l",
+            "asset_id": "78248573293987",
             "revision": 1,
-            "mesh_family_id": "human_common_m001",
+            "mesh_family_id": "human_female_m001",
             "appearance_id": "",
             "used_bones": [
               "face_brow_l"
@@ -298,10 +298,10 @@
             "color": "#000000"
           },
           "eyebrow_r": {
-            "id": "human_common_m001_eyebrow_r",
-            "asset_id": "88353012521312",
+            "id": "human_female_m001_eyebrow_r",
+            "asset_id": "76315575186865",
             "revision": 1,
-            "mesh_family_id": "human_common_m001",
+            "mesh_family_id": "human_female_m001",
             "appearance_id": "",
             "used_bones": [
               "face_brow_r"
@@ -314,26 +314,29 @@
             "color": "#000000"
           },
           "hair": {
-            "id": "human_female_m001_hair",
-            "asset_id": "93538100175421",
+            "id": "human_female_m004_hair",
+            "asset_id": "115395555838720",
             "revision": 1,
-            "mesh_family_id": "human_female_m001",
+            "mesh_family_id": "human_female_m004",
             "appearance_id": "",
             "used_bones": [],
             "attachment": "hair_mount",
             "attachment_mode": "pivot",
             "socket_bone": "",
-            "extras": [],
+            "extras": [
+              "human_female_m004_hair_extra_01"
+            ],
             "atlas_image_id": "",
             "colors": {
-              "primary": "#E7A2B0"
+              "primary": "#FEE1F9",
+              "extra_01": "#FEA9E7"
             },
             "material": "SmoothPlastic"
           }
         },
         "ready": true,
         "missing": [],
-        "fingerprint": "a0f0428cfa07c8e6776e29ab"
+        "fingerprint": "d61d06cae72215c84e13b42e"
       },
       "stats": {
         "Level": 2,

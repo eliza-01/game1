@@ -204,5 +204,47 @@
         "durationSeconds": 0.9
       }
     }
+  },
+  "socketRanges": {
+    "house": {
+      "door_01_handle_outside_socket": {
+        "useRadius": 8.0
+      },
+      "door_01_handle_inside_socket": {
+        "useRadius": 8.0
+      },
+      "door_01_padlock_01_outside_socket": {
+        "useRadius": 6.0
+      },
+      "door_01_padlock_01_inside_socket": {
+        "useRadius": 6.0
+      },
+      "chest_01_socket": {
+        "useRadius": 11.0,
+        "aimRadius": 6.0
+      },
+      "elevator_01_socket": {
+        "useRadius": 12.0,
+        "aimRadius": 6.0
+      },
+      "elevator_02_socket": {
+        "useRadius": 12.0,
+        "aimRadius": 6.0
+      },
+      "elevator_03_socket": {
+        "useRadius": 12.0,
+        "aimRadius": 6.0
+      },
+      "fireplace_01_socket": {
+        "useRadius": 13.0,
+        "aimRadius": 7.0
+      }
+    },
+    "campfire": {
+      "fire_socket": {
+        "useRadius": 14.0,
+        "aimRadius": 8.0
+      }
+    }
   }
 }

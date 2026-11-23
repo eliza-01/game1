@@ -57,12 +57,13 @@ function game1OptionsRender(){
   game1HealthDraftStatus(data);
   game1UiRender();
   game1UiDraftStatus(data);
+  game1SocketRangesRender();
   $('option-world-streaming-radius').value=String(data.worldStreaming?.targetRadiusStuds??150);
   $('save-combat-options').disabled=game1OptionsState.saving;
   $('option-npc-overhead-save').disabled=game1OptionsState.saving;
   $('save-character-life-options').disabled=game1OptionsState.saving;
   $('save-player-jump-options').disabled=game1OptionsState.saving;
-  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save']){
+  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save']){
     $(id).disabled=game1OptionsState.saving;
   }
 }
@@ -177,6 +178,60 @@ setInterval(async()=>{
   }catch{}
 },2500);
 window.game1OptionsLoad=game1OptionsLoad;
+
+// M449 · persisted interaction reach; preview-only Studio HS overrides remain
+// separate player attributes. Do not expose non-interactive Bone anchors.
+const GAME1_SOCKET_GROUPS = [
+  ['house','House sockets',[
+    ['door_01_handle_outside_socket','Door · outside'],
+    ['door_01_handle_inside_socket','Door · inside'],
+    ['door_01_padlock_01_outside_socket','Padlock · outside'],
+    ['door_01_padlock_01_inside_socket','Padlock · inside'],
+    ['chest_01_socket','Chest'],
+    ['elevator_01_socket','Elevator · 1'],
+    ['elevator_02_socket','Elevator · 2'],
+    ['elevator_03_socket','Elevator · 3'],
+    ['fireplace_01_socket','Fireplace'],
+  ]],
+  ['campfire','Campfire sockets',[
+    ['fire_socket','Campfire · fire_socket'],
+  ]],
+];
+function game1SocketRangesRender(){
+  const host=$('option-sockets-fields');if(!host)return;
+  const ranges=game1OptionsState.data?.socketRanges||{};
+  host.innerHTML=GAME1_SOCKET_GROUPS.map(([domain,title,sockets])=>
+    `<section class="game1-socket-range-group"><h4>${title}</h4><div class="game1-socket-range-head"><span>Socket</span><span>USE · studs</span><span>AIM · studs</span></div>`+
+    sockets.map(([name,label])=>{
+      const row=ranges[domain]?.[name]||{};
+      const prefix=`option-socket-${domain}-${name}`;
+      const input=(field,min,max)=>`<input aria-label="${label} ${field}" id="${prefix}-${field}" type="number" min="${min}" max="${max}" step="0.5" value="${Number(row[field]??(field==='useRadius'?8:4))}" required>`;
+      return `<div class="game1-socket-range-row"><label title="${name}">${label}<small>${name}</small></label><label>${input('useRadius',2,30)}</label>`+
+        `<label>${row.aimRadius===undefined?'<span class="muted">—</span>':input('aimRadius',1,16)}</label></div>`;
+    }).join('')+'</section>').join('');
+}
+$('option-sockets-save').onclick=()=>{
+  try{
+    const change={house:{},campfire:{}};
+    for(const [domain,,sockets] of GAME1_SOCKET_GROUPS)for(const [name] of sockets){
+      const saved=game1OptionsState.data?.socketRanges?.[domain]?.[name];
+      if(!saved)throw Error(`Socket settings missing: ${name}. Reload Options.`);
+      const values={};
+      for(const field of Object.keys(saved)){
+        const input=$(`option-socket-${domain}-${name}-${field}`);
+        if(!input||!input.value.trim())throw Error(`${name}.${field}: empty value`);
+        const value=Number(input.value),low=field==='useRadius'?2:1,high=field==='useRadius'?30:16;
+        if(!Number.isFinite(value)||value<low||value>high||value*2!==Math.round(value*2))
+          throw Error(`${name}.${field}: ${low}..${high}, step 0.5`);
+        values[field]=value;
+      }
+      if(values.aimRadius!==undefined&&values.aimRadius>values.useRadius)
+        throw Error(`${name}: AIM cannot exceed USE`);
+      change[domain][name]=values;
+    }
+    game1OptionsSave({socketRanges:change},'Socket ranges saved · sync Rojo and restart Studio Play');
+  }catch(error){toast(error.message,true)}
+};
 
 // M322: PC and Mobile edit buffers are independent. Save sends only the selected
 // profile, preserving the other device's persisted settings.

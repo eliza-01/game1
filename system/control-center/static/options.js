@@ -58,6 +58,7 @@ function game1OptionsRender(){
   game1UiRender();
   game1UiDraftStatus(data);
   game1SocketRangesRender();
+  game1FloraRender();
   $('option-rotation-windmill-enabled').checked=data.rotations?.windmill_02?.enabled??true;
   $('option-rotation-windmill-period').value=String(data.rotations?.windmill_02?.secondsPerRevolution??3);
   $('option-world-streaming-radius').value=String(data.worldStreaming?.targetRadiusStuds??150);
@@ -65,7 +66,7 @@ function game1OptionsRender(){
   $('option-npc-overhead-save').disabled=game1OptionsState.saving;
   $('save-character-life-options').disabled=game1OptionsState.saving;
   $('save-player-jump-options').disabled=game1OptionsState.saving;
-  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save','option-rotation-save']){
+  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save','option-rotation-save','option-flora-save']){
     $(id).disabled=game1OptionsState.saving;
   }
 }
@@ -399,4 +400,40 @@ $('option-ui-import').onclick=()=>{
   game1OptionsState.uiDrafts[draft.device]=JSON.parse(JSON.stringify(draft.settings));
   game1OptionsState.uiDevice=draft.device;
   game1UiRender();toast('Studio UI draft imported · Save to persist');
+};
+
+// M456 · Flora is a purely client-side visual effect. Saved values are emitted
+// in GameOptionsRegistry; no server mechanics or per-player remotes are changed.
+const GAME1_FLORA_FIELDS=['leavesPerBurst','spawnRadiusStuds','spreadRadiusStuds',
+  'contactPaddingStuds','durationSeconds','cooldownSeconds','maxActiveLeaves'];
+const GAME1_FLORA_BOUNDS={leavesPerBurst:[1,20],spawnRadiusStuds:[0,8],
+  spreadRadiusStuds:[0.5,20],contactPaddingStuds:[0,5],durationSeconds:[0.3,4],
+  cooldownSeconds:[0.2,30],maxActiveLeaves:[8,96]};
+function game1FloraRender(){
+  const flora=game1OptionsState.data?.flora||{};
+  $('option-flora-enabled').checked=flora.enabled??true;
+  $('option-flora-leafAssetSlug').value=flora.leafAssetSlug??'leaf_01';
+  $('option-flora-residentAssets').value=(flora.residentAssets||['leaf_01']).join(', ');
+  for(const key of GAME1_FLORA_FIELDS){
+    if(flora[key]!==undefined)$('option-flora-'+key).value=String(flora[key]);
+  }
+}
+$('option-flora-save').onclick=()=>{
+  try{
+    const flora={enabled:$('option-flora-enabled').checked,
+      leafAssetSlug:$('option-flora-leafAssetSlug').value.trim(),
+      residentAssets:$('option-flora-residentAssets').value.split(',').map(s=>s.trim()).filter(Boolean)};
+    if(flora.residentAssets.length<1||flora.residentAssets.length>8||
+      new Set(flora.residentAssets).size!==flora.residentAssets.length ||
+      !flora.residentAssets.includes(flora.leafAssetSlug))throw Error('Resident assets: 1–8 unique slugs, including leaf slug');
+    for(const key of GAME1_FLORA_FIELDS){
+      const el=$('option-flora-'+key),value=Number(el.value),[lo,hi]=GAME1_FLORA_BOUNDS[key];
+      if(!el.value.trim()||!Number.isFinite(value)||value<lo||value>hi ||
+        (['leavesPerBurst','maxActiveLeaves'].includes(key)&&!Number.isInteger(value)))
+        throw Error(`Flora ${key}: expected ${lo}–${hi}`);
+      flora[key]=value;
+    }
+    if(flora.leavesPerBurst>flora.maxActiveLeaves)throw Error('Max active must cover one full burst');
+    game1OptionsSave({flora},'Flora settings saved · Rojo Sync and restart Play');
+  }catch(error){toast(error.message,true)}
 };

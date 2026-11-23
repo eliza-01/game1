@@ -5,6 +5,7 @@ import re
 import time
 import threading
 from services.camera_settings import DEFAULT_CAMERA, normalize_camera
+from services.flora_effect_settings import DEFAULTS as FLORA_DEFAULTS, normalize_flora, validate_residents
 from copy import deepcopy
 from pathlib import Path
 
@@ -277,6 +278,8 @@ def lua_literal(value, indent=1):
         return 'table.freeze({\n' + ''.join(
             f'{pad}\t{key} = {lua_literal(item, indent + 1)},\n'
             for key, item in value.items()) + pad + '})'
+    if isinstance(value, list):
+        return 'table.freeze({' + ', '.join(lua_literal(item, indent + 1) for item in value) + '})'
     if isinstance(value, bool):
         return 'true' if value else 'false'
     if isinstance(value, (int, float)):
@@ -295,6 +298,7 @@ DEFAULT_PAYLOAD = {
     "uiPresentation": deepcopy(UI_PROFILE_DEFAULTS),
     "socketRanges": deepcopy(SOCKET_RANGE_DEFAULTS),
     "rotations": deepcopy(ROTATION_DEFAULTS),
+    "flora": deepcopy(FLORA_DEFAULTS),
     "npcOverhead": deepcopy(NPC_OVERHEAD_DEFAULTS),
     "monsterAi": {"noDamageReturnSeconds": 30},
     "worldStreaming": {"targetRadiusStuds": 150},
@@ -349,6 +353,7 @@ class OptionsStore:
         normalize_ui_presentation(payload.get('uiPresentation', UI_PROFILE_DEFAULTS))
         normalize_socket_ranges(payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))
         normalize_rotations(payload.get('rotations', ROTATION_DEFAULTS))
+        validate_residents(self.root, normalize_flora(payload.get('flora', FLORA_DEFAULTS)))
         normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
         normalize_world_streaming(payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
@@ -379,6 +384,7 @@ class OptionsStore:
             "\tuiPresentation = " + lua_literal(normalize_ui_presentation(payload.get('uiPresentation', UI_PROFILE_DEFAULTS))) + ",",
             "\tsocketRanges = " + lua_literal(normalize_socket_ranges(payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))) + ",",
             "\trotations = " + lua_literal(normalize_rotations(payload.get('rotations', ROTATION_DEFAULTS))) + ",",
+            "\tflora = " + lua_literal(normalize_flora(payload.get('flora', FLORA_DEFAULTS))) + ",",
             "\tnpcOverhead = " + lua_literal(normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))) + ",",
             "\tmonsterAi = " + lua_literal(normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))) + ",",
             "\tplayerJump = " + lua_literal(normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))) + ",",
@@ -435,7 +441,7 @@ class OptionsStore:
                     print(f'[options] M449 campfire range migration skipped: {error}')
             payload['socketRanges'] = normalize_socket_ranges(initial)
             changed = True
-        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges', 'rotations'):
+        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges', 'rotations', 'flora'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
@@ -530,6 +536,10 @@ class OptionsStore:
             payload['npcOverhead'] = normalize_npc_overhead(request['npcOverhead'], payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         if 'monsterAi' in request:
             payload['monsterAi'] = normalize_monster_ai(request['monsterAi'], payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
+        if 'flora' in request:
+            next_flora = normalize_flora(request['flora'], payload.get('flora', FLORA_DEFAULTS))
+            validate_residents(self.root, next_flora)
+            payload['flora'] = next_flora
         if 'rotations' in request:
             payload['rotations'] = normalize_rotations(request['rotations'],
                 payload.get('rotations', ROTATION_DEFAULTS))

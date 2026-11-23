@@ -200,6 +200,18 @@ return table.freeze({
 			secondsPerRevolution = 6,
 		}),
 	}),
+	flora = table.freeze({
+		enabled = true,
+		leafAssetSlug = "leaf_01",
+		residentAssets = table.freeze({"leaf_01"}),
+		leavesPerBurst = 8,
+		spawnRadiusStuds = 2,
+		spreadRadiusStuds = 5,
+		contactPaddingStuds = 1.25,
+		durationSeconds = 1.5,
+		cooldownSeconds = 1.5,
+		maxActiveLeaves = 32,
+	}),
 	npcOverhead = table.freeze({
 		desktop = table.freeze({
 			nameRadiusStuds = 70,

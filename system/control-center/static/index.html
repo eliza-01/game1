@@ -449,6 +449,25 @@
   <small class="hint">Лопасти и ткань вращаются синхронно вокруг общего центра. После Save — Rojo Sync / новый Play.</small>
   <div class="actions"><button id="option-rotation-save" class="primary" type="button">Save rotations</button></div>
 </div></details>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🍃</span><span><strong>Flora</strong><small>Контакт с деревьями/кустами · листья · resident assets</small></span></summary>
+<div class="panel character-card">
+  <div class="section-title"><div><span>Game Runtime · client-only VFX</span><h3>Foliage contact</h3></div></div>
+  <small class="hint">Работает без CanCollide/Touched, по близости игрока к геометрии и его движению. Эффект локален для игрока. Resident assets — исключения из выгрузки ресурсов эффекта, не глобальное отключение LOD размещённых растений.</small>
+  <div class="character-grid">
+    <label><input id="option-flora-enabled" type="checkbox"> Включить листья при контакте</label>
+    <label>Листья · Asset slug<input id="option-flora-leafAssetSlug" type="text" maxlength="64" spellcheck="false"></label>
+    <label>Листьев на столкновение<input id="option-flora-leavesPerBurst" type="number" min="1" max="20" step="1"></label>
+    <label>Радиус возникновения · studs<input id="option-flora-spawnRadiusStuds" type="number" min="0" max="8" step="0.25"></label>
+    <label>Радиус разлёта · studs<input id="option-flora-spreadRadiusStuds" type="number" min="0.5" max="20" step="0.25"></label>
+    <label>Допуск контакта · studs<input id="option-flora-contactPaddingStuds" type="number" min="0" max="5" step="0.25"></label>
+    <label>Время полёта · сек<input id="option-flora-durationSeconds" type="number" min="0.3" max="4" step="0.1"></label>
+    <label>Повторный эффект · сек<input id="option-flora-cooldownSeconds" type="number" min="0.2" max="30" step="0.1"></label>
+    <label>Максимум активных листьев<input id="option-flora-maxActiveLeaves" type="number" min="8" max="96" step="1"></label>
+    <label>Always resident · список slug через запятую<input id="option-flora-residentAssets" type="text" spellcheck="false" placeholder="leaf_01"></label>
+  </div>
+  <small class="hint">В resident list разрешены только опубликованные Location Asset с одним MeshPart (до 8). Загружаются один раз сервером и прогреваются клиентом. Применение — Save → Rojo Sync → Studio Play.</small>
+  <div class="actions"><button id="option-flora-save" class="primary" type="button">Save Flora</button></div>
+</div></details>
 <details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🎯</span><span><strong>Sockets · USE / AIM</strong><small>House, Campfire &amp; Windmill · интерактивные зоны</small></span></summary>
 <div class="panel character-card game1-socket-range-options">
   <div class="section-title"><div><span>authoritative socket reach · studs</span><h3>House, Campfire &amp; Windmill</h3></div></div>
@@ -1116,7 +1135,7 @@
 <script src="location-asset-workflow.js?v=453"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=452"></script>
+<script src="options.js?v=456"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=437"></script>

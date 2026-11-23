@@ -113,6 +113,9 @@ end
 function Service.Start()
     if started then return end
     started = true
+    -- Resident cosmetic templates are independent of Place LOD placements.
+    -- Stage in both Studio and compiled Runtime using the SAME verified loader.
+    require(script.Parent:WaitForChild("LocationResidentTemplateService")).Start(loadPrototype)
     local marker = ReplicatedStorage:FindFirstChild(Contract.MarkerName)
     if not marker then
         require(script.Parent:WaitForChild("StudioLodPreviewTemplates")).Start(loadPrototype)

@@ -78,6 +78,11 @@ end)
 if not windmillOk then warn("[game1][client] windmill visuals failed: " .. tostring(windmillError)) end
 require(script:WaitForChild("world"):WaitForChild("LandscapeSwayController")).Start()
 require(script:WaitForChild("world"):WaitForChild("LocationWorldStreamer")).Start()
+-- Lightweight foliage contact visual; independent of World LOD transitions.
+local floraOk, floraError = pcall(function()
+    require(script:WaitForChild("world"):WaitForChild("FloraLeafBurstController")).Start()
+end)
+if not floraOk then warn("[game1][client] flora effect startup failed: " .. tostring(floraError)) end
 require(script:WaitForChild("world"):WaitForChild("BoneOrbController")).Start()
 require(script:WaitForChild("world"):WaitForChild("BoneFireController")).Start()
 HouseSocketDebugController.Start()

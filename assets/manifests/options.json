@@ -257,5 +257,19 @@
       "enabled": true,
       "secondsPerRevolution": 6.0
     }
+  },
+  "flora": {
+    "enabled": true,
+    "leafAssetSlug": "leaf_01",
+    "residentAssets": [
+      "leaf_01"
+    ],
+    "leavesPerBurst": 8,
+    "spawnRadiusStuds": 2.0,
+    "spreadRadiusStuds": 5.0,
+    "contactPaddingStuds": 1.25,
+    "durationSeconds": 1.5,
+    "cooldownSeconds": 1.5,
+    "maxActiveLeaves": 32
   }
 }

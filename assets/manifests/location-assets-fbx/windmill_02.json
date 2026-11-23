@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "slug": "windmill_02",
-  "sourceSha256": "eb196722137b851e729dd2f61c2ef0852b7406a536d47cc8eb58677fde80b43e",
+  "sourceSha256": "631568db143cf79d930ab5932f01e92bfb721a4d1cd0f8ec07a381efbcdf746d",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
@@ -42,8 +42,30 @@
       {
         "name": "door",
         "armature": "windmill_armature",
-        "vertices": 34,
+        "vertices": 58,
         "bones": [
+          {
+            "name": "windmill_door_handle_socket",
+            "parent": "windmill_door_socket",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              -2.2500725,
+              0.0,
+              0.0,
+              -0.9999999,
+              -6.3410845,
+              0.0,
+              0.9999999,
+              1e-07,
+              3.1455998,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
           {
             "name": "windmill_door_socket",
             "parent": "",
@@ -54,11 +76,11 @@
               2.7204952,
               0.0,
               0.0,
-              -1.0,
+              -0.9999999,
               -6.2024255,
               0.0,
-              1.0,
-              0.0,
+              0.9999999,
+              1e-07,
               3.0508738,
               0.0,
               0.0,
@@ -101,8 +123,30 @@
       {
         "name": "rig_carrier",
         "armature": "windmill_armature",
-        "vertices": 3,
+        "vertices": 6,
         "bones": [
+          {
+            "name": "windmill_door_handle_socket",
+            "parent": "windmill_door_socket",
+            "matrixLocal": [
+              1.0,
+              0.0,
+              0.0,
+              -2.2500725,
+              0.0,
+              0.0,
+              -0.9999999,
+              -6.3410845,
+              0.0,
+              0.9999999,
+              1e-07,
+              3.1455998,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
           {
             "name": "windmill_door_socket",
             "parent": "",
@@ -113,11 +157,11 @@
               2.7204952,
               0.0,
               0.0,
-              -1.0,
+              -0.9999999,
               -6.2024255,
               0.0,
-              1.0,
-              0.0,
+              0.9999999,
+              1e-07,
               3.0508738,
               0.0,
               0.0,
@@ -127,6 +171,7 @@
           }
         ],
         "influencedBones": [
+          "windmill_door_handle_socket",
           "windmill_door_socket"
         ],
         "role": "carrier",

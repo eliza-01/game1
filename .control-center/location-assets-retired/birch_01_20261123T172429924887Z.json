@@ -1,0 +1,70 @@
+{
+  "asset": {
+    "slug": "birch_01",
+    "name_en": "Birch 01",
+    "category": "tree",
+    "model_path": "assets/source/location-assets/tree/birch_01/model/birch_01.fbx",
+    "model_sha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
+    "model_asset_id": "110075621214873",
+    "model_published_sha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
+    "model_moderation_state": "Approved",
+    "destructible": 1,
+    "revision": 4,
+    "created_at": 1792461987.3799765,
+    "updated_at": 1794280897.511054,
+    "published_at": 1794280897.511054,
+    "mesh_options_json": "{\"birch_01\": {\"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": true}}",
+    "surface_material": "default",
+    "alpha_enabled": 0,
+    "appearance_mode": "atlas",
+    "visual_material": "SmoothPlastic",
+    "visual_color": "#FFFFFF"
+  },
+  "publications": [
+    {
+      "id": 34,
+      "asset_slug": "birch_01",
+      "kind": "model",
+      "revision": 1,
+      "asset_id": "75425552383886",
+      "operation_path": "operations/11d6d9c8-d69b-43ea-990c-a3601029c721",
+      "sha256": "9e1f926a1ceba8b15bc227133e7dee3f3b38017b507317850fe56703a028b52e",
+      "moderation_state": "Approved",
+      "published_at": 1792461997.0088174
+    },
+    {
+      "id": 50,
+      "asset_slug": "birch_01",
+      "kind": "model",
+      "revision": 2,
+      "asset_id": "127245547696536",
+      "operation_path": "operations/2e621166-99c3-4bac-9e99-434780cc84a8",
+      "sha256": "ff25196a924e6c27f245429159450334a43ac16604b391640f818cfec696a327",
+      "moderation_state": "Approved",
+      "published_at": 1793903073.7166655
+    },
+    {
+      "id": 67,
+      "asset_slug": "birch_01",
+      "kind": "model",
+      "revision": 4,
+      "asset_id": "110075621214873",
+      "operation_path": "operations/d644de46-90de-444e-9de4-929a972ebc04",
+      "sha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
+      "moderation_state": "Approved",
+      "published_at": 1794280897.511054
+    }
+  ],
+  "rigManifests": [
+    {
+      "asset_slug": "birch_01",
+      "model_asset_id": "110075621214873",
+      "source_sha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
+      "manifest_json": "{\"boneHash\": \"f8bc3463790decc40556cf401b366dc9a9fc21be45f6e4f7a9e1fcdfe02c53aa\", \"bones\": [{\"matrix\": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], \"name\": \"Bone\", \"parent\": \"\"}, {\"matrix\": [0.9988223, 0.0485191, 0.0001674, 0.0, 0.0031862, -0.0621481, -0.9980618, 0.0, -0.0484146, 0.9968869, -0.0622295, 4.0522251, 0.0, 0.0, 0.0, 1.0], \"name\": \"Bone.001\", \"parent\": \"Bone\"}, {\"matrix\": [0.9998968, 0.0143583, 0.0005088, 0.1303113, 0.0005968, -0.0061263, -0.999981, -0.1669157, -0.014355, 0.9998781, -0.0061342, 6.7296371, 0.0, 0.0, 0.0, 1.0], \"name\": \"Bone.002\", \"parent\": \"Bone.001\"}, {\"matrix\": [0.9921572, -0.1135378, 0.0522841, 0.1861927, 0.0453692, -0.0626577, -0.9970033, -0.1907587, 0.1164735, 0.991556, -0.0570151, 10.6210747, 0.0, 0.0, 0.0, 1.0], \"name\": \"Bone.003\", \"parent\": \"Bone.002\"}, {\"matrix\": [0.9973591, 0.0487963, 0.0537962, -0.0526468, 0.0575924, -0.0800524, -0.9951255, -0.3225661, -0.0442519, 0.9955956, -0.0826513, 12.7069244, 0.0, 0.0, 0.0, 1.0], \"name\": \"Bone.004\", \"parent\": \"Bone.003\"}], \"carrierName\": \"rig_carrier\", \"inventoryHash\": \"25017b900072a8f3b0b038465ebfef93028206338d1513e624aba5746ead11fd\", \"parts\": [{\"name\": \"birch_01\", \"role\": \"visual\", \"vertices\": 791}, {\"name\": \"col_mesh\", \"role\": \"collider\", \"vertices\": 226}, {\"name\": \"rig_carrier\", \"role\": \"rig_carrier\", \"vertices\": 15}], \"rigKind\": \"skinned\", \"schemaVersion\": 2, \"sourceSha256\": \"\", \"structuralHash\": \"93792e421c1cbb67d170f9d90a8872d668aea36de4ff34c598c1f5b46d74ee5c\"}",
+      "created_at": 1794280897.511054
+    }
+  ],
+  "collisionBlueprints": [],
+  "lodResources": [],
+  "sourceFilesPreserved": true
+}

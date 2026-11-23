@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "dry_tree_02",
+  "sourceSha256": "c6213af70f4fc3a1198424bb1cd72e1aa72ebd7dd12c5feac7dd85729af3e811",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "dry_tree_02",
+        "armature": "",
+        "vertices": 189,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

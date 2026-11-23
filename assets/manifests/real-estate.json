@@ -19905,6 +19905,39 @@
       ]
     },
     {
+      "atlasKey": "thuja_02",
+      "baseKey": "thuja",
+      "version": "02",
+      "variants": [
+        {
+          "id": 85,
+          "family_id": 60,
+          "width": 64,
+          "height": 128,
+          "filename": "thuja_02_64x128_atlas.png",
+          "original_filename": "thuja_02_64x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/thuja_02/64x128/thuja_02_64x128_atlas.png",
+          "source_sha256": "6a32b301b4a4dd3985975f8a16eca0d1d5ff28ccb3c9c861d946b9418fca5b05",
+          "uses_alpha": true,
+          "published_id": "115926462956875",
+          "published_sha256": "6a32b301b4a4dd3985975f8a16eca0d1d5ff28ccb3c9c861d946b9418fca5b05",
+          "moderation_state": "Reviewing",
+          "published_at": 1795454302.2247868,
+          "created_at": 1795452865.2788908,
+          "retired_at": null,
+          "atlas_key": "thuja_02",
+          "replacement_sha256": null,
+          "favorite": false,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "64x128",
+          "baseKey": "thuja",
+          "version": "02"
+        }
+      ]
+    },
+    {
       "atlasKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
       "baseKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
       "version": "",
@@ -21401,6 +21434,22 @@
       "atlasName": "structures",
       "atlasVersion": "01",
       "atlasResolution": "2048×2048"
+    },
+    {
+      "reference": "atlas:85",
+      "label": "thuja_02",
+      "slug": "",
+      "filename": "thuja_02_64x128_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/thuja_02/64x128/thuja_02_64x128_atlas.png",
+      "sha256": "6a32b301b4a4dd3985975f8a16eca0d1d5ff28ccb3c9c861d946b9418fca5b05",
+      "assetId": "115926462956875",
+      "atlasKey": "thuja_02",
+      "atlasName": "thuja",
+      "atlasVersion": "02",
+      "atlasResolution": "64×128"
     },
     {
       "reference": "atlas:31",

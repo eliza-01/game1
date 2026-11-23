@@ -1,0 +1,120 @@
+{
+  "asset": {
+    "slug": "windmill_01",
+    "name_en": "Windmill 01",
+    "category": "building",
+    "model_path": "assets/source/location-assets/building/windmill_01/model/windmill_01.fbx",
+    "model_sha256": "2c812dd23bea262e0c9f05cae276f1a7a1066592a910cb75688c7ee71f3ff6f1",
+    "model_asset_id": "125638050890051",
+    "model_published_sha256": "686d8817c8c57c7dc467296e12f585e4b92d2274b9fdf6f08d2da687c66d1c99",
+    "model_moderation_state": "Approved",
+    "destructible": 0,
+    "revision": 14,
+    "created_at": 1795442312.933316,
+    "updated_at": 1795446930.15916,
+    "published_at": 1795445442.6951785,
+    "mesh_options_json": "{\"blades\": {\"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": false}, \"body\": {\"appearanceMode\": \"material\", \"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": true, \"visualColor\": \"#AF9797\", \"visualMaterial\": \"Brick\"}, \"door\": {\"appearanceMode\": \"material\", \"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": true, \"visualColor\": \"#985234\", \"visualMaterial\": \"Wood\"}, \"fabric\": {\"appearanceMode\": \"material\", \"collisionFidelity\": \"Box\", \"doubleSided\": true, \"glass\": false, \"noCollide\": true, \"visualColor\": \"#FFCAAD\", \"visualMaterial\": \"Sand\"}, \"roof\": {\"appearanceMode\": \"material\", \"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": true, \"visualColor\": \"#8E2E2E\", \"visualMaterial\": \"ClayRoofTiles\"}, \"wood\": {\"appearanceMode\": \"material\", \"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": true, \"visualColor\": \"#985234\", \"visualMaterial\": \"Wood\"}}",
+    "surface_material": "default",
+    "alpha_enabled": 0,
+    "appearance_mode": "material",
+    "visual_material": "Plastic",
+    "visual_color": "#FFFFFF"
+  },
+  "publications": [
+    {
+      "id": 109,
+      "asset_slug": "windmill_01",
+      "kind": "model",
+      "revision": 2,
+      "asset_id": "125261389110705",
+      "operation_path": "operations/daee58b7-073f-47d4-8b26-3e1fbfa56d72",
+      "sha256": "d005d88537d4cd3b6da682e360b2b4c8b914000370c117cc22ee4760246808f4",
+      "moderation_state": "Approved",
+      "published_at": 1795442337.6788137
+    },
+    {
+      "id": 110,
+      "asset_slug": "windmill_01",
+      "kind": "model",
+      "revision": 4,
+      "asset_id": "129259484136077",
+      "operation_path": "operations/0ffa1577-305d-4e04-86d7-b53d653e1739",
+      "sha256": "d28c38304e3653b949eb227e0b21fe5208f76f3b314996ab2399d7e02db1c9ba",
+      "moderation_state": "Approved",
+      "published_at": 1795442872.3959353
+    },
+    {
+      "id": 111,
+      "asset_slug": "windmill_01",
+      "kind": "model",
+      "revision": 6,
+      "asset_id": "102830395520037",
+      "operation_path": "operations/8fbf8deb-ba7f-48e5-b75b-fbd7647e3c7e",
+      "sha256": "e25a7dd7ff3d6b4ff2020bb11e9464967828b0901ceb9ad42aff2678a533ebc2",
+      "moderation_state": "Approved",
+      "published_at": 1795445031.9837608
+    },
+    {
+      "id": 112,
+      "asset_slug": "windmill_01",
+      "kind": "model",
+      "revision": 8,
+      "asset_id": "128012469357176",
+      "operation_path": "operations/6f22ba6a-a0f8-4b13-a79f-26fd0d1a6d96",
+      "sha256": "6e812fec7b57b1a61c9e4ca8de9b096422e9f81e4d3c413a3de63c83ca26dbdd",
+      "moderation_state": "Approved",
+      "published_at": 1795445214.754376
+    },
+    {
+      "id": 113,
+      "asset_slug": "windmill_01",
+      "kind": "model",
+      "revision": 10,
+      "asset_id": "125638050890051",
+      "operation_path": "operations/81386ce0-6e08-4674-9140-3df4dbc65c9c",
+      "sha256": "686d8817c8c57c7dc467296e12f585e4b92d2274b9fdf6f08d2da687c66d1c99",
+      "moderation_state": "Approved",
+      "published_at": 1795445442.6951785
+    }
+  ],
+  "rigManifests": [
+    {
+      "asset_slug": "windmill_01",
+      "model_asset_id": "102830395520037",
+      "source_sha256": "e25a7dd7ff3d6b4ff2020bb11e9464967828b0901ceb9ad42aff2678a533ebc2",
+      "manifest_json": "{\"boneHash\": \"220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac\", \"bones\": [{\"matrix\": [1.0, 0.0, 0.0, 2.7204952, 0.0, 0.0, -1.0, -6.2024255, 0.0, 1.0, 0.0, 3.0508738, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_door_socket\", \"parent\": \"\"}, {\"matrix\": [1.0, 0.0, 0.0, 0.0176226, 0.0, 0.0, -1.0, -8.6503077, 0.0, 1.0, 0.0, 15.2668781, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_rotation_socket\", \"parent\": \"\"}], \"carrierName\": \"rig_carrier\", \"inventoryHash\": \"1070a4a753e35a3d87e98c3c36301f1275ae964d7f4007c46a72849a38c39615\", \"parts\": [{\"name\": \"blades\", \"role\": \"visual\", \"vertices\": 344}, {\"name\": \"body\", \"role\": \"visual\", \"vertices\": 70}, {\"name\": \"door\", \"role\": \"visual\", \"vertices\": 34}, {\"name\": \"fabric\", \"role\": \"visual\", \"vertices\": 80}, {\"name\": \"rig_carrier\", \"role\": \"rig_carrier\", \"vertices\": 6}, {\"name\": \"roof\", \"role\": \"visual\", \"vertices\": 74}, {\"name\": \"wood\", \"role\": \"visual\", \"vertices\": 28}], \"rigKind\": \"skinned\", \"schemaVersion\": 2, \"sourceSha256\": \"\", \"structuralHash\": \"496da9e3111131db7c0b9ad68030bb5f650e0ca10f26cbd31d62da5efe2d9363\"}",
+      "created_at": 1795445031.9837608
+    },
+    {
+      "asset_slug": "windmill_01",
+      "model_asset_id": "125261389110705",
+      "source_sha256": "d005d88537d4cd3b6da682e360b2b4c8b914000370c117cc22ee4760246808f4",
+      "manifest_json": "{\"boneHash\": \"220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac\", \"bones\": [{\"matrix\": [1.0, 0.0, 0.0, 2.7204952, 0.0, 0.0, -1.0, -6.2024255, 0.0, 1.0, 0.0, 3.0508738, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_door_socket\", \"parent\": \"\"}, {\"matrix\": [1.0, 0.0, 0.0, 0.0176226, 0.0, 0.0, -1.0, -8.6503077, 0.0, 1.0, 0.0, 15.2668781, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_rotation_socket\", \"parent\": \"\"}], \"carrierName\": \"rig_carrier\", \"inventoryHash\": \"c498ea77bfe84ff1debd714c232e21d196f3ac6f3b59f2c7a571419ecd0d8b20\", \"parts\": [{\"name\": \"body\", \"role\": \"visual\", \"vertices\": 70}, {\"name\": \"door\", \"role\": \"visual\", \"vertices\": 34}, {\"name\": \"fabric\", \"role\": \"visual\", \"vertices\": 80}, {\"name\": \"rig_carrier\", \"role\": \"rig_carrier\", \"vertices\": 6}, {\"name\": \"roof\", \"role\": \"visual\", \"vertices\": 74}, {\"name\": \"wood\", \"role\": \"visual\", \"vertices\": 412}], \"rigKind\": \"skinned\", \"schemaVersion\": 2, \"sourceSha256\": \"\", \"structuralHash\": \"1c05f4414e15f5c913b43b1d035b9eeb0230bc6340bef8d3838e5cea39753b6f\"}",
+      "created_at": 1795442337.6788137
+    },
+    {
+      "asset_slug": "windmill_01",
+      "model_asset_id": "125638050890051",
+      "source_sha256": "686d8817c8c57c7dc467296e12f585e4b92d2274b9fdf6f08d2da687c66d1c99",
+      "manifest_json": "{\"boneHash\": \"220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac\", \"bones\": [{\"matrix\": [1.0, 0.0, 0.0, 2.7204952, 0.0, 0.0, -1.0, -6.2024255, 0.0, 1.0, 0.0, 3.0508738, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_door_socket\", \"parent\": \"\"}, {\"matrix\": [1.0, 0.0, 0.0, 0.0176226, 0.0, 0.0, -1.0, -8.6503077, 0.0, 1.0, 0.0, 15.2668781, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_rotation_socket\", \"parent\": \"\"}], \"carrierName\": \"rig_carrier\", \"inventoryHash\": \"1070a4a753e35a3d87e98c3c36301f1275ae964d7f4007c46a72849a38c39615\", \"parts\": [{\"name\": \"blades\", \"role\": \"visual\", \"vertices\": 344}, {\"name\": \"body\", \"role\": \"visual\", \"vertices\": 70}, {\"name\": \"door\", \"role\": \"visual\", \"vertices\": 34}, {\"name\": \"fabric\", \"role\": \"visual\", \"vertices\": 80}, {\"name\": \"rig_carrier\", \"role\": \"rig_carrier\", \"vertices\": 6}, {\"name\": \"roof\", \"role\": \"visual\", \"vertices\": 74}, {\"name\": \"wood\", \"role\": \"visual\", \"vertices\": 28}], \"rigKind\": \"skinned\", \"schemaVersion\": 2, \"sourceSha256\": \"\", \"structuralHash\": \"496da9e3111131db7c0b9ad68030bb5f650e0ca10f26cbd31d62da5efe2d9363\"}",
+      "created_at": 1795445442.6951785
+    },
+    {
+      "asset_slug": "windmill_01",
+      "model_asset_id": "128012469357176",
+      "source_sha256": "6e812fec7b57b1a61c9e4ca8de9b096422e9f81e4d3c413a3de63c83ca26dbdd",
+      "manifest_json": "{\"boneHash\": \"220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac\", \"bones\": [{\"matrix\": [1.0, 0.0, 0.0, 2.7204952, 0.0, 0.0, -1.0, -6.2024255, 0.0, 1.0, 0.0, 3.0508738, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_door_socket\", \"parent\": \"\"}, {\"matrix\": [1.0, 0.0, 0.0, 0.0176226, 0.0, 0.0, -1.0, -8.6503077, 0.0, 1.0, 0.0, 15.2668781, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_rotation_socket\", \"parent\": \"\"}], \"carrierName\": \"rig_carrier\", \"inventoryHash\": \"1070a4a753e35a3d87e98c3c36301f1275ae964d7f4007c46a72849a38c39615\", \"parts\": [{\"name\": \"blades\", \"role\": \"visual\", \"vertices\": 344}, {\"name\": \"body\", \"role\": \"visual\", \"vertices\": 70}, {\"name\": \"door\", \"role\": \"visual\", \"vertices\": 34}, {\"name\": \"fabric\", \"role\": \"visual\", \"vertices\": 80}, {\"name\": \"rig_carrier\", \"role\": \"rig_carrier\", \"vertices\": 6}, {\"name\": \"roof\", \"role\": \"visual\", \"vertices\": 74}, {\"name\": \"wood\", \"role\": \"visual\", \"vertices\": 28}], \"rigKind\": \"skinned\", \"schemaVersion\": 2, \"sourceSha256\": \"\", \"structuralHash\": \"496da9e3111131db7c0b9ad68030bb5f650e0ca10f26cbd31d62da5efe2d9363\"}",
+      "created_at": 1795445214.754376
+    },
+    {
+      "asset_slug": "windmill_01",
+      "model_asset_id": "129259484136077",
+      "source_sha256": "d28c38304e3653b949eb227e0b21fe5208f76f3b314996ab2399d7e02db1c9ba",
+      "manifest_json": "{\"boneHash\": \"220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac\", \"bones\": [{\"matrix\": [1.0, 0.0, 0.0, 2.7204952, 0.0, 0.0, -1.0, -6.2024255, 0.0, 1.0, 0.0, 3.0508738, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_door_socket\", \"parent\": \"\"}, {\"matrix\": [1.0, 0.0, 0.0, 0.0176226, 0.0, 0.0, -1.0, -8.6503077, 0.0, 1.0, 0.0, 15.2668781, 0.0, 0.0, 0.0, 1.0], \"name\": \"windmill_rotation_socket\", \"parent\": \"\"}], \"carrierName\": \"rig_carrier\", \"inventoryHash\": \"a4d56e178a7f0971b351aa88bbea5a1405bd72e878d10e4c3a093db57f42ffd8\", \"parts\": [{\"name\": \"body\", \"role\": \"visual\", \"vertices\": 70}, {\"name\": \"door\", \"role\": \"visual\", \"vertices\": 34}, {\"name\": \"fabric\", \"role\": \"visual\", \"vertices\": 80}, {\"name\": \"rig_carrier\", \"role\": \"rig_carrier\", \"vertices\": 6}, {\"name\": \"roof\", \"role\": \"visual\", \"vertices\": 74}, {\"name\": \"wood\", \"role\": \"visual\", \"vertices\": 372}], \"rigKind\": \"skinned\", \"schemaVersion\": 2, \"sourceSha256\": \"\", \"structuralHash\": \"080b5edbf9d7444e5706cab6ead22311fc2f55c1328c04b4dec454c54c5762ae\"}",
+      "created_at": 1795442872.3959353
+    }
+  ],
+  "collisionBlueprints": [],
+  "lodResources": [],
+  "sourceFilesPreserved": true
+}

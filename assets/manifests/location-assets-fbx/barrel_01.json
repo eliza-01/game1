@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "slug": "barrel_01",
+  "sourceSha256": "38da3442bf39f6d209dc8b4c9f53b7905ad1cd4f83fa59dc36678daade7526ac",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "barrel_01",
+        "armature": "",
+        "vertices": 88,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

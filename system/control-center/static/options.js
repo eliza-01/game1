@@ -58,12 +58,14 @@ function game1OptionsRender(){
   game1UiRender();
   game1UiDraftStatus(data);
   game1SocketRangesRender();
+  $('option-rotation-windmill-enabled').checked=data.rotations?.windmill_02?.enabled??true;
+  $('option-rotation-windmill-period').value=String(data.rotations?.windmill_02?.secondsPerRevolution??3);
   $('option-world-streaming-radius').value=String(data.worldStreaming?.targetRadiusStuds??150);
   $('save-combat-options').disabled=game1OptionsState.saving;
   $('option-npc-overhead-save').disabled=game1OptionsState.saving;
   $('save-character-life-options').disabled=game1OptionsState.saving;
   $('save-player-jump-options').disabled=game1OptionsState.saving;
-  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save']){
+  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save','option-rotation-save']){
     $(id).disabled=game1OptionsState.saving;
   }
 }
@@ -179,6 +181,16 @@ setInterval(async()=>{
 },2500);
 window.game1OptionsLoad=game1OptionsLoad;
 
+$('option-rotation-save').onclick=()=>{
+  const input=$('option-rotation-windmill-period');
+  const period=Number(input.value);
+  if(!input.value.trim()||!Number.isFinite(period)||period<0.25||period>120){
+    toast('Windmill period must be 0.25–120 seconds',true);return;
+  }
+  game1OptionsSave({rotations:{windmill_02:{enabled:$('option-rotation-windmill-enabled').checked,secondsPerRevolution:period}}},
+    'Windmill rotation saved · sync Rojo and restart Play');
+};
+
 // M449 · persisted interaction reach; preview-only Studio HS overrides remain
 // separate player attributes. Do not expose non-interactive Bone anchors.
 const GAME1_SOCKET_GROUPS = [
@@ -196,6 +208,9 @@ const GAME1_SOCKET_GROUPS = [
   ['campfire','Campfire sockets',[
     ['fire_socket','Campfire · fire_socket'],
   ]],
+  ['windmill','Windmill sockets',[
+    ['windmill_door_handle_socket','Windmill · door handle'],
+  ]],
 ];
 function game1SocketRangesRender(){
   const host=$('option-sockets-fields');if(!host)return;
@@ -212,7 +227,7 @@ function game1SocketRangesRender(){
 }
 $('option-sockets-save').onclick=()=>{
   try{
-    const change={house:{},campfire:{}};
+    const change={house:{},campfire:{},windmill:{}};
     for(const [domain,,sockets] of GAME1_SOCKET_GROUPS)for(const [name] of sockets){
       const saved=game1OptionsState.data?.socketRanges?.[domain]?.[name];
       if(!saved)throw Error(`Socket settings missing: ${name}. Reload Options.`);

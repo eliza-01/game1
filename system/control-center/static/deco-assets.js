@@ -301,10 +301,11 @@ async function decoAssetLoad() {
 function decoAssetRenderInspection() {
   const host=$('location-asset-fbx-preview');
   if(!host)return;
+  const expandedMeshes=window.game1MeshAuthoring.openMeshNames(host);
   host.innerHTML=window.game1MeshAuthoring.inspectionView(
     decoAssetState.inspection,decoAssetState.meshOptions,'location-mesh',{
       materials:decoAssetState.data?.options?.visualMaterials||[],
-      atlases:decoAssetAtlasCatalog(),alphaEnabled:false,defaultUsesAtlas:decoAssetAppearanceMode()!=='material'});
+      atlases:decoAssetAtlasCatalog(),alphaEnabled:false,defaultUsesAtlas:decoAssetAppearanceMode()!=='material'},expandedMeshes);
   window.game1MeshAuthoring.wire(host,decoAssetState.meshOptions,null,
     Boolean(decoAssetState.inspection?.hasCollider),{
       materials:decoAssetState.data?.options?.visualMaterials||[],

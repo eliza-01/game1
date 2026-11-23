@@ -30,9 +30,20 @@ local visibleSignature: {[Attachment]: string} = {}
 -- Campfire interaction is a separate Location-domain contract; the House
 -- registry must never treat fire_socket as a House socket.
 local CAMPFIRE_DEFINITION = CampfireContract.Fire
+local Options = require(Shared:WaitForChild("GameOptionsRegistry"))
+local windmillReach = Options.socketRanges and Options.socketRanges.windmill
+    and Options.socketRanges.windmill.windmill_door_handle_socket
+local WINDMILL_DEFINITION = table.freeze({
+    name = "windmill_door_handle_socket", role = "windmill_door", interact = true,
+    radius = if windmillReach then windmillReach.useRadius else 8,
+})
 local function definitionFor(prompt: ProximityPrompt): any?
     if prompt:GetAttribute("Game1SocketDomain") == "campfire" then
         return if prompt:GetAttribute("Game1SocketName") == "fire_socket" then CAMPFIRE_DEFINITION else nil
+    end
+    if prompt:GetAttribute("Game1SocketDomain") == "windmill" then
+        return if prompt:GetAttribute("Game1SocketName") == WINDMILL_DEFINITION.name
+            then WINDMILL_DEFINITION else nil
     end
     local name = prompt:GetAttribute("Game1HouseSocketName")
     return if typeof(name) == "string" then Contract.Get(name) else nil
@@ -73,6 +84,7 @@ end
 -- character types; native prompts cannot bypass AIM visibility.
 local function clientNativeDistance(name: string): number
     local definition = Contract.Get(name)
+    if name == WINDMILL_DEFINITION.name then return WINDMILL_DEFINITION.radius end
     return if definition and definition.hoverRadius then 0 else radius(name)
 end
 
@@ -155,8 +167,9 @@ local function requestAction(prompt: ProximityPrompt)
     local key = prompt.KeyboardKeyCode.Name
     if key ~= "E" and key ~= "F" then return end
     local folder = ReplicatedStorage:FindFirstChild("Game1Remotes")
-    local remoteName = if prompt:GetAttribute("Game1SocketDomain") == "campfire"
-        then "CampfireSocketInteract" else "HouseSocketInteract"
+    local domain = prompt:GetAttribute("Game1SocketDomain")
+    local remoteName = if domain == "campfire" then "CampfireSocketInteract"
+        else if domain == "windmill" then "WindmillSocketInteract" else "HouseSocketInteract"
     local remote = folder and folder:FindFirstChild(remoteName)
     if remote and remote:IsA("RemoteEvent") then
         remote:FireServer(socket, key)
@@ -189,7 +202,8 @@ local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): Proximit
         local frame = if socket:IsA("Bone") then socket.TransformedWorldCFrame else socket.WorldCFrame
         local distance = (frame.Position - root.Position).Magnitude
         -- USE always uses the character root, not the camera.
-        local maxDistance = if definition == CAMPFIRE_DEFINITION then campfireRadius() else radius(name)
+        local maxDistance = if definition == CAMPFIRE_DEFINITION then campfireRadius()
+            else if definition == WINDMILL_DEFINITION then WINDMILL_DEFINITION.radius else radius(name)
         if distance > maxDistance then continue end
         if definition.hoverRadius then
             local aimRadius = if definition == CAMPFIRE_DEFINITION then campfireHoverRadius() else hoverRadius(name)

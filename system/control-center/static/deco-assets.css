@@ -164,11 +164,17 @@
 .deco-fbx-report {display:grid;gap:11px;margin:12px 0 14px;padding:14px;border:1px solid var(--line);border-radius:10px;min-width:0;}
 .deco-fbx-report-header {display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .deco-fbx-report-header small {color:var(--muted);}
-.deco-fbx-mesh {display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);min-width:0;}
-.deco-fbx-mesh-title {display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;}
-.deco-fbx-report>small,.deco-fbx-mesh>small {display:block;color:var(--muted);}
-.deco-fbx-mesh details {margin-top:6px;font-size:12px;overflow-wrap:anywhere;}
-.deco-fbx-mesh-title small {color:var(--muted);}
+.deco-fbx-mesh {display:block;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);min-width:0;}
+.deco-fbx-mesh-title {display:flex;align-items:center;gap:8px;min-width:0;list-style:none;cursor:pointer;}
+.deco-fbx-mesh-title::-webkit-details-marker {display:none;}
+.deco-fbx-mesh-title::before {content:"▸";color:var(--muted);flex:none;}
+.deco-fbx-mesh[open] > .deco-fbx-mesh-title::before {content:"▾";}
+.deco-fbx-mesh-title:focus-visible {outline:2px solid var(--mint);outline-offset:4px;border-radius:3px;}
+.deco-fbx-mesh-title strong {flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;}
+.deco-fbx-mesh-title small {color:var(--muted);flex:0 1 auto;min-width:0;max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;}
+.deco-fbx-mesh-body {display:grid;gap:10px;margin-top:12px;min-width:0;}
+.deco-fbx-report>small,.deco-fbx-mesh-body>small {display:block;color:var(--muted);}
+.deco-fbx-mesh-body details {margin-top:6px;font-size:12px;overflow-wrap:anywhere;}
 .deco-fbx-skeleton summary {cursor:pointer;color:var(--mint);}
 .deco-fbx-skeleton ul {margin:8px 0 0 4px;max-height:160px;overflow:auto;padding-left:18px;}
 .deco-fbx-report .real-estate-physics-controls {display:flex;flex-wrap:wrap;gap:12px;align-items:end;}

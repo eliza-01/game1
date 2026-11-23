@@ -1,0 +1,105 @@
+{
+  "boneHash": "5c36e4de1317a46f4c6e1e298c92b18e1668b09b9d43feab0c53dd21994f1643",
+  "bones": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        -2.2500725,
+        0.0,
+        0.0,
+        -0.9999999,
+        -6.3410845,
+        0.0,
+        0.9999999,
+        1e-07,
+        3.1455998,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "windmill_door_handle_socket",
+      "parent": "windmill_door_socket"
+    },
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        2.7204952,
+        0.0,
+        0.0,
+        -0.9999999,
+        -6.2024255,
+        0.0,
+        0.9999999,
+        1e-07,
+        3.0508738,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "windmill_door_socket",
+      "parent": ""
+    }
+  ],
+  "carrierName": "rig_carrier",
+  "inventoryHash": "b2750c47a8d3fc4405f92f7fc8ce181545e30d48976502272af0781ba3afd8b2",
+  "parts": [
+    {
+      "name": "blades",
+      "role": "visual",
+      "vertices": 344
+    },
+    {
+      "name": "body",
+      "role": "visual",
+      "vertices": 70
+    },
+    {
+      "name": "door",
+      "role": "visual",
+      "vertices": 58
+    },
+    {
+      "name": "fabric",
+      "role": "visual",
+      "vertices": 80
+    },
+    {
+      "name": "rig_carrier",
+      "role": "rig_carrier",
+      "vertices": 6
+    },
+    {
+      "name": "roof",
+      "role": "visual",
+      "vertices": 74
+    },
+    {
+      "name": "wood",
+      "role": "visual",
+      "vertices": 28
+    }
+  ],
+  "rigKind": "skinned",
+  "schemaVersion": 2,
+  "skinPreparation": {
+    "minimumInfluence": 0.05,
+    "minimumVerticesPerBone": 1,
+    "patchedBoneCount": 0,
+    "patchedBones": [],
+    "prunedVertices": 0,
+    "survivingBoneCount": 2,
+    "unweightedVertexPolicy": "nearest-authored-bone-head-v1",
+    "unweightedVerticesAfter": 0,
+    "unweightedVerticesBefore": 0,
+    "verticesOverFourAfter": 0,
+    "verticesOverFourBefore": 0
+  },
+  "sourceSha256": "631568db143cf79d930ab5932f01e92bfb721a4d1cd0f8ec07a381efbcdf746d",
+  "structuralHash": "85f10d473835c88f5b81562007ab7dfc889c491fd1d298cb9983ba665dd9e471"
+}

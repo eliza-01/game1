@@ -66,6 +66,11 @@ end)
 if not fireplaceOk then
     warn("[game1][client] fireplace information UI failed; other modules remain available: " .. tostring(fireplaceError))
 end
+-- Windmill bone skinning is evaluated independently on every client.
+local windmillOk, windmillError = pcall(function()
+    require(script:WaitForChild("world"):WaitForChild("WindmillVisualController")).Start()
+end)
+if not windmillOk then warn("[game1][client] windmill visuals failed: " .. tostring(windmillError)) end
 require(script:WaitForChild("world"):WaitForChild("LandscapeSwayController")).Start()
 require(script:WaitForChild("world"):WaitForChild("LocationWorldStreamer")).Start()
 require(script:WaitForChild("world"):WaitForChild("BoneOrbController")).Start()

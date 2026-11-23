@@ -1,11 +1,13 @@
 """One mechanics documentation schema for shared rules and future per-asset scripts."""
 from .house import ITEMS as HOUSE_ITEMS
+from .windmill import ITEMS as WINDMILL_ITEMS
 from .npc import ITEMS as NPC_ITEMS
 from .monster import ITEMS as MONSTER_ITEMS
 from .character import ITEMS as CHARACTER_ITEMS
 
 DOMAINS = (
     {'id': 'house', 'label': 'House', 'description': 'Сокеты, взаимодействия и правила домов', 'items': HOUSE_ITEMS},
+    {'id': 'windmill', 'label': 'Windmill', 'description': 'Windmill 02 · ротор и дверь', 'items': WINDMILL_ITEMS},
     {'id': 'npc', 'label': 'NPC', 'description': 'Технические карты по каждому NPC и его собственным скриптам', 'items': NPC_ITEMS},
     {'id': 'monster', 'label': 'Monster', 'description': 'Технические карты по каждому монстру и его собственным скриптам', 'items': MONSTER_ITEMS},
     {'id': 'character', 'label': 'Character', 'description': 'Механики персонажа и общий контракт управления', 'items': CHARACTER_ITEMS},
@@ -60,6 +62,12 @@ SOURCES = {
     'resource-feedback': ('src/client/world/FloatingResourceFeedback.luau', 'Получение и расход'),
     'ui-settings': ('src/client/world/UiPresentationSettings.luau', 'UI-профили'),
     'health-ui': ('src/client/combat/PlayerHealthHudController.luau', 'HP-интерфейс'),
+    'windmill-rotation-client': ('src/client/world/WindmillRotorVisual.luau', 'Ротор · blades + fabric'),
+    'windmill-door-client': ('src/client/world/WindmillDoorVisual.luau', 'Дверь · Bone.Transform'),
+    'windmill-observer-client': ('src/client/world/WindmillVisualController.luau', 'Клиент · жизненный цикл'),
+    'windmill-door-server': ('src/server/world/WindmillDoorService.luau', 'Сервер · валидация и состояние'),
+    'windmill-options': ('src/shared/GameOptionsRegistry.luau', 'Options · rotations'),
+    'windmill-doc': ('docs/workflows/WINDMILL_02_MECHANICS_M452_RU.md', 'Мельница · авторинг и ограничения'),
     'socket-contract': ('src/shared/world/HouseSocketContract.luau', 'Контракт сокетов'),
     'socket-service': ('src/server/world/HouseSocketService.luau', 'Реестр и валидация'),
     'socket-discovery': ('src/server/world/HouseSocketDiscovery.luau', 'Обнаружение домов'),

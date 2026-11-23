@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "slug": "thuja_02",
+  "sourceSha256": "601cd024ae7c223d86335d2f1204eb1b83b84be65ffc0da82708fd0af617e1d3",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "leaf_01",
+        "armature": "",
+        "vertices": 90,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "thuja_02",
+        "armature": "",
+        "vertices": 57,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

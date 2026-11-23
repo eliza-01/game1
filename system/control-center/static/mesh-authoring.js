@@ -88,7 +88,13 @@ window.game1MeshAuthoring = (() => {
       <small class="hint">${mode?(mode==='material_atlas'&&!selected&&!defaultAtlas?'Select a variant: the Location Asset has no default atlas.':'Independent MeshPart appearance'):'Uses the Location Asset default. Resetting an override restores inheritance.'}</small>
     </div>`;
   }
-  function inspectionView(analysis,options={},prefix='location-mesh',visualContext=null) {
+  // Native <details> keeps each FBX MeshPart's authoring controls hidden until needed.
+  // Callers preserve only expanded row identities when refreshing an existing report.
+  function openMeshNames(container) {
+    return new Set(Array.from(container?.querySelectorAll?.('.deco-fbx-mesh[open]')||[],
+      row=>row.dataset.fbxMesh));
+  }
+  function inspectionView(analysis,options={},prefix='location-mesh',visualContext=null,expandedMeshes=new Set()) {
     if(!analysis) return `<small class="deco-manage-value">Choose an FBX to inspect its mesh, physics and bone hierarchy.</small>`;
     const meshes=analysis.meshes||[];
     const armatures=analysis.armatures||[];
@@ -98,8 +104,9 @@ window.game1MeshAuthoring = (() => {
       ${meshes.filter(mesh=>!isRetired(mesh.name)).map(mesh=>{
         const name=mesh.name,flags=normalize(name,options[name],!!analysis.hasCollider,'location'),role=isCarrier(name)?'rig_carrier · shared Bone owner':isGlass(name)?'Glass':'Visual';
         const bones=mesh.bones||[];
-        return `<section class="deco-fbx-mesh" data-fbx-mesh="${e(name)}">
-          <div class="deco-fbx-mesh-title"><strong>${e(name)}</strong><small>${role} · ${Number(mesh.vertices)||0} vertices</small></div>
+        return `<details class="deco-fbx-mesh" data-fbx-mesh="${e(name)}" ${expandedMeshes.has(name)?'open':''}>
+          <summary class="deco-fbx-mesh-title"><strong>${e(name)}</strong><small>${role} · ${Number(mesh.vertices)||0} vertices</small></summary>
+          <div class="deco-fbx-mesh-body">
           ${isCarrier(name)?'<small>Authored carrier · no visual, atlas, collision or editable physics</small>':`<div class="real-estate-mesh-switches" role="group" aria-label="${e(name)} physics settings">
             <label class="real-estate-physics-toggle"><input type="checkbox" data-mesh-field="noCollide" ${flags.noCollide?'checked':''}> No Collide</label>
             <label class="real-estate-glass-toggle"><input type="checkbox" data-mesh-field="glass" ${flags.glass?'checked':''}> Glass · 0.02</label>
@@ -114,7 +121,8 @@ window.game1MeshAuthoring = (() => {
           <details class="deco-fbx-skeleton"><summary>${e(mesh.armature||'No Armature')} · ${bones.length} bones · ${(mesh.influencedBones||[]).length} weighted</summary>
             ${bones.length?boneList(bones,mesh.influencedBones):'<small>No bones</small>'}
           </details>
-        </section>`;
+          </div>
+        </details>`;
       }).join('')}
       ${(analysis.unassignedArmatures||[]).length?`<small>Unassigned armatures: ${analysis.unassignedArmatures.map(e).join(', ')}</small>`:''}
     </div>`;
@@ -181,5 +189,5 @@ window.game1MeshAuthoring = (() => {
       });
     });
   }
-  return Object.freeze({defaults,effectiveFidelity,normalize,controls,seeded,inspectionView,wire,status,boneList,displayAppearanceMode,atlasOptions});
+  return Object.freeze({defaults,effectiveFidelity,normalize,controls,seeded,openMeshNames,inspectionView,wire,status,boneList,displayAppearanceMode,atlasOptions});
 })();

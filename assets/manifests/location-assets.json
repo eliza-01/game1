@@ -1024,6 +1024,39 @@
       ]
     },
     {
+      "atlasKey": "dry_tree_02",
+      "baseKey": "dry_tree",
+      "version": "02",
+      "variants": [
+        {
+          "id": 86,
+          "family_id": 61,
+          "width": 128,
+          "height": 128,
+          "filename": "dry_tree_02_128x128_atlas.png",
+          "original_filename": "dry_tree_02_128x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/dry_tree_02/128x128/dry_tree_02_128x128_atlas.png",
+          "source_sha256": "e3bcd95c7a861df50aa6a97b667f9665d385414680c283340d7ed2200bdc4dd7",
+          "uses_alpha": true,
+          "published_id": "105914573093195",
+          "published_sha256": "e3bcd95c7a861df50aa6a97b667f9665d385414680c283340d7ed2200bdc4dd7",
+          "moderation_state": "Reviewing",
+          "published_at": 1795456253.5275118,
+          "created_at": 1795456238.5595977,
+          "retired_at": null,
+          "atlas_key": "dry_tree_02",
+          "replacement_sha256": null,
+          "favorite": false,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "128x128",
+          "baseKey": "dry_tree",
+          "version": "02"
+        }
+      ]
+    },
+    {
       "atlasKey": "glass_01",
       "baseKey": "glass",
       "version": "01",
@@ -2404,6 +2437,39 @@
       ]
     },
     {
+      "atlasKey": "thuja_02",
+      "baseKey": "thuja",
+      "version": "02",
+      "variants": [
+        {
+          "id": 85,
+          "family_id": 60,
+          "width": 64,
+          "height": 128,
+          "filename": "thuja_02_64x128_atlas.png",
+          "original_filename": "thuja_02_64x128_atlas.png",
+          "source_path": "assets/source/texture-atlases/thuja_02/64x128/thuja_02_64x128_atlas.png",
+          "source_sha256": "6a32b301b4a4dd3985975f8a16eca0d1d5ff28ccb3c9c861d946b9418fca5b05",
+          "uses_alpha": true,
+          "published_id": "115926462956875",
+          "published_sha256": "6a32b301b4a4dd3985975f8a16eca0d1d5ff28ccb3c9c861d946b9418fca5b05",
+          "moderation_state": "Reviewing",
+          "published_at": 1795454302.2247868,
+          "created_at": 1795452865.2788908,
+          "retired_at": null,
+          "atlas_key": "thuja_02",
+          "replacement_sha256": null,
+          "favorite": false,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "64x128",
+          "baseKey": "thuja",
+          "version": "02"
+        }
+      ]
+    },
+    {
       "atlasKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
       "baseKey": "tripo_material_2314f44f-f2f6-4f62-b240-43a157b21dc8",
       "version": "",
@@ -3706,567 +3772,19 @@
       "aliases": []
     },
     {
-      "slug": "weapon_shop",
-      "name_en": "Weapon Shop",
-      "category": "building",
-      "model_path": "assets/source/location-assets/decoration/weapon_shop/model/weapon_shop.fbx",
-      "model_sha256": "3e53649a28a934cf6b2eae219a6a99796cfabe9717983e6db57b8c9b457fbb7a",
-      "model_asset_id": "125142952565040",
-      "model_published_sha256": "3e53649a28a934cf6b2eae219a6a99796cfabe9717983e6db57b8c9b457fbb7a",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 2,
-      "created_at": 1791473596.458907,
-      "updated_at": 1792461837.7483227,
-      "published_at": 1791473606.3923557,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": null,
-      "rigManifest": null,
-      "needsFbxInspection": true,
-      "legacyStaticPublication": false,
-      "meshOptions": {},
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "default",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "assets/source/texture-atlases/smithy/2048x2048/migrated/d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872/smithy.png",
-      "texture_filename": "smithy.png",
-      "texture_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
-      "texture_asset_id": "85123253798993",
-      "texture_published_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 19,
-      "atlasFamily": "smithy",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 19,
-          "family_id": 15,
-          "width": 2048,
-          "height": 2048,
-          "filename": "smithy.png",
-          "original_filename": "smithy.png",
-          "source_path": "assets/source/texture-atlases/smithy/2048x2048/migrated/d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872/smithy.png",
-          "source_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
-          "uses_alpha": false,
-          "published_id": "85123253798993",
-          "published_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
-          "moderation_state": "Reviewing",
-          "published_at": 1793661745.075649,
-          "created_at": 1793661745.075649,
-          "retired_at": null,
-          "atlas_key": "smithy",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "2048x2048",
-          "baseKey": "smithy",
-          "version": ""
-        }
-      ],
-      "textureUsesAlpha": false,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": true,
-      "status": "PUBLISHED",
-      "category_label": "Building",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "112631288118441",
-          "name": "tripo_node_5814630f-2705-4abf-904c-e29110ce44e8"
-        }
-      ],
-      "aliases": []
-    },
-    {
-      "slug": "windmill_01",
-      "name_en": "Windmill 01",
-      "category": "building",
-      "model_path": "assets/source/location-assets/building/windmill_01/model/windmill_01.fbx",
-      "model_sha256": "2c812dd23bea262e0c9f05cae276f1a7a1066592a910cb75688c7ee71f3ff6f1",
-      "model_asset_id": "125638050890051",
-      "model_published_sha256": "686d8817c8c57c7dc467296e12f585e4b92d2274b9fdf6f08d2da687c66d1c99",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 14,
-      "created_at": 1795442312.933316,
-      "updated_at": 1795446930.15916,
-      "published_at": 1795445442.6951785,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "appearance_mode": "material",
-      "visual_material": "Plastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": {
-        "schemaVersion": 1,
-        "meshes": [
-          {
-            "name": "blades",
-            "armature": "windmill_armature",
-            "vertices": 344,
-            "bones": [
-              {
-                "name": "windmill_door_socket",
-                "parent": "",
-                "matrixLocal": [
-                  1.0,
-                  0.0,
-                  0.0,
-                  2.7204952,
-                  0.0,
-                  0.0,
-                  -1.0,
-                  -6.2024255,
-                  0.0,
-                  1.0,
-                  0.0,
-                  3.0508738,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              }
-            ],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          },
-          {
-            "name": "body",
-            "armature": "",
-            "vertices": 70,
-            "bones": [],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          },
-          {
-            "name": "door",
-            "armature": "windmill_armature",
-            "vertices": 34,
-            "bones": [
-              {
-                "name": "windmill_door_socket",
-                "parent": "",
-                "matrixLocal": [
-                  1.0,
-                  0.0,
-                  0.0,
-                  2.7204952,
-                  0.0,
-                  0.0,
-                  -1.0,
-                  -6.2024255,
-                  0.0,
-                  1.0,
-                  0.0,
-                  3.0508738,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              }
-            ],
-            "influencedBones": [
-              "windmill_door_socket"
-            ],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          },
-          {
-            "name": "fabric",
-            "armature": "windmill_armature",
-            "vertices": 80,
-            "bones": [
-              {
-                "name": "windmill_door_socket",
-                "parent": "",
-                "matrixLocal": [
-                  1.0,
-                  0.0,
-                  0.0,
-                  2.7204952,
-                  0.0,
-                  0.0,
-                  -1.0,
-                  -6.2024255,
-                  0.0,
-                  1.0,
-                  0.0,
-                  3.0508738,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              }
-            ],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          },
-          {
-            "name": "roof",
-            "armature": "",
-            "vertices": 74,
-            "bones": [],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          },
-          {
-            "name": "wood",
-            "armature": "windmill_armature",
-            "vertices": 28,
-            "bones": [
-              {
-                "name": "windmill_door_socket",
-                "parent": "",
-                "matrixLocal": [
-                  1.0,
-                  0.0,
-                  0.0,
-                  2.7204952,
-                  0.0,
-                  0.0,
-                  -1.0,
-                  -6.2024255,
-                  0.0,
-                  1.0,
-                  0.0,
-                  3.0508738,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              }
-            ],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          }
-        ],
-        "hasCollider": false,
-        "armatures": [
-          "windmill_armature"
-        ],
-        "unassignedArmatures": []
-      },
-      "rigManifest": {
-        "boneHash": "220d0da9d84ea6df122c2fcbbc504c9f0a12ce699b21dc5bdd918cb2e449b6ac",
-        "bones": [
-          {
-            "matrix": [
-              1.0,
-              0.0,
-              0.0,
-              2.7204952,
-              0.0,
-              0.0,
-              -1.0,
-              -6.2024255,
-              0.0,
-              1.0,
-              0.0,
-              3.0508738,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "name": "windmill_door_socket",
-            "parent": ""
-          },
-          {
-            "matrix": [
-              1.0,
-              0.0,
-              0.0,
-              0.0176226,
-              0.0,
-              0.0,
-              -1.0,
-              -8.6503077,
-              0.0,
-              1.0,
-              0.0,
-              15.2668781,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "name": "windmill_rotation_socket",
-            "parent": ""
-          }
-        ],
-        "carrierName": "rig_carrier",
-        "inventoryHash": "1070a4a753e35a3d87e98c3c36301f1275ae964d7f4007c46a72849a38c39615",
-        "parts": [
-          {
-            "name": "blades",
-            "role": "visual",
-            "vertices": 344
-          },
-          {
-            "name": "body",
-            "role": "visual",
-            "vertices": 70
-          },
-          {
-            "name": "door",
-            "role": "visual",
-            "vertices": 34
-          },
-          {
-            "name": "fabric",
-            "role": "visual",
-            "vertices": 80
-          },
-          {
-            "name": "rig_carrier",
-            "role": "rig_carrier",
-            "vertices": 6
-          },
-          {
-            "name": "roof",
-            "role": "visual",
-            "vertices": 74
-          },
-          {
-            "name": "wood",
-            "role": "visual",
-            "vertices": 28
-          }
-        ],
-        "rigKind": "skinned",
-        "schemaVersion": 2,
-        "sourceSha256": "",
-        "structuralHash": "496da9e3111131db7c0b9ad68030bb5f650e0ca10f26cbd31d62da5efe2d9363"
-      },
-      "needsFbxInspection": false,
-      "legacyStaticPublication": false,
-      "meshOptions": {
-        "blades": {
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": false
-        },
-        "body": {
-          "appearanceMode": "material",
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": true,
-          "visualColor": "#AF9797",
-          "visualMaterial": "Brick"
-        },
-        "door": {
-          "appearanceMode": "material",
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": true,
-          "visualColor": "#985234",
-          "visualMaterial": "Wood"
-        },
-        "fabric": {
-          "appearanceMode": "material",
-          "collisionFidelity": "Box",
-          "doubleSided": true,
-          "glass": false,
-          "noCollide": true,
-          "visualColor": "#FFCAAD",
-          "visualMaterial": "Sand"
-        },
-        "roof": {
-          "appearanceMode": "material",
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": true,
-          "visualColor": "#8E2E2E",
-          "visualMaterial": "ClayRoofTiles"
-        },
-        "wood": {
-          "appearanceMode": "material",
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": true,
-          "visualColor": "#985234",
-          "visualMaterial": "Wood"
-        }
-      },
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "default",
-      "appearanceMode": "material",
-      "visualMaterial": "Plastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "",
-      "texture_filename": "",
-      "texture_sha256": "",
-      "texture_asset_id": null,
-      "texture_published_sha256": "",
-      "texture_moderation_state": "",
-      "texture_reference_slug": "",
-      "atlasVariants": [],
-      "textureUsesAlpha": null,
-      "meshAtlasesCurrent": true,
-      "atlasVariantId": 0,
-      "bindingRevision": 14,
-      "atlasLegacyWarning": false,
-      "status": "UPDATE_AVAILABLE",
-      "category_label": "Building",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "108432647489107",
-          "name": "door"
-        },
-        {
-          "meshId": "121576725105866",
-          "name": "body"
-        },
-        {
-          "meshId": "140241783046226",
-          "name": "blades"
-        },
-        {
-          "meshId": "73114642413219",
-          "name": "roof"
-        },
-        {
-          "meshId": "87688304810047",
-          "name": "fabric"
-        },
-        {
-          "meshId": "97601098543144",
-          "name": "wood"
-        }
-      ],
-      "aliases": []
-    },
-    {
       "slug": "windmill_02",
       "name_en": "Windmill 02",
       "category": "building",
       "model_path": "assets/source/location-assets/building/windmill_02/model/windmill_02.fbx",
-      "model_sha256": "eb196722137b851e729dd2f61c2ef0852b7406a536d47cc8eb58677fde80b43e",
-      "model_asset_id": "86999805819635",
-      "model_published_sha256": "eb196722137b851e729dd2f61c2ef0852b7406a536d47cc8eb58677fde80b43e",
+      "model_sha256": "631568db143cf79d930ab5932f01e92bfb721a4d1cd0f8ec07a381efbcdf746d",
+      "model_asset_id": "76381304050412",
+      "model_published_sha256": "631568db143cf79d930ab5932f01e92bfb721a4d1cd0f8ec07a381efbcdf746d",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 6,
+      "revision": 14,
       "created_at": 1795447168.342814,
-      "updated_at": 1795447923.7782152,
-      "published_at": 1795447923.7782152,
+      "updated_at": 1795456701.6111188,
+      "published_at": 1795449066.3160079,
       "surface_material": "stone",
       "alpha_enabled": 0,
       "appearance_mode": "material",
@@ -4323,8 +3841,30 @@
           {
             "name": "door",
             "armature": "windmill_armature",
-            "vertices": 34,
+            "vertices": 58,
             "bones": [
+              {
+                "name": "windmill_door_handle_socket",
+                "parent": "windmill_door_socket",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -2.2500725,
+                  0.0,
+                  0.0,
+                  -0.9999999,
+                  -6.3410845,
+                  0.0,
+                  0.9999999,
+                  1e-07,
+                  3.1455998,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
               {
                 "name": "windmill_door_socket",
                 "parent": "",
@@ -4335,11 +3875,11 @@
                   2.7204952,
                   0.0,
                   0.0,
-                  -1.0,
+                  -0.9999999,
                   -6.2024255,
                   0.0,
-                  1.0,
-                  0.0,
+                  0.9999999,
+                  1e-07,
                   3.0508738,
                   0.0,
                   0.0,
@@ -4382,8 +3922,30 @@
           {
             "name": "rig_carrier",
             "armature": "windmill_armature",
-            "vertices": 3,
+            "vertices": 6,
             "bones": [
+              {
+                "name": "windmill_door_handle_socket",
+                "parent": "windmill_door_socket",
+                "matrixLocal": [
+                  1.0,
+                  0.0,
+                  0.0,
+                  -2.2500725,
+                  0.0,
+                  0.0,
+                  -0.9999999,
+                  -6.3410845,
+                  0.0,
+                  0.9999999,
+                  1e-07,
+                  3.1455998,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              },
               {
                 "name": "windmill_door_socket",
                 "parent": "",
@@ -4394,11 +3956,11 @@
                   2.7204952,
                   0.0,
                   0.0,
-                  -1.0,
+                  -0.9999999,
                   -6.2024255,
                   0.0,
-                  1.0,
-                  0.0,
+                  0.9999999,
+                  1e-07,
                   3.0508738,
                   0.0,
                   0.0,
@@ -4408,6 +3970,7 @@
               }
             ],
             "influencedBones": [
+              "windmill_door_handle_socket",
               "windmill_door_socket"
             ],
             "role": "carrier",
@@ -4463,8 +4026,30 @@
         "unassignedArmatures": []
       },
       "rigManifest": {
-        "boneHash": "20374dfedbb7c77ce9cb7c8e99c902cfa7ed54f5d10068ad0a9daafcbde88f6e",
+        "boneHash": "8b4b9990a0bda97b655aeae25331cdab2ec64225ed75d0796547a8ddfad56a0e",
         "bones": [
+          {
+            "matrix": [
+              1.0,
+              0.0,
+              0.0,
+              -2.2500725,
+              0.0,
+              0.0,
+              -0.9999999,
+              -6.3410854,
+              0.0,
+              0.9999999,
+              1e-07,
+              3.1456003,
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ],
+            "name": "windmill_door_handle_socket",
+            "parent": "windmill_door_socket"
+          },
           {
             "matrix": [
               1.0,
@@ -4473,11 +4058,11 @@
               2.7204952,
               0.0,
               0.0,
-              -1.0,
+              -0.9999999,
               -6.2024255,
               0.0,
-              1.0,
-              0.0,
+              0.9999999,
+              1e-07,
               3.0508738,
               0.0,
               0.0,
@@ -4489,7 +4074,7 @@
           }
         ],
         "carrierName": "rig_carrier",
-        "inventoryHash": "77b2ae260e3ef98b2023e52983a99430bdee28c81a453597036a2072ffdefb3c",
+        "inventoryHash": "b2750c47a8d3fc4405f92f7fc8ce181545e30d48976502272af0781ba3afd8b2",
         "parts": [
           {
             "name": "blades",
@@ -4504,7 +4089,7 @@
           {
             "name": "door",
             "role": "visual",
-            "vertices": 34
+            "vertices": 58
           },
           {
             "name": "fabric",
@@ -4514,7 +4099,7 @@
           {
             "name": "rig_carrier",
             "role": "rig_carrier",
-            "vertices": 3
+            "vertices": 6
           },
           {
             "name": "roof",
@@ -4530,7 +4115,7 @@
         "rigKind": "skinned",
         "schemaVersion": 2,
         "sourceSha256": "",
-        "structuralHash": "2ca84fc8519007613ec87523e74de53d393047ecdcb49d427b46b2764025cb65"
+        "structuralHash": "ba0763b85b1e4a46d5c96bafef308e81c5d42539fa7a96a7c235dc62ea26cf79"
       },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
@@ -4541,7 +4126,7 @@
           "doubleSided": false,
           "glass": false,
           "noCollide": true,
-          "visualColor": "#805442",
+          "visualColor": "#BC7A61",
           "visualMaterial": "Wood"
         },
         "body": {
@@ -4550,8 +4135,8 @@
           "doubleSided": false,
           "glass": false,
           "noCollide": true,
-          "visualColor": "#FEE0BE",
-          "visualMaterial": "Brick"
+          "visualColor": "#D0AB93",
+          "visualMaterial": "Cobblestone"
         },
         "door": {
           "appearanceMode": "material",
@@ -4559,13 +4144,13 @@
           "doubleSided": false,
           "glass": false,
           "noCollide": true,
-          "visualColor": "#805442",
+          "visualColor": "#91480B",
           "visualMaterial": "Wood"
         },
         "fabric": {
           "appearanceMode": "material",
           "collisionFidelity": "Box",
-          "doubleSided": false,
+          "doubleSided": true,
           "glass": false,
           "noCollide": true,
           "visualColor": "#FFDFC2",
@@ -4577,7 +4162,7 @@
           "doubleSided": false,
           "glass": false,
           "noCollide": true,
-          "visualColor": "#FE5448",
+          "visualColor": "#A3510D",
           "visualMaterial": "RoofShingles"
         },
         "wood": {
@@ -4586,7 +4171,7 @@
           "doubleSided": false,
           "glass": false,
           "noCollide": true,
-          "visualColor": "#805442",
+          "visualColor": "#BC7A61",
           "visualMaterial": "Wood"
         }
       },
@@ -4618,114 +4203,34 @@
       "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
       "atlasVariantId": 0,
-      "bindingRevision": 6,
+      "bindingRevision": 14,
       "atlasLegacyWarning": false,
-      "status": "PUBLISHED",
-      "category_label": "Building",
-      "publishedVisualMeshes": [],
-      "aliases": []
-    },
-    {
-      "slug": "smithy",
-      "name_en": "smithy",
-      "category": "building",
-      "model_path": "assets/source/location-assets/decoration/smithy/model/smithy.fbx",
-      "model_sha256": "194965777efb53aa377603a6a4e37c711d20905ae558bee0c552848bcf856159",
-      "model_asset_id": "118012468555982",
-      "model_published_sha256": "194965777efb53aa377603a6a4e37c711d20905ae558bee0c552848bcf856159",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 3,
-      "created_at": 1791473215.556618,
-      "updated_at": 1792461847.5852742,
-      "published_at": 1791473269.232121,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": null,
-      "rigManifest": null,
-      "needsFbxInspection": true,
-      "legacyStaticPublication": false,
-      "meshOptions": {},
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "default",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "assets/source/texture-atlases/smithy/2048x2048/migrated/d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872/smithy.png",
-      "texture_filename": "smithy.png",
-      "texture_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
-      "texture_asset_id": "85123253798993",
-      "texture_published_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 19,
-      "atlasFamily": "smithy",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 19,
-          "family_id": 15,
-          "width": 2048,
-          "height": 2048,
-          "filename": "smithy.png",
-          "original_filename": "smithy.png",
-          "source_path": "assets/source/texture-atlases/smithy/2048x2048/migrated/d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872/smithy.png",
-          "source_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
-          "uses_alpha": false,
-          "published_id": "85123253798993",
-          "published_sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
-          "moderation_state": "Reviewing",
-          "published_at": 1793661745.075649,
-          "created_at": 1793661745.075649,
-          "retired_at": null,
-          "atlas_key": "smithy",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "2048x2048",
-          "baseKey": "smithy",
-          "version": ""
-        }
-      ],
-      "textureUsesAlpha": false,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": true,
       "status": "PUBLISHED",
       "category_label": "Building",
       "publishedVisualMeshes": [
         {
-          "meshId": "99690489780806",
-          "name": "tripo_node_5814630f-2705-4abf-904c-e29110ce44e8"
+          "meshId": "105759403436176",
+          "name": "door"
+        },
+        {
+          "meshId": "118794451004922",
+          "name": "blades"
+        },
+        {
+          "meshId": "121576725105866",
+          "name": "body"
+        },
+        {
+          "meshId": "73114642413219",
+          "name": "roof"
+        },
+        {
+          "meshId": "90153776482919",
+          "name": "wood"
+        },
+        {
+          "meshId": "91790894042591",
+          "name": "fabric"
         }
       ],
       "aliases": []
@@ -4919,22 +4424,22 @@
       "aliases": []
     },
     {
-      "slug": "bush_01",
-      "name_en": "bush_01",
-      "category": "bush",
-      "model_path": "assets/source/location-assets/bush/bush_01/model/bush_01.fbx",
-      "model_sha256": "b5e29c596dcc41dbecd958a6006fc65099cb0971d8131251e3c3ae58b0cafa10",
-      "model_asset_id": "95987432802428",
-      "model_published_sha256": "b5e29c596dcc41dbecd958a6006fc65099cb0971d8131251e3c3ae58b0cafa10",
+      "slug": "barrel_01",
+      "name_en": "Barrel 01",
+      "category": "decoration",
+      "model_path": "assets/source/location-assets/decoration/barrel_01/model/barrel_01.fbx",
+      "model_sha256": "38da3442bf39f6d209dc8b4c9f53b7905ad1cd4f83fa59dc36678daade7526ac",
+      "model_asset_id": "98054852925753",
+      "model_published_sha256": "38da3442bf39f6d209dc8b4c9f53b7905ad1cd4f83fa59dc36678daade7526ac",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 4,
-      "created_at": 1791474388.6629841,
-      "updated_at": 1795190704.6241963,
-      "published_at": 1793930533.7606688,
-      "surface_material": "glass",
+      "revision": 1,
+      "created_at": 1795455590.0467823,
+      "updated_at": 1795455607.4230597,
+      "published_at": 1795455607.4230597,
+      "surface_material": "wood",
       "alpha_enabled": 0,
-      "appearance_mode": "material_atlas",
+      "appearance_mode": "material",
       "visual_material": "Plastic",
       "visual_color": "#FFFFFF",
       "lod1": {
@@ -4952,9 +4457,9 @@
         "schemaVersion": 1,
         "meshes": [
           {
-            "name": "bush_01",
+            "name": "barrel_01",
             "armature": "",
-            "vertices": 1500,
+            "vertices": 88,
             "bones": [],
             "influencedBones": [],
             "role": "visual",
@@ -4973,191 +4478,71 @@
         "armatures": [],
         "unassignedArmatures": []
       },
-      "rigManifest": null,
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "329b1da4f6077a8bd9e2c02db560afe1df6cbf778a0241232d9592222bf543b2",
+        "parts": [
+          {
+            "name": "barrel_01",
+            "role": "visual",
+            "vertices": 88
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "7bbae3563ed68c90f49f05adc9de6f6c22319a2d638ebb10ab1dc4c0d897cb9c"
+      },
       "needsFbxInspection": false,
-      "legacyStaticPublication": true,
+      "legacyStaticPublication": false,
       "meshOptions": {
-        "bush_01": {
+        "barrel_01": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 81,
           "collisionFidelity": "Box",
           "doubleSided": false,
           "glass": false,
-          "noCollide": true
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "121111101046810"
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 1,
-      "collisionBlueprintRevision": 1,
-      "collisionBlueprintPartCount": 1,
-      "collisionBlueprint": {
-        "anchor": {
-          "localCFrame": [
-            -0.104644775390625,
-            1.9659652709960938,
-            -0.073089599609375,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0
-          ],
-          "meshId": "85890571174919",
-          "size": [
-            4.447850227355957,
-            3.9319310188293457,
-            5.220827579498291
-          ]
-        },
-        "parts": [
-          {
-            "canQuery": true,
-            "canTouch": true,
-            "collisionGroup": "Default",
-            "id": "Part",
-            "localCFrame": [
-              -0.201263427734375,
-              0.40375518798828125,
-              -0.0731201171875,
-              -0.2123393565416336,
-              0.0,
-              0.9771959781646729,
-              0.0,
-              1.0,
-              0.0,
-              -0.9771959781646729,
-              0.0,
-              -0.2123393565416336
-            ],
-            "name": "Part",
-            "shape": "Block",
-            "size": [
-              2.360321521759033,
-              0.7839952707290649,
-              2.0
-            ]
-          }
-        ],
-        "pivot": "Model:GetPivot()",
-        "schemaVersion": 2
-      },
-      "collisionBlueprintSha256": "3db8563863d4486ede60dd91f11042e3531a38e86d2c82425d36e31522697241",
-      "surfaceMaterial": "glass",
-      "appearanceMode": "material_atlas",
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "wood",
+      "appearanceMode": "material",
       "visualMaterial": "Plastic",
       "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
-        "id": "glass",
-        "label": "Glass",
-        "robloxMaterial": "Glass",
-        "soundFamily": "glass"
+        "id": "wood",
+        "label": "Wood",
+        "robloxMaterial": "Wood",
+        "soundFamily": "wood"
       },
-      "texture_path": "assets/source/texture-atlases/bush_01/64x64/bush_01_64x64_atlas.png",
-      "texture_filename": "bush_01_64x64_atlas.png",
-      "texture_sha256": "b782cc7053b04bc1ec90197995b670999ac600a8502cdd0e07d5b51ecc0f740b",
-      "texture_asset_id": "119366136147899",
-      "texture_published_sha256": "b782cc7053b04bc1ec90197995b670999ac600a8502cdd0e07d5b51ecc0f740b",
-      "texture_moderation_state": "Reviewing",
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
       "texture_reference_slug": "",
-      "atlasVariantId": 72,
-      "atlasFamily": "bush_01",
-      "atlasResolution": "64x64",
-      "bindingRevision": 3,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 17,
-          "family_id": 13,
-          "width": 2048,
-          "height": 2048,
-          "filename": "christmas_tree.jpg",
-          "original_filename": "christmas_tree.jpg",
-          "source_path": "assets/source/texture-atlases/christmas_tree/2048x2048/migrated/9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386/christmas_tree.jpg",
-          "source_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-          "uses_alpha": false,
-          "published_id": "130407188742566",
-          "published_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-          "moderation_state": "Reviewing",
-          "published_at": 1793661745.075649,
-          "created_at": 1793661745.075649,
-          "retired_at": null,
-          "atlas_key": "christmas_tree",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "2048x2048",
-          "baseKey": "christmas_tree",
-          "version": ""
-        },
-        {
-          "id": 33,
-          "family_id": 27,
-          "width": 256,
-          "height": 256,
-          "filename": "bush_01_256x256_atlas.png",
-          "original_filename": "bush_01_256x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/bush_01/256x256/bush_01_256x256_atlas.png",
-          "source_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
-          "uses_alpha": true,
-          "published_id": "95618035804245",
-          "published_sha256": "8efc8a08db2158b374959aa71e8be7bb1043e03b0af6f9ee6dd4b9e9de36babc",
-          "moderation_state": "Reviewing",
-          "published_at": 1793931507.5976868,
-          "created_at": 1793931502.6602368,
-          "retired_at": null,
-          "atlas_key": "bush_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "256x256",
-          "baseKey": "bush",
-          "version": "01"
-        },
-        {
-          "id": 72,
-          "family_id": 27,
-          "width": 64,
-          "height": 64,
-          "filename": "bush_01_64x64_atlas.png",
-          "original_filename": "bush_01_64x64_atlas.png",
-          "source_path": "assets/source/texture-atlases/bush_01/64x64/bush_01_64x64_atlas.png",
-          "source_sha256": "b782cc7053b04bc1ec90197995b670999ac600a8502cdd0e07d5b51ecc0f740b",
-          "uses_alpha": true,
-          "published_id": "119366136147899",
-          "published_sha256": "b782cc7053b04bc1ec90197995b670999ac600a8502cdd0e07d5b51ecc0f740b",
-          "moderation_state": "Reviewing",
-          "published_at": 1794527105.0991201,
-          "created_at": 1794527101.241636,
-          "retired_at": null,
-          "atlas_key": "bush_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "64x64",
-          "baseKey": "bush",
-          "version": "01"
-        }
-      ],
-      "textureUsesAlpha": true,
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 1,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
-      "category_label": "Bush",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "85890571174919",
-          "name": "bush_01"
-        }
-      ],
+      "category_label": "Decoration",
+      "publishedVisualMeshes": [],
       "aliases": []
     },
     {
@@ -9505,14 +8890,14 @@
       "model_published_sha256": "f18f6cf3c95ba96b377d04344247e130fa1d24b5d0428d9ab8374f9a0ceb0cd1",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 2,
+      "revision": 3,
       "created_at": 1794276051.857426,
-      "updated_at": 1795362161.1181345,
+      "updated_at": 1795453402.3673193,
       "published_at": 1794276073.532448,
       "surface_material": "grass",
       "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
+      "appearance_mode": "material_atlas",
+      "visual_material": "Plastic",
       "visual_color": "#FFFFFF",
       "lod1": {
         "kind": "lod1",
@@ -9584,8 +8969,8 @@
       "collisionBlueprint": null,
       "collisionBlueprintSha256": "",
       "surfaceMaterial": "grass",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
+      "appearanceMode": "material_atlas",
+      "visualMaterial": "Plastic",
       "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -9861,14 +9246,14 @@
       "model_published_sha256": "d2de444737ca78fca79532388bf7a399d3ccae1c611156bd5454e61173502dfa",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 3,
+      "revision": 4,
       "created_at": 1794276114.6875803,
-      "updated_at": 1795362161.1181345,
+      "updated_at": 1795453436.3602166,
       "published_at": 1794276130.6505659,
       "surface_material": "default",
       "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
+      "appearance_mode": "material_atlas",
+      "visual_material": "Plastic",
       "visual_color": "#FFFFFF",
       "lod1": {
         "kind": "lod1",
@@ -9940,8 +9325,8 @@
       "collisionBlueprint": null,
       "collisionBlueprintSha256": "",
       "surfaceMaterial": "default",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
+      "appearanceMode": "material_atlas",
+      "visualMaterial": "Plastic",
       "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -10642,14 +10027,14 @@
       "model_published_sha256": "74e7908e5c6411a707326c0342c2d213ec2af72540327b5804c3bc404d54716b",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 12,
+      "revision": 13,
       "created_at": 1792517965.2518861,
-      "updated_at": 1795213759.9112282,
+      "updated_at": 1795449461.53715,
       "published_at": 1795213759.9112282,
       "surface_material": "wood",
       "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
+      "appearance_mode": "material_atlas",
+      "visual_material": "Plastic",
       "visual_color": "#FFFFFF",
       "lod1": {
         "kind": "lod1",
@@ -10940,8 +10325,8 @@
       },
       "collisionBlueprintSha256": "ff2f4b53c3bd925a83e6c77415f9af08e9149cd016cf95311f3f26abc0798e21",
       "surfaceMaterial": "wood",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
+      "appearanceMode": "material_atlas",
+      "visualMaterial": "Plastic",
       "visualColor": "#FFFFFF",
       "alphaEnabled": false,
       "materialDefinition": {
@@ -18314,1039 +17699,6 @@
       "aliases": []
     },
     {
-      "slug": "big_tree_01",
-      "name_en": "Big Tree 01",
-      "category": "tree",
-      "model_path": "assets/source/location-assets/tree/big_tree_01/model/big_tree_01.fbx",
-      "model_sha256": "a0156e0f74fe54b566d49ef29d77868d5a9025e8cc32feb2976b0d46492dd8fd",
-      "model_asset_id": "113465845823195",
-      "model_published_sha256": "a0156e0f74fe54b566d49ef29d77868d5a9025e8cc32feb2976b0d46492dd8fd",
-      "model_moderation_state": "Approved",
-      "destructible": true,
-      "revision": 2,
-      "created_at": 1792864890.9769711,
-      "updated_at": 1793901136.4099162,
-      "published_at": 1793901136.4099162,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": {
-        "schemaVersion": 1,
-        "meshes": [
-          {
-            "name": "big_tree_01",
-            "armature": "",
-            "vertices": 1910,
-            "bones": [],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          }
-        ],
-        "hasCollider": false,
-        "armatures": [],
-        "unassignedArmatures": []
-      },
-      "rigManifest": null,
-      "needsFbxInspection": false,
-      "legacyStaticPublication": true,
-      "meshOptions": {
-        "big_tree_01": {
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": true
-        }
-      },
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "default",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "assets/source/texture-atlases/big_tree_01/128x256/big_tree_01_128x256_atlas.png",
-      "texture_filename": "big_tree_01_128x256_atlas.png",
-      "texture_sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
-      "texture_asset_id": "100679979096136",
-      "texture_published_sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 2,
-      "atlasFamily": "big_tree_01",
-      "atlasResolution": "128x256",
-      "bindingRevision": 11,
-      "studioSyncStatus": "unverified",
-      "atlasVariants": [
-        {
-          "id": 7,
-          "family_id": 1,
-          "width": 1024,
-          "height": 2048,
-          "filename": "big_tree_01_1024x2048_atlas.png",
-          "original_filename": "big_tree_01_1024x2048_atlas.png",
-          "source_path": "assets/source/texture-atlases/big_tree_01/1024x2048/big_tree_01_1024x2048_atlas.png",
-          "source_sha256": "96763b3c92572ae98613e0524cb44e46e4695796cce3511cf0c52b1cccb95129",
-          "uses_alpha": true,
-          "published_id": "86799859841143",
-          "published_sha256": "96763b3c92572ae98613e0524cb44e46e4695796cce3511cf0c52b1cccb95129",
-          "moderation_state": "Reviewing",
-          "published_at": 1793176912.0441203,
-          "created_at": 1793176855.379011,
-          "retired_at": null,
-          "atlas_key": "big_tree_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "1024x2048",
-          "baseKey": "big_tree",
-          "version": "01"
-        },
-        {
-          "id": 6,
-          "family_id": 1,
-          "width": 512,
-          "height": 1024,
-          "filename": "big_tree_01_512x1024_atlas.png",
-          "original_filename": "big_tree_01_512x1024_atlas.png",
-          "source_path": "assets/source/texture-atlases/big_tree_01/512x1024/big_tree_01_512x1024_atlas.png",
-          "source_sha256": "db775fc9efb4b12457ebfbf2451c6bf3d3f60cc5fb48c54b68da9ec5cfd83b5e",
-          "uses_alpha": true,
-          "published_id": "96502503617864",
-          "published_sha256": "db775fc9efb4b12457ebfbf2451c6bf3d3f60cc5fb48c54b68da9ec5cfd83b5e",
-          "moderation_state": "Reviewing",
-          "published_at": 1793176819.9131594,
-          "created_at": 1793176633.679935,
-          "retired_at": null,
-          "atlas_key": "big_tree_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "512x1024",
-          "baseKey": "big_tree",
-          "version": "01"
-        },
-        {
-          "id": 1,
-          "family_id": 1,
-          "width": 256,
-          "height": 512,
-          "filename": "big_tree_01_256x512_atlas.png",
-          "original_filename": "big_tree_01_256x512_atlas.png",
-          "source_path": "assets/source/texture-atlases/big_tree_01/256x512/big_tree_01_256x512_atlas.png",
-          "source_sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
-          "uses_alpha": true,
-          "published_id": "134024944101662",
-          "published_sha256": "3ab5e47e22c6dd4153fd6b90672308335cdc70ec7711d904581f14855edee8df",
-          "moderation_state": "Reviewing",
-          "published_at": 1792864909.8548038,
-          "created_at": 1792864890.8597076,
-          "retired_at": null,
-          "atlas_key": "big_tree_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "256x512",
-          "baseKey": "big_tree",
-          "version": "01"
-        },
-        {
-          "id": 2,
-          "family_id": 1,
-          "width": 128,
-          "height": 256,
-          "filename": "big_tree_01_128x256_atlas.png",
-          "original_filename": "big_tree_01_128x256_atlas.png",
-          "source_path": "assets/source/texture-atlases/big_tree_01/128x256/big_tree_01_128x256_atlas.png",
-          "source_sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
-          "uses_alpha": true,
-          "published_id": "100679979096136",
-          "published_sha256": "9f1f34f8b364e8a3d034e774a71daf9b270bded836068202d769611a8fc12050",
-          "moderation_state": "Reviewing",
-          "published_at": 1792864977.6703994,
-          "created_at": 1792864962.0061045,
-          "retired_at": null,
-          "atlas_key": "big_tree_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "128x256",
-          "baseKey": "big_tree",
-          "version": "01"
-        }
-      ],
-      "textureUsesAlpha": true,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
-      "status": "PUBLISHED",
-      "category_label": "Tree",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "94864502535085",
-          "name": "big_tree_01"
-        }
-      ],
-      "aliases": []
-    },
-    {
-      "slug": "birch_01",
-      "name_en": "Birch 01",
-      "category": "tree",
-      "model_path": "assets/source/location-assets/tree/birch_01/model/birch_01.fbx",
-      "model_sha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
-      "model_asset_id": "110075621214873",
-      "model_published_sha256": "690192556411f8353a4578b25dccabccbe24a35f935f1e5828e4af24f0c1776d",
-      "model_moderation_state": "Approved",
-      "destructible": true,
-      "revision": 4,
-      "created_at": 1792461987.3799765,
-      "updated_at": 1794280897.511054,
-      "published_at": 1794280897.511054,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": {
-        "schemaVersion": 1,
-        "meshes": [
-          {
-            "name": "birch_01",
-            "armature": "birch_01_armature",
-            "vertices": 791,
-            "bones": [
-              {
-                "name": "Bone",
-                "parent": "",
-                "matrixLocal": [
-                  1.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  -1.0,
-                  0.0,
-                  0.0,
-                  1.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "Bone.001",
-                "parent": "Bone",
-                "matrixLocal": [
-                  0.9988223,
-                  0.0485191,
-                  0.0001674,
-                  0.0,
-                  0.0031862,
-                  -0.0621481,
-                  -0.9980618,
-                  0.0,
-                  -0.0484146,
-                  0.9968869,
-                  -0.0622295,
-                  4.0522251,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "Bone.002",
-                "parent": "Bone.001",
-                "matrixLocal": [
-                  0.9998968,
-                  0.0143584,
-                  0.0005088,
-                  0.1303113,
-                  0.0005968,
-                  -0.0061263,
-                  -0.999981,
-                  -0.1669157,
-                  -0.014355,
-                  0.9998781,
-                  -0.0061342,
-                  6.7296386,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "Bone.003",
-                "parent": "Bone.002",
-                "matrixLocal": [
-                  0.9921572,
-                  -0.1135379,
-                  0.0522841,
-                  0.1861928,
-                  0.0453692,
-                  -0.0626577,
-                  -0.9970033,
-                  -0.1907587,
-                  0.1164736,
-                  0.991556,
-                  -0.0570152,
-                  10.6210756,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "Bone.004",
-                "parent": "Bone.003",
-                "matrixLocal": [
-                  0.9973592,
-                  0.0487962,
-                  0.0537962,
-                  -0.0526471,
-                  0.0575924,
-                  -0.0800524,
-                  -0.9951255,
-                  -0.3225662,
-                  -0.0442519,
-                  0.9955956,
-                  -0.0826513,
-                  12.7069254,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              }
-            ],
-            "influencedBones": [
-              "Bone",
-              "Bone.001",
-              "Bone.002",
-              "Bone.003",
-              "Bone.004"
-            ],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          },
-          {
-            "name": "rig_carrier",
-            "armature": "birch_01_armature",
-            "vertices": 15,
-            "bones": [
-              {
-                "name": "Bone",
-                "parent": "",
-                "matrixLocal": [
-                  1.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  -1.0,
-                  0.0,
-                  0.0,
-                  1.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "Bone.001",
-                "parent": "Bone",
-                "matrixLocal": [
-                  0.9988223,
-                  0.0485191,
-                  0.0001674,
-                  0.0,
-                  0.0031862,
-                  -0.0621481,
-                  -0.9980618,
-                  0.0,
-                  -0.0484146,
-                  0.9968869,
-                  -0.0622295,
-                  4.0522251,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "Bone.002",
-                "parent": "Bone.001",
-                "matrixLocal": [
-                  0.9998968,
-                  0.0143584,
-                  0.0005088,
-                  0.1303113,
-                  0.0005968,
-                  -0.0061263,
-                  -0.999981,
-                  -0.1669157,
-                  -0.014355,
-                  0.9998781,
-                  -0.0061342,
-                  6.7296386,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "Bone.003",
-                "parent": "Bone.002",
-                "matrixLocal": [
-                  0.9921572,
-                  -0.1135379,
-                  0.0522841,
-                  0.1861928,
-                  0.0453692,
-                  -0.0626577,
-                  -0.9970033,
-                  -0.1907587,
-                  0.1164736,
-                  0.991556,
-                  -0.0570152,
-                  10.6210756,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              },
-              {
-                "name": "Bone.004",
-                "parent": "Bone.003",
-                "matrixLocal": [
-                  0.9973592,
-                  0.0487962,
-                  0.0537962,
-                  -0.0526471,
-                  0.0575924,
-                  -0.0800524,
-                  -0.9951255,
-                  -0.3225662,
-                  -0.0442519,
-                  0.9955956,
-                  -0.0826513,
-                  12.7069254,
-                  0.0,
-                  0.0,
-                  0.0,
-                  1.0
-                ]
-              }
-            ],
-            "influencedBones": [
-              "Bone",
-              "Bone.001",
-              "Bone.002",
-              "Bone.003",
-              "Bone.004"
-            ],
-            "role": "carrier",
-            "physics": {
-              "role": "carrier",
-              "canCollide": false,
-              "canQuery": false,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": "Box",
-              "physicsOnly": true
-            }
-          }
-        ],
-        "hasCollider": false,
-        "armatures": [
-          "birch_01_armature"
-        ],
-        "unassignedArmatures": []
-      },
-      "rigManifest": {
-        "boneHash": "f8bc3463790decc40556cf401b366dc9a9fc21be45f6e4f7a9e1fcdfe02c53aa",
-        "bones": [
-          {
-            "matrix": [
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              0.0,
-              0.0,
-              -1.0,
-              0.0,
-              0.0,
-              1.0,
-              0.0,
-              0.0,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "name": "Bone",
-            "parent": ""
-          },
-          {
-            "matrix": [
-              0.9988223,
-              0.0485191,
-              0.0001674,
-              0.0,
-              0.0031862,
-              -0.0621481,
-              -0.9980618,
-              0.0,
-              -0.0484146,
-              0.9968869,
-              -0.0622295,
-              4.0522251,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "name": "Bone.001",
-            "parent": "Bone"
-          },
-          {
-            "matrix": [
-              0.9998968,
-              0.0143583,
-              0.0005088,
-              0.1303113,
-              0.0005968,
-              -0.0061263,
-              -0.999981,
-              -0.1669157,
-              -0.014355,
-              0.9998781,
-              -0.0061342,
-              6.7296371,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "name": "Bone.002",
-            "parent": "Bone.001"
-          },
-          {
-            "matrix": [
-              0.9921572,
-              -0.1135378,
-              0.0522841,
-              0.1861927,
-              0.0453692,
-              -0.0626577,
-              -0.9970033,
-              -0.1907587,
-              0.1164735,
-              0.991556,
-              -0.0570151,
-              10.6210747,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "name": "Bone.003",
-            "parent": "Bone.002"
-          },
-          {
-            "matrix": [
-              0.9973591,
-              0.0487963,
-              0.0537962,
-              -0.0526468,
-              0.0575924,
-              -0.0800524,
-              -0.9951255,
-              -0.3225661,
-              -0.0442519,
-              0.9955956,
-              -0.0826513,
-              12.7069244,
-              0.0,
-              0.0,
-              0.0,
-              1.0
-            ],
-            "name": "Bone.004",
-            "parent": "Bone.003"
-          }
-        ],
-        "carrierName": "rig_carrier",
-        "inventoryHash": "25017b900072a8f3b0b038465ebfef93028206338d1513e624aba5746ead11fd",
-        "parts": [
-          {
-            "name": "birch_01",
-            "role": "visual",
-            "vertices": 791
-          },
-          {
-            "name": "col_mesh",
-            "role": "collider",
-            "vertices": 226
-          },
-          {
-            "name": "rig_carrier",
-            "role": "rig_carrier",
-            "vertices": 15
-          }
-        ],
-        "rigKind": "skinned",
-        "schemaVersion": 2,
-        "sourceSha256": "",
-        "structuralHash": "93792e421c1cbb67d170f9d90a8872d668aea36de4ff34c598c1f5b46d74ee5c"
-      },
-      "needsFbxInspection": false,
-      "legacyStaticPublication": false,
-      "meshOptions": {
-        "birch_01": {
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": true
-        }
-      },
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "default",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "assets/source/texture-atlases/birch_01/512x512/birch_01_512x512_atlas.png",
-      "texture_filename": "birch_01_512x512_atlas.png",
-      "texture_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
-      "texture_asset_id": "105396243494604",
-      "texture_published_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 32,
-      "atlasFamily": "birch_01",
-      "atlasResolution": "512x512",
-      "bindingRevision": 6,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 17,
-          "family_id": 13,
-          "width": 2048,
-          "height": 2048,
-          "filename": "christmas_tree.jpg",
-          "original_filename": "christmas_tree.jpg",
-          "source_path": "assets/source/texture-atlases/christmas_tree/2048x2048/migrated/9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386/christmas_tree.jpg",
-          "source_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-          "uses_alpha": false,
-          "published_id": "130407188742566",
-          "published_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-          "moderation_state": "Reviewing",
-          "published_at": 1793661745.075649,
-          "created_at": 1793661745.075649,
-          "retired_at": null,
-          "atlas_key": "christmas_tree",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "2048x2048",
-          "baseKey": "christmas_tree",
-          "version": ""
-        },
-        {
-          "id": 32,
-          "family_id": 26,
-          "width": 512,
-          "height": 512,
-          "filename": "birch_01_512x512_atlas.png",
-          "original_filename": "birch_01_512x512_atlas.png",
-          "source_path": "assets/source/texture-atlases/birch_01/512x512/birch_01_512x512_atlas.png",
-          "source_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
-          "uses_alpha": true,
-          "published_id": "105396243494604",
-          "published_sha256": "59acc26d21139f32103d178ca0eed27754d84078346f0777f6afa606be05c65b",
-          "moderation_state": "Reviewing",
-          "published_at": 1793903189.185853,
-          "created_at": 1793903184.2405777,
-          "retired_at": null,
-          "atlas_key": "birch_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "512x512",
-          "baseKey": "birch",
-          "version": "01"
-        }
-      ],
-      "textureUsesAlpha": true,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
-      "status": "PUBLISHED",
-      "category_label": "Tree",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "92601949463844",
-          "name": "birch_01"
-        }
-      ],
-      "aliases": []
-    },
-    {
-      "slug": "birch_02",
-      "name_en": "Birch 02",
-      "category": "tree",
-      "model_path": "assets/source/location-assets/tree/birch_02/model/birch_02.fbx",
-      "model_sha256": "09c04f28036cd040e56a6b61fcaf7d1c3757832f38ced0c948d2e3ebefe8d18e",
-      "model_asset_id": "93102458436625",
-      "model_published_sha256": "09c04f28036cd040e56a6b61fcaf7d1c3757832f38ced0c948d2e3ebefe8d18e",
-      "model_moderation_state": "Approved",
-      "destructible": true,
-      "revision": 1,
-      "created_at": 1792462015.1383383,
-      "updated_at": 1792462028.8508034,
-      "published_at": 1792462028.8508034,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "appearance_mode": "atlas",
-      "visual_material": "SmoothPlastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": null,
-      "rigManifest": null,
-      "needsFbxInspection": true,
-      "legacyStaticPublication": false,
-      "meshOptions": {},
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "default",
-      "appearanceMode": "atlas",
-      "visualMaterial": "SmoothPlastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "assets/source/texture-atlases/christmas_tree/2048x2048/migrated/9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386/christmas_tree.jpg",
-      "texture_filename": "christmas_tree.jpg",
-      "texture_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-      "texture_asset_id": "130407188742566",
-      "texture_published_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 17,
-      "atlasFamily": "christmas_tree",
-      "atlasResolution": "2048x2048",
-      "bindingRevision": 1,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 17,
-          "family_id": 13,
-          "width": 2048,
-          "height": 2048,
-          "filename": "christmas_tree.jpg",
-          "original_filename": "christmas_tree.jpg",
-          "source_path": "assets/source/texture-atlases/christmas_tree/2048x2048/migrated/9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386/christmas_tree.jpg",
-          "source_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-          "uses_alpha": false,
-          "published_id": "130407188742566",
-          "published_sha256": "9de5d31b2ae82633f6f91ee9705040c4fd5c03d579424189faa9bafe03ce6386",
-          "moderation_state": "Reviewing",
-          "published_at": 1793661745.075649,
-          "created_at": 1793661745.075649,
-          "retired_at": null,
-          "atlas_key": "christmas_tree",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "2048x2048",
-          "baseKey": "christmas_tree",
-          "version": ""
-        }
-      ],
-      "textureUsesAlpha": false,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": true,
-      "status": "PUBLISHED",
-      "category_label": "Tree",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "85357811441510",
-          "name": "birch_02"
-        }
-      ],
-      "aliases": []
-    },
-    {
-      "slug": "blossom_tree_01",
-      "name_en": "Blossom Tree 01",
-      "category": "tree",
-      "model_path": "assets/source/location-assets/tree/blossom_tree_01/model/blossom_tree_01.fbx",
-      "model_sha256": "b9f4af8a7a2857168613a1866694afeb0df3eb368028876d154f5a897f7eab4b",
-      "model_asset_id": "86078672052247",
-      "model_published_sha256": "b9f4af8a7a2857168613a1866694afeb0df3eb368028876d154f5a897f7eab4b",
-      "model_moderation_state": "Approved",
-      "destructible": false,
-      "revision": 3,
-      "created_at": 1793887548.4962683,
-      "updated_at": 1795190830.8310852,
-      "published_at": 1793887582.637806,
-      "surface_material": "default",
-      "alpha_enabled": 0,
-      "appearance_mode": "material_atlas",
-      "visual_material": "Plastic",
-      "visual_color": "#FFFFFF",
-      "lod1": {
-        "kind": "lod1",
-        "revision": 0,
-        "status": "NOT_REGISTERED",
-        "sourcePath": "",
-        "sourceSha256": "",
-        "publishedSha256": "",
-        "modelAssetId": "",
-        "moderationState": "",
-        "reuse": null
-      },
-      "fbxAnalysis": {
-        "schemaVersion": 1,
-        "meshes": [
-          {
-            "name": "blossom_tree_01",
-            "armature": "",
-            "vertices": 1340,
-            "bones": [],
-            "influencedBones": [],
-            "role": "visual",
-            "physics": {
-              "role": "visual",
-              "canCollide": null,
-              "canQuery": null,
-              "canTouch": false,
-              "doubleSided": false,
-              "collisionFidelity": null,
-              "physicsOnly": false
-            }
-          }
-        ],
-        "hasCollider": false,
-        "armatures": [],
-        "unassignedArmatures": []
-      },
-      "rigManifest": null,
-      "needsFbxInspection": false,
-      "legacyStaticPublication": true,
-      "meshOptions": {
-        "blossom_tree_01": {
-          "collisionFidelity": "Box",
-          "doubleSided": false,
-          "glass": false,
-          "noCollide": true
-        }
-      },
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
-      "surfaceMaterial": "default",
-      "appearanceMode": "material_atlas",
-      "visualMaterial": "Plastic",
-      "visualColor": "#FFFFFF",
-      "alphaEnabled": false,
-      "materialDefinition": {
-        "id": "default",
-        "label": "Default · unchanged",
-        "robloxMaterial": "",
-        "soundFamily": "generic"
-      },
-      "texture_path": "assets/source/texture-atlases/blossom_tree_01/128x128/blossom_tree_01_128x128_atlas.png",
-      "texture_filename": "blossom_tree_01_128x128_atlas.png",
-      "texture_sha256": "fba5b43c3468af33f3da8eef60d94aa9dee71d23357b06db2164e42ded60e2d8",
-      "texture_asset_id": "104197818268195",
-      "texture_published_sha256": "fba5b43c3468af33f3da8eef60d94aa9dee71d23357b06db2164e42ded60e2d8",
-      "texture_moderation_state": "Reviewing",
-      "texture_reference_slug": "",
-      "atlasVariantId": 63,
-      "atlasFamily": "blossom_tree_01",
-      "atlasResolution": "128x128",
-      "bindingRevision": 2,
-      "studioSyncStatus": "synced",
-      "atlasVariants": [
-        {
-          "id": 28,
-          "family_id": 23,
-          "width": 2048,
-          "height": 2048,
-          "filename": "blossom_tree_01_2048x2048_atlas.png",
-          "original_filename": "blossom_tree_01_2048x2048_atlas.png",
-          "source_path": "assets/source/texture-atlases/blossom_tree_01/2048x2048/blossom_tree_01_2048x2048_atlas.png",
-          "source_sha256": "9eb117cb05a64a0da996fc8151f1c6bfb3c0388305074a570681d185c850cca0",
-          "uses_alpha": true,
-          "published_id": "114432887987699",
-          "published_sha256": "9eb117cb05a64a0da996fc8151f1c6bfb3c0388305074a570681d185c850cca0",
-          "moderation_state": "Reviewing",
-          "published_at": 1793887617.0838869,
-          "created_at": 1793887548.4120514,
-          "retired_at": null,
-          "atlas_key": "blossom_tree_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "2048x2048",
-          "baseKey": "blossom_tree",
-          "version": "01"
-        },
-        {
-          "id": 63,
-          "family_id": 23,
-          "width": 128,
-          "height": 128,
-          "filename": "blossom_tree_01_128x128_atlas.png",
-          "original_filename": "blossom_tree_01_128x128_atlas.png",
-          "source_path": "assets/source/texture-atlases/blossom_tree_01/128x128/blossom_tree_01_128x128_atlas.png",
-          "source_sha256": "fba5b43c3468af33f3da8eef60d94aa9dee71d23357b06db2164e42ded60e2d8",
-          "uses_alpha": true,
-          "published_id": "104197818268195",
-          "published_sha256": "fba5b43c3468af33f3da8eef60d94aa9dee71d23357b06db2164e42ded60e2d8",
-          "moderation_state": "Reviewing",
-          "published_at": 1794525051.3939617,
-          "created_at": 1794525047.7101374,
-          "retired_at": null,
-          "atlas_key": "blossom_tree_01",
-          "replacement_sha256": null,
-          "favorite": false,
-          "retired": false,
-          "current": true,
-          "replacementPending": false,
-          "resolution": "128x128",
-          "baseKey": "blossom_tree",
-          "version": "01"
-        }
-      ],
-      "textureUsesAlpha": true,
-      "meshAtlasesCurrent": true,
-      "atlasLegacyWarning": false,
-      "status": "PUBLISHED",
-      "category_label": "Tree",
-      "publishedVisualMeshes": [
-        {
-          "meshId": "90624667941191",
-          "name": "blossom_tree_01"
-        }
-      ],
-      "aliases": []
-    },
-    {
       "slug": "christmas_tree_01",
       "name_en": "Christmas Tree 01",
       "category": "tree",
@@ -19818,11 +18170,297 @@
       "aliases": [
         "christmas_tree"
       ]
+    },
+    {
+      "slug": "dry_tree_02",
+      "name_en": "Dry Tree 02",
+      "category": "tree",
+      "model_path": "assets/source/location-assets/tree/dry_tree_02/model/dry_tree_02.fbx",
+      "model_sha256": "c6213af70f4fc3a1198424bb1cd72e1aa72ebd7dd12c5feac7dd85729af3e811",
+      "model_asset_id": "122879791308408",
+      "model_published_sha256": "c6213af70f4fc3a1198424bb1cd72e1aa72ebd7dd12c5feac7dd85729af3e811",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1795456238.6875873,
+      "updated_at": 1795456269.2092946,
+      "published_at": 1795456269.2092946,
+      "surface_material": "wood",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "dry_tree_02",
+            "armature": "",
+            "vertices": 189,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "d0db848e2f4ffe63ecb590c57c9194442df9e48c4f756371f33eb542b7e00cdb",
+        "parts": [
+          {
+            "name": "dry_tree_02",
+            "role": "visual",
+            "vertices": 189
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "9c2fc1c0d27007fa021b43cbbb6fd381fb3475bdaf00314345169d7403417c9a"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "dry_tree_02": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 86,
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "105914573093195"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "wood",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "wood",
+        "label": "Wood",
+        "robloxMaterial": "Wood",
+        "soundFamily": "wood"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 1,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Tree",
+      "publishedVisualMeshes": [],
+      "aliases": []
+    },
+    {
+      "slug": "thuja_02",
+      "name_en": "Thuja 02",
+      "category": "tree",
+      "model_path": "assets/source/location-assets/tree/thuja_02/model/thuja_02.fbx",
+      "model_sha256": "601cd024ae7c223d86335d2f1204eb1b83b84be65ffc0da82708fd0af617e1d3",
+      "model_asset_id": "106220440127931",
+      "model_published_sha256": "601cd024ae7c223d86335d2f1204eb1b83b84be65ffc0da82708fd0af617e1d3",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 2,
+      "created_at": 1795452865.3609116,
+      "updated_at": 1795454402.5086029,
+      "published_at": 1795454402.5086029,
+      "surface_material": "default",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 0,
+        "status": "NOT_REGISTERED",
+        "sourcePath": "",
+        "sourceSha256": "",
+        "publishedSha256": "",
+        "modelAssetId": "",
+        "moderationState": "",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "leaf_01",
+            "armature": "",
+            "vertices": 90,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "thuja_02",
+            "armature": "",
+            "vertices": 57,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "ae28044eac1ce88b04d2901ef64b4c17bf95a192f17cf952b7a7c7e824133f15",
+        "parts": [
+          {
+            "name": "leaf_01",
+            "role": "visual",
+            "vertices": 90
+          },
+          {
+            "name": "thuja_02",
+            "role": "visual",
+            "vertices": 57
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "5c7aab9b15f9d61e378d48be16599737369fb1df94eb11dba22ca66fc05a5ea6"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "leaf_01": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 71,
+          "collisionFidelity": "Box",
+          "doubleSided": true,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "82028913618222"
+        },
+        "thuja_02": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 85,
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "115926462956875"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "default",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "default",
+        "label": "Default · unchanged",
+        "robloxMaterial": "",
+        "soundFamily": "generic"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 2,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Tree",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "76844904318861",
+          "name": "thuja_02"
+        },
+        {
+          "meshId": "80512788751616",
+          "name": "leaf_01"
+        }
+      ],
+      "aliases": []
     }
   ],
   "summary": {
-    "registered": 45,
-    "published": 44,
-    "changed": 1
+    "registered": 40,
+    "published": 40,
+    "changed": 0
   }
 }

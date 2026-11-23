@@ -1,0 +1,40 @@
+{
+  "asset": {
+    "slug": "birch_02",
+    "name_en": "Birch 02",
+    "category": "tree",
+    "model_path": "assets/source/location-assets/tree/birch_02/model/birch_02.fbx",
+    "model_sha256": "09c04f28036cd040e56a6b61fcaf7d1c3757832f38ced0c948d2e3ebefe8d18e",
+    "model_asset_id": "93102458436625",
+    "model_published_sha256": "09c04f28036cd040e56a6b61fcaf7d1c3757832f38ced0c948d2e3ebefe8d18e",
+    "model_moderation_state": "Approved",
+    "destructible": 1,
+    "revision": 1,
+    "created_at": 1792462015.1383383,
+    "updated_at": 1792462028.8508034,
+    "published_at": 1792462028.8508034,
+    "mesh_options_json": "{}",
+    "surface_material": "default",
+    "alpha_enabled": 0,
+    "appearance_mode": "atlas",
+    "visual_material": "SmoothPlastic",
+    "visual_color": "#FFFFFF"
+  },
+  "publications": [
+    {
+      "id": 35,
+      "asset_slug": "birch_02",
+      "kind": "model",
+      "revision": 1,
+      "asset_id": "93102458436625",
+      "operation_path": "operations/79eca4c7-c366-430e-baa6-0d47c43a6dcd",
+      "sha256": "09c04f28036cd040e56a6b61fcaf7d1c3757832f38ced0c948d2e3ebefe8d18e",
+      "moderation_state": "Approved",
+      "published_at": 1792462028.8508034
+    }
+  ],
+  "rigManifests": [],
+  "collisionBlueprints": [],
+  "lodResources": [],
+  "sourceFilesPreserved": true
+}

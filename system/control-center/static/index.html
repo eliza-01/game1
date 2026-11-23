@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="character-armor.css?v=1">
 <link rel="stylesheet" href="location-category-picker.css?v=249">
 <link rel="stylesheet" href="location-alpha.css?v=250">
-<link rel="stylesheet" href="deco-assets.css?v=411">
+<link rel="stylesheet" href="deco-assets.css?v=453">
 <link rel="stylesheet" href="real-estate.css?v=423&physics=205">
 <link rel="stylesheet" href="kanban.css?v=339">
 <link rel="stylesheet" href="mechanics.css?v=442">
@@ -439,9 +439,19 @@
   </div>
 </div>
 </details>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🎯</span><span><strong>Sockets · USE / AIM</strong><small>House &amp; Campfire · интерактивные зоны</small></span></summary>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">⚙️</span><span><strong>Rotations</strong><small>Вращение механизмов · окружение</small></span></summary>
+<div class="panel character-card">
+  <div class="section-title"><div><span>location assets · runtime motion</span><h3>Windmill 02</h3></div></div>
+  <div class="character-grid">
+    <label><input id="option-rotation-windmill-enabled" type="checkbox"> Вращение включено</label>
+    <label>360° · секунд<input id="option-rotation-windmill-period" type="number" min="0.25" max="120" step="0.25" value="3" required></label>
+  </div>
+  <small class="hint">Лопасти и ткань вращаются синхронно вокруг общего центра. После Save — Rojo Sync / новый Play.</small>
+  <div class="actions"><button id="option-rotation-save" class="primary" type="button">Save rotations</button></div>
+</div></details>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🎯</span><span><strong>Sockets · USE / AIM</strong><small>House, Campfire &amp; Windmill · интерактивные зоны</small></span></summary>
 <div class="panel character-card game1-socket-range-options">
-  <div class="section-title"><div><span>authoritative socket reach · studs</span><h3>House &amp; Campfire</h3></div></div>
+  <div class="section-title"><div><span>authoritative socket reach · studs</span><h3>House, Campfire &amp; Windmill</h3></div></div>
   <small class="hint">USE — дистанция персонажа до сокета; AIM — радиус сферы наведения центральным прицелом. «—» означает, что AIM не используется. Точки HEAD / spawn / дым не интерактивны и не имеют редактируемых зон. Studio HS Debug меняет зоны временно; Save здесь сохраняет значения для опубликованной игры после Rojo Sync и нового Play.</small>
   <div id="option-sockets-fields" class="game1-socket-range-fields" aria-label="Socket interaction radius settings"></div>
   <div class="actions"><button id="option-sockets-save" class="primary" type="button">Save Socket Ranges</button></div>
@@ -1080,9 +1090,9 @@
 <script src="asset-atlas-actions.js?v=1"></script>
 <script src="asset-workflow-dialog.js?v=1"></script>
 <script src="asset-atlas-editor.js?v=435"></script>
-<script src="mesh-authoring.js?v=437"></script>
+<script src="mesh-authoring.js?v=453"></script>
 <script src="location-category-picker.js?v=249"></script>
-<script src="deco-assets.js?v=437"></script>
+<script src="deco-assets.js?v=453"></script>
 <script src="location-collision.js?v=385"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=405"></script>
@@ -1090,10 +1100,10 @@
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="lod-reuse-picker.js?v=411"></script>
-<script src="location-asset-workflow.js?v=411"></script>
+<script src="location-asset-workflow.js?v=453"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=449"></script>
+<script src="options.js?v=452"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=437"></script>
 <script src="weapon-workflow.js?v=309"></script>
@@ -1106,6 +1116,6 @@
 <script src="real-estate-placement.js?v=2"></script>
 <script src="monster-spawns.js?v=338"></script>
 <script src="kanban.js?v=339"></script>
-<script src="mechanics.js?v=442"></script>
+<script src="mechanics.js?v=452"></script>
 </body>
 </html>

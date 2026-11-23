@@ -1,0 +1,51 @@
+{
+  "asset": {
+    "slug": "smithy",
+    "name_en": "smithy",
+    "category": "building",
+    "model_path": "assets/source/location-assets/decoration/smithy/model/smithy.fbx",
+    "model_sha256": "194965777efb53aa377603a6a4e37c711d20905ae558bee0c552848bcf856159",
+    "model_asset_id": "118012468555982",
+    "model_published_sha256": "194965777efb53aa377603a6a4e37c711d20905ae558bee0c552848bcf856159",
+    "model_moderation_state": "Approved",
+    "destructible": 0,
+    "revision": 3,
+    "created_at": 1791473215.556618,
+    "updated_at": 1792461847.5852742,
+    "published_at": 1791473269.232121,
+    "mesh_options_json": "{}",
+    "surface_material": "default",
+    "alpha_enabled": 0,
+    "appearance_mode": "atlas",
+    "visual_material": "SmoothPlastic",
+    "visual_color": "#FFFFFF"
+  },
+  "publications": [
+    {
+      "id": 6,
+      "asset_slug": "smithy",
+      "kind": "model",
+      "revision": 2,
+      "asset_id": "118012468555982",
+      "operation_path": "operations/4f809de3-5053-4264-95f1-92d1dfc48ca3",
+      "sha256": "194965777efb53aa377603a6a4e37c711d20905ae558bee0c552848bcf856159",
+      "moderation_state": "Approved",
+      "published_at": 1791473262.9318259
+    },
+    {
+      "id": 7,
+      "asset_slug": "smithy",
+      "kind": "texture",
+      "revision": 2,
+      "asset_id": "85123253798993",
+      "operation_path": "operations/8dff6c2e-a28f-42d3-b423-378a4b54944b",
+      "sha256": "d5a4d7b01345f0ad009f62e9ec3e90cf0b8dd206840dbc82c1691f3f8d0d7872",
+      "moderation_state": "Reviewing",
+      "published_at": 1791473269.232121
+    }
+  ],
+  "rigManifests": [],
+  "collisionBlueprints": [],
+  "lodResources": [],
+  "sourceFilesPreserved": true
+}

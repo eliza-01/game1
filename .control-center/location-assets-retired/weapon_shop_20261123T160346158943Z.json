@@ -1,0 +1,40 @@
+{
+  "asset": {
+    "slug": "weapon_shop",
+    "name_en": "Weapon Shop",
+    "category": "building",
+    "model_path": "assets/source/location-assets/decoration/weapon_shop/model/weapon_shop.fbx",
+    "model_sha256": "3e53649a28a934cf6b2eae219a6a99796cfabe9717983e6db57b8c9b457fbb7a",
+    "model_asset_id": "125142952565040",
+    "model_published_sha256": "3e53649a28a934cf6b2eae219a6a99796cfabe9717983e6db57b8c9b457fbb7a",
+    "model_moderation_state": "Approved",
+    "destructible": 0,
+    "revision": 2,
+    "created_at": 1791473596.458907,
+    "updated_at": 1792461837.7483227,
+    "published_at": 1791473606.3923557,
+    "mesh_options_json": "{}",
+    "surface_material": "default",
+    "alpha_enabled": 0,
+    "appearance_mode": "atlas",
+    "visual_material": "SmoothPlastic",
+    "visual_color": "#FFFFFF"
+  },
+  "publications": [
+    {
+      "id": 8,
+      "asset_slug": "weapon_shop",
+      "kind": "model",
+      "revision": 1,
+      "asset_id": "125142952565040",
+      "operation_path": "operations/25fa3b1a-a0c5-44d5-994a-77eeb2551db0",
+      "sha256": "3e53649a28a934cf6b2eae219a6a99796cfabe9717983e6db57b8c9b457fbb7a",
+      "moderation_state": "Approved",
+      "published_at": 1791473606.3923557
+    }
+  ],
+  "rigManifests": [],
+  "collisionBlueprints": [],
+  "lodResources": [],
+  "sourceFilesPreserved": true
+}

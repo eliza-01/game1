@@ -188,6 +188,17 @@ return table.freeze({
 				aimRadius = 8,
 			}),
 		}),
+		windmill = table.freeze({
+			windmill_door_handle_socket = table.freeze({
+				useRadius = 8,
+			}),
+		}),
+	}),
+	rotations = table.freeze({
+		windmill_02 = table.freeze({
+			enabled = true,
+			secondsPerRevolution = 6,
+		}),
 	}),
 	npcOverhead = table.freeze({
 		desktop = table.freeze({

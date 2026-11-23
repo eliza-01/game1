@@ -1,0 +1,51 @@
+{
+  "asset": {
+    "slug": "big_tree_01",
+    "name_en": "Big Tree 01",
+    "category": "tree",
+    "model_path": "assets/source/location-assets/tree/big_tree_01/model/big_tree_01.fbx",
+    "model_sha256": "a0156e0f74fe54b566d49ef29d77868d5a9025e8cc32feb2976b0d46492dd8fd",
+    "model_asset_id": "113465845823195",
+    "model_published_sha256": "a0156e0f74fe54b566d49ef29d77868d5a9025e8cc32feb2976b0d46492dd8fd",
+    "model_moderation_state": "Approved",
+    "destructible": 1,
+    "revision": 2,
+    "created_at": 1792864890.9769711,
+    "updated_at": 1793901136.4099162,
+    "published_at": 1793901136.4099162,
+    "mesh_options_json": "{\"big_tree_01\": {\"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": true}}",
+    "surface_material": "default",
+    "alpha_enabled": 0,
+    "appearance_mode": "atlas",
+    "visual_material": "SmoothPlastic",
+    "visual_color": "#FFFFFF"
+  },
+  "publications": [
+    {
+      "id": 40,
+      "asset_slug": "big_tree_01",
+      "kind": "model",
+      "revision": 1,
+      "asset_id": "77517628720686",
+      "operation_path": "operations/ceaeb7de-e7cf-492a-987a-bd0623c3ccb9",
+      "sha256": "56f4ad09d2d468139b6b343a5d2fc7c94ffc8811bb24a45d666d8ec42775467d",
+      "moderation_state": "Approved",
+      "published_at": 1792864905.9361415
+    },
+    {
+      "id": 49,
+      "asset_slug": "big_tree_01",
+      "kind": "model",
+      "revision": 2,
+      "asset_id": "113465845823195",
+      "operation_path": "operations/a1d69e5b-5446-4074-9223-e99d65837ad4",
+      "sha256": "a0156e0f74fe54b566d49ef29d77868d5a9025e8cc32feb2976b0d46492dd8fd",
+      "moderation_state": "Approved",
+      "published_at": 1793901136.4099162
+    }
+  ],
+  "rigManifests": [],
+  "collisionBlueprints": [],
+  "lodResources": [],
+  "sourceFilesPreserved": true
+}

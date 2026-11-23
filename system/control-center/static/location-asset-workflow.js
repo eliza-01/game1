@@ -90,6 +90,7 @@ window.game1LocationAssetWorkflow = (() => {
     const scrollBody=d.querySelector('.real-estate-mesh-dialog-body')?.scrollTop??0;
     const scrollList=d.querySelector('.la-sync-list')?.scrollTop??0;
     const historyOpen=Boolean(d.querySelector('.la-sync-controls details')?.open);
+    const expandedMeshes=window.game1MeshAuthoring.openMeshNames(d);
     const busy=state.busy||state.atlas.busy||decoAssetState.atlasBusy||Boolean(decoAssetState.syncingSlug);
     const configured=Boolean(decoAssetState.data?.publication?.configured);
     const modelCurrent=Boolean(item.model_asset_id&&item.model_sha256===item.model_published_sha256);
@@ -149,7 +150,7 @@ window.game1LocationAssetWorkflow = (() => {
       modelAppearanceEditor+
       window.game1MeshAuthoring.inspectionView(inspection,state.meshOptions,'location-mesh',{
         materials:decoAssetState.data?.options?.visualMaterials||[],
-        atlases:decoAssetAtlasCatalog(),alphaEnabled:Boolean(modelAppearance.alphaEnabled),defaultUsesAtlas:modelUsesAtlas})+
+        atlases:decoAssetAtlasCatalog(),alphaEnabled:Boolean(modelAppearance.alphaEnabled),defaultUsesAtlas:modelUsesAtlas},expandedMeshes)+
       (Object.entries(item.meshOptions||{}).filter(([name,settings])=>
         settings?.appearanceMode&&settings.atlasVariantId&&!settings.texture_asset_id)
         .map(([name,settings])=>`<div class="la-publication-resource"><span>${e(name)} · Atlas not published</span>`+
@@ -176,7 +177,10 @@ window.game1LocationAssetWorkflow = (() => {
       'Регистрация сохраняет исходники. Публикация создаёт Roblox ID. Studio Sync выполняется отдельно.',
       `<div class="la-publication-stack">`+
       (item.appearanceMode==='material'?'':publicationStatus('atlas',`Atlas · ${e(publication.variant?.filename||'не выбран')}`,publication.atlasNeeded))+
+      publication.meshAtlases.map(entry=>publicationStatus('meshAtlases',
+        `MeshPart · ${e(entry.meshNames.join(', '))} · ${e(entry.filename||'Atlas '+entry.id)}`,true)).join('')+
       publicationStatus('model','Model · FBX',publication.modelNeeded)+`</div>`+
+      (publication.unresolvedMeshAtlases.length?`<p class="la-publication-warning">Невозможно найти Atlas variant: ${publication.unresolvedMeshAtlases.map(entry=>e(entry.meshName+' (#'+entry.variantId+')')).join(', ')}. Проверь назначения MeshPart — автоматическая публикация запрещена.</p>`:'')+
       (state.physicsDirty&&!publication.modelNeeded?'<p class="la-publication-warning">Есть изменения физических настроек MeshPart. Сохрани их через Model · FBX → Apply Changes.</p>':'')+
       (publication.reviewRequired?'<p class="la-publication-warning">Атлас изменён. Проверь его в Model · FBX → Default MeshPart appearance перед публикацией.</p>':'')+
       `<div class="la-publication-stage" role="status" aria-live="polite">`+
@@ -186,6 +190,7 @@ window.game1LocationAssetWorkflow = (() => {
         busy||!publication.count||!configured,'la-publish-primary '+(publication.count?'asset-apply-ready':''))}</div>`+
       (!configured&&publication.count?'<small class="la-publication-warning">Настрой Open Cloud, чтобы опубликовать ресурсы.</small>':'')+
       `<small>Публикация атласа не перепубликует Model. Публикация Model не публикует атлас. `+
+      `Индивидуальные MeshPart Atlases публикуются по отдельности и не перепубликуют Model. `+
       `Если один этап завершится ошибкой, успешный ID сохранится, повторятся только незавершённые этапы.</small>`,
       publication.count?`${publication.count} ожидает публикации`:'Готово',publication.count?'pending':'ready');
     const lod=item.lod1||{revision:0,status:'NOT_REGISTERED',modelAssetId:'',sourcePath:''};
@@ -427,7 +432,10 @@ window.game1LocationAssetWorkflow = (() => {
       const initial=window.game1LocationPublication.plan(row(),decoAssetAtlasCatalog(),Boolean(state.pendingModel));
       if(!initial.count){message('Все выбранные ресурсы уже опубликованы.');return;}
       state.tab='publish';
+      if(initial.unresolvedMeshAtlases.length)
+        throw Error('Некоторые MeshPart ссылаются на отсутствующие или удалённые Atlas variants. Исправь привязки перед публикацией.');
       state.publication={atlas:initial.atlasNeeded?'waiting':'',
+        meshAtlases:initial.meshAtlases.length?'waiting':'',
         model:initial.modelNeeded?'waiting':'',active:'',running:false};
       const stage=(key,label,status)=>{
         state.publication[key]=status;
@@ -445,6 +453,21 @@ window.game1LocationAssetWorkflow = (() => {
           stage('atlas',`Atlas опубликован · Image ID ${result.publishedAssetId}`,'done');
           completed++;
           if(result.exportWarnings?.length)message(result.exportWarnings.join(' | '),true);
+        }
+        // A published Model ID never implicitly publishes per-MeshPart images.
+        // Upload each missing shared variant ONCE, even when several mesh names
+        // use the same variant. Refresh before each upload so retries don't
+        // publish an ID already confirmed by another editor session.
+        for(const entry of initial.meshAtlases){
+          const current=window.game1LocationPublication.plan(row(),decoAssetAtlasCatalog());
+          if(!current.meshAtlases.some(atlas=>atlas.id===entry.id))continue;
+          stage('meshAtlases',`Публикуем MeshPart Atlas · ${entry.meshNames.join(', ')}…`,'running');
+          const result=await request(`/api/texture-atlases/variants/${entry.id}/publish`,{method:'POST'});
+          if(!result?.published_id)throw Error(`Atlas #${entry.id}: Open Cloud не подтвердил Image ID`);
+          await decoAssetLoad();
+          stage('meshAtlases',`MeshPart Atlas опубликован · Image ID ${result.published_id}`,'done');
+          completed++;
+          state.scanStale=true;
         }
         if(initial.modelNeeded){
           if(state.pendingModel||state.physicsDirty){
@@ -472,9 +495,11 @@ window.game1LocationAssetWorkflow = (() => {
         try{await decoAssetLoad();}catch(refreshError){
           // Preserve the original publication failure if ID refresh also fails.
         }
-        const key=state.publication.model==='running'?'model':'atlas';
+        const key=state.publication.model==='running'?'model':
+          state.publication.meshAtlases==='running'?'meshAtlases':'atlas';
         state.publication[key]='error';
-        state.publication.active=`Ошибка этапа ${key==='atlas'?'Atlas':'Model'}: ${error?.message||String(error)}. `+
+        const label=key==='meshAtlases'?'MeshPart Atlas':key==='atlas'?'Atlas':'Model';
+        state.publication.active=`Ошибка этапа ${label}: ${error?.message||String(error)}. `+
           `Уже подтверждено: ${completed}. Проверь обновлённые ID перед повторным запуском.`;
         state.publication.running=false;
         throw Error(state.publication.active);

@@ -1,0 +1,70 @@
+{
+  "asset": {
+    "slug": "bush_01",
+    "name_en": "bush_01",
+    "category": "bush",
+    "model_path": "assets/source/location-assets/bush/bush_01/model/bush_01.fbx",
+    "model_sha256": "b5e29c596dcc41dbecd958a6006fc65099cb0971d8131251e3c3ae58b0cafa10",
+    "model_asset_id": "95987432802428",
+    "model_published_sha256": "b5e29c596dcc41dbecd958a6006fc65099cb0971d8131251e3c3ae58b0cafa10",
+    "model_moderation_state": "Approved",
+    "destructible": 0,
+    "revision": 4,
+    "created_at": 1791474388.6629841,
+    "updated_at": 1795190704.6241963,
+    "published_at": 1793930533.7606688,
+    "mesh_options_json": "{\"bush_01\": {\"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": true}}",
+    "surface_material": "glass",
+    "alpha_enabled": 0,
+    "appearance_mode": "material_atlas",
+    "visual_material": "Plastic",
+    "visual_color": "#FFFFFF"
+  },
+  "publications": [
+    {
+      "id": 9,
+      "asset_slug": "bush_01",
+      "kind": "model",
+      "revision": 1,
+      "asset_id": "101368135428674",
+      "operation_path": "operations/281d47c9-0380-440a-b7f3-256d0aff22cf",
+      "sha256": "b904010407d56a4fe4398fa83fa2be9adcb3e019b06e5f85dbc3e6c4e0104b98",
+      "moderation_state": "Approved",
+      "published_at": 1791474405.8568606
+    },
+    {
+      "id": 10,
+      "asset_slug": "bush_01",
+      "kind": "model",
+      "revision": 2,
+      "asset_id": "101368135428674",
+      "operation_path": "operations/afc460aa-d0cc-4951-8ce8-7198d81074b1",
+      "sha256": "a3d6048b198df79f4026c88a8cf849cb8b348daf2b6c90ca024c5297e7ef0e98",
+      "moderation_state": "Approved",
+      "published_at": 1791475115.7066147
+    },
+    {
+      "id": 53,
+      "asset_slug": "bush_01",
+      "kind": "model",
+      "revision": 3,
+      "asset_id": "95987432802428",
+      "operation_path": "operations/8dc03b07-4502-4d06-8a4d-d171dc373540",
+      "sha256": "b5e29c596dcc41dbecd958a6006fc65099cb0971d8131251e3c3ae58b0cafa10",
+      "moderation_state": "Approved",
+      "published_at": 1793930533.7606688
+    }
+  ],
+  "rigManifests": [],
+  "collisionBlueprints": [
+    {
+      "asset_slug": "bush_01",
+      "revision": 1,
+      "blueprint_json": "{\"anchor\":{\"localCFrame\":[-0.104644775390625,1.9659652709960938,-0.073089599609375,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0],\"meshId\":\"85890571174919\",\"size\":[4.447850227355957,3.9319310188293457,5.220827579498291]},\"parts\":[{\"canQuery\":true,\"canTouch\":true,\"collisionGroup\":\"Default\",\"id\":\"Part\",\"localCFrame\":[-0.201263427734375,0.40375518798828125,-0.0731201171875,-0.2123393565416336,0.0,0.9771959781646729,0.0,1.0,0.0,-0.9771959781646729,0.0,-0.2123393565416336],\"name\":\"Part\",\"shape\":\"Block\",\"size\":[2.360321521759033,0.7839952707290649,2.0]}],\"pivot\":\"Model:GetPivot()\",\"schemaVersion\":2}",
+      "sha256": "3db8563863d4486ede60dd91f11042e3531a38e86d2c82425d36e31522697241",
+      "captured_at": 1795197633.4602282
+    }
+  ],
+  "lodResources": [],
+  "sourceFilesPreserved": true
+}

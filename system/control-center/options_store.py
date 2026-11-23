@@ -137,6 +137,7 @@ SOCKET_RANGE_DEFAULTS = {
         'fireplace_01_socket': {'useRadius': 8, 'aimRadius': 4},
     },
     'campfire': {'fire_socket': {'useRadius': 8, 'aimRadius': 4}},
+    'windmill': {'windmill_door_handle_socket': {'useRadius': 8}},
 }
 
 
@@ -147,6 +148,10 @@ def normalize_socket_ranges(change, base=None):
         raise ValueError('socketRanges: unknown domain')
     base = base or SOCKET_RANGE_DEFAULTS
     result = deepcopy(base)
+    for domain, sockets in SOCKET_RANGE_DEFAULTS.items():
+        result.setdefault(domain, {})
+        for name, fields in sockets.items():
+            result[domain].setdefault(name, deepcopy(fields))
     for domain, sockets in change.items():
         if not isinstance(sockets, dict) or set(sockets) - set(SOCKET_RANGE_DEFAULTS[domain]):
             raise ValueError(f'socketRanges.{domain}: unknown socket')
@@ -164,6 +169,33 @@ def normalize_socket_ranges(change, base=None):
             row = result[domain][name]
             if row.get('aimRadius', 0) > row['useRadius']:
                 raise ValueError(f'{name}: AIM must not exceed USE')
+    return result
+
+
+# M452: per-asset mechanical rotations. Rendering uses one source of truth
+# published into GameOptionsRegistry, not a client-side hard-coded period.
+ROTATION_DEFAULTS = {
+    'windmill_02': {'enabled': True, 'secondsPerRevolution': 3.0},
+}
+
+
+def normalize_rotations(change, base=None):
+    import math
+    if not isinstance(change, dict) or set(change) - set(ROTATION_DEFAULTS):
+        raise ValueError('rotations: unsupported asset')
+    result = deepcopy(base or ROTATION_DEFAULTS)
+    for slug, row in change.items():
+        if not isinstance(row, dict) or set(row) - {'enabled', 'secondsPerRevolution'}:
+            raise ValueError(f'rotations.{slug}: unknown field')
+        if 'enabled' in row:
+            if type(row['enabled']) is not bool:
+                raise ValueError(f'rotations.{slug}.enabled must be boolean')
+            result[slug]['enabled'] = row['enabled']
+        if 'secondsPerRevolution' in row:
+            value = row['secondsPerRevolution']
+            if type(value) not in (int, float) or not math.isfinite(value) or not 0.25 <= value <= 120:
+                raise ValueError(f'rotations.{slug}.secondsPerRevolution must be 0.25..120 seconds')
+            result[slug]['secondsPerRevolution'] = float(value)
     return result
 
 
@@ -262,6 +294,7 @@ DEFAULT_PAYLOAD = {
     "healthUi": deepcopy(HEALTH_UI_DEFAULTS),
     "uiPresentation": deepcopy(UI_PROFILE_DEFAULTS),
     "socketRanges": deepcopy(SOCKET_RANGE_DEFAULTS),
+    "rotations": deepcopy(ROTATION_DEFAULTS),
     "npcOverhead": deepcopy(NPC_OVERHEAD_DEFAULTS),
     "monsterAi": {"noDamageReturnSeconds": 30},
     "worldStreaming": {"targetRadiusStuds": 150},
@@ -315,6 +348,7 @@ class OptionsStore:
         normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))
         normalize_ui_presentation(payload.get('uiPresentation', UI_PROFILE_DEFAULTS))
         normalize_socket_ranges(payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))
+        normalize_rotations(payload.get('rotations', ROTATION_DEFAULTS))
         normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
         normalize_world_streaming(payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
@@ -344,6 +378,7 @@ class OptionsStore:
             "\thealthUi = " + lua_literal(normalize_health_ui(payload.get('healthUi', HEALTH_UI_DEFAULTS))) + ",",
             "\tuiPresentation = " + lua_literal(normalize_ui_presentation(payload.get('uiPresentation', UI_PROFILE_DEFAULTS))) + ",",
             "\tsocketRanges = " + lua_literal(normalize_socket_ranges(payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))) + ",",
+            "\trotations = " + lua_literal(normalize_rotations(payload.get('rotations', ROTATION_DEFAULTS))) + ",",
             "\tnpcOverhead = " + lua_literal(normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))) + ",",
             "\tmonsterAi = " + lua_literal(normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))) + ",",
             "\tplayerJump = " + lua_literal(normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))) + ",",
@@ -400,7 +435,7 @@ class OptionsStore:
                     print(f'[options] M449 campfire range migration skipped: {error}')
             payload['socketRanges'] = normalize_socket_ranges(initial)
             changed = True
-        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges'):
+        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges', 'rotations'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
@@ -418,6 +453,10 @@ class OptionsStore:
         upgraded_ui = normalize_ui_presentation(payload['uiPresentation'], UI_PROFILE_DEFAULTS)
         if upgraded_ui != payload['uiPresentation']:
             payload['uiPresentation'] = upgraded_ui
+            changed = True
+        normalized_ranges = normalize_socket_ranges({}, payload['socketRanges'])
+        if normalized_ranges != payload['socketRanges']:
+            payload['socketRanges'] = normalized_ranges
             changed = True
         if changed:
             payload["schemaVersion"] = 1
@@ -491,6 +530,9 @@ class OptionsStore:
             payload['npcOverhead'] = normalize_npc_overhead(request['npcOverhead'], payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         if 'monsterAi' in request:
             payload['monsterAi'] = normalize_monster_ai(request['monsterAi'], payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
+        if 'rotations' in request:
+            payload['rotations'] = normalize_rotations(request['rotations'],
+                payload.get('rotations', ROTATION_DEFAULTS))
         if 'socketRanges' in request:
             payload['socketRanges'] = normalize_socket_ranges(request['socketRanges'],
                 payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))

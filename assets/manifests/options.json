@@ -245,6 +245,17 @@
         "useRadius": 14.0,
         "aimRadius": 8.0
       }
+    },
+    "windmill": {
+      "windmill_door_handle_socket": {
+        "useRadius": 8
+      }
+    }
+  },
+  "rotations": {
+    "windmill_02": {
+      "enabled": true,
+      "secondsPerRevolution": 6.0
     }
   }
 }

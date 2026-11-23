@@ -1,0 +1,40 @@
+{
+  "asset": {
+    "slug": "blossom_tree_01",
+    "name_en": "Blossom Tree 01",
+    "category": "tree",
+    "model_path": "assets/source/location-assets/tree/blossom_tree_01/model/blossom_tree_01.fbx",
+    "model_sha256": "b9f4af8a7a2857168613a1866694afeb0df3eb368028876d154f5a897f7eab4b",
+    "model_asset_id": "86078672052247",
+    "model_published_sha256": "b9f4af8a7a2857168613a1866694afeb0df3eb368028876d154f5a897f7eab4b",
+    "model_moderation_state": "Approved",
+    "destructible": 0,
+    "revision": 3,
+    "created_at": 1793887548.4962683,
+    "updated_at": 1795190830.8310852,
+    "published_at": 1793887582.637806,
+    "mesh_options_json": "{\"blossom_tree_01\": {\"collisionFidelity\": \"Box\", \"doubleSided\": false, \"glass\": false, \"noCollide\": true}}",
+    "surface_material": "default",
+    "alpha_enabled": 0,
+    "appearance_mode": "material_atlas",
+    "visual_material": "Plastic",
+    "visual_color": "#FFFFFF"
+  },
+  "publications": [
+    {
+      "id": 47,
+      "asset_slug": "blossom_tree_01",
+      "kind": "model",
+      "revision": 1,
+      "asset_id": "86078672052247",
+      "operation_path": "operations/bacfdd88-09e1-4820-9432-64d012326f0a",
+      "sha256": "b9f4af8a7a2857168613a1866694afeb0df3eb368028876d154f5a897f7eab4b",
+      "moderation_state": "Approved",
+      "published_at": 1793887582.637806
+    }
+  ],
+  "rigManifests": [],
+  "collisionBlueprints": [],
+  "lodResources": [],
+  "sourceFilesPreserved": true
+}

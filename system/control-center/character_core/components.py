@@ -14,7 +14,7 @@ import time
 import uuid
 from sqlite_connection import connect
 from services.texture_atlas_registry import AtlasRegistry
-from character_core.part_names import parse_part, default_allowed_genders, rig_id, skeleton_matches, TOKEN, hair_color_channels, part_matches_source_rig, rig_family_and_gender
+from character_core.part_names import parse_part, default_allowed_genders, rig_id, skeleton_matches, TOKEN, hair_color_channels, part_matches_source_rig, rig_family_and_gender, part_bind_matches
 from character_core.component_fbx import inspect_fbx, inspect_rig_fbx
 
 _LOCK=threading.RLock()
@@ -81,11 +81,10 @@ class CharacterComponents:
         return dict(row) if row else None
 
     def part_compatible_with_rig(self, part, target_rig_id):
-        """Cross-rig reuse is safe only for common geometry with matching bind pose.
+        """Allow common geometry only if its published deforming bind chain fits.
 
-        Allowed genders describe an item in the game, but do not guarantee
-        its skin weights fit an unrelated Armature. Compare the *published*
-        bones, never trust a name or a pending revision.
+        Gender permission alone is insufficient. Unrelated bones on gendered
+        rigs may differ; weighted bones and their ancestry must still match.
         """
         if part['rig_id'] == target_rig_id:
             return True
@@ -100,10 +99,14 @@ class CharacterComponents:
             target = self.get('rig', target_rig_id)
             if not source or not target:
                 return False
-            a = self.publication_metadata(source)['bones']
-            b = self.publication_metadata(target)['bones']
-            skeleton_matches(a, b)
-            return True
+            part_meta = self.publication_metadata(part)
+            return part_bind_matches(
+                self.publication_metadata(source)['bones'],
+                self.publication_metadata(target)['bones'],
+                part_meta.get('skeleton', []),
+                used_bones=part_meta.get('used_bones', []),
+                attachment=part_meta.get('attachment', ''),
+            )
         except (ValueError, KeyError, TypeError):
             return False
 

@@ -25,6 +25,7 @@ class AnimationRegistryMixin:
 
         for row in clips:
             row["status"] = self._status(row)
+        shared = self.shared_rows()
 
         manifest_profiles = [
             {
@@ -72,6 +73,10 @@ class AnimationRegistryMixin:
             "profiles": manifest_profiles,
             "clips": manifest_clips,
             "bindings": manifest_bindings,
+            "shared": [{"family": r['family'], "scope": r['scope'], "weaponSet": r['weapon_set'],
+                        "slot": r['slot'], "variant": r['variant'], "sourceBindingId": r['source_binding_id'],
+                        "sourceCharacter": r['source_character'], "assetId": str(r.get('asset_id') or ''),
+                        "status": r['status']} for r in shared],
         }
         manifest = self.root / "assets/manifests/character-animations.json"
         manifest.parent.mkdir(parents=True, exist_ok=True)
@@ -79,11 +84,15 @@ class AnimationRegistryMixin:
 
         clips_by_id = {str(row["id"]): row for row in clips if str(row.get("asset_id") or "").isdigit() or str(row.get('source_path') or '').endswith('.animation.json')}
         profile_map: dict[str, dict] = {}
+        with self.connect() as db:
+            family_by_character = {r['id']:r['race'] for r in db.execute('SELECT id,race FROM characters')}
         for profile in profiles:
             profile_map[str(profile["character_id"])] = {
                 "skeletonSignature": str(profile.get("skeleton_signature") or ""),
+                "family": family_by_character.get(profile['character_id'], ''),
                 "base": {},
                 "emotions": {},
+                "social": {},
                 "weapons": {},
             }
         for binding in bindings:
@@ -91,7 +100,7 @@ class AnimationRegistryMixin:
             if clip is None:
                 continue
             character_id = str(binding["character_id"])
-            profile = profile_map.setdefault(character_id, {"skeletonSignature": "", "base": {}, "emotions": {}, "weapons": {}})
+            profile = profile_map.setdefault(character_id, {"skeletonSignature": "", "family": family_by_character.get(character_id,''), "base": {}, "emotions": {}, "social": {}, "weapons": {}})
             descriptor = {
                 "clipId": str(clip["id"]),
                 "assetId": str(clip["asset_id"]),
@@ -109,6 +118,8 @@ class AnimationRegistryMixin:
                 profile["base"].setdefault(str(binding["slot"]), []).append(descriptor)
             elif str(binding['scope']) == 'emotions':
                 profile['emotions'].setdefault(str(binding['slot']), []).append(descriptor)
+            elif str(binding['scope']) == 'social':
+                profile['social'].setdefault(str(binding['slot']), []).append(descriptor)
             else:
                 weapon = profile["weapons"].setdefault(str(binding["weapon_set"]), {})
                 weapon.setdefault(str(binding["slot"]), []).append(descriptor)
@@ -118,9 +129,26 @@ class AnimationRegistryMixin:
                 rows.sort(key=lambda row: row["variant"])
             for rows in profile['emotions'].values():
                 rows.sort(key=lambda row: row['variant'])
+            for rows in profile['social'].values():
+                rows.sort(key=lambda row: row['variant'])
             for weapon in profile["weapons"].values():
                 for rows in weapon.values():
                     rows.sort(key=lambda row: row["variant"])
+
+        shared_runtime = {}
+        for row in shared:
+            if row['status'] != 'PUBLISHED':
+                continue
+            family_data = shared_runtime.setdefault(row['family'], {'base':{},'social':{},'emotions':{},'weapons':{}})
+            with self.connect() as documents:
+                document = get_document(documents,row['clip_id'],row.get('published_sha256') or row['sha256'])
+            descriptor = dict(clipId=row['clip_id'],assetId=str(row['asset_id']),
+                              animationId='rbxassetid://'+str(row['asset_id']),variant=int(row['variant']),
+                              weight=int(row['weight']),looped=bool(row['looped']),priority=row['priority'],document=document)
+            if row['scope']=='weapon':
+                family_data['weapons'].setdefault(row['weapon_set'],{}).setdefault(row['slot'],[]).append(descriptor)
+            else:
+                family_data[row['scope'] if row['scope']!='base' else 'base'].setdefault(row['slot'],[]).append(descriptor)
 
         def lua_string(value: str) -> str:
             return json.dumps(str(value), ensure_ascii=False)
@@ -144,6 +172,7 @@ class AnimationRegistryMixin:
             "return table.freeze({",
             f"\tschemaVersion = {SCHEMA_VERSION},",
             '\tproject = "game1",',
+            "\tshared = " + lua_data(shared_runtime) + ",",
             "\tprofiles = table.freeze({",
         ]
         for character_id in sorted(profile_map):
@@ -151,6 +180,7 @@ class AnimationRegistryMixin:
             lines += [
                 f"\t\t[{lua_string(character_id)}] = table.freeze({{",
                 f"\t\t\tskeletonSignature = {lua_string(profile['skeletonSignature'])},",
+                f"\t\t\tfamily = {lua_string(profile.get('family') or '')},",
                 "\t\t\tbase = table.freeze({",
             ]
             for slot in sorted(profile["base"]):
@@ -162,6 +192,11 @@ class AnimationRegistryMixin:
             for slot in sorted(profile['emotions']):
                 lines.append(f"\t\t\t\t[{lua_string(slot)}] = table.freeze({{")
                 for row in profile['emotions'][slot]:lines.extend(emit_descriptor(row, "\t\t\t\t\t"))
+                lines.append("\t\t\t\t}),")
+            lines += ["\t\t\t}),", "\t\t\tsocial = table.freeze({"]
+            for slot in sorted(profile['social']):
+                lines.append(f"\t\t\t\t[{lua_string(slot)}] = table.freeze({{")
+                for row in profile['social'][slot]: lines.extend(emit_descriptor(row, "\t\t\t\t\t"))
                 lines.append("\t\t\t\t}),")
             lines += ["\t\t\t}),", "\t\t\tweapons = table.freeze({"]
             for weapon_set in sorted(profile["weapons"]):

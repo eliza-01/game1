@@ -158,6 +158,18 @@ class CharacterIdentityService:
             if identity_conflict:
                 raise ValueError(f"{race}/{gender} is already registered as {identity_conflict['id']}")
 
+            has_shared_bindings = bool(connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='animation_shared_bindings'"
+            ).fetchone())
+            if has_shared_bindings and race != str(old.get('race') or ''):
+                source_ids = [r['id'] for r in connection.execute(
+                    'SELECT id FROM animation_bindings WHERE character_id=?', (old_id,)
+                )]
+                for source_id in source_ids:
+                    if connection.execute(
+                        'SELECT 1 FROM animation_shared_bindings WHERE source_binding_id=?', (source_id,)
+                    ).fetchone():
+                        raise ValueError('unshare common animations before changing the character race')
             animation_rows = [
                 dict(row)
                 for row in connection.execute(
@@ -261,6 +273,11 @@ class CharacterIdentityService:
                             row["old_clip_id"],
                         ),
                     )
+                    if has_shared_bindings and row["new_binding_id"] != row["old_binding_id"]:
+                        connection.execute(
+                            "UPDATE animation_shared_bindings SET source_binding_id=? WHERE source_binding_id=?",
+                            (row["new_binding_id"], row["old_binding_id"]),
+                        )
                     connection.execute(
                         """UPDATE animation_bindings
                            SET id=?,character_id=?,clip_id=?,updated_at=?

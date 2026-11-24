@@ -54,9 +54,23 @@ function AnimationResolver.Resolve(character: Model, scope: string, weaponSet: s
 		rows = weapon and weapon[slot]
 	elseif scope == "emotions" then
 		rows = profile.emotions and profile.emotions[slot]
+	elseif scope == "social" then
+		rows = profile.social and profile.social[slot]
 	else
 		rows = profile.base and profile.base[slot]
 	end
+	if type(rows) ~= "table" or #rows == 0 then
+        local shared = Registry.shared and Registry.shared[profile.family or ""]
+        if shared then
+            if scope == "weapon" then
+                local group = shared.weapons and shared.weapons[tostring(weaponSet or "")]
+                rows = group and group[slot]
+            else
+                local group = shared[scope == "emotions" and "emotions" or scope == "social" and "social" or "base"]
+                rows = group and group[slot]
+            end
+        end
+    end
 	return weightedChoice(rows)
 end
 
@@ -73,6 +87,11 @@ function AnimationResolver.ListForCharacter(character: Model, includeProcedural:
 			end
 		end
 	end
+	for _, slotRows in pairs(profile.social or {}) do
+		for _, row in ipairs(slotRows) do
+			table.insert(rows, row)
+		end
+	end
 	for _, slotRows in pairs(profile.base or {}) do
 		for _, row in ipairs(slotRows) do
 			table.insert(rows, row)
@@ -85,6 +104,30 @@ function AnimationResolver.ListForCharacter(character: Model, includeProcedural:
 			end
 		end
 	end
+    local shared = Registry.shared and Registry.shared[profile.family or ""]
+    if shared then
+        for _, scope in ipairs({ "base", "emotions", "social" }) do
+            for slot, candidates in pairs(shared[scope] or {}) do
+                if not ((profile[scope] or {})[slot]) then
+                    for _, row in ipairs(candidates) do
+                        if includeProcedural or tostring(row.animationId or "") ~= "" then
+                            table.insert(rows, row)
+                        end
+                    end
+                end
+            end
+        end
+        for weaponSet, slots in pairs(shared.weapons or {}) do
+            local own = (profile.weapons or {})[weaponSet] or {}
+            for slot, candidates in pairs(slots) do
+                if not own[slot] then
+                    for _, row in ipairs(candidates) do
+                        table.insert(rows, row)
+                    end
+                end
+            end
+        end
+    end
 	return rows
 end
 

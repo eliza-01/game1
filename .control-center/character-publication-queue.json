@@ -477,6 +477,113 @@
           "asset_id": "122803353972225"
         }
       ]
+    },
+    {
+      "schema_version": 1,
+      "id": "a019ea72-de27-4f41-adb7-2b29e5860c71",
+      "status": "completed",
+      "started_at": 1795474691.3197854,
+      "finished_at": 1795474743.6899498,
+      "items": [
+        {
+          "kind": "rig",
+          "id": "human_male",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "71287027570743"
+        },
+        {
+          "kind": "part",
+          "id": "human_male_m001_head",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "116014875979775"
+        },
+        {
+          "kind": "part",
+          "id": "human_male_m001_lower",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "112606956000296"
+        },
+        {
+          "kind": "part",
+          "id": "human_male_m001_upper",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "135244274208890"
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "4c5bbc4a-1b24-4641-b855-d33df1fcf167",
+      "status": "completed",
+      "started_at": 1795474838.9609773,
+      "finished_at": 1795474851.19228,
+      "items": [
+        {
+          "kind": "part",
+          "id": "human_female_m001_head",
+          "revision": 3,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "111130300110765"
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "80f555f8-dbd9-4db2-9fcc-3363666484a3",
+      "status": "completed",
+      "started_at": 1795475656.6305115,
+      "finished_at": 1795475695.9481783,
+      "items": [
+        {
+          "kind": "part",
+          "id": "human_male_m001_hair",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "111512978035572"
+        },
+        {
+          "kind": "part",
+          "id": "human_male_m002_hair",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "85123345022327"
+        },
+        {
+          "kind": "part",
+          "id": "human_male_m003_hair",
+          "revision": 1,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "81549103854113"
+        }
+      ]
     }
   ]
 }

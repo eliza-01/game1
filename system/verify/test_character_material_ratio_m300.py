@@ -9,12 +9,12 @@ class MaterialsAndRatioM300(unittest.TestCase):
     def test_material_choices_are_shared(self):
         py=load('system/control-center/character_core/assemblies.py')
         js=load('system/control-center/static/character-assemblies.js')
-        for material in ('Glass','Metal','SmoothPlastic','Plaster','Slate','Sandstone',
+        for material in ('Plastic','Glass','Metal','SmoothPlastic','Plaster','Slate','Sandstone',
                          'Sand','Cardboard','Rubber','Limestone','Granite'):
             self.assertIn(repr(material),py)
             self.assertIn("'"+material+"'",js)
         self.assertIn('part_materials=selected_materials',py)
-        self.assertIn('record[\'material\']=selected_materials[slot]',py)
+        self.assertIn('record[\'material\']=selected_materials.get(slot,DEFAULT_MATERIAL)',py)
     def test_parts_receive_runtime_material_without_pivot_changes(self):
         source=load('src/server/character/CharacterAssemblyBuilder.luau')
         self.assertIn('mesh.Material = selected',source)

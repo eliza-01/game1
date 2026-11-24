@@ -19,7 +19,8 @@ FACE = ('head', 'eye_l', 'eye_r', 'eyebrow_l', 'eyebrow_r', 'hair')
 SOLID_FACE = frozenset(('eye_l', 'eye_r', 'eyebrow_l', 'eyebrow_r'))
 HEX_COLOR = re.compile(r'#[0-9a-fA-F]{6}\Z')
 MATERIAL_SLOTS = frozenset((*ARMOR_SLOTS,*FACE))
-MATERIALS = frozenset(('Glass','Metal','SmoothPlastic','Plaster','Slate','Sandstone','Sand',
+DEFAULT_MATERIAL = 'Plastic'
+MATERIALS = frozenset((DEFAULT_MATERIAL,'Glass','Metal','SmoothPlastic','Plaster','Slate','Sandstone','Sand',
                        'Cardboard','Rubber','Limestone','Granite'))
 
 
@@ -100,7 +101,7 @@ class CharacterAssemblies:
             record,problem=self._part(slot,mesh['id'],rig_id,gender,appearance_id=appearance['id'])
             if problem:missing.append(slot+': '+problem)
             else:
-                if slot in selected_materials:record['material']=selected_materials[slot]
+                record['material']=selected_materials.get(slot,DEFAULT_MATERIAL)
                 result['parts'][slot]=record
         faces=recipe.get('face_parts') or {}
         for slot in FACE:
@@ -143,7 +144,7 @@ class CharacterAssemblies:
                         missing.append(slot+': color must be #RRGGBB')
                     else:
                         record['color']=color.upper()
-            if slot in selected_materials:record['material']=selected_materials[slot]
+            record['material']=selected_materials.get(slot,DEFAULT_MATERIAL)
             result['parts'][slot]=record
         result['ready']=not missing
         result['missing']=missing

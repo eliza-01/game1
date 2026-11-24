@@ -43,10 +43,16 @@ local function rowsForEquippedAttack(character: Model): any
     if weaponSet ~= "" and weaponSet ~= "base" and weaponSet ~= "unarmed" then
         local weapon = profile.weapons and profile.weapons[weaponSet]
         if weapon and weapon.attack then return weapon.attack end
+        local shared = CharacterAnimationRegistry.shared and CharacterAnimationRegistry.shared[profile.family or ""]
+        local sharedWeapon = shared and shared.weapons and shared.weapons[weaponSet]
+        if sharedWeapon and sharedWeapon.attack then return sharedWeapon.attack end
         -- In particular, a bow may NEVER fire using the fallback hands clip.
         if weaponSet == "bow" then return nil end
     end
-    return profile.base and profile.base.attack or nil
+    local ownAttack = profile.base and profile.base.attack
+    if ownAttack then return ownAttack end
+    local shared = CharacterAnimationRegistry.shared and CharacterAnimationRegistry.shared[profile.family or ""]
+    return shared and shared.base and shared.base.attack or nil
 end
 
 local function allowedAttackDescriptor(character: Model, clipId: string): any?

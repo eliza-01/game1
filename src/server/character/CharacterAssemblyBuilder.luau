@@ -179,7 +179,22 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
                     local first = incoming[firstName :: string]
                     local target = assert(canonical[firstName], "unknown bind reference")
                     mesh.CFrame = target.WorldCFrame * first.WorldCFrame:Inverse() * mesh.CFrame
-                    for name, sourceBone in incoming do
+                    -- The imported MeshPart may retain unused bones from its
+                    -- authoring rig. Only weighted bones and their ancestor
+                    -- chains influence this part's bind pose; unrelated
+                    -- gender-specific face/weapon bones may legitimately differ.
+                    local required: {[string]: boolean} = {}
+                    for _, name in part.used_bones do
+                        local sourceBone = incoming[name]
+                        while sourceBone and sourceBone:IsA("Bone") do
+                            if required[sourceBone.Name] then break end
+                            required[sourceBone.Name] = true
+                            sourceBone = if sourceBone.Parent and sourceBone.Parent:IsA("Bone")
+                                then sourceBone.Parent :: Bone else nil
+                        end
+                    end
+                    for name in required do
+                        local sourceBone = assert(incoming[name], "missing imported bind for " .. name)
                         local targetBone = assert(canonical[name], "missing core bone " .. name)
                         local delta = targetBone.WorldCFrame:ToObjectSpace(sourceBone.WorldCFrame)
                         local _, angle = delta:ToAxisAngle()

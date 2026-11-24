@@ -7,6 +7,7 @@
   const labels={upper:'Верх',lower:'Низ',gloves:'Перчатки',boots:'Ботинки'};
   const types={light:'Лёгкая',heavy:'Тяжёлая',magic:'Магическая'};
   const genders={unisex:'Unisex',male:'Male',female:'Female'};
+  const coverage=window.game1ArmorReadiness;
   const ru='абвгдеёжзийклмнопрстуфхцчшщъыьэюя';
   const en=['a','b','v','g','d','e','yo','zh','z','i','y','k','l','m','n','o','p','r','s','t','u','f','h','ts','ch','sh','sch','','y','','e','yu','ya'];
   const slug=value=>{
@@ -28,11 +29,20 @@
     if(!variant.meshPartId&&!variant.appearanceId)return 'черновик';
     return (variant.meshPartId||'нет меша')+' / '+(variant.appearanceId||'нет текстуры');
   }
+  function selectVariant(slot,gender){
+    const target=selectedSet()?.pieces.find(p=>p.slot===slot);
+    if(!target)return;
+    pieceId=target.id;byId('gender').value=gender;render();
+  }
   function render(){
     if(!catalog)return;
     const list=byId('set-list');list.replaceChildren();
     for(const item of catalog.sets){
-      const btn=text('button',`${item.display_name} · ${types[item.armor_type]} · ${item.pieces.length} слотов`);
+      const assigned=item.readiness?.complete;
+      const rigsReady=(item.rigReadiness||[]).every(r=>r.ready);
+      const issueText=assigned&&rigsReady?'✓ готов для обоих полов':
+        `⚠ Male ${item.readiness?.genders?.male?.assigned??0}/${item.pieces.length} · Female ${item.readiness?.genders?.female?.assigned??0}/${item.pieces.length}${assigned?' · проверить риги':''}`;
+      const btn=text('button',`${item.display_name} · ${types[item.armor_type]} · ${item.pieces.length} слотов · ${issueText}`);
       btn.type='button';btn.className='armor-set'+(item.id===setId?' armor-selected':'');
       btn.onclick=()=>{setId=item.id;pieceId=item.pieces[0]?.id||null;editing=false;render();};
       list.append(btn);
@@ -52,9 +62,19 @@
       byId('add').disabled=busy||!available.length||!byId('add-slot').value;
       for(const piece of set.pieces){
         const row=document.createElement('div');row.className='armor-piece-row';
-        const button=text('button',`${labels[piece.slot]} · M: ${summary(piece,'male')} · F: ${summary(piece,'female')}`);
+        const button=text('button',labels[piece.slot]);
         button.type='button';button.className=piece.id===pieceId?'armor-selected':'';
         button.onclick=()=>{pieceId=piece.id;render();};
+        row.append(button);
+        for(const gender of ['male','female']){
+          const status=coverage.slot(set.readiness,piece.slot,gender);
+          const btn=text('button',`${genders[gender]} · ${status.ready?'✓': '!'}`);
+          btn.type='button';btn.className='armor-gender-chip '+(status.ready?'armor-ready':'armor-incomplete');
+          btn.title=`${genders[gender]}: ${coverage.badgeText(status)} · ${summary(piece,gender)}`;
+          btn.setAttribute('aria-label',`${labels[piece.slot]} · ${genders[gender]} · ${coverage.badgeText(status)}`);
+          btn.onclick=()=>selectVariant(piece.slot,gender);
+          row.append(btn);
+        }
         const remove=text('button','×');remove.type='button';remove.title='Удалить эту часть из комплекта';
         remove.onclick=()=>perform(async()=>{
           if(!confirm('Удалить '+labels[piece.slot]+' из '+set.display_name+'? Меши и атласы останутся в библиотеке.'))return;
@@ -62,19 +82,23 @@
           if(pieceId===piece.id)pieceId=null;
           render();window.dispatchEvent(new Event('character-armor-changed'));
         });
-        row.append(button,remove);slots.append(row);
+        row.append(remove);slots.append(row);
       }
     }
     byId('add-controls').hidden=!set;
     byId('variant-controls').hidden=!selectedPiece();
     byId('stats').hidden=!set;
     if(set){
-      const ready=gender=>set.pieces.filter(p=>{
-        const v=p.variants[gender]||p.variants.unisex;
-        return !!v?.meshPartId&&!!v?.appearanceId;
-      }).length;
-      byId('readiness').textContent=`Назначено частей: male ${ready('male')}/${set.pieces.length} · female ${ready('female')}/${set.pieces.length}. Отсутствующие слоты допустимы.`;
-    }else byId('readiness').textContent='';
+      const slotsReady=set.readiness?.complete;
+      const rigIssues=(set.rigReadiness||[]).filter(r=>!r.ready).length;
+      byId('readiness').textContent=!slotsReady
+        ?'Комплект не готов для обоих полов: открой недостающие варианты ниже. Сохранение черновика разрешено.'
+        :rigIssues?`Варианты для обоих полов назначены, но обнаружены проблемы совместимости ригов (${rigIssues}).`
+          :'Назначения для обоих полов и проверка зарегистрированных ригов — готовы.';
+      coverage.show(set,byId('readiness-detail'),selectVariant);
+    }else{
+      byId('readiness').textContent='';byId('readiness-detail').replaceChildren();
+    }
     if(selectedPiece())renderVariant();
   }
   function renderAtlasOptions(value){
@@ -100,7 +124,7 @@
     }
     byId('variant-title').textContent=`${labels[piece.slot]} · ${genders[gender]}`;
     byId('variant-note').textContent=gender==='unisex'?'Этот вариант подходит обоим полам. Male/Female варианты имеют приоритет.':
-      'Настройка влияет только на этот пол. Не изменяет геометрию или текстуру в других комплектах.';
+      'Настройка влияет только на этот пол. Для готовности комплекта проверь также второй пол и совместимость рига.';
   }
   async function perform(action){
     if(busy)return;busy=true;

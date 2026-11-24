@@ -11,14 +11,14 @@
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=435">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
-<link rel="stylesheet" href="character-animations.css?v=309">
+<link rel="stylesheet" href="character-animations.css?v=469">
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="location-instance-manager.css?v=353">
 <link rel="stylesheet" href="place-registry.css?v=405">
 <link rel="stylesheet" href="lod-manager.css?v=430">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=5">
-<link rel="stylesheet" href="character-armor.css?v=1">
+<link rel="stylesheet" href="character-armor.css?v=458">
 <link rel="stylesheet" href="location-category-picker.css?v=249">
 <link rel="stylesheet" href="location-alpha.css?v=250">
 <link rel="stylesheet" href="deco-assets.css?v=453">
@@ -109,7 +109,7 @@
 </form>
 <div class="armor-layout"><section aria-label="Комплекты"><h4>Зарегистрированные сеты</h4><div id="armor-set-list"></div></section>
 <section aria-label="Редактор комплекта"><div class="armor-head"><h4 id="armor-set-title">Выбери комплект</h4><button type="button" id="armor-set-edit" hidden>Изменить название/тип</button></div>
-<p id="armor-readiness" class="armor-help"></p><div id="armor-slots"></div>
+<p id="armor-readiness" class="armor-help"></p><div id="armor-readiness-detail"></div><div id="armor-slots"></div>
 <div id="armor-add-controls" class="armor-controls" hidden><label>Добавить необязательную часть<select id="armor-add-slot"></select></label><button type="button" id="armor-add">Добавить часть</button></div>
 <div id="armor-variant-controls" hidden><h4 id="armor-variant-title"></h4>
 <div class="armor-variant-form"><label>Вариант<select id="armor-gender"><option value="unisex">Unisex · оба пола</option><option value="male">Male</option><option value="female">Female</option></select></label>
@@ -223,7 +223,21 @@
 <div class="panel runtime-card"><div id="animation-profile-state" class="runtime-state registered"><strong>profile</strong><span>select a character.</span></div><div id="animation-publication-state" class="publication-missing">open cloud: checking…</div></div>
 <div id="animation-studio-sync-status" class="game1-asset-publication-state" role="status" aria-live="polite">Published animations are exported to the Rojo registry. Studio must be connected to Rojo before testing new clips.</div>
 <div class="panel character-card animation-profile-panel" id="animation-profile-panel">
-<div class="section-title"><div><span>Animation Profile</span><h3 id="animation-table-title">Зарегистрированные анимации</h3></div><div class="animation-profile-actions"><label class="animation-show-missing"><input id="animation-show-missing" type="checkbox"> Show missing</label><span id="animation-filter-label" class="pill">all</span><button id="animation-prepare-sync" type="button">Prepare Studio Sync</button></div></div>
+<div class="animation-gender-tabs" role="group" aria-label="Анимации персонажа по полу">
+    <button type="button" data-animation-gender="male">male</button>
+    <button type="button" data-animation-gender="female">female</button>
+    <span class="muted">общие анимации наследуются при отсутствии своей версии</span>
+</div>
+<details class="naming-guide" id="animation-shared-panel"><summary>common · общие анимации</summary>
+<div class="animation-common-picker">
+  <p class="muted">Выбери опубликованную анимацию male или female. Назначение действует для всего семейства; собственная анимация персонажа имеет приоритет.</p>
+  <label>Поиск по названию, слоту или id<input id="animation-common-search" type="search" autocomplete="off" placeholder="например jump, idle, social" /></label>
+  <label>Опубликованные анимации<select id="animation-common-select" size="6" aria-label="Выбор общей анимации"></select></label>
+  <p id="animation-common-details" class="muted" aria-live="polite"></p>
+  <div class="animation-common-actions"><button id="animation-common-assign" type="button" disabled>назначить common</button><span class="muted">уже назначенные анимации</span></div>
+  <div id="animation-shared-rows"></div>
+</div></details>
+<div class="section-title"><div><span>Animation Profile</span><h3 id="animation-table-title">Зарегистрированные анимации</h3></div><div class="animation-profile-actions"><label class="animation-name-search">Поиск <input id="animation-name-search" type="search" autocomplete="off" spellcheck="false" placeholder="название или slot" aria-label="Поиск анимаций по названию"></label><label class="animation-show-missing"><input id="animation-show-missing" type="checkbox"> Show missing</label><span id="animation-filter-label" class="pill">all</span><button id="animation-prepare-sync" type="button">Prepare Studio Sync</button></div></div>
 <div class="animation-legend"><span><b>base</b> базовые движения</span><span><b>weapon</b> оружейные состояния</span><span><b>emotions</b> лицо и эмоции</span><span><b>variant</b> варианты анимации</span></div>
 <div class="table-wrap animation-table-wrap"><table><thead><tr><th data-animation-sort="context" role="button" tabindex="0">context ↕</th><th data-animation-sort="slot" role="button" tabindex="0">slot ↕</th><th data-animation-sort="variant" role="button" tabindex="0">variant ↕</th><th>clip</th><th>asset</th><th data-animation-sort="status" role="button" tabindex="0">status ↕</th><th>weight</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
 <div id="animation-details" class="details"><span class="muted">select a clip.</span></div>
@@ -1102,18 +1116,19 @@
 <div id="app-busy-overlay" class="app-busy-overlay" hidden><div class="app-busy-card"><div class="app-busy-spinner" aria-hidden="true"></div><div id="app-busy-text">Processing…</div></div></div>
 <script src="publication-descriptions.js?v=1"></script>
 <script src="asset-name-defaults.js?v=437"></script>
-<script src="character-assets.js?v=437"></script>
+<script src="character-assets.js?v=468"></script>
 <script src="asset-section-order.js?v=1"></script>
-<script src="character-animation-ui.js?v=360"></script>
+<script src="character-animation-ui.js?v=469"></script>
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
 <script src="character-component-summary.js?v=1"></script>
 <script src="character-atlas-presentation.js?v=435"></script>
-<script src="character-armor.js?v=435"></script>
+<script src="armor-readiness.js?v=458"></script>
+<script src="character-armor.js?v=458"></script>
 <script src="character-components.js?v=15"></script>
 <script src="atlas-identity.js?v=435"></script>
 <script src="character-atlas-ui.js?v=435"></script>
-<script src="character-assemblies.js?v=437"></script>
+<script src="character-assemblies.js?v=461"></script>
 <script src="animation-speed.js?v=3"></script>
 <script src="timelines.js?v=360"></script>
 <script src="locations.js?v=2"></script>

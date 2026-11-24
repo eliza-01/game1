@@ -2,9 +2,11 @@
 return table.freeze({
 	schemaVersion = 2,
 	project = "game1",
+	shared = {["human"]={["base"]={["jump_loop"]={{["clipId"]="human_female__base__jump_loop__00",["assetId"]="96394674601402",["animationId"]="rbxassetid://96394674601402",["variant"]=0,["weight"]=100,["looped"]=true,["priority"]="Movement",["document"]=nil}},["jump_start"]={{["clipId"]="human_female__base__jump_start__00",["assetId"]="124331685465753",["animationId"]="rbxassetid://124331685465753",["variant"]=0,["weight"]=100,["looped"]=false,["priority"]="Movement",["document"]=nil}}},["social"]={},["emotions"]={},["weapons"]={}}},
 	profiles = table.freeze({
 		["human_female"] = table.freeze({
 			skeletonSignature = "1f420b74eeeb7d27fdf2f0b48207a9a4363a17ad622b339d0c7abee30dfc6265",
+			family = "human",
 			base = table.freeze({
 				["death"] = table.freeze({
 					table.freeze({
@@ -15,6 +17,30 @@ return table.freeze({
 						weight = 100,
 						looped = false,
 						priority = "Action",
+						document = nil,
+					}),
+				}),
+				["jump_loop"] = table.freeze({
+					table.freeze({
+						clipId = "human_female__base__jump_loop__00",
+						assetId = "96394674601402",
+						animationId = "rbxassetid://96394674601402",
+						variant = 0,
+						weight = 100,
+						looped = true,
+						priority = "Movement",
+						document = nil,
+					}),
+				}),
+				["jump_start"] = table.freeze({
+					table.freeze({
+						clipId = "human_female__base__jump_start__00",
+						assetId = "124331685465753",
+						animationId = "rbxassetid://124331685465753",
+						variant = 0,
+						weight = 100,
+						looped = false,
+						priority = "Movement",
 						document = nil,
 					}),
 				}),
@@ -32,6 +58,8 @@ return table.freeze({
 				}),
 			}),
 			emotions = table.freeze({
+			}),
+			social = table.freeze({
 			}),
 			weapons = table.freeze({
 				["1hs"] = table.freeze({
@@ -228,6 +256,18 @@ return table.freeze({
 						}),
 					}),
 				}),
+			}),
+		}),
+		["human_male"] = table.freeze({
+			skeletonSignature = "2bdb11970f14c20819d1d254dd52e3dd5a7022082a0a9471a9b895dde35a4903",
+			family = "human",
+			base = table.freeze({
+			}),
+			emotions = table.freeze({
+			}),
+			social = table.freeze({
+			}),
+			weapons = table.freeze({
 			}),
 		}),
 	}),

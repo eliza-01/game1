@@ -191,6 +191,9 @@ local function bindCharacter(newCharacter: Model)
 	newCharacter:SetAttribute("AnimationMovementDirection", movementDirectionMode)
 	newCharacter:SetAttribute("MovementState", "Idle")
 	newCharacter:SetAttribute("MovementStateAuthority", "ClientDerivedPresentation")
+	-- Movement owns jump state; animation only reads these presentation attributes.
+	newCharacter:SetAttribute("AnimationAirborne", false)
+	newCharacter:SetAttribute("AnimationJumpSequence", 0)
 	newCharacter:GetAttributeChangedSignal("RunSpeed"):Connect(function()
 		if character == newCharacter and controllerManager then
 			controllerManager.BaseMoveSpeed = baseMoveSpeedForCurrentState(newCharacter)
@@ -473,23 +476,31 @@ local function performJump()
 	local deltaVelocity = math.max(CharacterConfig.JumpVelocity * math.sqrt(JumpSettings.heightMultiplier) - upwardSpeed, 0)
 	if deltaVelocity > 0 then
 		navigationRoot:ApplyImpulse(Vector3.yAxis * navigationRoot.AssemblyMass * deltaVelocity)
+		-- Only a real impulse starts the presentation, never an unaccepted input.
+		if character then
+			character:SetAttribute("AnimationJumpSequence", (tonumber(character:GetAttribute("AnimationJumpSequence")) or 0) + 1)
+			character:SetAttribute("AnimationAirborne", true)
+		end
 	end
 end
 
 local function updateJumpDescent()
     local force = fallForce
     local actorRoot = navigationRoot
-    if not force or not actorRoot or not character then return end
+    if not actorRoot or not character then return end
     if character:GetAttribute("LifeState") ~= "Alive" then
-        force.Enabled = false
+        if force then force.Enabled = false end
         jumpInFlight = false
+        character:SetAttribute("AnimationAirborne", false)
         return
     end
-    if isGrounded() and os.clock() >= airLockUntil then
+    if jumpInFlight and isGrounded() and os.clock() >= airLockUntil then
         jumpInFlight = false
-        force.Enabled = false
+        character:SetAttribute("AnimationAirborne", false)
+        if force then force.Enabled = false end
         return
     end
+    if not force then return end
     local downward = actorRoot.AssemblyLinearVelocity.Y <= 0
     local slow = JumpSettings.descentTimeMultiplier
     local enabled = jumpInFlight and downward and math.abs(slow - 1) > 0.0001
@@ -513,6 +524,7 @@ local function updateMovement(deltaTime: number)
 	if character and tostring(character:GetAttribute("LifeState") or "Alive") ~= "Alive" then
         if fallForce then fallForce.Enabled = false end
         jumpInFlight = false
+        character:SetAttribute("AnimationAirborne", false)
 		controllerManager.MovingDirection = Vector3.zero
 		if character:GetAttribute("MovementState") ~= "Idle" then
 			character:SetAttribute("MovementState", "Idle")
@@ -522,6 +534,7 @@ local function updateMovement(deltaTime: number)
 
 	if UserInputService:GetFocusedTextBox() then
 		controllerManager.MovingDirection = Vector3.zero
+		updateJumpDescent()
 		return
 	end
 

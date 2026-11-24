@@ -26,6 +26,11 @@ local animator: Animator? = nil
 local cache = nil
 local currentLoop = nil
 local currentLoopClipId = ""
+-- Per-spawn airborne playback; movement owns the physical jump state.
+local airborneSequence = -1
+local jumpStartFinished = false
+local jumpWarningSequence = -1
+local jumpStartStoppedConnection: RBXScriptConnection? = nil
 local currentAction = nil
 local currentActionOnComplete = nil
 local currentActionSlot = ""
@@ -42,6 +47,13 @@ local deathTrack: AnimationTrack? = nil
 local deathTerminalPoseHeld = false
 local deathTerminalReported = false
 
+local function disconnectJumpStart()
+	if jumpStartStoppedConnection then
+		jumpStartStoppedConnection:Disconnect()
+		jumpStartStoppedConnection = nil
+	end
+end
+
 local function disconnectAll()
 	for _, connection in ipairs(connections) do
 		connection:Disconnect()
@@ -50,6 +62,10 @@ local function disconnectAll()
 end
 
 local function clearCharacter()
+	disconnectJumpStart()
+	airborneSequence = -1
+	jumpStartFinished = false
+	jumpWarningSequence = -1
 	disconnectAll()
 	if cache then
 		cache:Destroy()
@@ -152,6 +168,7 @@ local function movementSlot(): string
 end
 
 local function stopCurrentLoop(fadeTime: number?)
+	disconnectJumpStart()
 	if currentLoop and currentLoop.IsPlaying then
 		currentLoop:Stop(fadeTime or 0)
 	end
@@ -229,10 +246,49 @@ refreshLoop = function()
 		return
 	end
 	local slot = movementSlot()
+	local inJump = character:GetAttribute("AnimationAirborne") == true
+	local sequence = tonumber(character:GetAttribute("AnimationJumpSequence")) or 0
+	if inJump then
+		if airborneSequence ~= sequence then
+			-- A new accepted impulse restarts jump_start, even when the same
+			-- AnimationTrack is cached from an earlier jump.
+			airborneSequence = sequence
+			jumpStartFinished = false
+			stopCurrentLoop(0.04)
+			currentLoop = nil
+			currentLoopClipId = ""
+		end
+		slot = if jumpStartFinished then "jump_loop" else "jump_start"
+	else
+		if airborneSequence ~= -1 then
+			disconnectJumpStart()
+			airborneSequence = -1
+			jumpStartFinished = false
+		end
+	end
+	local descriptor = AnimationResolver.ResolveLocomotion(character, slot)
+	if inJump and not descriptor and slot == "jump_start" then
+		-- A published loop can still play if jump_start is not authored yet.
+		if jumpWarningSequence ~= sequence then
+			warn("[game1][animation][jump] jump_start missing from published character profile")
+			jumpWarningSequence = sequence
+		end
+		jumpStartFinished = true
+		slot = "jump_loop"
+		descriptor = AnimationResolver.ResolveLocomotion(character, slot)
+	end
+	if inJump and not descriptor then
+		if jumpWarningSequence ~= sequence then
+			warn("[game1][animation][jump] jump_loop missing from published character profile")
+			jumpWarningSequence = sequence
+		end
+		-- Preserve pre-existing locomotion as a compatibility fallback.
+		slot = movementSlot()
+		descriptor = AnimationResolver.ResolveLocomotion(character, slot)
+	end
 	if attackLowerBodyActive then
 		character:SetAttribute("AnimationAttackLowerBodySlot", slot)
 	end
-	local descriptor = AnimationResolver.ResolveLocomotion(character, slot)
 	if not descriptor then
 		stopCurrentLoop(0.12)
 		currentLoop = nil
@@ -247,7 +303,6 @@ refreshLoop = function()
 	if not attackLowerBodyActive then
 		publishPlaybackPercent(slot)
 	end
-
 	if currentLoop and currentLoopClipId == clipId then
 		applyBackwardPlayback(currentLoop, slot)
 		return
@@ -255,18 +310,43 @@ refreshLoop = function()
 
 	local nextTrack = cache:Get(descriptor)
 	if not nextTrack then
+		if inJump and slot == "jump_start" then
+			jumpStartFinished = true
+			refreshLoop()
+		end
 		return
 	end
-	stopCurrentLoop(0.15)
+	local isJumpSlot = slot == "jump_start" or slot == "jump_loop"
+	stopCurrentLoop(if isJumpSlot then 0.05 else 0.15)
 	currentLoop = nextTrack
 	currentLoopClipId = clipId
 	nextTrack.Looped = descriptor.looped == true
-	nextTrack:Play(0.15, 1, playbackScale)
+	if isJumpSlot then
+		nextTrack:Play(0.05, 1, playbackScale)
+	else
+		-- Preserve the existing locomotion blend for walk/run/idle.
+		nextTrack:Play(0.15, 1, playbackScale)
+	end
 	applyBackwardPlayback(nextTrack, slot)
 	character:SetAttribute("AnimationResolvedSlot", slot)
 	character:SetAttribute("AnimationResolvedClip", clipId)
-end
 
+	if inJump and slot == "jump_start" then
+		local boundCharacter = character
+		local boundSequence = sequence
+		local boundTrack = nextTrack
+		jumpStartStoppedConnection = boundTrack.Stopped:Connect(function()
+			if character ~= boundCharacter or airborneSequence ~= boundSequence
+				or boundCharacter:GetAttribute("AnimationAirborne") ~= true
+				or currentLoop ~= boundTrack then
+				return
+			end
+			disconnectJumpStart()
+			jumpStartFinished = true
+			refreshLoop()
+		end)
+	end
+end
 local function notifyDeathTerminalReached(boundCharacter: Model)
 	if deathTerminalReported or character ~= boundCharacter or not boundCharacter.Parent then
 		return
@@ -456,7 +536,7 @@ local function bindCharacter(newCharacter: Model)
         warn("[game1][animation] Animator missing; visual unavailable, gameplay continues")
     end
     lastLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
-	local refreshAttributes = { "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier" }
+	local refreshAttributes = { "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "AnimationAirborne", "AnimationJumpSequence" }
 	for _, channel in ipairs({ "run", "walk" }) do
 		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
 	end

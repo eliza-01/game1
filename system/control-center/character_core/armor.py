@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import json
 import time
-from character_core.part_names import TOKEN
+from character_core.part_names import TOKEN, rig_family_and_gender
+from character_core.armor_readiness import describe_set
 from sqlite_connection import connect
 
 ARMOR_SLOTS = ('upper', 'lower', 'gloves', 'boots')
@@ -113,9 +114,29 @@ class ArmorCatalog:
                 by_piece[variant['piece_id']]['variants'][variant['gender']] = dict(
                     meshPartId=variant['mesh_part_id'], appearanceId=variant['appearance_id'],
                     revision=variant['revision'])
-        meshes = [p for p in self.components.snapshot()['items'] if
+        components = self.components.snapshot()['items']
+        meshes = [p for p in components if
                   p['kind'] == 'part' and p['slot'] in ARMOR_SLOTS and p.get('mesh_family_id')]
         atlases = [v for f in self.components.atlases.catalog(domain='character') for v in f['variants']]
+        # Additive snapshot fields: no SQLite migration, no changes to existing
+        # character recipes or published Model/Image IDs.
+        for armor_set in sets:
+            armor_set['readiness'] = describe_set(armor_set, meshes, appearances, atlases)
+            # The actual rig check matters: common allowedGenders does not
+            # imply identical bind poses for male/female rigs.
+            by_rig = []
+            for rig in components:
+                if rig['kind'] != 'rig':
+                    continue
+                try:
+                    _family, explicit_gender = rig_family_and_gender(rig['id'])
+                except ValueError:
+                    continue
+                for gender in ((explicit_gender,) if explicit_gender else GENDERS):
+                    _parts, missing = self.resolve(armor_set['id'], gender, rig['id'])
+                    by_rig.append(dict(rigId=rig['id'], gender=gender,
+                                       ready=not missing, missing=missing))
+            armor_set['rigReadiness'] = by_rig
         return dict(schema_version=2, sets=sets, meshes=meshes, appearances=appearances, atlases=atlases,
                     slots=list(ARMOR_SLOTS), types=list(ARMOR_TYPES), genders=list(VARIANTS))
 

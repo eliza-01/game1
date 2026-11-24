@@ -27,7 +27,11 @@ class CharacterAnimationScanPublishM193(unittest.TestCase):
             capture_output=True, text=True, timeout=10,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('character-animation-ui.js?v=309', (STATIC / 'index.html').read_text(encoding='utf-8'))
+        import re
+        html = (STATIC / 'index.html').read_text(encoding='utf-8')
+        version = re.search(r'character-animation-ui\.js\?v=(\d+)', html)
+        self.assertIsNotNone(version, 'Character Animation UI script must be loaded')
+        self.assertGreaterEqual(int(version.group(1)), 309, 'Client cache version must not regress')
 
 
 if __name__ == '__main__':

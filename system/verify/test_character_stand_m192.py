@@ -63,7 +63,7 @@ class CharacterTestStandM192(unittest.TestCase):
         self.assertIn('animationId:match(', catalog)
         self.assertIn('clip.animationId', catalog)
         self.assertIn('profile.weapons', catalog)
-        self.assertIn('for _, scope in {"base", "emotions"}', catalog)
+        self.assertIn('for _, scope in {"base", "emotions", "social"}', catalog)
         self.assertIn('profile[scope]', catalog)
         self.assertNotIn('LoadAnimation', catalog)
 

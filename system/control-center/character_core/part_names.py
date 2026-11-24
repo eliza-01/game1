@@ -124,6 +124,61 @@ def skeleton_matches(expected, actual, tolerance=1e-5):
             raise ValueError(f'bind pose/parent changed for {name}; register a new rig profile')
 
 
+
+def required_bind_bones(skeleton, influenced_bones, *, attachment=''):
+    """Return weighted/socket Bone names and their ancestor chains.
+
+    Unused bones belong to the same imported Armature but cannot deform this
+    MeshPart. Do not require unrelated face/weapon socket poses to match.
+    Reject malformed or incomplete chains instead of inferring compatibility.
+    """
+    by_name = {bone['name']: bone for bone in skeleton}
+    if len(by_name) != len(skeleton):
+        raise ValueError('duplicate bone name in published skeleton')
+    roots = set(influenced_bones)
+    if attachment:
+        roots.add(attachment)
+    if not roots:
+        raise ValueError('common mesh has no bone influences or attachment')
+    required = set()
+    for name in roots:
+        visited = set()
+        while name:
+            if name in visited:
+                raise ValueError('cyclic skeleton parent chain at ' + name)
+            visited.add(name)
+            bone = by_name.get(name)
+            if bone is None:
+                raise ValueError('missing bind bone ' + name)
+            required.add(name)
+            name = bone['parent']
+    return required
+
+
+def part_bind_matches(source_bones, target_bones, part_bones, *, used_bones=(), attachment='', tolerance=2e-5):
+    """Validate the published part's actual bind chain on both rigs.
+
+    A common part may be skinned to an authored female rig while other
+    unrelated male bones differ. Only the weighted/socket ancestor chain
+    determines whether that part can be safely reused without reauthoring.
+    """
+    required = required_bind_bones(part_bones, used_bones, attachment=attachment)
+    part_by_name = {bone['name']: bone for bone in part_bones}
+    for rig in (source_bones, target_bones):
+        rig_by_name = {bone['name']: bone for bone in rig}
+        if len(rig_by_name) != len(rig):
+            raise ValueError('duplicate bone name in rig')
+        for name in required:
+            part = part_by_name[name]
+            other = rig_by_name.get(name)
+            if other is None or part['parent'] != other['parent']:
+                raise ValueError('incompatible bind hierarchy for ' + name)
+            a, b = part['matrix'], other['matrix']
+            if len(a) != 16 or len(b) != 16 or any(abs(x-y) > tolerance for x, y in zip(a, b)):
+                raise ValueError('incompatible bind pose for ' + name)
+    return True
+
+
 def rigid_pivot_mount_for_part(name):
     """Only a rigless hair part may be mounted by its authored mesh pivot."""
     try:

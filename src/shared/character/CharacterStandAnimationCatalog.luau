@@ -34,15 +34,34 @@ function Catalog.List(registry: any, profileId: string): {any}
             end
         end
     end
-    for _, scope in {"base", "emotions"} do
-        local groups = profile[scope] or {}
-        for _, slot in sortedKeys(groups) do
-            appendRows(scope, nil, slot, groups[slot])
+    local shared = registry.shared and registry.shared[profile.family or ""] or {}
+    for _, scope in {"base", "emotions", "social"} do
+        local own = profile[scope] or {}
+        local inherited = shared[scope] or {}
+        for _, slot in sortedKeys(own) do
+            appendRows(scope, nil, slot, own[slot])
+        end
+        for _, slot in sortedKeys(inherited) do
+            if own[slot] == nil then
+                appendRows(scope, nil, slot, inherited[slot])
+            end
         end
     end
-    for _, weaponSet in sortedKeys(profile.weapons) do
-        for _, slot in sortedKeys(profile.weapons[weaponSet]) do
-            appendRows("weapon", weaponSet, slot, profile.weapons[weaponSet][slot])
+    local ownWeapons = profile.weapons or {}
+    local inheritedWeapons = shared.weapons or {}
+    local sets = {}
+    for weaponSet in pairs(ownWeapons) do sets[weaponSet] = true end
+    for weaponSet in pairs(inheritedWeapons) do sets[weaponSet] = true end
+    for _, weaponSet in sortedKeys(sets) do
+        local own = ownWeapons[weaponSet] or {}
+        local inherited = inheritedWeapons[weaponSet] or {}
+        for _, slot in sortedKeys(own) do
+            appendRows("weapon", weaponSet, slot, own[slot])
+        end
+        for _, slot in sortedKeys(inherited) do
+            if own[slot] == nil then
+                appendRows("weapon", weaponSet, slot, inherited[slot])
+            end
         end
     end
     table.sort(entries, function(a, b)

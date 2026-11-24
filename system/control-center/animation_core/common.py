@@ -45,6 +45,39 @@ EMOTION_SLOT_CATALOG = [
     for name in ('idle','combat_idle','happy','happy_sharp_caret','happy_thick_caret','sad',
                  'blink','closed','indignant_surprise','dizzy_spiral','look_around','nausea_wave','raised_eyebrow')
 ]
+SOCIAL_SLOT_CATALOG = [
+    {"group": "social", "slot": "waiting_a", "label": "Warm-up / разминка", "looped": False,
+     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "clap", "label": "Clap / аплодисменты", "looped": False,
+     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "atk", "label": "To battle / меч вперёд 45°", "looped": False,
+     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "victory", "label": "Victory / меч вверх", "looped": False,
+     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "yes", "label": "Yes / согласие", "looped": False,
+     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "bow", "label": "Bow / поклон", "looped": False,
+     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "laugh", "label": "Laugh / смех", "looped": False,
+     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "hi", "label": "Hi / приветствие", "looped": False,
+     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "sad", "label": "Sad / грусть", "looped": False,
+     "priority": "Action", "variants": False},
+]
+SLOT_BY_SOCIAL = {row["slot"]: row for row in SOCIAL_SLOT_CATALOG}
+
+
+def social_slots_for(character_id: str = "", gender: str = "") -> list[dict]:
+    """Every Social action is authorable for Male and Female, with separate clips.
+
+    Keep the existing function signature for snapshot, filename-rule and registration
+    consumers. Gender never filters semantic Social slots; published IDs still belong
+    to their own character profile in AnimationRegistry.
+    """
+    return list(SOCIAL_SLOT_CATALOG)
+
+
 SLOT_BY_EMOTION = {row['slot']:row for row in EMOTION_SLOT_CATALOG}
 SLOT_BY_BASE = {row["slot"]: row for row in BASE_SLOT_CATALOG}
 SLOT_BY_WEAPON = {row["slot"]: row for row in WEAPON_SLOT_CATALOG}
@@ -91,6 +124,14 @@ def filename_rule_catalog(character_id: str = "") -> list[dict]:
             label=definition['label'],variants=False,variantPattern='',
             canonicalFilename=filename_prefix+_canonical_file_stem('emotions','',slot,0)+('.animation.json' if definition['execution']=='procedural' else '.rbxmx')))
 
+    for definition in social_slots_for(archetype):
+        slot = definition["slot"]
+        rows.append({
+            "scope": "social", "context": "social", "group": "social", "state": slot,
+            "label": definition["label"], "variants": False, "variantPattern": "",
+            "canonicalFilename": filename_prefix + _canonical_file_stem("social", "", slot, 0) + ".rbxm",
+        })
+
     for weapon_set in WEAPON_SETS:
         for definition in _catalog_for_weapon(weapon_set).values():
             slot = definition["slot"]
@@ -124,6 +165,8 @@ def _canonical_file_stem(scope: str, weapon_set: str, slot: str, variant: int) -
         return f"base_{slot_token}"
     if scope == 'emotions':
         return f'emotions_{slot_token}'
+    if scope == "social":
+        return f"social_{slot_token}"
     suffix = f"_{variant:02d}" if variant > 0 else ""
     return f"{weapon_set}_{slot_token}{suffix}"
 
@@ -184,8 +227,12 @@ def normalize_manual_binding(scope: str, weapon_set: str, slot: str, variant: in
     if scope == 'emotions':
         if slot not in SLOT_BY_EMOTION:raise ValueError('unknown emotion slot: '+slot)
         return {'scope':'emotions','weaponSet':'','slot':slot,'variant':0,**SLOT_BY_EMOTION[slot]}
+    if scope == "social":
+        if slot not in SLOT_BY_SOCIAL:
+            raise ValueError(f"unknown social animation slot: {slot}")
+        return {"scope": "social", "weaponSet": "", "slot": slot, "variant": 0, **SLOT_BY_SOCIAL[slot]}
     if scope != "weapon":
-        raise ValueError("animation scope must be base, weapon or emotions")
+        raise ValueError("animation scope must be base, weapon, social or emotions")
     if weapon_set not in WEAPON_SETS:
         raise ValueError(f"unknown weapon animation set: {weapon_set}")
     catalog = _catalog_for_weapon(weapon_set)
@@ -208,6 +255,11 @@ def classify_animation(path: Path, character_id: str | None = None) -> dict | No
         slot=stem[len('emotions_'):]
         if slot in SLOT_BY_EMOTION:return normalize_manual_binding('emotions','',slot)
         return None
+
+    if stem.startswith("social_"):
+        slot = stem[len("social_"):]
+        allowed = {row["slot"] for row in social_slots_for(character_id or "")}
+        return normalize_manual_binding("social", "", slot) if slot in allowed else None
 
     base_aliases = {
         "idle": "idle", "base_idle": "idle", "walk": "walk", "base_walk": "walk",

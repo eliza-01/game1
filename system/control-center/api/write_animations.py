@@ -94,6 +94,15 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {"error": str(error)})
 
+    if path == "/api/animations/shared":
+        try:
+            payload = body()
+            if not isinstance(payload, dict) or not isinstance(payload.get('enabled'), bool):
+                raise ValueError('expected bindingId and boolean enabled')
+            return out(200, animations.set_shared(str(payload.get('bindingId') or ''), payload['enabled']))
+        except (ValueError, TypeError) as error:
+            return out(400, {'error': str(error)})
+
     if path == "/api/animations/preview":
         try:
             payload = body()

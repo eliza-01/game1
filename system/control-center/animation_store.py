@@ -11,9 +11,10 @@ from animation_core.publication import AnimationPublicationMixin
 from animation_core.registry import AnimationRegistryMixin
 from animation_core.scan_review import AnimationScanReviewMixin
 from animation_core.storage import AnimationStorageMixin
+from animation_core.shared import AnimationSharedMixin
 
 
-class AnimationStore(AnimationScanReviewMixin, AnimationStorageMixin, AnimationPublicationMixin, AnimationRegistryMixin):
+class AnimationStore(AnimationScanReviewMixin, AnimationStorageMixin, AnimationSharedMixin, AnimationPublicationMixin, AnimationRegistryMixin):
     def __init__(self, root: Path):
         self.root = root.resolve()
         self.runtime = self.root / ".control-center"

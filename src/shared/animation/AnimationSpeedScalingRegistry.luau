@@ -123,6 +123,14 @@ return table.freeze({
 			label = "character / human_female / base_death",
 			channel = "death",
 		}),
+		["96394674601402"] = table.freeze({
+			label = "character / human_female / base_jump_loop",
+			channel = "jump_loop",
+		}),
+		["124331685465753"] = table.freeze({
+			label = "character / human_female / base_jump_start",
+			channel = "jump_start",
+		}),
 		["71151100957955"] = table.freeze({
 			label = "character / human_female / base_revive",
 			channel = "revive",

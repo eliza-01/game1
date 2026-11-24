@@ -5,7 +5,8 @@
   const slots=['head','eye_l','eye_r','eyebrow_l','eyebrow_r','hair'];
   const bodySlots=['upper','lower','gloves','boots'];
   const materialSlots=[...bodySlots,...slots];
-  const materials=['','Glass','Metal','SmoothPlastic','Plaster','Slate','Sandstone','Sand','Cardboard','Rubber','Limestone','Granite'];
+  const defaultMaterial='Plastic';
+  const materials=['Plastic','Glass','Metal','SmoothPlastic','Plaster','Slate','Sandstone','Sand','Cardboard','Rubber','Limestone','Granite'];
   const bodyLabels={upper:'Верх',lower:'Низ',gloves:'Перчатки',boots:'Обувь'};
   const solidFaceSlots=['eye_l','eye_r','eyebrow_l','eyebrow_r'];
   const atlasSlots=['head','hair'];
@@ -174,12 +175,12 @@
   function materialSelect(slot){
     const control=document.createElement('select');control.id='ca-material-'+slot;
     control.setAttribute('aria-label','Материал · '+(labels[slot]||bodyLabels[slot]));
-    for(const name of materials)control.append(new Option(name||'Исходный',name));
+    for(const name of materials)control.append(new Option(name,name));
     control.onchange=()=>{update();autoSaveMaterial();};
     return control;
   }
   function fillMaterials(saved={}){
-    for(const slot of materialSlots)byId('material-'+slot).value=saved?.[slot]||'';
+    for(const slot of materialSlots)byId('material-'+slot).value=saved?.[slot]||defaultMaterial;
   }
   let materialSaveRevision=0;
   async function autoSaveMaterial(){

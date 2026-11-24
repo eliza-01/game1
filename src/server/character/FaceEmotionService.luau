@@ -28,6 +28,10 @@ function Service.Bind(character: Model)
     local function refresh()
         local state=character:GetAttribute(Contract.attribute) or (if character:GetAttribute("InCombat")==true then "combat_idle" else "idle")
         local rows=profile.emotions and profile.emotions[state]
+        if not rows then
+            local shared = Registry.shared and Registry.shared[profile.family or ""]
+            rows = shared and shared.emotions and shared.emotions[state]
+        end
         local descriptor=rows and rows[1]
         local doc=descriptor and descriptor.document
         local track=nil

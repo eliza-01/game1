@@ -10,7 +10,7 @@ from sqlite_connection import connect as open_database
 from .documents import ensure_schema, is_animation_source, read_document, document_path, document_digest, save_document, get_document
 
 from .common import (
-    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, EMOTION_SLOT_CATALOG, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT, filename_rule_catalog,
+    ANIMATION_EXTENSIONS, BASE_SLOT_CATALOG, BOW_EXTRA_SLOTS, EMOTION_SLOT_CATALOG, SOCIAL_SLOT_CATALOG, social_slots_for, MAX_SCAN_FILES, NAMING_EXAMPLES, PROJECT, filename_rule_catalog,
     SCHEMA_VERSION, WEAPON_SETS, WEAPON_SLOT_CATALOG, _binding_id, _canonical_file_stem,
     _catalog_for_weapon, _clip_id, _now, classify_animation, normalize_manual_binding,
 )
@@ -65,6 +65,12 @@ class AnimationStorageMixin:
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
                     UNIQUE(character_id, scope, weapon_set, slot, variant)
+                );
+                CREATE TABLE IF NOT EXISTS animation_shared_bindings(
+                    family TEXT NOT NULL, scope TEXT NOT NULL, weapon_set TEXT NOT NULL DEFAULT '',
+                    slot TEXT NOT NULL, variant INTEGER NOT NULL DEFAULT 0,
+                    source_binding_id TEXT NOT NULL, created_at REAL NOT NULL,
+                    PRIMARY KEY(family,scope,weapon_set,slot,variant)
                 );
                 CREATE TABLE IF NOT EXISTS animation_publications(
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -249,6 +255,8 @@ class AnimationStorageMixin:
             relative = Path("characters") / race / gender / character_id / "animations" / "base" / f"{stem}{suffix}"
         elif scope == 'emotions':
             relative = Path('characters') / race / gender / character_id / 'animations' / 'emotions' / f'{stem}{suffix}'
+        elif scope == 'social':
+            relative = Path('characters') / race / gender / character_id / 'animations' / 'social' / f'{stem}{suffix}'
         else:
             relative = Path("characters") / race / gender / character_id / "animations" / "weapons" / weapon_set / f"{stem}{suffix}"
         canonical = self.root / "assets/source" / relative
@@ -261,6 +269,10 @@ class AnimationStorageMixin:
             raise ValueError('standalone animation document must be procedural')
         doc_sha=document_digest(source) if document else ''
         character_id = str(character.get("id") or "")
+        if binding["scope"] == "social":
+            allowed = {row["slot"] for row in social_slots_for(gender=str(character.get("gender") or ""))}
+            if binding["slot"] not in allowed:
+                raise ValueError(f"social slot {binding['slot']} is not available for {character_id}")
         clip_id = _clip_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
         binding_id = _binding_id(character_id, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
         clip_name = _canonical_file_stem(binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
@@ -479,6 +491,16 @@ class AnimationStorageMixin:
         if not selected and characters:
             selected = str(characters[0]["id"])
         items = self.list_for_character(selected) if selected else []
+        selected_row = next((row for row in characters if row['id']==selected), None)
+        family = str((selected_row or {}).get('race') or '')
+        shared = self.shared_rows(family) if family else []
+        local_keys = {(r['scope'],r['weapon_set'],r['slot'],r['variant']) for r in items}
+        inherited = [dict(row, inherited=True, scope=row['scope'], weapon_set=row['weapon_set'],
+                          sourceCharacter=row['source_character'], sourceBindingId=row['source_binding_id'],
+                          status='COMMON', binding_id='', source_path='', document_only=False,
+                          name=row['name'], missing=False, shared=True)
+                     for row in shared if row['status']=='PUBLISHED' and
+                     (row['scope'],row['weapon_set'],row['slot'],row['variant']) not in local_keys]
         profile = self._profile(selected) if selected else None
         character = next((row for row in characters if row["id"] == selected), None)
         compatible = bool(profile and character and str(profile.get("skeleton_signature") or "") == str(character.get("skeleton_signature") or ""))
@@ -495,9 +517,13 @@ class AnimationStorageMixin:
             "slotCatalog": {
                 "base": BASE_SLOT_CATALOG,
                 "emotions": EMOTION_SLOT_CATALOG,
+                "social": social_slots_for(selected, str((character or {}).get("gender") or "")),
                 "weapon": {weapon_set: list(_catalog_for_weapon(weapon_set).values()) for weapon_set in WEAPON_SETS},
             },
             "items": items,
+            "shared": shared,
+            "sharedCandidates": self.shared_candidates(family),
+            "inherited": inherited,
             "summary": {
                 "registered": len(items),
                 "published": sum(row["status"] == "PUBLISHED" for row in items),
@@ -541,6 +567,7 @@ class AnimationStorageMixin:
                 raise ValueError(f"unknown animation binding: {binding_id}")
             character_id = str(row["character_id"])
             clip_id = str(row["clip_id"])
+            connection.execute("DELETE FROM animation_shared_bindings WHERE source_binding_id=?", (binding_id,))
             connection.execute("DELETE FROM animation_bindings WHERE id=?", (binding_id,))
             other = connection.execute("SELECT 1 FROM animation_bindings WHERE clip_id=? LIMIT 1", (clip_id,)).fetchone()
             if other is None:

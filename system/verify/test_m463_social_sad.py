@@ -22,19 +22,19 @@ class SocialSadM463(unittest.TestCase):
         self.assertIn('sad', {r['slot'] for r in EMOTION_SLOT_CATALOG})
         sad = next(r for r in SOCIAL_SLOT_CATALOG if r['slot'] == 'sad')
         self.assertEqual((sad['group'], sad['priority'], sad['looped'], sad['variants']),
-                         ('social', 'Action', False, False))
+                         ('social', 'Action', False, True))
         for gender in ('male', 'female'):
             character = 'human_' + gender
             self.assertIn('sad', {r['slot'] for r in social_slots_for(character, gender)})
             rules = {(r['scope'], r['state']): r for r in filename_rule_catalog(character)}
             self.assertEqual(rules[('social', 'sad')]['canonicalFilename'],
-                             f'{character}_social_sad.rbxm')
+                             f'{character}_social_sad_01.rbxm')
             self.assertNotEqual(rules[('social', 'sad')]['canonicalFilename'],
                                 rules[('emotions', 'sad')]['canonicalFilename'])
             for extension in ('.rbxm', '.rbxmx'):
-                binding = classify_animation(Path(f'{character}_social_sad{extension}'), character)
+                binding = classify_animation(Path(f'{character}_social_sad_01{extension}'), character)
                 self.assertEqual((binding['scope'], binding['slot'], binding['variant']),
-                                 ('social', 'sad', 0))
+                                 ('social', 'sad', 1))
                 self.assertEqual((binding['looped'], binding['priority']), (False, 'Action'))
             self.assertEqual(normalize_manual_binding('social', '', 'sad')['slot'], 'sad')
 
@@ -55,16 +55,17 @@ class SocialSadM463(unittest.TestCase):
             incoming.mkdir()
             for gender in ('male', 'female'):
                 character = 'human_' + gender
-                (incoming / f'{character}_social_sad.rbxm').write_bytes(character.encode())
+                (incoming / f'{character}_social_sad_01.rbxm').write_bytes(character.encode())
                 preview = store.preview_folder(character, str(incoming))
-                self.assertEqual([(r['scope'], r['slot']) for r in preview['items']],
+                owned = [row for row in preview['items'] if row['ownerCharacterId'] == character]
+                self.assertEqual([(r['scope'], r['slot']) for r in owned],
                                  [('social', 'sad')])
-                self.assertEqual(store.register_selected(character, str(incoming), preview['items'])['count'], 1)
+                self.assertEqual(store.register_selected(character, str(incoming), owned)['count'], 1)
                 self.assertEqual(store.snapshot(character)['items'][0]['status'], 'LOCAL_ONLY')
             registry_path = root / 'src/shared/character/CharacterAnimationRegistry.luau'
             registry = registry_path.read_text(encoding='utf8')
-            self.assertNotIn('human_male__social__sad__00', registry)
-            self.assertNotIn('human_female__social__sad__00', registry)
+            self.assertNotIn('human_male__social__sad__01', registry)
+            self.assertNotIn('human_female__social__sad__01', registry)
             with store.connect() as connection:
                 for gender, aid in (('male', '111111'), ('female', '222222')):
                     clip = store.snapshot('human_' + gender)['items'][0]
@@ -73,7 +74,7 @@ class SocialSadM463(unittest.TestCase):
             store.export()
             registry = registry_path.read_text(encoding='utf8')
             for gender, aid in (('male', '111111'), ('female', '222222')):
-                self.assertIn(f'human_{gender}__social__sad__00', registry)
+                self.assertIn(f'human_{gender}__social__sad__01', registry)
                 self.assertIn('rbxassetid://' + aid, registry)
 
 

@@ -16,7 +16,7 @@ from animation_core.common import (
 from animation_store import AnimationStore
 from sqlite_connection import connect
 
-EXPECTED = {'waiting_a', 'clap', 'atk', 'victory', 'yes', 'bow', 'laugh', 'hi', 'sad'}
+EXPECTED = {'waiting', 'clap', 'atk', 'victory', 'yes', 'bow', 'laugh', 'hi', 'sad', 'dance', 'no', 'sp_wait', 'unaware'}
 ADDED = {'yes', 'bow', 'laugh', 'hi'}
 
 
@@ -29,14 +29,14 @@ class SocialActionsM462(unittest.TestCase):
             rules = {r['state']: r for r in filename_rule_catalog(character) if r['scope'] == 'social'}
             self.assertEqual(set(rules), EXPECTED)
             for slot in ADDED | {'clap'}:
-                self.assertEqual(rules[slot]['canonicalFilename'], f'{character}_social_{slot}.rbxm')
+                self.assertEqual(rules[slot]['canonicalFilename'], f'{character}_social_{slot}_01.rbxm')
                 for ext in ('.rbxm', '.rbxmx'):
-                    binding = classify_animation(Path(f'{character}_social_{slot}{ext}'), character)
+                    binding = classify_animation(Path(f'{character}_social_{slot}_01{ext}'), character)
                     self.assertEqual((binding['scope'], binding['slot'], binding['variant']),
-                                     ('social', slot, 0))
+                                     ('social', slot, 1))
                     self.assertEqual((binding['looped'], binding['priority']), (False, 'Action'))
                 manual = normalize_manual_binding('social', '', slot)
-                self.assertEqual((manual['slot'], manual['variant']), (slot, 0))
+                self.assertEqual((manual['slot'], manual['variant']), (slot, 1))
 
     def test_registration_and_published_registry_are_per_gender(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -56,17 +56,18 @@ class SocialActionsM462(unittest.TestCase):
             for gender in ('male', 'female'):
                 character = 'human_' + gender
                 for slot in ADDED:
-                    (inbox / f'{character}_social_{slot}.rbxm').write_bytes(
+                    (inbox / f'{character}_social_{slot}_01.rbxm').write_bytes(
                         f'{gender}:{slot}'.encode('utf8'))
                 review = store.preview_folder(character, str(inbox))
-                self.assertEqual({item['slot'] for item in review['items']}, ADDED)
-                self.assertEqual(store.register_selected(character, str(inbox), review['items'])['count'], 4)
+                owned = [item for item in review['items'] if item['ownerCharacterId'] == character]
+                self.assertEqual({item['slot'] for item in owned}, ADDED)
+                self.assertEqual(store.register_selected(character, str(inbox), owned)['count'], 4)
                 self.assertEqual({item['status'] for item in store.snapshot(character)['items']}, {'LOCAL_ONLY'})
             registry_path = root / 'src/shared/character/CharacterAnimationRegistry.luau'
             registry = registry_path.read_text(encoding='utf8')
             for gender in ('male', 'female'):
                 for slot in ADDED:
-                    self.assertNotIn(f'human_{gender}__social__{slot}__00', registry)
+                    self.assertNotIn(f'human_{gender}__social__{slot}__01', registry)
             # Emulate *metadata* of an approved asset (no actual Roblox upload).
             with store.connect() as connection:
                 for gender in ('male', 'female'):
@@ -77,14 +78,14 @@ class SocialActionsM462(unittest.TestCase):
             registry = registry_path.read_text(encoding='utf8')
             for gender in ('male', 'female'):
                 for slot in ADDED:
-                    self.assertIn(f'human_{gender}__social__{slot}__00', registry)
+                    self.assertIn(f'human_{gender}__social__{slot}__01', registry)
             self.assertIn('rbxassetid://100000', registry)
             self.assertIn('rbxassetid://200000', registry)
 
     def test_client_resolves_social_from_registry_without_hardcoded_slot_whitelist(self):
         source = (ROOT / 'src/client/character/animation/SocialAnimationPlayback.luau').read_text(encoding='utf8')
         self.assertIn('Resolver.Resolve(character, "social", nil, slot)', source)
-        self.assertNotIn('slot ~= "waiting_a"', source)
+        self.assertNotIn('slot ~= "waiting_01"', source)
         self.assertIn('track.Looped = false', source)
 
 

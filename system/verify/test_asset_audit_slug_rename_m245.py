@@ -1,6 +1,7 @@
 """M245: existing MySQL audit identities survive Location slug renames."""
 from __future__ import annotations
 
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase, mock
@@ -41,7 +42,7 @@ class AuditSlugRenameM245(TestCase):
         db_path = self.root / '.control-center' / 'game1.db'
         db_path.parent.mkdir(parents=True)
         self.path = db_path
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.executescript('''
                 CREATE TABLE location_asset_publications (
                     id INTEGER PRIMARY KEY, asset_slug TEXT, kind TEXT, revision INTEGER,
@@ -62,7 +63,7 @@ class AuditSlugRenameM245(TestCase):
         self.importer = SqliteAssetAuditImporter(self.root, self.repository)
 
     def rename(self, old, new, when):
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('UPDATE location_asset_publications SET asset_slug=? WHERE asset_slug=?',
                        (new, old))
             db.execute("UPDATE texture_atlas_legacy_publications SET consumer_id=? "
@@ -78,7 +79,7 @@ class AuditSlugRenameM245(TestCase):
         self.importer.sync_all()  # Previously rejected every audited write.
         for source, original in initial.items():
             self.assertEqual(self.repository.events[source], original)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('INSERT INTO location_asset_publications VALUES (2,?,?,?,?,?,?,?)',
                        ('tree_01', 'model', 2, '12002', 'asset/b', 'sha2', 150))
         self.importer.sync_all()
@@ -93,7 +94,7 @@ class AuditSlugRenameM245(TestCase):
                               if event['assetId'] == '12001')['assetKey'], 'old_tree')
         self.assertEqual(next(event for event in self.repository.events.values()
                               if event['assetId'] == '12002')['assetKey'], 'tree_01')
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('INSERT INTO location_asset_publications VALUES (3,?,?,?,?,?,?,?)',
                        ('tree_final', 'model', 3, '12003', 'asset/c', 'sha3', 250))
         self.importer.sync_all()
@@ -120,7 +121,7 @@ class AuditSlugRenameM245(TestCase):
 
     def test_unrelated_publication_rebinding_is_still_rejected(self):
         self.importer.sync_all()
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("UPDATE location_asset_publications SET asset_slug='some_other_tree' WHERE id=1")
         with self.assertRaisesRegex(ValueError, 'different asset'):
             self.importer.sync_all()

@@ -120,6 +120,16 @@ class SqliteAssetAuditImporter:
                 raise RuntimeError(f'{spec.database}/{spec.table} audit columns missing: {missing}')
             rows = [dict(row) for row in connection.execute(
                 f'SELECT * FROM "{spec.table}" ORDER BY id')]
+            # An animation slot can be renamed by a schema migration, while
+            # MySQL audit identity is immutable. Read the authoring-owned,
+            # append-only original asset key recorded at first publication.
+            historical_animation_keys = {}
+            if spec.table == 'animation_publications' and spec.database == 'game1.db' \
+                    and 'animation_publication_audit_keys' in self._tables(connection):
+                historical_animation_keys = {
+                    int(item['publication_id']): dict(item)
+                    for item in connection.execute('SELECT * FROM animation_publication_audit_keys')
+                }
             # M242 intentionally moves old publications to the current authoring
             # slug. Reconstruct their *original* audit key using the recorded
             # rename timestamps; MySQL operations remain immutable.
@@ -136,6 +146,13 @@ class SqliteAssetAuditImporter:
                 continue
             current_key = str(row.get(spec.key_column) or '')
             key = current_key
+            if spec.domain == 'character_animation':
+                historical = historical_animation_keys.get(int(row['id']))
+                if historical is not None:
+                    if (str(historical['asset_id']) != asset_id or
+                            str(historical['operation_path']) != str(row.get('operation_path') or '')):
+                        raise ValueError('animation audit identity provenance mismatch at publication ' + str(row['id']))
+                    key = historical['asset_key']
             if (spec.domain == 'location_asset' or
                     (spec.domain == 'texture_atlas_legacy'
                      and row.get('consumer_type') == 'location_asset')):

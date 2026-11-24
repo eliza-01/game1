@@ -87,6 +87,8 @@ class AnimationRegistryMixin:
         with self.connect() as db:
             family_by_character = {r['id']:r['race'] for r in db.execute('SELECT id,race FROM characters')}
         for profile in profiles:
+            if str(profile["character_id"]).endswith("_common"):
+                continue  # shared source, not a playable character profile
             profile_map[str(profile["character_id"])] = {
                 "skeletonSignature": str(profile.get("skeleton_signature") or ""),
                 "family": family_by_character.get(profile['character_id'], ''),
@@ -100,6 +102,8 @@ class AnimationRegistryMixin:
             if clip is None:
                 continue
             character_id = str(binding["character_id"])
+            if character_id.endswith("_common"):
+                continue  # published into registry.shared, never into a player rig
             profile = profile_map.setdefault(character_id, {"skeletonSignature": "", "family": family_by_character.get(character_id,''), "base": {}, "emotions": {}, "social": {}, "weapons": {}})
             descriptor = {
                 "clipId": str(clip["id"]),
@@ -144,7 +148,8 @@ class AnimationRegistryMixin:
                 document = get_document(documents,row['clip_id'],row.get('published_sha256') or row['sha256'])
             descriptor = dict(clipId=row['clip_id'],assetId=str(row['asset_id']),
                               animationId='rbxassetid://'+str(row['asset_id']),variant=int(row['variant']),
-                              weight=int(row['weight']),looped=bool(row['looped']),priority=row['priority'],document=document)
+                              weight=int(row['weight']),looped=bool(row['looped']),priority=row['priority'],document=document,
+                              authoritative=str(row['source_character']).endswith('_common'))
             if row['scope']=='weapon':
                 family_data['weapons'].setdefault(row['weapon_set'],{}).setdefault(row['slot'],[]).append(descriptor)
             else:

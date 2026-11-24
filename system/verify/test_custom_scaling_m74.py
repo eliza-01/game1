@@ -62,9 +62,10 @@ class CustomScalingTests(unittest.TestCase):
         for token in ("RuleForAnimation", "ResolveForAnimation", "RefreshPlaying", "Policy.CustomRule"):
             self.assertIn(token, scaling)
         self.assertIn("Registry.custom", (ROOT / "src/shared/animation/AnimationScalingPolicy.luau").read_text())
-        self.assertIn("RunService:IsStudio()", studio)
+        self.assertIn("PublishedDebugAccess.ServerEnabled()", studio)
+        self.assertIn("PublishedDebugAccess.ServerAllowed(_player)", studio)
         self.assertIn("GetPlayingAnimationTracks", scaling)
-        self.assertIn("RunService:IsStudio()", client)
+        self.assertIn("PublishedDebugAccess.ClientAllowed()", client)
         movement = (ROOT / "src/server/npc/NpcCombatAIService.luau").read_text()
         self.assertIn('NpcAttackPursuitAnimationId', movement)
         self.assertIn('AnimationSpeedScaling.ResolveForAnimation(', movement)

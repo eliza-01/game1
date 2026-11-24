@@ -3,6 +3,7 @@
 local Contract = require(game:GetService("ReplicatedStorage").Game1Shared.character.FaceEmotionContract)
 local Service = {}
 local Registry=require(game:GetService("ReplicatedStorage").Game1Shared.character.CharacterAnimationRegistry)
+local VariantMerge=require(game:GetService("ReplicatedStorage").Game1Shared.character.CharacterAnimationVariantMerge)
 local bound=setmetatable({}, {__mode="k"})
 function Service.Set(character: Model, emotion: string?)
     assert(emotion == nil or Contract.names[emotion], "unsupported face emotion")
@@ -28,10 +29,9 @@ function Service.Bind(character: Model)
     local function refresh()
         local state=character:GetAttribute(Contract.attribute) or (if character:GetAttribute("InCombat")==true then "combat_idle" else "idle")
         local rows=profile.emotions and profile.emotions[state]
-        if not rows then
-            local shared = Registry.shared and Registry.shared[profile.family or ""]
-            rows = shared and shared.emotions and shared.emotions[state]
-        end
+        local shared = Registry.shared and Registry.shared[profile.family or ""]
+        local common = shared and shared.emotions and shared.emotions[state]
+        rows = VariantMerge.Rows(rows, common)
         local descriptor=rows and rows[1]
         local doc=descriptor and descriptor.document
         local track=nil

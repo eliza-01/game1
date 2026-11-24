@@ -27,23 +27,41 @@ class AnimationScanReviewMixin:
                        key=lambda p: p.as_posix().casefold())
         if len(files) > MAX_SCAN_FILES:
             raise ValueError(f"animation scan found more than {MAX_SCAN_FILES} files; choose a narrower folder")
+        family = str(character.get('race') or '').lower()
+        common_id = family + '_common'
         with self.connect() as connection:
+            # A scan folder may contain male, female and common clips together.
+            # Route only explicitly named, registered members of this family.
+            family_characters = {
+                row['id']: dict(row) for row in connection.execute(
+                    'SELECT * FROM characters WHERE race=?', (family,))
+            }
+            owners = sorted((*family_characters, common_id), key=len, reverse=True)
             documents={(r['clip_id'],r['animation_sha256']):r['document_sha256'] for r in connection.execute('SELECT clip_id,animation_sha256,document_sha256 FROM animation_clip_documents')}
+            placeholders = ','.join('?' for _ in owners)
             existing = {row["id"]: dict(row) for row in connection.execute(
-                "SELECT id,asset_id,sha256,published_sha256 FROM animation_clips WHERE character_id=?",
-                (character_id,))}
+                f"SELECT id,asset_id,sha256,published_sha256 FROM animation_clips WHERE character_id IN ({placeholders})",
+                tuple(owners))}
         seen = {}
         items, unassigned = [], []
         for path in files:
-            binding = classify_animation(path, character_id)
+            stem = path.name.lower()
+            owner = next((candidate for candidate in owners
+                          if stem.startswith(candidate + '_')), None)
+            if owner is None:
+                unassigned.append({"filename": path.name, "path": str(path),
+                                   "reason": "ожидается префикс зарегистрированного персонажа или " + common_id})
+                continue
+            common = owner == common_id
+            binding = classify_animation(path, owner)
             if binding is None:
                 unassigned.append({"filename": path.name, "path": str(path), "reason": "имя не соответствует семантическому слоту"})
                 continue
-            coordinate = (binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
+            coordinate = (owner, binding["scope"], binding["weaponSet"], binding["slot"], int(binding["variant"]))
             if coordinate in seen:
                 raise ValueError(f"animation scan is ambiguous: {seen[coordinate]} and {path.name} map to the same slot")
             seen[coordinate] = path.name
-            clip_id = _clip_id(character_id, *coordinate)
+            clip_id = _clip_id(*coordinate)
             sha = self._sha256(path)
             document=read_document(path,None if path.name.endswith('.animation.json') else sha)
             doc_sha=document_digest(path) if document else ''
@@ -62,6 +80,7 @@ class AnimationScanReviewMixin:
                           "documentSha256":doc_sha,
                           "clipId": clip_id, "assetId": str((old or {}).get("asset_id") or ""),
                           "status": status, "selectable": status in ("NEW", "LOCAL_UPDATE", "DOCUMENT_UPDATE"),
+                          "ownerCharacterId": owner, "common": common,
                           **binding})
         return {"characterId": character_id, "rootPath": str(root),
                 "filesScanned": len(files), "items": items, "unassigned": unassigned,
@@ -85,6 +104,20 @@ class AnimationScanReviewMixin:
                 raise ValueError("animation selection changed since preview; scan again")
             requested.append(row)
         character = self._character(character_id)
+        family = str(character.get('race') or '').lower()
+        # The owning profile comes from the audited scan result, not from the
+        # currently visible male/female tab. Never reassign an animation.
+        owner_characters = {
+            row['ownerCharacterId']: self._character(row['ownerCharacterId'])
+            for row in requested if not row['common']
+        }
+        if any(row['common'] for row in requested):
+            # A virtual publication profile owns shared clips exactly once. The
+            # family must have compatible authored rigs before assigning Common.
+            common_character = self._character(family + '_common')
+            self._profile(common_character['id'])
+        else:
+            common_character = None
         now = _now()
         items = []
         with tempfile.TemporaryDirectory(prefix='game1-animation-input-') as directory:
@@ -98,16 +131,34 @@ class AnimationScanReviewMixin:
                     raise ValueError('animation file changed during registration; scan again')
                 binding={key:row[key] for key in ('scope','weaponSet','slot','variant','looped','priority')}
                 suffix='.animation.json' if copy.name.endswith('.animation.json') else copy.suffix.lower()
-                canonical,_=self._canonical_paths(character,binding,suffix)
+                owner_character = common_character if row['common'] else owner_characters[row['ownerCharacterId']]
+                canonical,_=self._canonical_paths(owner_character,binding,suffix)
                 destinations.extend([canonical,document_path(canonical)])
-                staged.append((copy,binding))
+                staged.append((copy,binding,owner_character,row['common']))
             with rollback_files(destinations),self.connect() as connection:
-                for source,binding in staged:
-                    outcome,item=self._register_source(connection,character,source,binding,now)
-                    items.append({'outcome':outcome,**item})
+                for source,binding,owner_character,is_common in staged:
+                    if is_common:
+                        self.validate_common_source(connection, family, character_id,
+                                                    binding['scope'], binding['slot'])
+                    outcome,item=self._register_source(connection,owner_character,source,binding,now)
+                    if is_common:
+                        # A pending share is deliberate. It is never exported to
+                        # Runtime until Roblox confirms a current approved ID.
+                        from .common import _binding_id
+                        connection.execute('''INSERT INTO animation_shared_bindings(
+                            family,scope,weapon_set,slot,variant,source_binding_id,created_at
+                        ) VALUES(?,?,?,?,?,?,?)
+                        ON CONFLICT(family,scope,weapon_set,slot,variant)
+                        DO UPDATE SET source_binding_id=excluded.source_binding_id''',
+                            (family,binding['scope'],binding['weaponSet'],binding['slot'],
+                             binding['variant'],_binding_id(owner_character['id'],binding['scope'],
+                             binding['weaponSet'],binding['slot'],binding['variant']),now))
+                    items.append({'outcome':outcome,**item, 'common':is_common,
+                                  'ownerCharacterId':owner_character['id']})
                 if items:
-                    connection.execute('UPDATE animation_profiles SET scan_root=?,updated_at=? WHERE character_id=?',
-                                       (review['rootPath'],now,character_id))
+                    for owner in {character_id, *(row['ownerCharacterId'] for row in requested)}:
+                        connection.execute('UPDATE animation_profiles SET scan_root=?,updated_at=? WHERE character_id=?',
+                                           (review['rootPath'],now,owner))
         if items:
             self.export()
         return {"characterId": character_id, "registered": items, "count": len(items)}

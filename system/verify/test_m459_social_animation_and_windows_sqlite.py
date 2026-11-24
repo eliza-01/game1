@@ -18,20 +18,20 @@ from sqlite_connection import connect
 class SocialAuthoringM459(unittest.TestCase):
     def test_social_filenames_are_symmetric_for_both_genders(self):
         for gender, expected in (
-            ('male', ('waiting_a', 'clap', 'atk', 'victory', 'yes', 'bow', 'laugh', 'hi', 'sad')),
-            ('female', ('waiting_a', 'clap', 'atk', 'victory', 'yes', 'bow', 'laugh', 'hi', 'sad')),
+            ('male', ('waiting', 'clap', 'atk', 'victory', 'yes', 'bow', 'laugh', 'hi', 'sad', 'dance', 'no', 'sp_wait', 'unaware')),
+            ('female', ('waiting', 'clap', 'atk', 'victory', 'yes', 'bow', 'laugh', 'hi', 'sad', 'dance', 'no', 'sp_wait', 'unaware')),
         ):
             rules = [x for x in filename_rule_catalog('human_' + gender) if x['scope'] == 'social']
             self.assertEqual({row['state'] for row in rules}, set(expected))
             for row in rules:
-                self.assertEqual(row['canonicalFilename'], 'human_' + gender + '_social_' + row['state'] + '.rbxm')
+                self.assertEqual(row['canonicalFilename'], 'human_' + gender + '_social_' + row['state'] + '_01.rbxm')
                 for suffix in ('.rbxm', '.rbxmx'):
                     binding = classify_animation(Path(row['canonicalFilename']).with_suffix(suffix), 'human_' + gender)
-                    self.assertEqual((binding['scope'], binding['slot'], binding['variant']), ('social', row['state'], 0))
+                    self.assertEqual((binding['scope'], binding['slot'], binding['variant']), ('social', row['state'], 1))
                     self.assertFalse(binding['looped'])
                     self.assertEqual(binding['priority'], 'Action')
         self.assertIsNone(classify_animation(Path('human_male_social_unknown.rbxm'), 'human_male'))
-        self.assertEqual(classify_animation(Path('human_female_social_atk.rbxm'), 'human_female')['slot'], 'atk')
+        self.assertEqual(classify_animation(Path('human_female_social_atk_01.rbxm'), 'human_female')['slot'], 'atk')
         with self.assertRaisesRegex(ValueError, 'unknown social animation slot'):
             normalize_manual_binding('social', '', 'attack')
 
@@ -48,38 +48,41 @@ class SocialAuthoringM459(unittest.TestCase):
             for gender in ('male', 'female'):
                 data = store.snapshot('human_' + gender)
                 self.assertIn('social', data['slotCatalog'])
-                self.assertEqual(len(data['slotCatalog']['social']), 9)
+                self.assertEqual(len(data['slotCatalog']['social']), 13)
                 self.assertEqual(data['items'], [])
             inbox = root / 'inbox'
             inbox.mkdir()
-            for name in ('human_male_social_waiting_a.rbxm', 'human_male_social_victory.rbxmx',
-                         'human_female_social_clap.rbxm', 'human_female_social_atk.rbxm',
-                         'human_female_social_victory.rbxmx'):
+            for name in ('human_male_social_waiting_01.rbxm', 'human_male_social_victory_01.rbxmx',
+                         'human_female_social_clap_01.rbxm', 'human_female_social_atk_01.rbxm',
+                         'human_female_social_victory_01.rbxmx'):
                 (inbox / name).write_bytes(b'fixture animation source')
             male_review = store.preview_folder('human_male', str(inbox))
-            self.assertEqual({row['slot'] for row in male_review['items']}, {'waiting_a','victory'})
-            self.assertEqual(male_review['recognized'], 2)
-            male_outcome = store.register_selected('human_male', str(inbox), male_review['items'])
+            self.assertEqual(male_review['recognized'], 5)
+            self.assertEqual({row['ownerCharacterId'] for row in male_review['items']},
+                             {'human_male', 'human_female'})
+            male_items = [row for row in male_review['items'] if row['ownerCharacterId']=='human_male']
+            male_outcome = store.register_selected('human_male', str(inbox), male_items)
             self.assertEqual(male_outcome['count'], 2)
             female_review = store.preview_folder('human_female', str(inbox))
-            self.assertEqual({row['slot'] for row in female_review['items']}, {'clap','atk','victory'})
-            self.assertEqual(store.register_selected('human_female', str(inbox), female_review['items'])['count'], 3)
-            self.assertTrue((root / 'assets/source/characters/human/male/human_male/animations/social/social_waiting_a.rbxm').exists())
+            female_items = [row for row in female_review['items'] if row['ownerCharacterId']=='human_female']
+            self.assertEqual({row['slot'] for row in female_items}, {'clap','atk','victory'})
+            self.assertEqual(store.register_selected('human_female', str(inbox), female_items)['count'], 3)
+            self.assertTrue((root / 'assets/source/characters/human/male/human_male/animations/social/social_waiting_01.rbxm').exists())
             clips = store.snapshot('human_male')['items']
             self.assertEqual({row['scope'] for row in clips}, {'social'})
             self.assertEqual({row['status'] for row in clips}, {'LOCAL_ONLY'})
             # Unpublished source must not be written as an executable animation.
             registry = (root / 'src/shared/character/CharacterAnimationRegistry.luau').read_text(encoding='utf8')
             self.assertIn('social = table.freeze({', registry)
-            self.assertNotIn('human_male__social__waiting_a__00', registry)
+            self.assertNotIn('human_male__social__waiting__01', registry)
             with store.connect() as db:
                 db.execute("UPDATE animation_clips SET asset_id='123456789',published_sha256=sha256 WHERE id=?",
-                           (next(c['clip_id'] for c in clips if c['slot'] == 'waiting_a'),))
+                           (next(c['clip_id'] for c in clips if c['slot'] == 'waiting'),))
             store.export()
             registry = (root / 'src/shared/character/CharacterAnimationRegistry.luau').read_text(encoding='utf8')
-            self.assertIn('human_male__social__waiting_a__00', registry)
+            self.assertIn('human_male__social__waiting__01', registry)
             self.assertIn('rbxassetid://123456789', registry)
-            self.assertNotIn('human_male__social__victory__00', registry)
+            self.assertNotIn('human_male__social__victory__01', registry)
             self.assertIn('skeletonSignature = "test-signature"', registry)
 
     def test_m458_sqlite_backup_closing_contract(self):
@@ -102,7 +105,7 @@ class SocialAuthoringM459(unittest.TestCase):
         stands = (ROOT / 'src/shared/character/CharacterStandAnimationCatalog.luau').read_text(encoding='utf8')
         helper = (ROOT / 'src/client/character/animation/SocialAnimationPlayback.luau').read_text(encoding='utf8')
         self.assertIn('scope == "social"', resolver)
-        self.assertIn('pairs(profile.social or {})', resolver)
+        self.assertIn('{ "base", "emotions", "social" }', resolver)
         self.assertIn('"social"', stands)
         self.assertIn('Resolver.Resolve(character, "social", nil, slot)', helper)
         self.assertIn('Social.new(character: Model, cache: any)', helper)

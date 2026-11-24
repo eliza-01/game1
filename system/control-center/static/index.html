@@ -6,7 +6,7 @@
 <link rel="icon" href="data:,">
 <title>Characters</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
-<link rel="stylesheet" href="asset-manager.css?v=370">
+<link rel="stylesheet" href="asset-manager.css?v=474">
 <link rel="stylesheet" href="m337-options.css?v=449">
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=435">
@@ -226,11 +226,11 @@
 <div class="animation-gender-tabs" role="group" aria-label="Анимации персонажа по полу">
     <button type="button" data-animation-gender="male">male</button>
     <button type="button" data-animation-gender="female">female</button>
-    <span class="muted">общие анимации наследуются при отсутствии своей версии</span>
+    <span class="muted">human_common — приоритет для обоих полов; ручной common — запасной вариант</span>
 </div>
 <details class="naming-guide" id="animation-shared-panel"><summary>common · общие анимации</summary>
 <div class="animation-common-picker">
-  <p class="muted">Выбери опубликованную анимацию male или female. Назначение действует для всего семейства; собственная анимация персонажа имеет приоритет.</p>
+  <p class="muted">Выбери опубликованный клип из списка либо загрузи human_common_* из папки. Автоматический human_common имеет приоритет для Male/Female; вручную назначенный Common остаётся запасным вариантом.</p>
   <label>Поиск по названию, слоту или id<input id="animation-common-search" type="search" autocomplete="off" placeholder="например jump, idle, social" /></label>
   <label>Опубликованные анимации<select id="animation-common-select" size="6" aria-label="Выбор общей анимации"></select></label>
   <p id="animation-common-details" class="muted" aria-live="polite"></p>
@@ -238,6 +238,23 @@
   <div id="animation-shared-rows"></div>
 </div></details>
 <div class="section-title"><div><span>Animation Profile</span><h3 id="animation-table-title">Зарегистрированные анимации</h3></div><div class="animation-profile-actions"><label class="animation-name-search">Поиск <input id="animation-name-search" type="search" autocomplete="off" spellcheck="false" placeholder="название или slot" aria-label="Поиск анимаций по названию"></label><label class="animation-show-missing"><input id="animation-show-missing" type="checkbox"> Show missing</label><span id="animation-filter-label" class="pill">all</span><button id="animation-prepare-sync" type="button">Prepare Studio Sync</button></div></div>
+<div class="animation-publish-controls">
+  <button id="animation-publish-all" class="primary" type="button">Publish All · Male / Female / Common</button>
+  <small>Только зарегистрированные LOCAL_ONLY. CHANGED и опубликованные ID не перепубликуются.</small>
+</div>
+<div id="animation-publish-queue" class="animation-publish-queue" hidden aria-label="Очередь публикации анимаций">
+  <div class="animation-publish-queue-head">
+    <strong id="animation-publish-queue-title">Очередь публикации</strong>
+    <span id="animation-publish-queue-count" aria-live="polite">0 / 0</span>
+  </div>
+  <progress id="animation-publish-queue-bar" value="0" max="1" aria-label="Прогресс публикации"></progress>
+  <p id="animation-publish-queue-message" role="status" aria-live="polite"></p>
+  <div class="animation-publish-queue-actions">
+    <button id="animation-publish-stop" type="button" hidden>Остановить после текущей</button>
+    <button id="animation-publish-continue" type="button" hidden>Пропустить ошибку и продолжить</button>
+  </div>
+  <ol id="animation-publish-queue-items" class="animation-publish-queue-items"></ol>
+</div>
 <div class="animation-legend"><span><b>base</b> базовые движения</span><span><b>weapon</b> оружейные состояния</span><span><b>emotions</b> лицо и эмоции</span><span><b>variant</b> варианты анимации</span></div>
 <div class="table-wrap animation-table-wrap"><table><thead><tr><th data-animation-sort="context" role="button" tabindex="0">context ↕</th><th data-animation-sort="slot" role="button" tabindex="0">slot ↕</th><th data-animation-sort="variant" role="button" tabindex="0">variant ↕</th><th>clip</th><th>asset</th><th data-animation-sort="status" role="button" tabindex="0">status ↕</th><th>weight</th><th>actions</th></tr></thead><tbody id="animation-rows"></tbody></table></div>
 <div id="animation-details" class="details"><span class="muted">select a clip.</span></div>
@@ -261,7 +278,12 @@
 <dialog id="animation-scan-dialog" class="animation-operation-dialog">
   <div class="animation-operation-head"><div><small>Проверка папки</small><h3>Scan folder · отчёт</h3></div><button data-animation-close type="button" aria-label="Закрыть">✕</button></div>
   <div id="animation-scan-review" class="animation-operation-body"></div>
-  <div class="animation-operation-actions"><button id="animation-register-selected" class="primary" type="button">Register + Publish</button><button data-animation-close type="button">Закрыть</button></div>
+  <div id="animation-scan-queue-progress" class="animation-publish-queue" hidden>
+  <div class="animation-publish-queue-head"><strong>Очередь публикации</strong><span id="animation-scan-queue-count">0 / 0</span></div>
+  <progress id="animation-scan-queue-bar" value="0" max="1" aria-label="Прогресс публикации из сканирования"></progress>
+  <p id="animation-scan-queue-message" role="status" aria-live="polite"></p>
+</div>
+<div class="animation-operation-actions"><button id="animation-register-selected" class="primary" type="button">Register + Publish</button><button data-animation-close type="button">Закрыть</button></div>
 </dialog>
 <dialog id="animation-replace-dialog" class="animation-operation-dialog">
   <div class="animation-operation-head"><div><small>Постоянный Roblox ID</small><h3>Замена анимации</h3></div><button data-animation-close type="button" aria-label="Закрыть">✕</button></div>
@@ -283,10 +305,16 @@
 <hr class="card-separator">
 <div class="section-title"><div><span>individual clip overrides</span><h3>custom scaling animations</h3></div></div>
 <p class="hint">Search a published Character, NPC or Monster animation. Overrides use its permanent Roblox Animation ID, not its filename. Removing an override immediately restores the state-level scaling rule.</p>
-<label class="custom-scaling-search-label">Search registered animation
-<input type="search" id="custom-scaling-search" autocomplete="off" placeholder="start typing animation, NPC, monster, character or ID">
+<label class="custom-scaling-search-label">Search published animations
+<input type="search" id="custom-scaling-search" autocomplete="off" placeholder="animation name, variant, male, female, common, NPC, monster or ID">
 </label>
-<div id="custom-scaling-results" class="custom-scaling-results" role="listbox" hidden></div>
+<div class="custom-scaling-catalog-toolbar">
+  <label>Category <select id="custom-scaling-kind"><option value="">All</option><option value="character">Characters</option><option value="npc">NPCs</option><option value="monster">Monsters</option></select></label>
+  <label>Profile <select id="custom-scaling-subject"><option value="">All profiles</option></select></label>
+  <span id="custom-scaling-catalog-count" aria-live="polite"></span>
+</div>
+<div id="custom-scaling-results" class="custom-scaling-results" role="list"></div>
+<div id="custom-scaling-catalog-pages" class="custom-scaling-pages" hidden></div>
 <div id="custom-scaling-rows" class="custom-scaling-list"><span class="muted">No custom overrides.</span></div>
 </div>
 </div>
@@ -1118,7 +1146,9 @@
 <script src="asset-name-defaults.js?v=437"></script>
 <script src="character-assets.js?v=468"></script>
 <script src="asset-section-order.js?v=1"></script>
-<script src="character-animation-ui.js?v=469"></script>
+<script src="character-animation-ui.js?v=474"></script>
+<script src="animation-publish-queue-core.js?v=474"></script>
+<script src="animation-publish-queue.js?v=474"></script>
 <script src="character-workflow.js?v=2"></script>
 <script src="character-publications.js?v=2"></script>
 <script src="character-component-summary.js?v=1"></script>
@@ -1129,7 +1159,8 @@
 <script src="atlas-identity.js?v=435"></script>
 <script src="character-atlas-ui.js?v=435"></script>
 <script src="character-assemblies.js?v=461"></script>
-<script src="animation-speed.js?v=3"></script>
+<script src="animation-speed-catalog.js?v=1"></script>
+<script src="animation-speed.js?v=4"></script>
 <script src="timelines.js?v=360"></script>
 <script src="locations.js?v=2"></script>
 <script src="shared-asset-retirement.js?v=4"></script>

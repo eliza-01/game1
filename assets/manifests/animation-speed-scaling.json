@@ -97,6 +97,11 @@
       "unitsPerPercent": 2.4
     },
     {
+      "assetId": "123558039981038",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 0.8
+    },
+    {
       "assetId": "130243478044042",
       "stat": "RunSpeed",
       "unitsPerPercent": 0.6
@@ -117,9 +122,19 @@
       "unitsPerPercent": 1.5
     },
     {
+      "assetId": "137036143274780",
+      "stat": "AttackSpeed",
+      "unitsPerPercent": 1.5
+    },
+    {
       "assetId": "140129007932289",
       "stat": "AttackSpeed",
       "unitsPerPercent": 0.7
+    },
+    {
+      "assetId": "140606693135980",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 0.55
     },
     {
       "assetId": "72958203766772",
@@ -130,6 +145,11 @@
       "assetId": "77341804648662",
       "stat": "RunSpeed",
       "unitsPerPercent": 0.55
+    },
+    {
+      "assetId": "81941108455302",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 0.8
     },
     {
       "assetId": "85145236963317",
@@ -150,6 +170,11 @@
       "assetId": "92273150940176",
       "stat": "RunSpeed",
       "unitsPerPercent": 0.8
+    },
+    {
+      "assetId": "94783167520529",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 0.6
     }
   ]
 }

@@ -78,6 +78,20 @@ const callbacks = {
     throw Error('unexpected API path: ' + path);
   },
 };
+// M474: register-selected hands new clips to the shared publication queue.
+// Simulate its tested contract here; queue scheduling/failures have dedicated tests.
+window.game1AnimationPublishQueue = {
+  async publishRegistered(rows) {
+    let published = 0;
+    for (const row of rows) {
+      if (row.documentOnly || row.metadataOnly) continue;
+      await callbacks.request('/api/animations/' + encodeURIComponent(row.clipId) + '/publish', {method:'POST'});
+      published++;
+    }
+    await callbacks.load();
+    return {published,documents:rows.length-published,failed:'',pending:0};
+  },
+};
 const context = vm.createContext({ window, document, localStorage: {getItem: () => null}, console });
 vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), context, { filename: 'character-animation-ui.js' });
 window.game1AnimationUI.init(callbacks);

@@ -1,6 +1,8 @@
 --!strict
 -- Reusable presentation-only social animation. Player and creation scene both
 -- pass their existing Animator's AnimationTrackCache; never owns combat state.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local AnimationSpeedScaling = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("animation"):WaitForChild("AnimationSpeedScaling"))
 local Resolver = require(script.Parent:WaitForChild("AnimationResolver"))
 
 local Social = {}
@@ -11,7 +13,9 @@ function Social.Resolve(character: Model, slot: string): any?
     if slot == "" then
         return nil
     end
-    local row = Resolver.Resolve(character, "social", nil, slot)
+    local action, version = slot:match("^(.*)_(%d%d+)$")
+    local row = if action then Resolver.Resolve(character, "social", nil, action, tonumber(version))
+        else Resolver.Resolve(character, "social", nil, slot)
     if row and tostring(row.animationId or ""):match("^rbxassetid://[1-9]%d*$") then
         return row
     end
@@ -32,7 +36,11 @@ function Social:Play(slot: string): AnimationTrack?
     if not track then return nil end
     self:Stop(0.12)
     track.Looped = false
-    track:Play(0.12)
+    -- Social is normally 100% speed; clip overrides are keyed by the same
+    -- published Animation ID for male, female and explicit common variants.
+    track:Play(0.12, 1, AnimationSpeedScaling.ResolveScaleForAnimation(
+        self.character, "social", descriptor.animationId
+    ))
     self.activeTrack = track
     return track
 end

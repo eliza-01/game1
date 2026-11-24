@@ -1,4 +1,4 @@
-const animationSpeedState={data:null,saving:new Set(),search:"",overrideFilter:"",overridePage:0};
+const animationSpeedState={data:null,saving:new Set(),search:"",catalogKind:"",catalogSubject:"",catalogPage:0,overrideFilter:"",overridePage:0};
 const animationSpeedChannelMeta={
   run:{title:'Run',description:'Running movement animations.'},
   walk:{title:'Walk',description:'Walking movement animations.'},
@@ -67,19 +67,59 @@ function customScalingRender(){
   if(!list||!results)return;
   const catalog=customScalingCatalog(),saved=customScalingSaved();
   const byId=new Map(catalog.map(c=>[c.assetId,c]));
-  const term=animationSpeedState.search.trim().toLowerCase();
-  const matches=term?catalog.filter(c=>
-    [c.name,c.subject,c.kind,c.channel,c.assetId,c.clipId].some(x=>String(x||'').toLowerCase().includes(term))
-  ).slice(0,30):[];
-  results.hidden=!term;
-  results.innerHTML=term?(matches.length?matches.map(c=>
-    `<button type="button" data-custom-pick="${esc(c.assetId)}"><b>${esc(c.name)}</b><small>${esc(c.kind)} / ${esc(c.subject)} / ${esc(c.channel)} · ${esc(c.assetId)}</small></button>`
-  ).join(''):'<span class="muted">No published animations match.</span>'):'';
+  // Published catalog is always visible. Custom overrides below are only a
+  // subset; requiring a typed query hid newly registered social/common clips.
+  const selectors=window.game1AnimationSpeedCatalog;
+  const kind=animationSpeedState.catalogKind;
+  const subjectPicker=$('custom-scaling-subject');
+  const subjects=selectors.subjects(catalog,kind);
+  if(animationSpeedState.catalogSubject&&!subjects.includes(animationSpeedState.catalogSubject)){
+    animationSpeedState.catalogSubject='';
+  }
+  if(subjectPicker){
+    subjectPicker.innerHTML='<option value="">All profiles</option>'+subjects.map(s=>
+      `<option value="${esc(s)}" ${s===animationSpeedState.catalogSubject?'selected':''}>${esc(s)}</option>`
+    ).join('');
+  }
+  const filteredCatalog=selectors.visible(catalog,{
+    search:animationSpeedState.search,kind,subject:animationSpeedState.catalogSubject
+  });
+  const shown=selectors.page(filteredCatalog,animationSpeedState.catalogPage,24);
+  animationSpeedState.catalogPage=shown.number;
+  const catalogCount=$('custom-scaling-catalog-count');
+  if(catalogCount)catalogCount.textContent=`${filteredCatalog.length} / ${catalog.length} published animations`;
+  results.hidden=false;
+  results.innerHTML=shown.rows.length?shown.rows.map(c=>{
+    const existing=saved.find(row=>row.assetId===c.assetId);
+    const policy=customScalingInherited(c);
+    const hasStateRule=(animationSpeedState.data?.profiles||[]).some(p=>
+      p.targetType===(c.kind==='monster'?'monster':'humanoid')&&
+      p.targetId===(c.kind==='monster'?c.subject:'all')&&
+      (p.rules||[]).some(r=>r.channel===c.channel)
+    );
+    const defaultLabel=hasStateRule?`State rule · ${policy.stat}`:'Default · 100%';
+    return `<div class="custom-scaling-catalog-row" role="listitem">
+      <div class="custom-scaling-clip"><strong>${esc(c.subject)} · ${esc(c.name)}</strong>
+      <small>${esc(c.kind)} / ${esc(c.scope||c.channel)}${c.weaponSet?' / '+esc(c.weaponSet):''} / ${esc(c.channel)} · ${esc(c.assetId)}${c.availableFor?.length>1?' · for '+esc(c.availableFor.join(', ')):''}</small></div>
+      <span class="custom-scaling-catalog-status ${existing?'active':''}">${esc(existing?'Custom · '+existing.stat:defaultLabel)}</span>
+      <button type="button" data-custom-pick="${esc(c.assetId)}">${existing?'Edit':'Configure'}</button>
+    </div>`;
+  }).join(''):'<span class="muted">No published animations match. Change filters or refresh the catalog.</span>';
+  const catalogPages=$('custom-scaling-catalog-pages');
+  if(catalogPages){
+    catalogPages.hidden=shown.pages<=1;
+    catalogPages.innerHTML=`<button type="button" data-catalog-page="prev" ${shown.number===0?'disabled':''}>←</button><span>${shown.number+1} / ${shown.pages}</span><button type="button" data-catalog-page="next" ${shown.number>=shown.pages-1?'disabled':''}>→</button>`;
+    for(const button of catalogPages.querySelectorAll('[data-catalog-page]'))button.onclick=()=>{
+      animationSpeedState.catalogPage+=button.dataset.catalogPage==='next'?1:-1;
+      customScalingRender();
+    };
+  }
   for(const button of results.querySelectorAll('[data-custom-pick]'))button.onclick=()=>{
     const aid=button.dataset.customPick;
     if(!saved.some(row=>row.assetId===aid))saved.push({assetId:aid,...customScalingInherited(byId.get(aid)),_draft:true});
-    animationSpeedState.search='';$('custom-scaling-search').value='';
-    animationSpeedState.overrideFilter='';animationSpeedState.overridePage=0;
+    animationSpeedState.overrideFilter='';
+    const order=[...saved].sort((a,b)=>(byId.get(a.assetId)?.name||a.assetId).localeCompare(byId.get(b.assetId)?.name||b.assetId));
+    animationSpeedState.overridePage=Math.floor(order.findIndex(row=>row.assetId===aid)/CUSTOM_SCALING_PAGE_SIZE);
     const filter=$('custom-scaling-filter');if(filter)filter.value='';
     customScalingRender();
     list.querySelector(`[data-custom-row="${aid}"]`)?.scrollIntoView({block:'nearest'});
@@ -142,7 +182,9 @@ async function customScalingSave(assetId,section,remove){
     animationSpeedRender();customScalingRender();
   }catch(error){toast(error.message,true);action.disabled=false}
 }
-$('custom-scaling-search').oninput=e=>{animationSpeedState.search=e.target.value;customScalingRender()};
+$('custom-scaling-search').oninput=e=>{animationSpeedState.search=e.target.value;animationSpeedState.catalogPage=0;customScalingRender()};
+$('custom-scaling-kind').onchange=e=>{animationSpeedState.catalogKind=e.target.value;animationSpeedState.catalogSubject='';animationSpeedState.catalogPage=0;customScalingRender()};
+$('custom-scaling-subject').onchange=e=>{animationSpeedState.catalogSubject=e.target.value;animationSpeedState.catalogPage=0;customScalingRender()};
 
 // Controls live beside the existing list, so older Control Center markup is
 // still compatible without copying/replacing the entire HTML template.

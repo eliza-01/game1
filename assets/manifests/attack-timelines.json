@@ -54,8 +54,7 @@
         "HitEnd": {
           "normalizedTime": 0.5
         }
-      },
-      "reviewRequired": true
+      }
     },
     {
       "clipId": "human_male__weapon__1hs__attack__02",
@@ -64,8 +63,7 @@
         "HitEnd": {
           "normalizedTime": 0.5
         }
-      },
-      "reviewRequired": true
+      }
     },
     {
       "clipId": "human_male__weapon__1hs__attack__03",
@@ -74,18 +72,25 @@
         "HitEnd": {
           "normalizedTime": 0.5
         }
-      },
-      "reviewRequired": true
+      }
+    },
+    {
+      "clipId": "human_male__weapon__bow__attack__01",
+      "duration": 1.5,
+      "events": {
+        "Release": {
+          "normalizedTime": 0.60397
+        }
+      }
     },
     {
       "clipId": "human_male__weapon__hands__attack__01",
       "duration": 1.5,
       "events": {
         "HitEnd": {
-          "normalizedTime": 0.5
+          "normalizedTime": 0.69159
         }
-      },
-      "reviewRequired": true
+      }
     },
     {
       "clipId": "monster__gremlin__attack__01",

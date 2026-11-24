@@ -160,7 +160,9 @@ async function scanAnimations(){
   setAnimationFolder($('animation-folder-path').value,true);
   return window.game1AnimationUI?.scanFolder();
 }
-async function publishAnimation(clipId){try{toast('publishing animation…');await request('/api/animations/'+encodeURIComponent(clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:$('animation-publication-description').value})});await loadAnimations();toast('animation published')}catch(error){toast(error.message,true)}}
+async function publishAnimation(clipId){
+  return window.game1AnimationPublishQueue?.publishOne(clipId);
+}
 async function checkRobloxAnimationAssets(){if(state.animationPublishing)return;try{state.animationPublishing=true;renderAnimations();const monsterButton=$('check-roblox-monster-animations');if(monsterButton)monsterButton.disabled=true;toast('checking newer Roblox animation asset versions…');const result=await request('/api/animations/check-roblox-assets',{method:'POST'});await loadAnimations();if(window.game1MonsterAnimationsLoad)await window.game1MonsterAnimationsLoad();const requested=Number(result.requested||0),confirmed=Number(result.confirmed||0),pending=Number(result.pending||0),failed=Number(result.failed||0);if(!requested)toast('Roblox animation check · no CHANGED assets');else toast(`Roblox animation check · confirmed ${confirmed} · pending ${pending} · failed ${failed}`,failed>0)}catch(error){toast(error.message,true)}finally{state.animationPublishing=false;renderAnimations();const monsterButton=$('check-roblox-monster-animations');if(monsterButton)monsterButton.disabled=false}}
 window.game1CheckRobloxAnimations=checkRobloxAnimationAssets;
 async function setAnimationWeight(bindingId,weight){try{state.animations=await request('/api/animation-bindings/'+encodeURIComponent(bindingId)+'/weight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({weight:Number(weight)})});state.animations.publication=state.data?.publication||{};renderAnimations()}catch(error){toast(error.message,true)}}
@@ -177,6 +179,7 @@ loadCharacters();
 
 if (typeof game1SyncPublicationDescription === "function" && typeof $("display-name").addEventListener === "function") $("display-name").addEventListener("input", () => game1SyncPublicationDescription("publication-description", "Character Model", $("display-name").value));
 
+window.addEventListener('load',()=>window.game1AnimationPublishQueue?.init({state:()=>state,load:loadAnimations,request,toast,render:renderAnimations}));
 window.addEventListener('load',()=>window.game1AnimationUI?.init({
   state:()=>state,render:renderAnimations,load:loadAnimations,request,toast,
   weight:setAnimationWeight,remove:removeAnimationBinding,publish:publishAnimation,

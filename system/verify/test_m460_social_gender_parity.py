@@ -19,7 +19,7 @@ from animation_core.common import (
 class SocialGenderParityM460(unittest.TestCase):
     def test_all_social_slots_have_distinct_male_and_female_source_names(self):
         canonical = {item['slot'] for item in SOCIAL_SLOT_CATALOG}
-        self.assertEqual(canonical, {'waiting_a', 'clap', 'atk', 'victory', 'yes', 'bow', 'laugh', 'hi', 'sad'})
+        self.assertEqual(canonical, {'waiting', 'clap', 'atk', 'victory', 'yes', 'bow', 'laugh', 'hi', 'sad', 'dance', 'no', 'sp_wait', 'unaware'})
         names = set()
         for gender in ('male', 'female'):
             character_id = 'human_' + gender
@@ -31,10 +31,10 @@ class SocialGenderParityM460(unittest.TestCase):
                 filename = item['canonicalFilename']
                 self.assertNotIn(filename, names)
                 names.add(filename)
-                self.assertEqual(filename, f'{character_id}_social_{item["state"]}.rbxm')
+                self.assertEqual(filename, f'{character_id}_social_{item["state"]}_01.rbxm')
                 clip = classify_animation(Path(filename), character_id)
                 self.assertEqual((clip['scope'], clip['slot'], clip['variant']),
-                                 ('social', item['state'], 0))
+                                 ('social', item['state'], 1))
                 self.assertFalse(clip['looped'])
                 self.assertEqual(clip['priority'], 'Action')
                 self.assertEqual(normalize_manual_binding('social', '', item['state'])['slot'], item['state'])
@@ -59,13 +59,14 @@ class SocialGenderParityM460(unittest.TestCase):
             folder.mkdir()
             for gender in ('male', 'female'):
                 for slot in ('atk', 'victory'):
-                    (folder / f'human_{gender}_social_{slot}.rbxm').write_bytes(
+                    (folder / f'human_{gender}_social_{slot}_01.rbxm').write_bytes(
                         f'{gender}:{slot}'.encode('ascii'))
             for gender in ('male', 'female'):
                 character = 'human_' + gender
                 review = store.preview_folder(character, str(folder))
-                self.assertEqual({r['slot'] for r in review['items']}, {'atk', 'victory'})
-                self.assertEqual(store.register_selected(character, str(folder), review['items'])['count'], 2)
+                owned = [row for row in review['items'] if row['ownerCharacterId'] == character]
+                self.assertEqual({r['slot'] for r in owned}, {'atk', 'victory'})
+                self.assertEqual(store.register_selected(character, str(folder), owned)['count'], 2)
                 clips = store.snapshot(character)['items']
                 self.assertEqual({r['status'] for r in clips}, {'LOCAL_ONLY'})
                 with store.connect() as connection:
@@ -79,7 +80,7 @@ class SocialGenderParityM460(unittest.TestCase):
             registry = (root / 'src/shared/character/CharacterAnimationRegistry.luau').read_text(encoding='utf8')
             for gender in ('male', 'female'):
                 for slot in ('atk', 'victory'):
-                    self.assertIn(f'human_{gender}__social__{slot}__00', registry)
+                    self.assertIn(f'human_{gender}__social__{slot}__01', registry)
             for animation_id in ('100000', '100001', '200000', '200001'):
                 self.assertIn('rbxassetid://' + animation_id, registry)
 

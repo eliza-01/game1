@@ -193,6 +193,18 @@ class AnimationStorageMixin:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM characters WHERE id=?", (character_id,)).fetchone()
         if not row:
+            # An animation family profile is not a playable character. It owns a
+            # single publication, referenced by the shared-binding catalog.
+            if character_id.endswith("_common"):
+                family = character_id[:-len("_common")]
+                with self.connect() as connection:
+                    known = connection.execute(
+                        "SELECT 1 FROM characters WHERE race=? LIMIT 1", (family,)
+                    ).fetchone()
+                if known and family:
+                    return {"id": character_id, "race": family, "gender": "common",
+                            "skeleton_signature": "family:" + family,
+                            "display_name": family + " common animations"}
             raise ValueError(f"unknown character archetype: {character_id}")
         return dict(row)
 
@@ -494,13 +506,30 @@ class AnimationStorageMixin:
         selected_row = next((row for row in characters if row['id']==selected), None)
         family = str((selected_row or {}).get('race') or '')
         shared = self.shared_rows(family) if family else []
+        # Common clips which failed Cloud publication must remain reachable
+        # even though they are intentionally absent from Runtime/inherited.
+        with self.connect() as connection:
+            pending_common_exists = bool(family and connection.execute(
+                'SELECT 1 FROM animation_bindings WHERE character_id=? LIMIT 1',
+                (family + '_common',)).fetchone())
+        pending_common = ([row for row in self.list_for_character(family + '_common')
+                           if row['status'] in ('LOCAL_ONLY', 'CHANGED')]
+                          if pending_common_exists else [])
+        active_common = {(r['scope'], r['weapon_set'], r['slot'], r['variant'])
+                         for r in shared if r['status'] == 'PUBLISHED'
+                         and str(r['source_character']).endswith('_common')}
+        for row in items:
+            row['overriddenByCommon'] = (row['scope'], row['weapon_set'], row['slot'], row['variant']) in active_common
         local_keys = {(r['scope'],r['weapon_set'],r['slot'],r['variant']) for r in items}
         inherited = [dict(row, inherited=True, scope=row['scope'], weapon_set=row['weapon_set'],
                           sourceCharacter=row['source_character'], sourceBindingId=row['source_binding_id'],
                           status='COMMON', binding_id='', source_path='', document_only=False,
-                          name=row['name'], missing=False, shared=True)
+                          name=(row['source_character'] + '_' + row['name'])
+                          if str(row['source_character']).endswith('_common') else row['name'],
+                          missing=False, shared=True)
                      for row in shared if row['status']=='PUBLISHED' and
-                     (row['scope'],row['weapon_set'],row['slot'],row['variant']) not in local_keys]
+                     ((row['scope'],row['weapon_set'],row['slot'],row['variant']) not in local_keys
+                      or str(row['source_character']).endswith('_common'))]
         profile = self._profile(selected) if selected else None
         character = next((row for row in characters if row["id"] == selected), None)
         compatible = bool(profile and character and str(profile.get("skeleton_signature") or "") == str(character.get("skeleton_signature") or ""))
@@ -522,6 +551,7 @@ class AnimationStorageMixin:
             },
             "items": items,
             "shared": shared,
+            "commonPending": pending_common,
             "sharedCandidates": self.shared_candidates(family),
             "inherited": inherited,
             "summary": {

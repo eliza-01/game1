@@ -29,12 +29,29 @@ class SharedAnimationM468(unittest.TestCase):
     def test_cross_gender_sharing_rejects_non_locomotion_bind_differences(self):
         source = [bone('root'), bone('foot_l','root'),bone('face_mouth','root',1)]
         target = json.loads(json.dumps(source));target[-1]['matrix'][3] = 2
+        # Jump and body Social clips may ignore different facial bind poses.
         self.assertEqual(compatible_rigs(source,target,scope='base',slot='jump_start'),'locomotion-core')
+        self.assertEqual(compatible_rigs(source,target,scope='social',slot='hi'),'body-core')
+        # Face emotions are not body Social clips and still require matching binds.
         with self.assertRaisesRegex(ValueError,'incompatible bind'):
-            compatible_rigs(source,target,scope='social',slot='hi')
+            compatible_rigs(source,target,scope='emotions',slot='sad')
+
+        # Actual locomotion/body bone differences must remain blocked.
         target[1]['matrix'][3] = .01
-        with self.assertRaisesRegex(ValueError,'incompatible bind'):
-            compatible_rigs(source,target,scope='base',slot='jump_start')
+        for scope, slot in (('base','jump_start'),('social','hi')):
+            with self.subTest(scope=scope,slot=slot):
+                with self.assertRaisesRegex(ValueError,'incompatible bind'):
+                    compatible_rigs(source,target,scope=scope,slot=slot)
+
+        # Weapon Social actions retain strict grip bind validation.
+        source = [bone('root'), bone('weapon_grip_l','root')]
+        target = json.loads(json.dumps(source))
+        target[-1]['matrix'][3] = .01
+        self.assertEqual(compatible_rigs(source,target,scope='social',slot='hi'),'body-core')
+        for slot in ('atk','victory'):
+            with self.subTest(slot=slot):
+                with self.assertRaisesRegex(ValueError,'incompatible bind'):
+                    compatible_rigs(source,target,scope='social',slot=slot)
 
     def test_published_share_fallback_override_unshare_and_export(self):
         with tempfile.TemporaryDirectory() as folder:

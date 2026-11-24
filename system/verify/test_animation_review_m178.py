@@ -35,7 +35,7 @@ class AnimationReviewM178(unittest.TestCase):
         self.tmp.cleanup()
         self.warnings_context.__exit__(None, None, None)
 
-    def clip(self, name='human_male_idle.rbxm', data=b'original'):
+    def clip(self, name='human_male_idle_01.rbxm', data=b'original'):
         path=self.inbox/name
         path.write_bytes(data)
         return path
@@ -46,11 +46,11 @@ class AnimationReviewM178(unittest.TestCase):
         review=self.store.preview_folder('human_male',str(self.inbox))
         self.assertEqual((review['recognized'],review['items'][0]['status']), (1,'NEW'))
         self.assertEqual(self.store.snapshot('human_male'),original)
-        self.assertFalse((self.root/'assets/source/characters/human/male/human_male/animations/base/base_idle.rbxm').exists())
+        self.assertFalse((self.root/'assets/source/characters/human/male/human_male/animations/base/base_idle_01.rbxm').exists())
 
     def test_selected_register_and_nonselected_remains_missing(self):
         path=self.clip()
-        self.clip('human_male_walk.rbxm',b'walking')
+        self.clip('human_male_walk_01.rbxm',b'walking')
         review=self.store.preview_folder('human_male',str(self.inbox))
         selected=next(row for row in review['items'] if row['path']==str(path))
         result=self.store.register_selected('human_male',str(self.inbox),[selected])

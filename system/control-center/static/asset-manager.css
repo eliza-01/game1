@@ -289,3 +289,33 @@ main > .content{padding-top:14px}
 .app-busy-card{min-width:260px;padding:18px 20px;border:1px solid rgba(118,137,156,.25);border-radius:14px;background:#171d26;color:#eef3f8;display:flex;gap:12px;align-items:center;box-shadow:0 16px 44px rgba(0,0,0,.34)}
 .app-busy-spinner{width:18px;height:18px;border-radius:999px;border:2px solid rgba(255,255,255,.18);border-top-color:#d9ac43;animation:game1-spin .9s linear infinite}
 @keyframes game1-spin{to{transform:rotate(360deg)}}
+
+/* M474: one bounded, visible queue for Character, Common and newly registered clips. */
+.animation-publish-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 0}
+.animation-publish-controls small{color:var(--muted)}
+.animation-publish-queue{border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0;background:var(--panel2)}
+.animation-publish-queue[hidden],.animation-publish-queue button[hidden]{display:none}
+.animation-publish-queue-head,.animation-publish-queue-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.animation-publish-queue progress{width:100%;height:10px;margin:10px 0;accent-color:var(--mint)}
+.animation-publish-queue p{margin:6px 0 10px;color:var(--muted);overflow-wrap:anywhere}
+.animation-publish-queue-items{margin:0;padding:0;list-style:none;max-height:265px;overflow-y:auto;display:grid;gap:4px}
+.animation-publish-queue-items li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:7px 9px;border:1px solid var(--line);border-radius:8px}
+.animation-publish-queue-items li small{display:block;color:var(--muted);overflow-wrap:anywhere}
+.animation-publish-queue-items li[data-status="failed"]{border-color:var(--danger,#a45e52)}
+.animation-publish-queue-items li[data-status="published"] .animation-queue-status{color:var(--mint)}
+.animation-publish-queue-items li[data-status="uploading"] .animation-queue-status{color:var(--text)}
+
+/* M475: browse all published clip IDs before creating optional stat overrides. */
+#animation-speed-view .custom-scaling-catalog-toolbar{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin:10px 0}
+#animation-speed-view .custom-scaling-catalog-toolbar label{display:grid;gap:4px;min-width:150px;font-size:11px;color:var(--muted)}
+#animation-speed-view .custom-scaling-catalog-toolbar select{margin:0;width:100%}
+#custom-scaling-catalog-count{color:var(--muted);font-size:11px;margin-left:auto}
+#custom-scaling-results{max-width:none;max-height:370px;overflow:auto}
+.custom-scaling-catalog-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(115px,auto) auto;gap:10px;align-items:center;border-bottom:1px solid var(--line);padding:8px}
+.custom-scaling-catalog-row:last-child{border-bottom:0}
+.custom-scaling-catalog-row .custom-scaling-clip strong{white-space:normal;overflow-wrap:anywhere}
+.custom-scaling-catalog-row .custom-scaling-clip small{white-space:normal;overflow-wrap:anywhere}
+.custom-scaling-catalog-row>button{width:auto;white-space:nowrap}
+.custom-scaling-catalog-status{color:var(--muted);font-size:11px}
+.custom-scaling-catalog-status.active{color:var(--mint)}
+@media(max-width:650px){.custom-scaling-catalog-row{grid-template-columns:minmax(0,1fr) auto}.custom-scaling-catalog-status{grid-column:1/-1;grid-row:2}}

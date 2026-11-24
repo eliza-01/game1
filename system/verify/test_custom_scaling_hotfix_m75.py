@@ -53,6 +53,7 @@ function elem(id){
 }
 const context={window:{},$:(id)=>elem(id),esc:v=>String(v),toast:()=>{},request:async()=>({}),console};
 vm.createContext(context);
+vm.runInContext(fs.readFileSync(process.argv[3],'utf8'),context);
 vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),context);
 vm.runInContext(`animationSpeedState.data={profiles:[],catalog:[{assetId:'12345678',kind:'npc',name:'guard_attack_01',subject:'guard',channel:'attack'}]};customScalingRender()`,context);
 ui['custom-scaling-search'].oninput({target:{value:'guard'}});
@@ -66,7 +67,7 @@ console.log('M75 DOM first-pick passed');
         with tempfile.TemporaryDirectory(prefix='m75-node-') as temp:
             harness = Path(temp) / 'harness.cjs'
             harness.write_text(script, encoding='utf-8')
-            process = subprocess.run([node, str(harness), str(ROOT / 'system/control-center/static/animation-speed.js')], capture_output=True, text=True)
+            process = subprocess.run([node, str(harness), str(ROOT / 'system/control-center/static/animation-speed.js'), str(ROOT / 'system/control-center/static/animation-speed-catalog.js')], capture_output=True, text=True)
             self.assertEqual(process.returncode, 0, process.stdout + '\n' + process.stderr)
 
     def test_debug_button_not_offscreen_and_remote_nonblocking(self):

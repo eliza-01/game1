@@ -61,11 +61,12 @@ class CommonAnimationPickerM469(unittest.TestCase):
             self.assertEqual({r['sourceGender'] for r in candidates},{'female','male'})
             jumps=[r for r in candidates if r['slot']=='jump_start']
             self.assertTrue(all(r['ready'] for r in jumps))
-            incompatible=next(r for r in candidates if r['bindingId']==female_hi)
-            self.assertFalse(incompatible['ready'])
-            self.assertIn('bind',incompatible['reason'])
-            with self.assertRaisesRegex(ValueError,'incompatible bind'):
-                store.set_shared(female_hi,True)
+            body_compatible=next(r for r in candidates if r['bindingId']==female_hi)
+            self.assertTrue(body_compatible['ready'])
+            self.assertEqual(body_compatible['compatibility'],'body-core')
+            store.set_shared(female_hi,True)
+            self.assertEqual(store.shared_rows('human')[0]['slot'],'hi')
+            store.set_shared(female_hi,False)
 
             store.set_shared(female_jump,True)
             selected=store.snapshot('human_male')['sharedCandidates']

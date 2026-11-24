@@ -26,44 +26,52 @@ BASE_SLOT_CATALOG = [
 ]
 
 WEAPON_SLOT_CATALOG = [
-    {"group": "stance", "slot": "idle", "label": "idle", "looped": True, "priority": "Idle", "variants": False},
-    {"group": "stance", "slot": "combat_idle", "label": "combat idle", "looped": True, "priority": "Idle", "variants": False},
-    {"group": "movement", "slot": "walk", "label": "walk", "looped": True, "priority": "Movement", "variants": False},
-    {"group": "movement", "slot": "run", "label": "run", "looped": True, "priority": "Movement", "variants": False},
+    {"group": "stance", "slot": "idle", "label": "idle", "looped": True, "priority": "Idle", "variants": True},
+    {"group": "stance", "slot": "combat_idle", "label": "combat idle", "looped": True, "priority": "Idle", "variants": True},
+    {"group": "movement", "slot": "walk", "label": "walk", "looped": True, "priority": "Movement", "variants": True},
+    {"group": "movement", "slot": "run", "label": "run", "looped": True, "priority": "Movement", "variants": True},
     {"group": "combat", "slot": "attack", "label": "attack", "looped": False, "priority": "Action", "variants": True},
     {"group": "combat", "slot": "special_attack", "label": "special attack", "looped": False, "priority": "Action", "variants": True},
 ]
 
 BOW_EXTRA_SLOTS = [
-    {"group": "stance", "slot": "aim", "label": "aim", "looped": True, "priority": "Movement", "variants": False},
+    {"group": "stance", "slot": "aim", "label": "aim", "looped": True, "priority": "Movement", "variants": True},
 ]
 
 EMOTION_SLOT_CATALOG = [
     {"group":"emotions","slot":name,"label":name.replace('_',' '),
      "looped":name in {'idle','combat_idle','happy','happy_sharp_caret','happy_thick_caret','sad','closed'},
-     "priority":"Action2","variants":False,"execution":"skeletal" if name in {"idle","combat_idle","sad","look_around","raised_eyebrow"} else "procedural"}
+     "priority":"Action2","variants":True,"execution":"skeletal" if name in {"idle","combat_idle","sad","look_around","raised_eyebrow"} else "procedural"}
     for name in ('idle','combat_idle','happy','happy_sharp_caret','happy_thick_caret','sad',
                  'blink','closed','indignant_surprise','dizzy_spiral','look_around','nausea_wave','raised_eyebrow')
 ]
 SOCIAL_SLOT_CATALOG = [
-    {"group": "social", "slot": "waiting_a", "label": "Warm-up / разминка", "looped": False,
-     "priority": "Action", "variants": False},
+    {"group": "social", "slot": "waiting", "label": "Warm-up / разминка", "looped": False,
+     "priority": "Action", "variants": True},
     {"group": "social", "slot": "clap", "label": "Clap / аплодисменты", "looped": False,
-     "priority": "Action", "variants": False},
+     "priority": "Action", "variants": True},
     {"group": "social", "slot": "atk", "label": "To battle / меч вперёд 45°", "looped": False,
-     "priority": "Action", "variants": False},
+     "priority": "Action", "variants": True},
     {"group": "social", "slot": "victory", "label": "Victory / меч вверх", "looped": False,
-     "priority": "Action", "variants": False},
+     "priority": "Action", "variants": True},
     {"group": "social", "slot": "yes", "label": "Yes / согласие", "looped": False,
-     "priority": "Action", "variants": False},
+     "priority": "Action", "variants": True},
     {"group": "social", "slot": "bow", "label": "Bow / поклон", "looped": False,
-     "priority": "Action", "variants": False},
+     "priority": "Action", "variants": True},
     {"group": "social", "slot": "laugh", "label": "Laugh / смех", "looped": False,
-     "priority": "Action", "variants": False},
+     "priority": "Action", "variants": True},
     {"group": "social", "slot": "hi", "label": "Hi / приветствие", "looped": False,
-     "priority": "Action", "variants": False},
+     "priority": "Action", "variants": True},
     {"group": "social", "slot": "sad", "label": "Sad / грусть", "looped": False,
-     "priority": "Action", "variants": False},
+     "priority": "Action", "variants": True},
+    {"group": "social", "slot": "dance", "label": "Dance / танец", "looped": False,
+     "priority": "Action", "variants": True},
+    {"group": "social", "slot": "no", "label": "No / отказ", "looped": False,
+     "priority": "Action", "variants": True},
+    {"group": "social", "slot": "sp_wait", "label": "Special wait 01", "looped": False,
+     "priority": "Action", "variants": True},
+    {"group": "social", "slot": "unaware", "label": "Unaware / недоумение", "looped": False,
+     "priority": "Action", "variants": True},
 ]
 SLOT_BY_SOCIAL = {row["slot"]: row for row in SOCIAL_SLOT_CATALOG}
 
@@ -84,12 +92,13 @@ SLOT_BY_WEAPON = {row["slot"]: row for row in WEAPON_SLOT_CATALOG}
 SLOT_BY_BOW = {**SLOT_BY_WEAPON, **{row["slot"]: row for row in BOW_EXTRA_SLOTS}}
 
 NAMING_EXAMPLES = [
-    "human_female_hands_idle.rbxm -> hands / idle",
+    "human_female_hands_idle_01.rbxm -> hands / idle / 01",
     "human_female_hands_attack_01.rbxm -> hands / attack / 01",
     "human_female_1hs_attack_02.rbxm -> 1hs / attack / 02",
-    "human_female_bow_aim.rbxm -> bow / aim",
-    "human_female_idle.rbxm -> base / idle",
-    "Atk02_1HS_FFighter.rbxm -> 1hs / attack / 02 (reference form)",
+    "human_female_bow_aim_01.rbxm -> bow / aim / 01",
+    "human_female_base_idle_01.rbxm -> base / idle / 01",
+    "human_common_social_no_01.rbxm -> human / common social.no / 01 (both genders)",
+    "human_male_1hs_attack_02.rbxm -> 1hs / attack / 02",
 ]
 
 
@@ -113,30 +122,30 @@ def filename_rule_catalog(character_id: str = "") -> list[dict]:
             "group": definition.get("group", ""),
             "state": slot,
             "label": definition.get("label", slot),
-            "variants": False,
-            "variantPattern": "",
-            "canonicalFilename": filename_prefix + _canonical_file_stem("base", "", slot, 0) + ".rbxm",
+            "variants": True,
+            "variantPattern": "01..n",
+            "canonicalFilename": filename_prefix + _canonical_file_stem("base", "", slot, 1) + ".rbxm",
         })
 
     for definition in EMOTION_SLOT_CATALOG:
         slot=definition['slot']
         rows.append(dict(scope='emotions',context='emotions',group='emotions',state=slot,
-            label=definition['label'],variants=False,variantPattern='',
-            canonicalFilename=filename_prefix+_canonical_file_stem('emotions','',slot,0)+('.animation.json' if definition['execution']=='procedural' else '.rbxmx')))
+            label=definition['label'],variants=True,variantPattern='01..n',
+            canonicalFilename=filename_prefix+_canonical_file_stem('emotions','',slot,1)+('.animation.json' if definition['execution']=='procedural' else '.rbxmx')))
 
     for definition in social_slots_for(archetype):
         slot = definition["slot"]
         rows.append({
             "scope": "social", "context": "social", "group": "social", "state": slot,
-            "label": definition["label"], "variants": False, "variantPattern": "",
-            "canonicalFilename": filename_prefix + _canonical_file_stem("social", "", slot, 0) + ".rbxm",
+            "label": definition["label"], "variants": True, "variantPattern": "01..n",
+            "canonicalFilename": filename_prefix + _canonical_file_stem("social", "", slot, 1) + ".rbxm",
         })
 
     for weapon_set in WEAPON_SETS:
         for definition in _catalog_for_weapon(weapon_set).values():
             slot = definition["slot"]
-            has_variants = bool(definition.get("variants"))
-            example_variant = 1 if has_variants else 0
+            has_variants = True
+            example_variant = 1
             rows.append({
                 "scope": "weapon",
                 "context": weapon_set,
@@ -144,7 +153,7 @@ def filename_rule_catalog(character_id: str = "") -> list[dict]:
                 "state": slot,
                 "label": definition.get("label", slot),
                 "variants": has_variants,
-                "variantPattern": "01..n" if has_variants else "",
+                "variantPattern": "01..n",
                 "canonicalFilename": filename_prefix + _canonical_file_stem("weapon", weapon_set, slot, example_variant) + ".rbxm",
             })
 
@@ -160,14 +169,15 @@ def _safe_token(value: str) -> str:
 
 
 def _canonical_file_stem(scope: str, weapon_set: str, slot: str, variant: int) -> str:
+    """Canonical filename always carries its distinct numbered version."""
     slot_token = slot.replace(".", "_")
+    suffix = f"_{variant:02d}" if variant > 0 else ""  # only for pre-migration legacy rows
     if scope == "base":
-        return f"base_{slot_token}"
-    if scope == 'emotions':
-        return f'emotions_{slot_token}'
+        return f"base_{slot_token}{suffix}"
+    if scope == "emotions":
+        return f"emotions_{slot_token}{suffix}"
     if scope == "social":
-        return f"social_{slot_token}"
-    suffix = f"_{variant:02d}" if variant > 0 else ""
+        return f"social_{slot_token}{suffix}"
     return f"{weapon_set}_{slot_token}{suffix}"
 
 
@@ -209,28 +219,28 @@ def _strip_character_prefix(stem: str, character_id: str | None) -> str:
     return stem
 
 
-def normalize_manual_binding(scope: str, weapon_set: str, slot: str, variant: int | str = 0) -> dict:
+def normalize_manual_binding(scope: str, weapon_set: str, slot: str, variant: int | str = 1) -> dict:
     scope = _safe_token(str(scope or ""))
     weapon_set = _safe_token(str(weapon_set or ""))
     slot = _safe_token(str(slot or "")).replace("seated_enter", "seated.enter").replace("seated_loop", "seated.loop").replace("seated_exit", "seated.exit")
     try:
-        variant_number = max(0, int(variant or 0))
+        variant_number = max(1, int(variant or 1))
     except (TypeError, ValueError):
-        variant_number = 0
+        variant_number = 1
 
     if scope == "base":
         if slot not in SLOT_BY_BASE:
             raise ValueError(f"unknown base animation slot: {slot}")
         definition = SLOT_BY_BASE[slot]
-        return {"scope": "base", "weaponSet": "", "slot": slot, "variant": 0, **definition}
+        return {"scope": "base", "weaponSet": "", "slot": slot, "variant": variant_number, **definition}
 
     if scope == 'emotions':
         if slot not in SLOT_BY_EMOTION:raise ValueError('unknown emotion slot: '+slot)
-        return {'scope':'emotions','weaponSet':'','slot':slot,'variant':0,**SLOT_BY_EMOTION[slot]}
+        return {'scope':'emotions','weaponSet':'','slot':slot,'variant':variant_number,**SLOT_BY_EMOTION[slot]}
     if scope == "social":
         if slot not in SLOT_BY_SOCIAL:
             raise ValueError(f"unknown social animation slot: {slot}")
-        return {"scope": "social", "weaponSet": "", "slot": slot, "variant": 0, **SLOT_BY_SOCIAL[slot]}
+        return {"scope": "social", "weaponSet": "", "slot": slot, "variant": variant_number, **SLOT_BY_SOCIAL[slot]}
     if scope != "weapon":
         raise ValueError("animation scope must be base, weapon, social or emotions")
     if weapon_set not in WEAPON_SETS:
@@ -239,27 +249,31 @@ def normalize_manual_binding(scope: str, weapon_set: str, slot: str, variant: in
     if slot not in catalog:
         raise ValueError(f"slot {slot} is not available for {weapon_set}")
     definition = catalog[slot]
-    if definition.get("variants"):
-        variant_number = max(1, variant_number)
-    else:
-        variant_number = 0
+    variant_number = max(1, variant_number)
     return {"scope": "weapon", "weaponSet": weapon_set, "slot": slot, "variant": variant_number, **definition}
 
 
 def classify_animation(path: Path, character_id: str | None = None) -> dict | None:
-    """Map a Studio-exported clip filename to the canonical game1 semantic coordinate."""
+    """Map explicit _01/_02/... filenames to one semantic slot per version."""
     stem = _strip_character_prefix(_normalize_stem(path), character_id)
     if not stem:
         return None
-    if stem.startswith('emotions_'):
-        slot=stem[len('emotions_'):]
-        if slot in SLOT_BY_EMOTION:return normalize_manual_binding('emotions','',slot)
+    base, variant = _parse_variant(stem)
+    if variant < 1:
+        # New imports must be versioned. Historical unversioned bindings are
+        # converted by the migration without touching their Roblox Asset IDs.
+        # Legacy reference-form attacks are handled below.
+        pass
+    if variant >= 1 and base.startswith('emotions_'):
+        slot = base[len('emotions_'):]
+        if slot in SLOT_BY_EMOTION:
+            return normalize_manual_binding('emotions', '', slot, variant)
         return None
-
-    if stem.startswith("social_"):
-        slot = stem[len("social_"):]
-        allowed = {row["slot"] for row in social_slots_for(character_id or "")}
-        return normalize_manual_binding("social", "", slot) if slot in allowed else None
+    if variant >= 1 and base.startswith('social_'):
+        slot = base[len('social_'):]
+        if slot in SLOT_BY_SOCIAL:
+            return normalize_manual_binding('social', '', slot, variant)
+        return None
 
     base_aliases = {
         "idle": "idle", "base_idle": "idle", "walk": "walk", "base_walk": "walk",
@@ -276,49 +290,20 @@ def classify_animation(path: Path, character_id: str | None = None) -> dict | No
         "death": "death", "die": "death", "base_death": "death",
         "revive": "revive", "rise": "revive", "resurrection": "revive", "base_revive": "revive",
     }
-    if stem in base_aliases:
-        slot = base_aliases[stem]
-        return {"scope": "base", "weaponSet": "", "slot": slot, "variant": 0, **SLOT_BY_BASE[slot]}
+    if variant >= 1 and base in base_aliases:
+        return normalize_manual_binding('base', '', base_aliases[base], variant)
 
     for weapon_set in WEAPON_SETS:
         prefix = weapon_set + "_"
-        if not stem.startswith(prefix):
+        if not base.startswith(prefix) or variant < 1:
             continue
-        body, variant = _parse_variant(stem[len(prefix):])
         slot = {
             "idle": "idle", "combat_idle": "combat_idle", "attack_wait": "combat_idle",
             "walk": "walk", "run": "run", "attack": "attack",
             "special_attack": "special_attack", "aim": "aim",
-        }.get(body)
+        }.get(base[len(prefix):])
         catalog = _catalog_for_weapon(weapon_set)
         if slot in catalog:
-            if not catalog[slot].get("variants"):
-                variant = 0
-            elif variant <= 0:
-                variant = 1
-            return {"scope": "weapon", "weaponSet": weapon_set, "slot": slot, "variant": variant, **catalog[slot]}
+            return normalize_manual_binding('weapon', weapon_set, slot, variant)
 
-    # proven reference forms: Wait_1HS_*, AtkWait_Bow_*, Atk01_1HS_*, SpAtk02_Bow_*
-    tokens = stem.split("_")
-    weapon_index = next((i for i, token in enumerate(tokens) if token in WEAPON_SETS), None)
-    if weapon_index is None or weapon_index <= 0:
-        return None
-    head = tokens[0]
-    weapon_set = tokens[weapon_index]
-    slot = {"wait": "idle", "atkwait": "combat_idle", "walk": "walk", "run": "run"}.get(head)
-    variant = 0
-    if head == "aim" and weapon_set == "bow":
-        slot = "aim"
-    if slot is None:
-        attack_match = re.fullmatch(r"atk0*([0-9]+)", head)
-        special_match = re.fullmatch(r"spatk0*([0-9]+)", head)
-        if attack_match:
-            slot = "attack"
-            variant = max(1, int(attack_match.group(1)))
-        elif special_match:
-            slot = "special_attack"
-            variant = max(1, int(special_match.group(1)))
-    catalog = _catalog_for_weapon(weapon_set)
-    if slot in catalog:
-        return {"scope": "weapon", "weaponSet": weapon_set, "slot": slot, "variant": variant, **catalog[slot]}
     return None

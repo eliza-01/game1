@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Game1Shared:WaitForChild("character")
 local Registry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
+local VariantMerge = require(CharacterShared:WaitForChild("CharacterAnimationVariantMerge"))
 
 local AnimationResolver = {}
 local random = Random.new()
@@ -43,7 +44,7 @@ local function profileFor(character: Model)
 	return profile
 end
 
-function AnimationResolver.Resolve(character: Model, scope: string, weaponSet: string?, slot: string)
+function AnimationResolver.Resolve(character: Model, scope: string, weaponSet: string?, slot: string, variant: number?)
 	local profile = profileFor(character)
 	if not profile then
 		return nil
@@ -59,76 +60,54 @@ function AnimationResolver.Resolve(character: Model, scope: string, weaponSet: s
 	else
 		rows = profile.base and profile.base[slot]
 	end
-	if type(rows) ~= "table" or #rows == 0 then
-        local shared = Registry.shared and Registry.shared[profile.family or ""]
-        if shared then
-            if scope == "weapon" then
-                local group = shared.weapons and shared.weapons[tostring(weaponSet or "")]
-                rows = group and group[slot]
-            else
-                local group = shared[scope == "emotions" and "emotions" or scope == "social" and "social" or "base"]
-                rows = group and group[slot]
-            end
+    local shared = Registry.shared and Registry.shared[profile.family or ""]
+    local commonRows = nil
+    if shared then
+        if scope == "weapon" then
+            local group = shared.weapons and shared.weapons[tostring(weaponSet or "")]
+            commonRows = group and group[slot]
+        else
+            local group = shared[scope == "emotions" and "emotions" or scope == "social" and "social" or "base"]
+            commonRows = group and group[slot]
         end
     end
-	return weightedChoice(rows)
+    return weightedChoice(VariantMerge.Version(VariantMerge.Rows(rows, commonRows), variant))
 end
 
 function AnimationResolver.ListForCharacter(character: Model, includeProcedural: boolean?)
-	local profile = profileFor(character)
-	if not profile then
-		return {}
-	end
-	local rows = {}
-	for _, slotRows in pairs(profile.emotions or {}) do
-		for _, row in ipairs(slotRows) do
-			if includeProcedural or tostring(row.animationId or "") ~= "" then
-				table.insert(rows, row)
-			end
-		end
-	end
-	for _, slotRows in pairs(profile.social or {}) do
-		for _, row in ipairs(slotRows) do
-			table.insert(rows, row)
-		end
-	end
-	for _, slotRows in pairs(profile.base or {}) do
-		for _, row in ipairs(slotRows) do
-			table.insert(rows, row)
-		end
-	end
-	for _, weapon in pairs(profile.weapons or {}) do
-		for _, slotRows in pairs(weapon) do
-			for _, row in ipairs(slotRows) do
-				table.insert(rows, row)
-			end
-		end
-	end
-    local shared = Registry.shared and Registry.shared[profile.family or ""]
-    if shared then
-        for _, scope in ipairs({ "base", "emotions", "social" }) do
-            for slot, candidates in pairs(shared[scope] or {}) do
-                if not ((profile[scope] or {})[slot]) then
-                    for _, row in ipairs(candidates) do
-                        if includeProcedural or tostring(row.animationId or "") ~= "" then
-                            table.insert(rows, row)
-                        end
-                    end
-                end
-            end
-        end
-        for weaponSet, slots in pairs(shared.weapons or {}) do
-            local own = (profile.weapons or {})[weaponSet] or {}
-            for slot, candidates in pairs(slots) do
-                if not own[slot] then
-                    for _, row in ipairs(candidates) do
-                        table.insert(rows, row)
-                    end
-                end
+    local profile = profileFor(character)
+    if not profile then return {} end
+    local rows = {}
+    local shared = Registry.shared and Registry.shared[profile.family or ""] or {}
+    local function append(slotRows)
+        for _, row in ipairs(slotRows or {}) do
+            if includeProcedural or tostring(row.animationId or "") ~= "" then
+                table.insert(rows, row)
             end
         end
     end
-	return rows
+    for _, scope in ipairs({ "base", "emotions", "social" }) do
+        local own = profile[scope] or {}
+        local common = shared[scope] or {}
+        local keys = {}
+        for slot in pairs(own) do keys[slot] = true end
+        for slot in pairs(common) do keys[slot] = true end
+        for slot in pairs(keys) do append(VariantMerge.Rows(own[slot], common[slot])) end
+    end
+    local ownWeapons = profile.weapons or {}
+    local sharedWeapons = shared.weapons or {}
+    local sets = {}
+    for weaponSet in pairs(ownWeapons) do sets[weaponSet] = true end
+    for weaponSet in pairs(sharedWeapons) do sets[weaponSet] = true end
+    for weaponSet in pairs(sets) do
+        local own = ownWeapons[weaponSet] or {}
+        local common = sharedWeapons[weaponSet] or {}
+        local keys = {}
+        for slot in pairs(own) do keys[slot] = true end
+        for slot in pairs(common) do keys[slot] = true end
+        for slot in pairs(keys) do append(VariantMerge.Rows(own[slot], common[slot])) end
+    end
+    return rows
 end
 
 function AnimationResolver.ResolveLocomotion(character: Model, slot: string)

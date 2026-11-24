@@ -12,6 +12,9 @@ def _query(parsed, name: str) -> str:
 
 def route(parsed, sources, publication_config):
     path = parsed.path
+    if path == '/api/animations/publish-queue':
+        return 200, {'items': sources['animations'].pending_publications(),
+                     'publication': publication_config()}
     if path == '/api/npc-atlas-sources':
         return 200, sources['npc_atlas_sources'].snapshot()
     if path == '/api/armor':

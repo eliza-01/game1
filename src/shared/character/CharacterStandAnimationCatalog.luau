@@ -1,6 +1,7 @@
 --!strict
 -- Published animation clip catalog for Studio-only character test stands.
 -- Pure reader: does not load assets, choose gameplay states or mutate the registry.
+local Merge = require(script.Parent:WaitForChild("CharacterAnimationVariantMerge"))
 local Catalog = {}
 
 local function sortedKeys(dictionary: any): {string}
@@ -26,7 +27,7 @@ function Catalog.List(registry: any, profileId: string): {any}
                 table.insert(entries, {
                     clipId = tostring(clip.clipId or ""),
                     animationId = animationId,
-                    label = if weaponSet then scope .. "/" .. weaponSet .. "/" .. slot else scope .. "/" .. slot,
+                    label = (if weaponSet then scope .. "/" .. weaponSet .. "/" .. slot else scope .. "/" .. slot) .. string.format("_%02d", tonumber(clip.variant) or 1),
                     variant = tonumber(clip.variant) or 0,
                     priority = tostring(clip.priority or "Action"),
                     looped = clip.looped == true,
@@ -38,13 +39,11 @@ function Catalog.List(registry: any, profileId: string): {any}
     for _, scope in {"base", "emotions", "social"} do
         local own = profile[scope] or {}
         local inherited = shared[scope] or {}
-        for _, slot in sortedKeys(own) do
-            appendRows(scope, nil, slot, own[slot])
-        end
-        for _, slot in sortedKeys(inherited) do
-            if own[slot] == nil then
-                appendRows(scope, nil, slot, inherited[slot])
-            end
+        local keys = {}
+        for slot in pairs(own) do keys[slot] = true end
+        for slot in pairs(inherited) do keys[slot] = true end
+        for _, slot in sortedKeys(keys) do
+            appendRows(scope, nil, slot, Merge.Rows(own[slot], inherited[slot]))
         end
     end
     local ownWeapons = profile.weapons or {}
@@ -55,13 +54,11 @@ function Catalog.List(registry: any, profileId: string): {any}
     for _, weaponSet in sortedKeys(sets) do
         local own = ownWeapons[weaponSet] or {}
         local inherited = inheritedWeapons[weaponSet] or {}
-        for _, slot in sortedKeys(own) do
-            appendRows("weapon", weaponSet, slot, own[slot])
-        end
-        for _, slot in sortedKeys(inherited) do
-            if own[slot] == nil then
-                appendRows("weapon", weaponSet, slot, inherited[slot])
-            end
+        local keys = {}
+        for slot in pairs(own) do keys[slot] = true end
+        for slot in pairs(inherited) do keys[slot] = true end
+        for _, slot in sortedKeys(keys) do
+            appendRows("weapon", weaponSet, slot, Merge.Rows(own[slot], inherited[slot]))
         end
     end
     table.sort(entries, function(a, b)

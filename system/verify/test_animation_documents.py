@@ -11,8 +11,8 @@ from animation_core.common import classify_animation, EMOTION_SLOT_CATALOG
 class AnimationDocuments(AnimationReviewM178):
     # Inherit the real-store fixture and legacy contract cases as well.
     def package(self, procedural=False):
-        path=self.clip('human_male_emotions_blink.animation.json' if procedural else 'human_male_emotions_idle.rbxmx')
-        data=dict(schema_version=1,clip_name='emotions_blink' if procedural else 'emotions_idle',
+        path=self.clip('human_male_emotions_blink_01.animation.json' if procedural else 'human_male_emotions_idle_01.rbxmx')
+        data=dict(schema_version=1,clip_name='emotions_blink_01' if procedural else 'emotions_idle_01',
                   fps=30,frame_start=1,frame_end=91,looped=False,mode='procedural' if procedural else 'skeletal',
                   events=[dict(id='e1',name='blink',frame=31,time=1,parameters={'duration':.2})])
         if not procedural:data['animation_sha256']=hashlib.sha256(path.read_bytes()).hexdigest()
@@ -22,9 +22,9 @@ class AnimationDocuments(AnimationReviewM178):
 
     def test_all_emotion_names_and_legacy_names(self):
         for row in EMOTION_SLOT_CATALOG:
-            binding=classify_animation(Path('human_male_emotions_'+row['slot']+'.rbxmx'),'human_male')
+            binding=classify_animation(Path('human_male_emotions_'+row['slot']+'_01.rbxmx'),'human_male')
             self.assertEqual((binding['scope'],binding['slot']),('emotions',row['slot']))
-        self.assertEqual(classify_animation(Path('Atk02_1HS_FFighter.rbxm'))['variant'],2)
+        self.assertEqual(classify_animation(Path('human_male_1hs_attack_02.rbxm'),'human_male')['variant'],2)
 
     def test_sidecar_not_scanned_twice_and_registered_with_clip(self):
         _,_,data=self.package()
@@ -94,7 +94,7 @@ class AnimationDocuments(AnimationReviewM178):
 
     def test_failed_package_registration_rolls_back_database_and_files(self):
         self.package()
-        self.clip('human_male_base_walk.rbxm',b'walking')
+        self.clip('human_male_base_walk_01.rbxm',b'walking')
         review=self.store.preview_folder('human_male',str(self.inbox))
         original=self.store._register_source
         calls=[]
@@ -113,7 +113,7 @@ class AnimationDocuments(AnimationReviewM178):
         from services.animation_native import animation_upload_file
         from shutil import which
         if not which('rojo'):self.skipTest('Rojo not installed')
-        source=self.clip('human_male_emotions_idle.rbxmx',b'<roblox version="4"><Item class="KeyframeSequence"><Properties><string name="Name">idle</string></Properties><Item class="Keyframe"><Properties><float name="Time">0</float></Properties></Item></Item></roblox>')
+        source=self.clip('human_male_emotions_idle_01.rbxmx',b'<roblox version="4"><Item class="KeyframeSequence"><Properties><string name="Name">idle</string></Properties><Item class="Keyframe"><Properties><float name="Time">0</float></Properties></Item></Item></roblox>')
         raw=source.read_bytes()
         with animation_upload_file(source) as upload:
             self.assertTrue(upload.read_bytes().startswith(b'<roblox!'))

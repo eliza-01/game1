@@ -159,6 +159,14 @@ class AnimationSpeedScalingStore:
             if not path.is_file():
                 continue
             data = json.loads(path.read_text(encoding="utf-8"))
+            # A single published Animation ID can be consumed by both genders.
+            # Keep one catalog row per asset, with the declared consumers for UI
+            # discovery; never duplicate the authoring / override identity.
+            shared_ids = {
+                str(row.get("assetId") or "")
+                for row in data.get("shared", [])
+                if isinstance(row, dict)
+            } if kind == "character" else set()
             bindings: dict[str, list[dict]] = {}
             for binding in data.get("bindings", []):
                 bindings.setdefault(str(binding.get("clipId") or binding.get("clip_id") or ""), []).append(binding)
@@ -178,6 +186,13 @@ class AnimationSpeedScalingStore:
                         "kind": kind,
                         "subject": subject,
                         "channel": channel,
+                        "scope": str(binding.get("scope") or ""),
+                        "weaponSet": str(binding.get("weaponSet") or ""),
+                        "variant": int(binding.get("variant") or 1),
+                        "availableFor": (["human_male", "human_female"]
+                                         if kind == "character" and
+                                         (subject == "human_common" or asset_id in shared_ids)
+                                         else [subject]),
                         "stat": "RunSpeed" if channel in {"walk", "run"} else "AttackSpeed",
                     }
                     found.setdefault(asset_id, row)

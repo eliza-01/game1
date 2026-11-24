@@ -7,24 +7,24 @@
 
 | Имя исходника | Пол | Семантика |
 | --- | --- | --- |
-| `human_male_social_waiting_a.rbxm` | Male | Разминка (одноразовая) |
-| `human_female_social_waiting_a.rbxm` | Female | Разминка (одноразовая) |
-| `human_male_social_clap.rbxm` | Male | Аплодисменты |
-| `human_female_social_clap.rbxm` | Female | Аплодисменты |
-| `human_male_social_atk.rbxm` | Male | В бой, меч вперёд на 45° |
-| `human_male_social_victory.rbxm` | Male | Победа, меч вверх |
-| `human_female_social_atk.rbxm` | Female | В бой, меч вперёд на 45° |
-| `human_female_social_victory.rbxm` | Female | Победа, меч вверх |
-| `human_male_social_yes.rbxm` | Male | Согласие |
-| `human_female_social_yes.rbxm` | Female | Согласие |
-| `human_male_social_bow.rbxm` | Male | Поклон |
-| `human_female_social_bow.rbxm` | Female | Поклон |
-| `human_male_social_laugh.rbxm` | Male | Смех |
-| `human_female_social_laugh.rbxm` | Female | Смех |
-| `human_male_social_hi.rbxm` | Male | Приветствие |
-| `human_female_social_hi.rbxm` | Female | Приветствие |
-| `human_male_social_sad.rbxm` | Male | Грусть |
-| `human_female_social_sad.rbxm` | Female | Грусть |
+| `human_male_social_waiting_01.rbxm` | Male | Разминка (одноразовая) |
+| `human_female_social_waiting_01.rbxm` | Female | Разминка (одноразовая) |
+| `human_male_social_clap_01.rbxm` | Male | Аплодисменты |
+| `human_female_social_clap_01.rbxm` | Female | Аплодисменты |
+| `human_male_social_atk_01.rbxm` | Male | В бой, меч вперёд на 45° |
+| `human_male_social_victory_01.rbxm` | Male | Победа, меч вверх |
+| `human_female_social_atk_01.rbxm` | Female | В бой, меч вперёд на 45° |
+| `human_female_social_victory_01.rbxm` | Female | Победа, меч вверх |
+| `human_male_social_yes_01.rbxm` | Male | Согласие |
+| `human_female_social_yes_01.rbxm` | Female | Согласие |
+| `human_male_social_bow_01.rbxm` | Male | Поклон |
+| `human_female_social_bow_01.rbxm` | Female | Поклон |
+| `human_male_social_laugh_01.rbxm` | Male | Смех |
+| `human_female_social_laugh_01.rbxm` | Female | Смех |
+| `human_male_social_hi_01.rbxm` | Male | Приветствие |
+| `human_female_social_hi_01.rbxm` | Female | Приветствие |
+| `human_male_social_sad_01.rbxm` | Male | Грусть |
+| `human_female_social_sad_01.rbxm` | Female | Грусть |
 
 M463: добавлен `sad` (полнотелая социальная анимация, не лицевая `emotions.sad`) для обоих полов. Итого девять Social-действий и 18 семантических слотов. Никаких фиктивных Animation ID или дополнительных runtime-таблиц.
 

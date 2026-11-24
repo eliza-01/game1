@@ -1,13 +1,31 @@
 from __future__ import annotations
 
+from threading import Lock
+
 from .common import ANIMATION_EXTENSIONS, _now
 from opencloud_assets import create_animation_asset, wait_for_operation
 from animation_reimport_check import find_confirmed_manual_reimport
 from services.animation_native import animation_upload_file
 
 
+# One Host Agent cannot submit the same clip twice in parallel (two browser tabs).
+_inflight_guard = Lock()
+_inflight_clips: set[str] = set()
+
+
 class AnimationPublicationMixin:
     def publish_clip(self, clip_id: str, credentials: dict) -> dict:
+        with _inflight_guard:
+            if clip_id in _inflight_clips:
+                raise ValueError('animation publication already running for this clip')
+            _inflight_clips.add(clip_id)
+        try:
+            return self._publish_clip_unlocked(clip_id, credentials)
+        finally:
+            with _inflight_guard:
+                _inflight_clips.discard(clip_id)
+
+    def _publish_clip_unlocked(self, clip_id: str, credentials: dict) -> dict:
         with self.connect() as connection:
             raw = connection.execute("SELECT * FROM animation_clips WHERE id=?", (clip_id,)).fetchone()
         if not raw:

@@ -45,6 +45,10 @@ return table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 2.4,
 		}),
+		["123558039981038"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.8,
+		}),
 		["130243478044042"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 0.6,
@@ -61,9 +65,17 @@ return table.freeze({
 			stat = "AttackSpeed",
 			unitsPerPercent = 1.5,
 		}),
+		["137036143274780"] = table.freeze({
+			stat = "AttackSpeed",
+			unitsPerPercent = 1.5,
+		}),
 		["140129007932289"] = table.freeze({
 			stat = "AttackSpeed",
 			unitsPerPercent = 0.7,
+		}),
+		["140606693135980"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.55,
 		}),
 		["72958203766772"] = table.freeze({
 			stat = "AttackSpeed",
@@ -72,6 +84,10 @@ return table.freeze({
 		["77341804648662"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 0.55,
+		}),
+		["81941108455302"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.8,
 		}),
 		["85145236963317"] = table.freeze({
 			stat = "RunSpeed",
@@ -89,8 +105,28 @@ return table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 0.8,
 		}),
+		["94783167520529"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.6,
+		}),
 	}),
 	catalog = table.freeze({
+		["106354028305823"] = table.freeze({
+			label = "character / human_common / social_clap_01",
+			channel = "clap",
+		}),
+		["139636256337070"] = table.freeze({
+			label = "character / human_common / social_laugh_02",
+			channel = "laugh",
+		}),
+		["86287418093077"] = table.freeze({
+			label = "character / human_common / social_unaware_01",
+			channel = "unaware",
+		}),
+		["81698256953301"] = table.freeze({
+			label = "character / human_common / social_waiting_01",
+			channel = "waiting",
+		}),
 		["129682558481362"] = table.freeze({
 			label = "character / human_female / 1hs_attack_01",
 			channel = "attack",
@@ -104,35 +140,35 @@ return table.freeze({
 			channel = "attack",
 		}),
 		["76353644425278"] = table.freeze({
-			label = "character / human_female / 1hs_combat_idle",
+			label = "character / human_female / 1hs_combat_idle_01",
 			channel = "combat_idle",
 		}),
 		["112773584547454"] = table.freeze({
-			label = "character / human_female / 1hs_idle",
+			label = "character / human_female / 1hs_idle_01",
 			channel = "idle",
 		}),
 		["89877200678956"] = table.freeze({
-			label = "character / human_female / 1hs_run",
+			label = "character / human_female / 1hs_run_01",
 			channel = "run",
 		}),
 		["91826964629992"] = table.freeze({
-			label = "character / human_female / 1hs_walk",
+			label = "character / human_female / 1hs_walk_01",
 			channel = "walk",
 		}),
 		["107614308022042"] = table.freeze({
-			label = "character / human_female / base_death",
+			label = "character / human_female / base_death_01",
 			channel = "death",
 		}),
 		["96394674601402"] = table.freeze({
-			label = "character / human_female / base_jump_loop",
+			label = "character / human_female / base_jump_loop_01",
 			channel = "jump_loop",
 		}),
 		["124331685465753"] = table.freeze({
-			label = "character / human_female / base_jump_start",
+			label = "character / human_female / base_jump_start_01",
 			channel = "jump_start",
 		}),
 		["71151100957955"] = table.freeze({
-			label = "character / human_female / base_revive",
+			label = "character / human_female / base_revive_01",
 			channel = "revive",
 		}),
 		["127579361053055"] = table.freeze({
@@ -140,19 +176,19 @@ return table.freeze({
 			channel = "attack",
 		}),
 		["105422326147906"] = table.freeze({
-			label = "character / human_female / bow_combat_idle",
+			label = "character / human_female / bow_combat_idle_01",
 			channel = "combat_idle",
 		}),
 		["114054767776363"] = table.freeze({
-			label = "character / human_female / bow_idle",
+			label = "character / human_female / bow_idle_01",
 			channel = "idle",
 		}),
 		["130243478044042"] = table.freeze({
-			label = "character / human_female / bow_run",
+			label = "character / human_female / bow_run_01",
 			channel = "run",
 		}),
 		["134879106022438"] = table.freeze({
-			label = "character / human_female / bow_walk",
+			label = "character / human_female / bow_walk_01",
 			channel = "walk",
 		}),
 		["82219458610259"] = table.freeze({
@@ -160,16 +196,172 @@ return table.freeze({
 			channel = "attack",
 		}),
 		["72958203766772"] = table.freeze({
-			label = "character / human_female / hands_combat_idle",
+			label = "character / human_female / hands_combat_idle_01",
 			channel = "combat_idle",
 		}),
 		["134447739445281"] = table.freeze({
-			label = "character / human_female / hands_idle",
+			label = "character / human_female / hands_idle_01",
 			channel = "idle",
 		}),
 		["77341804648662"] = table.freeze({
-			label = "character / human_female / hands_run",
+			label = "character / human_female / hands_run_01",
 			channel = "run",
+		}),
+		["138317146623432"] = table.freeze({
+			label = "character / human_female / social_atk_01",
+			channel = "atk",
+		}),
+		["98881427457743"] = table.freeze({
+			label = "character / human_female / social_bow_01",
+			channel = "bow",
+		}),
+		["73991280791321"] = table.freeze({
+			label = "character / human_female / social_dance_01",
+			channel = "dance",
+		}),
+		["138371235727688"] = table.freeze({
+			label = "character / human_female / social_hi_01",
+			channel = "hi",
+		}),
+		["75544003795894"] = table.freeze({
+			label = "character / human_female / social_no_01",
+			channel = "no",
+		}),
+		["89209080006928"] = table.freeze({
+			label = "character / human_female / social_sad_01",
+			channel = "sad",
+		}),
+		["127736867161535"] = table.freeze({
+			label = "character / human_female / social_victory_01",
+			channel = "victory",
+		}),
+		["88848258307587"] = table.freeze({
+			label = "character / human_female / social_yes_01",
+			channel = "yes",
+		}),
+		["106676962056967"] = table.freeze({
+			label = "character / human_male / 1hs_attack_01",
+			channel = "attack",
+		}),
+		["139041038718083"] = table.freeze({
+			label = "character / human_male / 1hs_attack_02",
+			channel = "attack",
+		}),
+		["75231329593103"] = table.freeze({
+			label = "character / human_male / 1hs_attack_03",
+			channel = "attack",
+		}),
+		["133422596292935"] = table.freeze({
+			label = "character / human_male / 1hs_combat_idle_01",
+			channel = "combat_idle",
+		}),
+		["124961758388548"] = table.freeze({
+			label = "character / human_male / 1hs_idle_01",
+			channel = "idle",
+		}),
+		["123558039981038"] = table.freeze({
+			label = "character / human_male / 1hs_run_01",
+			channel = "run",
+		}),
+		["81941108455302"] = table.freeze({
+			label = "character / human_male / 1hs_walk_01",
+			channel = "walk",
+		}),
+		["124597466760206"] = table.freeze({
+			label = "character / human_male / base_death_01",
+			channel = "death",
+		}),
+		["139699991911427"] = table.freeze({
+			label = "character / human_male / base_fall_01",
+			channel = "fall",
+		}),
+		["102544716302150"] = table.freeze({
+			label = "character / human_male / base_revive_01",
+			channel = "revive",
+		}),
+		["116694310975365"] = table.freeze({
+			label = "character / human_male / bow_attack_01",
+			channel = "attack",
+		}),
+		["137036143274780"] = table.freeze({
+			label = "character / human_male / bow_combat_idle_01",
+			channel = "combat_idle",
+		}),
+		["114052617538895"] = table.freeze({
+			label = "character / human_male / bow_idle_01",
+			channel = "idle",
+		}),
+		["94783167520529"] = table.freeze({
+			label = "character / human_male / bow_run_01",
+			channel = "run",
+		}),
+		["125331371585949"] = table.freeze({
+			label = "character / human_male / bow_walk_01",
+			channel = "walk",
+		}),
+		["71666921186730"] = table.freeze({
+			label = "character / human_male / hands_attack_01",
+			channel = "attack",
+		}),
+		["73922774068806"] = table.freeze({
+			label = "character / human_male / hands_combat_idle_01",
+			channel = "combat_idle",
+		}),
+		["71474375261472"] = table.freeze({
+			label = "character / human_male / hands_idle_01",
+			channel = "idle",
+		}),
+		["140606693135980"] = table.freeze({
+			label = "character / human_male / hands_run_01",
+			channel = "run",
+		}),
+		["137509593149945"] = table.freeze({
+			label = "character / human_male / hands_walk_01",
+			channel = "walk",
+		}),
+		["138087829046951"] = table.freeze({
+			label = "character / human_male / social_atk_01",
+			channel = "atk",
+		}),
+		["72956152466710"] = table.freeze({
+			label = "character / human_male / social_bow_01",
+			channel = "bow",
+		}),
+		["137968752312649"] = table.freeze({
+			label = "character / human_male / social_dance_01",
+			channel = "dance",
+		}),
+		["103661798744962"] = table.freeze({
+			label = "character / human_male / social_hi_01",
+			channel = "hi",
+		}),
+		["70777876737713"] = table.freeze({
+			label = "character / human_male / social_laugh_01",
+			channel = "laugh",
+		}),
+		["79357566032423"] = table.freeze({
+			label = "character / human_male / social_no_01",
+			channel = "no",
+		}),
+		["103336706133741"] = table.freeze({
+			label = "character / human_male / social_sad_01",
+			channel = "sad",
+		}),
+		["119004317256557"] = table.freeze({
+			label = "character / human_male / social_sp_wait_01",
+			channel = "sp_wait",
+		}),
+		["79619539771101"] = table.freeze({
+			label = "character / human_male / social_unaware_01",
+			channel = "unaware",
+		}),
+		["127068855452023"] = table.freeze({
+			label = "character / human_male / social_victory_01",
+			channel = "victory",
+		}),
+		["97634051523504"] = table.freeze({
+			label = "character / human_male / social_yes_01",
+			channel = "yes",
 		}),
 		["101898400862842"] = table.freeze({
 			label = "monster / gremlin / attack_01",

@@ -10,6 +10,7 @@ local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineCo
 local CharacterAttackHitEnd = require(CombatShared:WaitForChild("CharacterAttackHitEnd"))
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
+local VariantMerge = require(CharacterShared:WaitForChild("CharacterAnimationVariantMerge"))
 local AttackAimGeometry = require(CombatShared:WaitForChild("AttackAimGeometry"))
 local MeleeMovingFacing = require(CombatShared:WaitForChild("MeleeMovingFacing"))
 local BowAimGeometry = require(CombatShared:WaitForChild("BowAimGeometry"))
@@ -35,24 +36,18 @@ local pendingBowReleases: { [Player]: any } = {}
 local function rowsForEquippedAttack(character: Model): any
     local profileId = tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")
     local profile = CharacterAnimationRegistry.profiles[profileId]
-    if not profile then
-        return nil
-    end
-
+    if not profile then return nil end
+    local shared = CharacterAnimationRegistry.shared and CharacterAnimationRegistry.shared[profile.family or ""]
     local weaponSet = tostring(character:GetAttribute("AnimationWeaponSet") or "")
     if weaponSet ~= "" and weaponSet ~= "base" and weaponSet ~= "unarmed" then
-        local weapon = profile.weapons and profile.weapons[weaponSet]
-        if weapon and weapon.attack then return weapon.attack end
-        local shared = CharacterAnimationRegistry.shared and CharacterAnimationRegistry.shared[profile.family or ""]
-        local sharedWeapon = shared and shared.weapons and shared.weapons[weaponSet]
-        if sharedWeapon and sharedWeapon.attack then return sharedWeapon.attack end
+        local ownWeapon = profile.weapons and profile.weapons[weaponSet]
+        local commonWeapon = shared and shared.weapons and shared.weapons[weaponSet]
+        local rows = VariantMerge.Rows(ownWeapon and ownWeapon.attack, commonWeapon and commonWeapon.attack)
+        if #rows > 0 then return rows end
         -- In particular, a bow may NEVER fire using the fallback hands clip.
         if weaponSet == "bow" then return nil end
     end
-    local ownAttack = profile.base and profile.base.attack
-    if ownAttack then return ownAttack end
-    local shared = CharacterAnimationRegistry.shared and CharacterAnimationRegistry.shared[profile.family or ""]
-    return shared and shared.base and shared.base.attack or nil
+    return VariantMerge.Rows(profile.base and profile.base.attack, shared and shared.base and shared.base.attack)
 end
 
 local function allowedAttackDescriptor(character: Model, clipId: string): any?

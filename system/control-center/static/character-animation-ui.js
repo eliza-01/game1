@@ -11,8 +11,8 @@
     const data=api.state().animations||{}, items=data.items||[], catalog=data.filenameRules||[];
     if(!showMissing)return items.concat(data.inherited||[]);
     const present=items.concat(data.inherited||[]);
-    const missing=catalog.filter(def=>!present.some(row=>row.scope===def.scope&&context(row)===def.context&&row.slot===def.state)).map(def=>({
-      scope:def.scope,weapon_set:(['base','emotions','social'].includes(def.context))?'':def.context,slot:def.state,variant:def.variants?1:0,
+    const missing=catalog.filter(def=>def.context!=='common'&&!present.some(row=>row.scope===def.scope&&context(row)===def.context&&row.slot===def.state&&Number(row.variant||0)===1)).map(def=>({
+      scope:def.scope,weapon_set:(['base','emotions','social'].includes(def.context))?'':def.context,slot:def.state,variant:1,
       name:def.canonicalFilename,source_path:'',status:'MISSING',missing:true,weight:0,binding_id:null,asset_id:''}));
     return present.concat(missing);
   }
@@ -49,7 +49,7 @@
       select.selectedIndex=-1;
     }
     const selected=candidates.find(row=>row.bindingId===commonSelection);
-    button.disabled=busy||!selected||!selected.ready||selected.selected;
+    button.disabled=busy||api.state().animationPublishing||!selected||!selected.ready||selected.selected;
     button.textContent=selected?.replacesSource&&!selected?.selected?'заменить источник common':'назначить common';
     $('animation-common-details').textContent=selected
       ?`${selected.sourceCharacter} · ${selected.name} · ${selected.assetId} · ${selected.ready?selected.compatibility:'недоступно: '+selected.reason}${selected.selected?' · уже common':''}`
@@ -58,8 +58,11 @@
   function renderShared(){
     const data=api.state().animations||{}, host=$('animation-shared-rows');
     if(!host)return;
-    host.innerHTML=(data.shared||[]).map(row=>`<div class="animation-scan-item"><span><b>${safe(row.scope)} · ${safe(row.slot)}</b><small>${safe(row.source_character)} · ${safe(row.asset_id||'—')} · ${safe(row.status)}</small></span><button type="button" data-shared-remove="${safe(row.source_binding_id)}">отменить common</button></div>`).join('')||'<p class="muted">Общих анимаций пока нет.</p>';
+    const sharedRows=(data.shared||[]).map(row=>`<div class="animation-scan-item"><span><b>${safe(row.scope)} · ${safe(row.slot)}_${String(row.variant||1).padStart(2,'0')}</b><small>${safe(row.sourceFilename||row.source_character)} · ${safe(row.asset_id||'—')} · ${safe(row.status)}${row.sourceFilename?' · общий клип имеет приоритет':''}</small></span><button type="button" data-shared-remove="${safe(row.source_binding_id)}">отменить common</button></div>`).join('');
+    const pendingRows=(data.commonPending||[]).map(row=>`<div class="animation-scan-item"><span><b>human_common · ${safe(row.name)}</b><small>${safe(row.status)} · ${safe(row.clip_id)} · публикация требуется</small></span>${row.status==='LOCAL_ONLY'?`<button type="button" data-common-publish="${safe(row.clip_id)}" ${api.state().animationPublishing?'disabled':''}>publish</button>`:'<small>Replace из исходного профиля</small>'}</div>`).join('');
+    host.innerHTML=sharedRows+pendingRows||'<p class="muted">Общих анимаций пока нет.</p>';
     host.querySelectorAll('[data-shared-remove]').forEach(btn=>btn.onclick=()=>setCommon(btn.dataset.sharedRemove,false));
+    host.querySelectorAll('[data-common-publish]').forEach(btn=>btn.onclick=()=>api.publish(btn.dataset.commonPublish));
     renderCommonPicker();
     document.querySelectorAll('[data-animation-gender]').forEach(btn=>{
       const char=(data.characters||[]).find(c=>c.id===api.state().animationCharacter);
@@ -81,7 +84,7 @@
       const timing=attack&&timelineByClip?.get(row.clip_id);
       const timingLabel=timelineByClip===null?'таймлайн: не проверен':timing?.configured?'таймлайн: готов':'таймлайн: нужен HitEnd';
       const tr=document.createElement('tr');tr.className=(row.binding_id&&row.binding_id===s.animationSelected?'active ':'')+(row.missing?'animation-empty-row':'');
-      tr.innerHTML=`<td><span class="context-chip ${safe(row.scope)}">${safe(context(row))}</span></td><td><b>${safe(row.slot)}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${safe(row.name||'—')}${row.source_path?`<br><small class="animation-source-path" title="${safe(row.source_path)}">${safe(row.source_path)}</small>`:''}</td><td>${safe(row.asset_id||'—')}</td><td><span class="tag ${safe(String(row.status).toLowerCase())}">${safe(row.status)}</span>${row.user_attested?'<small class="animation-timeline-status required">Replaced · user attested, not verified</small>':''}${attack?`<small class="animation-timeline-status ${timing?.configured?'ready':'required'}">${safe(timingLabel)}</small>`:''}</td><td>${row.missing||row.inherited?'—':`<input data-weight class="weight-input" type="number" min="1" max="10000" value="${safe(row.weight||100)}">`}</td><td>${row.missing?'Требуется файл':row.inherited?`common · ${safe(row.sourceCharacter)} · read only`:`<div class="row-actions"><button data-open>детали</button>${row.document_only?'программное состояние':row.asset_id?`<button data-replace>${row.status==='CHANGED'?'проверить / replace':'replace'}</button>`:`<button data-publish ${row.status==='LOCAL_ONLY'?'':'disabled'}>publish</button>`}${row.asset_id?`<button data-share type="button">common</button>`:''}${attack?'<button data-timeline type="button">таймлайн удара</button>':''}<button data-delete class="danger">удалить</button></div>`}</td>`;
+      tr.innerHTML=`<td><span class="context-chip ${safe(row.scope)}">${safe(context(row))}</span></td><td><b>${safe(row.slot)}_${String(row.variant||1).padStart(2,'0')}</b></td><td>${row.variant?String(row.variant).padStart(2,'0'):'—'}</td><td>${safe(row.name||'—')}${row.source_path?`<br><small class="animation-source-path" title="${safe(row.source_path)}">${safe(row.source_path)}</small>`:''}</td><td>${safe(row.asset_id||'—')}</td><td><span class="tag ${safe(String(row.status).toLowerCase())}">${safe(row.status)}</span>${row.overriddenByCommon?'<small>common активен · эта личная анимация сохранена</small>':''}${row.user_attested?'<small class="animation-timeline-status required">Replaced · user attested, not verified</small>':''}${attack?`<small class="animation-timeline-status ${timing?.configured?'ready':'required'}">${safe(timingLabel)}</small>`:''}</td><td>${row.missing||row.inherited?'—':`<input data-weight class="weight-input" type="number" min="1" max="10000" value="${safe(row.weight||100)}">`}</td><td>${row.missing?'Требуется файл':row.inherited?`common · ${safe(row.sourceCharacter)} · read only`:`<div class="row-actions"><button data-open>детали</button>${row.document_only?'программное состояние':row.asset_id?`<button data-replace>${row.status==='CHANGED'?'проверить / replace':'replace'}</button>`:`<button data-publish ${row.status==='LOCAL_ONLY'&&!api.state().animationPublishing?'':'disabled'}>publish</button>`}${row.asset_id?`<button data-share type="button">common</button>`:''}${attack?'<button data-timeline type="button">таймлайн удара</button>':''}<button data-delete class="danger">удалить</button></div>`}</td>`;
       if(!row.missing&&!row.inherited){tr.querySelector('[data-open]').onclick=()=>{s.animationSelected=row.binding_id;api.render()};tr.querySelector('[data-weight]').onchange=e=>api.weight(row.binding_id,e.target.value);tr.querySelector('[data-publish]')?.addEventListener('click',()=>api.publish(row.clip_id));tr.querySelector('[data-replace]')?.addEventListener('click',()=>openReplacement(row));tr.querySelector('[data-timeline]')?.addEventListener('click',()=>api.openTimeline(row.clip_id));tr.querySelector('[data-share]')?.addEventListener('click',()=>setCommon(row.binding_id,true));tr.querySelector('[data-delete]').onclick=()=>api.remove(row.binding_id)}
       tr.dataset.context=context(row);tr.dataset.slot=row.slot;host.append(tr);
     }
@@ -112,10 +115,10 @@
   }
   function renderScan(){const host=$('animation-scan-review');if(!scan)return;const items=scan.items||[];
     const count=x=>items.filter(r=>r.status===x).length;
-    host.innerHTML=`<p><strong>${safe(scan.characterId)}</strong> · ${scan.filesScanned} файлов · ${count('NEW')} новых · ${count('UNCHANGED')} без изменений · ${count('REPLACE_REQUIRED')} требуют Replace · ${(scan.unassigned||[]).length} с неверными именами</p><p class="animation-info">Сканирование ничего не зарегистрировало и не опубликовало. Выбери новые файлы. Опубликованные анимации заменяются только через их строку.</p><div class="animation-scan-list">${items.map((row,index)=>`<label class="animation-scan-item"><input type="checkbox" data-review-index="${index}" ${row.selectable?'checked':'disabled'}><span><strong>${safe(row.filename)}</strong><small>${safe(context(row))} / ${safe(row.slot)} ${row.variant?'· '+row.variant:''}</small></span><span class="animation-review-status ${row.status==='NEW'?'new':''}">${safe(row.status)}</span></label>`).join('')}${(scan.unassigned||[]).map(row=>`<div class="animation-scan-item animation-invalid"><span><strong>${safe(row.filename)}</strong><small>${safe(row.reason)}</small></span><span>Неверное имя</span></div>`).join('')}</div><div class="animation-review-result" id="animation-review-result" aria-live="polite"></div>`;
+    host.innerHTML=`<p><strong>${safe(scan.characterId)}</strong> · ${scan.filesScanned} файлов · ${count('NEW')} новых · ${count('UNCHANGED')} без изменений · ${count('REPLACE_REQUIRED')} требуют Replace · ${(scan.unassigned||[]).length} с неверными именами</p><p class="animation-info">Папка может содержать Male, Female и human_common. Файл направляется в профиль по префиксу имени; Common публикуется один раз. Опубликованные клипы заменяются только через их строку.</p><div class="animation-scan-list">${items.map((row,index)=>`<label class="animation-scan-item"><input type="checkbox" data-review-index="${index}" ${row.selectable?'checked':'disabled'}><span><strong>${safe(row.filename)}</strong><small>${safe(row.common?'common · male + female':row.ownerCharacterId+' · '+context(row))} / ${safe(row.slot)} ${row.variant?'· '+row.variant:''}</small></span><span class="animation-review-status ${row.status==='NEW'?'new':''}">${safe(row.status)}</span></label>`).join('')}${(scan.unassigned||[]).map(row=>`<div class="animation-scan-item animation-invalid"><span><strong>${safe(row.filename)}</strong><small>${safe(row.reason)}</small></span><span>Неверное имя</span></div>`).join('')}</div><div class="animation-review-result" id="animation-review-result" aria-live="polite"></div>`;
     syncScanPublishButton();
   }
-  async function scanFolder(){if(busy)return;const s=api.state();const characterId=s.animationCharacter;const path=$('animation-folder-path').value.trim();if(!path||!characterId){api.toast('Выбери персонажа и папку',true);return;}busy=true;scan=null;syncScanPublishButton();$('scan-animations').disabled=true;
+  async function scanFolder(){if(busy||api.state().animationPublishing)return;const s=api.state();const characterId=s.animationCharacter;const path=$('animation-folder-path').value.trim();if(!path||!characterId){api.toast('Выбери персонажа и папку',true);return;}busy=true;scan=null;syncScanPublishButton();$('scan-animations').disabled=true;
     try{
       const preview=await api.request('/api/animations/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId,rootPath:path})});
       if(api.state().animationCharacter!==characterId){api.toast('Персонаж изменился во время сканирования. Повтори Scan folder.',true);return;}
@@ -123,17 +126,23 @@
     }catch(e){api.toast(e.message,true)}finally{busy=false;syncScanPublishButton();api.render()}
   }
   async function registerSelected(){
-    if(!scan||busy)return;
+    if(!scan||busy||api.state().animationPublishing)return;
     if(scan.characterId!==api.state().animationCharacter){api.toast('Выбран другой персонаж. Повтори Scan folder.',true);syncScanPublishButton();return;}
     const items=[...$('animation-scan-review').querySelectorAll('[data-review-index]:checked')]
       .map(input=>scan.items?.[Number(input.dataset.reviewIndex)]).filter(row=>row?.selectable);
     if(!items.length){syncScanPublishButton();return;}
-    busy=true;syncScanPublishButton();let registered=0,published=0,documents=0,committed=false;const report=$('animation-review-result');report.innerHTML='';
-    try{const result=await api.request('/api/animations/register-selected',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:scan.characterId,rootPath:scan.rootPath,items:items.map(r=>({path:r.path,sha256:r.sha256,documentSha256:r.documentSha256||''}))})});registered=result.count;committed=true;report.textContent=`Зарегистрировано: ${registered}. Публикация…`;
-      for(const row of result.registered){try{if(row.documentOnly||row.metadataOnly){documents++;report.textContent=`Документы применены: ${documents} · опубликовано: ${published}`;continue;}await api.request('/api/animations/'+encodeURIComponent(row.clipId)+'/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:'Game1 Character Animation '+scan.characterId})});published++;report.textContent=`Зарегистрировано ${registered} · опубликовано ${published}/${registered}`}catch(e){report.textContent=`Зарегистрировано ${registered} · опубликовано ${published}. Остановлено: ${e.message}. Неопубликованные остаются в профиле — повтори Publish из их строки.`;break;}}
-      await api.load();if(published+documents===registered)report.textContent=`Done! Зарегистрировано ${registered} · опубликовано ${published} · документов применено ${documents}.`;
-    }catch(e){report.textContent='Не выполнено: '+e.message;api.toast(e.message,true)}finally{busy=false;if(committed)scan=null;syncScanPublishButton();api.render()}
+    busy=true;syncScanPublishButton();let registered=0,committed=false;const report=$('animation-review-result');report.innerHTML='';
+    try{
+      const result=await api.request('/api/animations/register-selected',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({characterId:scan.characterId,rootPath:scan.rootPath,items:items.map(r=>({path:r.path,sha256:r.sha256,documentSha256:r.documentSha256||''}))})});
+      registered=result.count;committed=true;
+      report.textContent=`Зарегистрировано: ${registered}. Очередь публикации отображается над таблицей.`;
+      const summary=await window.game1AnimationPublishQueue.publishRegistered(result.registered||[]);
+      report.textContent=`Зарегистрировано: ${registered} · опубликовано: ${summary.published} · документов: ${summary.documents}. `+
+        (summary.failed?'Ошибка публикации — смотри очередь. Неопубликованные клипы сохранены.':'Очередь завершена.');
+    }catch(e){report.textContent='Не выполнено: '+e.message;api.toast(e.message,true)}
+    finally{busy=false;if(committed)scan=null;syncScanPublishButton();api.render()}
   }
+
   function syncManualConfirm(){
     const el=$('animation-replace-manual');if(!el)return;
     el.disabled=busy||replacing?.status!=='CHANGED'||

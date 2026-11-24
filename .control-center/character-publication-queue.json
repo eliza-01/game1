@@ -584,6 +584,44 @@
           "asset_id": "81549103854113"
         }
       ]
+    },
+    {
+      "schema_version": 1,
+      "id": "30927712-2e7b-420a-9c40-59297311930d",
+      "status": "completed",
+      "started_at": 1795552843.9548812,
+      "finished_at": 1795552858.8254485,
+      "items": [
+        {
+          "kind": "rig",
+          "id": "human_male",
+          "revision": 2,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "95340066576649"
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "id": "0ce748f8-6cc0-4211-b918-a61665a623cc",
+      "status": "completed",
+      "started_at": 1795553151.85684,
+      "finished_at": 1795553164.7851753,
+      "items": [
+        {
+          "kind": "rig",
+          "id": "human_male",
+          "revision": 3,
+          "status": "succeeded",
+          "step": "Published",
+          "error": "",
+          "warning": "",
+          "asset_id": "88385664023269"
+        }
+      ]
     }
   ]
 }

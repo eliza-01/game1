@@ -49,6 +49,10 @@ return table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 0.8,
 		}),
+		["125331371585949"] = table.freeze({
+			stat = "RunSpeed",
+			unitsPerPercent = 0.8,
+		}),
 		["130243478044042"] = table.freeze({
 			stat = "RunSpeed",
 			unitsPerPercent = 0.6,
@@ -78,6 +82,10 @@ return table.freeze({
 			unitsPerPercent = 0.55,
 		}),
 		["72958203766772"] = table.freeze({
+			stat = "AttackSpeed",
+			unitsPerPercent = 0.8,
+		}),
+		["73922774068806"] = table.freeze({
 			stat = "AttackSpeed",
 			unitsPerPercent = 0.8,
 		}),

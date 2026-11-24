@@ -102,6 +102,11 @@
       "unitsPerPercent": 0.8
     },
     {
+      "assetId": "125331371585949",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 0.8
+    },
+    {
       "assetId": "130243478044042",
       "stat": "RunSpeed",
       "unitsPerPercent": 0.6
@@ -138,6 +143,11 @@
     },
     {
       "assetId": "72958203766772",
+      "stat": "AttackSpeed",
+      "unitsPerPercent": 0.8
+    },
+    {
+      "assetId": "73922774068806",
       "stat": "AttackSpeed",
       "unitsPerPercent": 0.8
     },

@@ -1,0 +1,55 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'../control-center/static');
+const api=require(path.join(root,'animation-speed-filters.js'));
+
+const male={assetId:'111',stat:'RunSpeed'};
+const female={assetId:'222',stat:'AttackSpeed'};
+const clipMale={subject:'human_male',name:'human_male_weapon_hands_run_01',kind:'character',scope:'weapon',channel:'run',clipId:'run_01'};
+const clipFemale={subject:'human_female',name:'human_female_social_laugh_02',kind:'character',scope:'social',channel:'laugh',clipId:'laugh_02'};
+const shared={subject:'human_common',name:'human_common_social_laugh_02',kind:'character',scope:'social',channel:'laugh',availableFor:['human_male','human_female']};
+let state=api.read(null);
+assert.deepEqual(state,{saved:[],active:[]});
+state=api.add(state,'_male');
+assert.deepEqual(state,{saved:['_male'],active:['_male']});
+assert.equal(api.canAdd(state,'_male'),false);
+state=api.add(state,'run');
+assert.deepEqual(state.active,['_male','run']);
+assert.equal(api.matches(male,clipMale,'',state.active),true);
+assert.equal(api.matches(female,clipFemale,'',state.active),false,'_male must not match the substring in female');
+assert.equal(api.matches(male,clipMale,'social',state.active),false,'typed search and active filters combine');
+assert.equal(api.matches(male,clipMale,'',[]),true);
+assert.equal(api.matches(female,clipFemale,'_female',[]),true);
+assert.equal(api.matches(male,clipMale,'_female',[]),false);
+state=api.toggle(state,'run');
+assert.deepEqual(state.active,['_male']);
+state=api.remove(state,'_male');
+assert.deepEqual(state,{saved:['run'],active:[]});
+state=api.add(state,'social');
+assert.equal(api.matches({assetId:'333',stat:'AttackSpeed'},shared,'',state.active),true);
+state=api.clear(state);
+assert.equal(state.saved.length,2);
+assert.equal(state.active.length,0,'clearing active filters preserves saved presets');
+assert.deepEqual(api.read(JSON.stringify(state)),state,'saved presets survive reload');
+assert.deepEqual(api.read('{broken json'),{saved:[],active:[]});
+assert.deepEqual(api.read('{"saved":["abc","ABC","",null],"active":["ABC","missing"]}'),{saved:['abc'],active:['abc']});
+let limited=api.read({saved:Array.from({length:40},(_,i)=>`filter_${i}`),active:[]});
+assert.equal(limited.saved.length,api.MAX);
+assert.equal(api.canAdd(limited,'overflow'),false);
+
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const script=fs.readFileSync(path.join(root,'animation-speed.js'),'utf8');
+const css=fs.readFileSync(path.join(root,'asset-manager.css'),'utf8');
+for(const id of ['custom-scaling-filter','custom-scaling-save-filter','custom-scaling-reset-filter','custom-scaling-filter-chips','custom-scaling-rows']){
+  assert.ok(html.includes(`id="${id}"`),`missing ${id}`);
+}
+assert.ok(html.indexOf('animation-speed-filters.js')<html.indexOf('animation-speed.js'));
+assert.ok(script.includes('customFilterApi.matches('));
+assert.ok(script.includes('customScalingRememberFilters()'));
+assert.ok(script.includes('customScalingFilterControls()'));
+assert.ok(script.includes('custom-scaling-clip">') && !script.includes('custom-scaling-clip-meta'));
+assert.ok(css.includes('custom-scaling-origin'));
+assert.ok(css.includes('custom-scaling-action'));
+console.log('m476: saved override filters, strict gender matching, readable UI contracts ok');

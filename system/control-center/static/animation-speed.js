@@ -62,9 +62,40 @@ function customScalingInherited(clip){
   return {stat:rule?.stat||clip.stat||'AttackSpeed',unitsPerPercent:rule?.unitsPerPercent||1};
 }
 const CUSTOM_SCALING_PAGE_SIZE=40;
+const customFilterApi=window.game1AnimationSpeedFilters;
+let customFilterState=customFilterApi.read(null);
+try{customFilterState=customFilterApi.read(localStorage.getItem(customFilterApi.KEY))}catch{}
+function customScalingRememberFilters(){
+  try{localStorage.setItem(customFilterApi.KEY,JSON.stringify(customFilterState))}catch{}
+}
+function customScalingFilterControls(){
+  const field=$('custom-scaling-filter');
+  const save=$('custom-scaling-save-filter');
+  const clear=$('custom-scaling-reset-filter');
+  const chips=$('custom-scaling-filter-chips');
+  if(!field||!save||!clear||!chips)return;
+  save.disabled=!customFilterApi.canAdd(customFilterState,field.value);
+  clear.disabled=!customFilterState.active.length&&!field.value.trim();
+  chips.innerHTML=customFilterState.saved.length?customFilterState.saved.map((name,index)=>{
+    const active=customFilterState.active.includes(name);
+    return `<span class="custom-scaling-filter-chip${active?' active':''}">
+      <button type="button" data-filter-toggle="${index}" aria-pressed="${active}" title="${active?'Выключить':'Включить'} фильтр ${esc(name)}">${esc(name)}</button>
+      <button type="button" class="custom-scaling-filter-remove" data-filter-remove="${index}" aria-label="Удалить фильтр ${esc(name)}">×</button>
+    </span>`;
+  }).join(''):'<span class="custom-scaling-filter-empty">Нет сохранённых фильтров</span>';
+  for(const button of chips.querySelectorAll('[data-filter-toggle]'))button.onclick=()=>{
+    customFilterState=customFilterApi.toggle(customFilterState,customFilterState.saved[Number(button.dataset.filterToggle)]);
+    animationSpeedState.overridePage=0;customScalingRememberFilters();customScalingRender();
+  };
+  for(const button of chips.querySelectorAll('[data-filter-remove]'))button.onclick=()=>{
+    customFilterState=customFilterApi.remove(customFilterState,customFilterState.saved[Number(button.dataset.filterRemove)]);
+    animationSpeedState.overridePage=0;customScalingRememberFilters();customScalingRender();
+  };
+}
 function customScalingRender(){
   const list=$('custom-scaling-rows'),results=$('custom-scaling-results');
   if(!list||!results)return;
+  customScalingFilterControls();
   const catalog=customScalingCatalog(),saved=customScalingSaved();
   const byId=new Map(catalog.map(c=>[c.assetId,c]));
   // Published catalog is always visible. Custom overrides below are only a
@@ -98,10 +129,16 @@ function customScalingRender(){
       (p.rules||[]).some(r=>r.channel===c.channel)
     );
     const defaultLabel=hasStateRule?`State rule · ${policy.stat}`:'Default · 100%';
+    const action=[c.scope||c.channel,c.weaponSet,c.channel].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' · ');
     return `<div class="custom-scaling-catalog-row" role="listitem">
-      <div class="custom-scaling-clip"><strong>${esc(c.subject)} · ${esc(c.name)}</strong>
-      <small>${esc(c.kind)} / ${esc(c.scope||c.channel)}${c.weaponSet?' / '+esc(c.weaponSet):''} / ${esc(c.channel)} · ${esc(c.assetId)}${c.availableFor?.length>1?' · for '+esc(c.availableFor.join(', ')):''}</small></div>
-      <span class="custom-scaling-catalog-status ${existing?'active':''}">${esc(existing?'Custom · '+existing.stat:defaultLabel)}</span>
+      <div class="custom-scaling-clip">
+        <strong>${esc(c.name)}</strong>
+        <span class="custom-scaling-catalog-subject">${esc(c.subject||c.kind||'animation')}</span>
+        <span class="custom-scaling-catalog-action">${esc(action||'animation')}</span>
+        <code class="custom-scaling-catalog-id">id ${esc(c.assetId)}</code>
+        ${c.availableFor?.length>1?'<span class="custom-scaling-catalog-shared" title="Shared by '+esc(c.availableFor.join(', '))+'">Male + Female</span>':''}
+      </div>
+      <span class="custom-scaling-catalog-status ${existing?'active':hasStateRule?'inherited':'default'}">${esc(existing?'Custom · '+existing.stat:defaultLabel)}</span>
       <button type="button" data-custom-pick="${esc(c.assetId)}">${existing?'Edit':'Configure'}</button>
     </div>`;
   }).join(''):'<span class="muted">No published animations match. Change filters or refresh the catalog.</span>';
@@ -118,18 +155,18 @@ function customScalingRender(){
     const aid=button.dataset.customPick;
     if(!saved.some(row=>row.assetId===aid))saved.push({assetId:aid,...customScalingInherited(byId.get(aid)),_draft:true});
     animationSpeedState.overrideFilter='';
+    // Selecting a catalog item must reveal its row even when saved filters hide it.
+    customFilterState=customFilterApi.clear(customFilterState);
+    customScalingRememberFilters();
     const order=[...saved].sort((a,b)=>(byId.get(a.assetId)?.name||a.assetId).localeCompare(byId.get(b.assetId)?.name||b.assetId));
     animationSpeedState.overridePage=Math.floor(order.findIndex(row=>row.assetId===aid)/CUSTOM_SCALING_PAGE_SIZE);
     const filter=$('custom-scaling-filter');if(filter)filter.value='';
     customScalingRender();
     list.querySelector(`[data-custom-row="${aid}"]`)?.scrollIntoView({block:'nearest'});
   };
-  const query=animationSpeedState.overrideFilter.trim().toLowerCase();
-  const filtered=saved.filter(row=>{
-    const c=byId.get(row.assetId);
-    return !query||[row.assetId,row.stat,c?.name,c?.subject,c?.kind,c?.channel,c?.clipId]
-      .some(value=>String(value||'').toLowerCase().includes(query));
-  }).sort((a,b)=>{
+  const filtered=saved.filter(row=>customFilterApi.matches(
+    row,byId.get(row.assetId),animationSpeedState.overrideFilter,customFilterState.active
+  )).sort((a,b)=>{
     const ca=byId.get(a.assetId),cb=byId.get(b.assetId);
     return String(ca?.name||a.assetId).localeCompare(String(cb?.name||b.assetId));
   });
@@ -140,11 +177,16 @@ function customScalingRender(){
   const status=$('custom-scaling-count');
   if(status)status.textContent=`${filtered.length} / ${saved.length} overrides`;
   list.innerHTML=pageRows.length?`<div class="custom-scaling-table" role="table" aria-label="Clip scaling overrides">
-    <div class="custom-scaling-table-head" role="row"><span>Анимация</span><span>Stat</span><span>Ед./1%</span><span>Действия</span></div>
+    <div class="custom-scaling-table-head" role="row"><span>Анимация и профиль</span><span>Характеристика</span><span>Ед. / +1%</span><span>Управление</span></div>
     ${pageRows.map(row=>{
       const c=byId.get(row.assetId);
       return `<div class="custom-scaling-table-row" role="row" data-custom-row="${esc(row.assetId)}">
-        <div class="custom-scaling-clip" title="${esc(c?.name||row.assetId)}"><strong>${esc(c?.name||row.assetId)}</strong><small>${esc(c?.subject||c?.kind||'registered')} · ${esc(c?.channel||'')} · ${esc(row.assetId)}${row._draft?' · NEW':''}</small></div>
+        <div class="custom-scaling-clip"><strong>${esc(c?.name||row.assetId)}</strong>
+          <span class="custom-scaling-origin">${esc(c?.subject||c?.kind||'registered')}</span>
+          <span class="custom-scaling-action">${esc([c?.scope,c?.channel].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' · ')||'animation')}</span>
+          <code class="custom-scaling-asset-id">id ${esc(row.assetId)}</code>
+          ${row._draft?'<span class="custom-scaling-draft">new</span>':''}
+        </div>
         <label class="custom-scaling-cell"><span class="sr-only">Gameplay stat</span><select aria-label="Stat for ${esc(c?.name||row.assetId)}" data-custom-stat><option value="AttackSpeed" ${row.stat==='AttackSpeed'?'selected':''}>AttackSpeed</option><option value="RunSpeed" ${row.stat==='RunSpeed'?'selected':''}>RunSpeed</option></select></label>
         <label class="custom-scaling-cell"><span class="sr-only">Units per 1 percent</span><input aria-label="Units per 1% for ${esc(c?.name||row.assetId)}" data-custom-units type="number" min="0.001" max="1000" step="0.01" value="${esc(animationSpeedFormat(row.unitsPerPercent))}"></label>
         <div class="custom-scaling-table-actions"><button data-custom-apply class="primary" type="button" title="Сохранить override">Save</button><button data-custom-remove type="button" title="${row._draft?'Отменить':'Удалить override'}">${row._draft?'Cancel':'Remove'}</button></div>
@@ -186,18 +228,26 @@ $('custom-scaling-search').oninput=e=>{animationSpeedState.search=e.target.value
 $('custom-scaling-kind').onchange=e=>{animationSpeedState.catalogKind=e.target.value;animationSpeedState.catalogSubject='';animationSpeedState.catalogPage=0;customScalingRender()};
 $('custom-scaling-subject').onchange=e=>{animationSpeedState.catalogSubject=e.target.value;animationSpeedState.catalogPage=0;customScalingRender()};
 
-// Controls live beside the existing list, so older Control Center markup is
-// still compatible without copying/replacing the entire HTML template.
-const customRowsHost=$('custom-scaling-rows');
-if(customRowsHost&&!$('custom-scaling-filter')){
-  customRowsHost.insertAdjacentHTML('beforebegin',`<div class="custom-scaling-toolbar">
-    <label>Filter overrides <input type="search" id="custom-scaling-filter" autocomplete="off" placeholder="name, subject, channel, ID"></label>
-    <span id="custom-scaling-count" aria-live="polite">0 overrides</span>
-  </div>`);
-  customRowsHost.insertAdjacentHTML('afterend','<div id="custom-scaling-pages" class="custom-scaling-pages" hidden></div>');
-}
 $('custom-scaling-filter').oninput=e=>{
   animationSpeedState.overrideFilter=e.target.value;
   animationSpeedState.overridePage=0;
   customScalingRender();
 };
+$('custom-scaling-filter').onkeydown=e=>{
+  if(e.key==='Enter'){e.preventDefault();$('custom-scaling-save-filter').click()}
+};
+$('custom-scaling-save-filter').onclick=()=>{
+  const label=$('custom-scaling-filter').value;
+  if(!customFilterApi.canAdd(customFilterState,label))return;
+  customFilterState=customFilterApi.add(customFilterState,label);
+  animationSpeedState.overrideFilter='';$('custom-scaling-filter').value='';
+  animationSpeedState.overridePage=0;
+  customScalingRememberFilters();customScalingRender();
+};
+$('custom-scaling-reset-filter').onclick=()=>{
+  customFilterState=customFilterApi.clear(customFilterState);
+  animationSpeedState.overrideFilter='';$('custom-scaling-filter').value='';
+  animationSpeedState.overridePage=0;
+  customScalingRememberFilters();customScalingRender();
+};
+customScalingFilterControls();

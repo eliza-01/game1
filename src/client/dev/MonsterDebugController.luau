@@ -106,8 +106,6 @@ local function createGui()
         collapsed=value
         body.Visible=not value; title.Visible=not value; subtitle.Visible=not value
         toggle.Text="×"; toggle.Position=UDim2.fromOffset(PANEL_WIDTH-COLLAPSED,0)
-        launcher.BackgroundColor3=if value then COLORS.control else COLORS.selected
-        launcher.TextColor3=if value then COLORS.text else COLORS.accent
         panel.Visible=not value
         aggroFolder.Parent=if value then nil else Workspace; attackFolder.Parent=if value then nil else Workspace
     end
@@ -120,9 +118,14 @@ local function createGui()
     playerGui:GetAttributeChangedSignal(OPEN_ATTRIBUTE):Connect(function() setCollapsed(playerGui:GetAttribute(OPEN_ATTRIBUTE)~=PANEL_ID) end)
     setCollapsed(playerGui:GetAttribute(OPEN_ATTRIBUTE)~=PANEL_ID)
 
-    local remotes=ReplicatedStorage:WaitForChild("Game1Remotes")
-    local catalogRemote=remotes:WaitForChild("GetMonsterDebugCatalog") :: RemoteFunction
-    local applyRemote=remotes:WaitForChild("ApplyMonsterDebug") :: RemoteFunction
+    StudioDebugDock.Bind(PANEL_ID, launcher, panel, PANEL_WIDTH)
+    -- NPC asset loading can delay the server's optional debug service. Never
+    -- block the launcher or keep a stale reference to the remote folder.
+    local function findRemote(name: string): RemoteFunction?
+        local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
+        local remote = remotes and remotes:FindFirstChild(name)
+        return if remote and remote:IsA("RemoteFunction") then remote else nil
+    end
 
     local function renderSelected()
         selectedRow=rows[selectedIndex]
@@ -140,6 +143,8 @@ local function createGui()
     end
 
     local function refreshCatalog()
+        local catalogRemote = findRemote("GetMonsterDebugCatalog")
+        if not catalogRemote then stateText.Text = "Waiting for server debug service…"; return end
         local previousId=selectedRow and tostring(selectedRow.id) or ""
         local ok,result=pcall(function() return catalogRemote:InvokeServer() end)
         if not ok or type(result)~="table" then return end
@@ -151,6 +156,8 @@ local function createGui()
 
     local function applyPatch(patch:any)
         if busy or not selectedRow then return end
+        local applyRemote = findRemote("ApplyMonsterDebug")
+        if not applyRemote then stateText.Text = "Waiting for server debug service…"; return end
         busy=true
         local ok,result=pcall(function() return applyRemote:InvokeServer(selectedRow.id,patch) end)
         busy=false
@@ -196,7 +203,7 @@ local function createGui()
     end)
 
     task.spawn(function()
-        while gui.Parent do refreshCatalog(); task.wait(POLL_SECONDS) end
+        while gui.Parent do if not collapsed then refreshCatalog() end; task.wait(POLL_SECONDS) end
     end)
     gui.Destroying:Connect(function() aggroFolder:Destroy(); attackFolder:Destroy() end)
 end

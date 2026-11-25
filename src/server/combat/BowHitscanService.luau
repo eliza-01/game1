@@ -22,6 +22,7 @@ local swayOk, swayModule = pcall(function()
 end)
 local LandscapeSwayService = if swayOk then swayModule else nil
 
+local TestIsolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
 local Service = {}
 local remote: RemoteEvent? = nil
 local started = false
@@ -238,6 +239,7 @@ function Service.Release(player: Player, character: Model, snapshot: any): (bool
         target = nil
     end
     if not withinRange then target = nil end
+    if target and not TestIsolation.Allows(character, target) then target = nil end
 
     local hitPart: BasePart? = if allowed and withinRange and snapshot.contactPart
         and snapshot.contactPart:IsA("BasePart") and snapshot.contactPart.Parent

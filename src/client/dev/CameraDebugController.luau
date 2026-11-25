@@ -165,14 +165,21 @@ function Debug.Start()
         end)
     end
     refresh()
-    opener.MouseButton1Click:Connect(function()
-        panel.Visible=not panel.Visible
-        if panel.Visible then
-            values=CameraController.GetSettings()
-            refresh()
-        end
+    local playerGui = player:WaitForChild("PlayerGui")
+    local function syncPanel()
+        local open = playerGui:GetAttribute("Game1DebugPanelOpen") == "CD"
+        panel.Visible = open
+        if open then values = CameraController.GetSettings(); refresh() end
+    end
+    opener.Activated:Connect(function()
+        playerGui:SetAttribute("Game1DebugPanelOpen", if panel.Visible then "" else "CD")
     end)
-    close.MouseButton1Click:Connect(function()panel.Visible=false end)
+    close.Activated:Connect(function()
+        if playerGui:GetAttribute("Game1DebugPanelOpen") == "CD" then playerGui:SetAttribute("Game1DebugPanelOpen", "") end
+    end)
+    playerGui:GetAttributeChangedSignal("Game1DebugPanelOpen"):Connect(syncPanel)
+    StudioDebugDock.Bind("CD", opener, panel, 362)
+    syncPanel()
 end
 
 return table.freeze(Debug)

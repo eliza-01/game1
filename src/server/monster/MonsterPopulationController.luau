@@ -41,8 +41,15 @@ function MonsterPopulationController.new(spawnOne: (any) -> Model?): any
         state.creating += 1
         local ok, result = pcall(spawnOne, state)
         state.creating -= 1
+        local constructing = state.testConstructing
+        state.testConstructing = nil
         if not ok then
+            if constructing and state.dispose then state.dispose(state, constructing) end
             warn("[game1][monster-spawn] could not create monster: " .. tostring(result))
+            return nil
+        end
+        if result and not state.enabled then
+            if state.dispose then state.dispose(state, result) end
             return nil
         end
         return result
@@ -73,7 +80,7 @@ function MonsterPopulationController.new(spawnOne: (any) -> Model?): any
     end
 
     function controller:ScheduleRespawn(state: any, diedAt: number?)
-        if state.enabled then
+        if state.enabled and not state.record.testNoRespawn then
             local delaySeconds = math.max(0, finite(state.record.respawnSeconds, 10))
             -- The timer belongs to this death, not the spawn record. Corpse
             -- retention still occupies maxAlive until it has been released.
@@ -92,6 +99,26 @@ function MonsterPopulationController.new(spawnOne: (any) -> Model?): any
                 end
             end)
         end
+    end
+
+    function controller:AddTest(record: any, dispose: (any, Model) -> ()): any
+        local key = tostring(record.spawnId)
+        assert(states[key] == nil, "Duplicate test spawn ID")
+        local state = {record=record, enabled=true, instances={}, creating=0, dispose=dispose}
+        states[key] = state
+        return state
+    end
+    function controller:FillTest(state: any): Model?
+        if not state.enabled then return nil end
+        return spawnReserved(state)
+    end
+    function controller:RemoveTest(state: any)
+        state.enabled = false
+        states[tostring(state.record.spawnId)] = nil
+        if state.testConstructing then state.dispose(state, state.testConstructing) end
+        local models = {}
+        for model in pairs(state.instances) do table.insert(models, model) end
+        for _, model in ipairs(models) do state.dispose(state, model) end
     end
 
     function controller:Start(): number

@@ -233,11 +233,11 @@ def check_monster_contracts(
     if "normalize('NFKD')" not in monster_js_text:
         report_error("monster slug preview must normalize unicode names")
 
-    for required in ["CritChance = 0"]:
+    for required in ["CritChance = Balance.Rules.critChance"]:
         if required not in stats_config_text:
             report_error(f"character critical stat missing {required}")
-    if 'setBase(character, "CritChance", value("CritChance"))' not in stats_service_text:
-        report_error("character critical chance is not initialized from archetype starting stats")
+    if 'setBase(character, "CritChance", Balance.Rules.critChance)' not in stats_service_text:
+        report_error("character critical chance is not initialized from Balance")
     for required in ['"slot": "death"', '"slot": "revive"']:
         if required not in animation_store_text:
             report_error(f"character life animation catalog missing {required}")

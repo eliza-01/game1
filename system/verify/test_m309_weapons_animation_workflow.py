@@ -83,7 +83,7 @@ class WorkflowM309(unittest.TestCase):
         self.assertIn('game1AssetWorkflowDialog',script)
         self.assertIn("game1WeaponAtlasPicker.render('weapon-workflow-atlas'",script)
         html=(ROOT/'system/control-center/static/index.html').read_text()
-        self.assertIn('weapon-workflow.js?v=309',html)
+        self.assertRegex(html,r'weapon-workflow\.js\?v=\d+')
         self.assertIn('weapon-register-disclosure',html)
         self.assertIn('animation-replace-manual',html)
         for file in ['weapon-workflow.js','weapon-assets.js','weapon-atlas-picker.js',

@@ -109,15 +109,15 @@ def check_weapon_registration(
         if required not in attack_controller_text:
             err(f"client full-animation attack lock missing {required}")
 
-    if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui or 'id="weapon-stat-attack-speed"' not in ui:
+    if 'id="nav-weapons"' not in ui or 'id="register-weapon"' not in ui:
         err("asset manager weapon registration section is missing")
-    if 'id="weapon-attack-radius"' not in ui:
-        err("weapon registration must expose attack radius in studs")
+    if 'id="balance-panel"' not in ui or 'id="weapon-attack-radius"' in ui:
+        err("weapon gameplay authoring must live in Database Balance")
     if 'id="weapon-test-loadout"' in ui or 'id="save-weapon-test-loadout"' in ui:
         err("studio test loadout must not live in the web asset manager")
     weapon_js_path = ROOT / "system/control-center/static/weapon-assets.js"
     weapon_js_text = weapon_js_path.read_text(encoding="utf-8") if weapon_js_path.is_file() else ""
-    for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate", "attackRadiusStuds", "weapon-attack-radius"]:
+    for required in ["weaponSlugify", "weaponRegister", "weaponPublish", "weaponSync", "weaponActivate"]:
         if required not in weapon_js_text:
             err(f"asset manager weapon ui missing {required}")
     for required in ["attack_radius_studs", "ATTACK_RADIUS_DEFAULT", "attackRadiusStuds"]:
@@ -162,8 +162,8 @@ def check_weapon_registration(
     for row in weapon_manifest.get("items") or []:
         if row.get("weapon_type") != "bow" and not 1 <= float(row.get("melee_arc_angle_degrees") or 0) <= 360:
             err(f"M358 weapon arc angle invalid: {row.get('slug')}")
-    if 'id="weapon-melee-arc-angle"' not in ui or 'data-ww-arc' not in (ROOT / "system/control-center/static/weapon-workflow.js").read_text(encoding="utf-8"):
-        err("M358 per-weapon arc editor missing")
+    if 'id="weapon-melee-arc-angle"' in ui or 'arc' not in (ROOT / 'system/control-center/static/game-balance.js').read_text(encoding='utf-8'):
+        err("per-weapon arc editor must live in Database Balance")
     if "MELEE_ARC_DEFAULT = 108.0" not in weapon_store_text or "melee_arc_angle_degrees" not in weapon_store_text:
         err("M358 per-weapon arc migration missing")
     return stats_config_text, stats_service_text, movement_config_text

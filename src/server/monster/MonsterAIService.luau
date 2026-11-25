@@ -149,6 +149,12 @@ local function runAgent(agent: any)
             continue
         end
         updateTarget(agent, now)
+        -- updateTarget can start Return when the player dies or respawns.
+        -- Do not fall through to NoTarget/leaveCombat and strand the monster.
+        if agent.returning then
+            updateReturn(agent)
+            continue
+        end
         local target = agent.target
         if target then
             if agent.lastDamageAt <= 0 then agent.lastDamageAt = now end

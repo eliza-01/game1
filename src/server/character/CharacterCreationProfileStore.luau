@@ -4,6 +4,7 @@
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Balance = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("balance"):WaitForChild("Balance"))
 local Store = {}
 Store.__index = Store
 local records: {[Player]: any} = {}
@@ -49,7 +50,8 @@ function Store.Load(player: Player): (any?, boolean)
     if type(raw) == "table" and raw.schemaVersion == 1 and
         (raw.archetype == "human_male" or raw.archetype == "human_female") and type(raw.appearance) == "table" then
         records[player] = {schemaVersion = 1, archetype = raw.archetype,
-            appearance = raw.appearance, lastWorldCFrame = raw.lastWorldCFrame}
+            appearance = raw.appearance, lastWorldCFrame = raw.lastWorldCFrame,
+            xp = Balance.NormalizeXP(raw.xp), gold = Balance.NormalizeGold(raw.gold)}
     end
     committed[player] = records[player] ~= nil and ok
     return records[player], ok
@@ -93,7 +95,7 @@ function Store.Save(player: Player): boolean
 end
 function Store.Create(player: Player, archetype: string, appearance: any): (boolean, boolean)
     if records[player] then return true, committed[player] == true end
-    local candidate = {schemaVersion = 1, archetype = archetype, appearance = appearance}
+    local candidate = {schemaVersion = 1, archetype = archetype, appearance = appearance, xp = 0, gold = 0}
     local saved, existing = writeRecord(player, candidate, true)
     if player.Parent ~= Players then return false, false end
     if existing ~= nil then
@@ -118,11 +120,14 @@ function Store.Create(player: Player, archetype: string, appearance: any): (bool
     return true, saved
 end
 function Store.RememberPosition(player: Player, character: Model?): boolean
-    if not records[player] or not character or character:GetAttribute("LifeState") ~= "Alive" then return false end
-    local root = character:FindFirstChild("RootCollider")
-    if root and root:IsA("BasePart") then
-        local frame = safeFrame(root.CFrame)
-        if frame then records[player].lastWorldCFrame = frame end
+    if not records[player] then return false end
+    -- Progression must persist even if the player is dead or at selection.
+    if character and character:GetAttribute("Game1GameplayTestOwner") == nil and character:GetAttribute("LifeState") == "Alive" then
+        local root = character:FindFirstChild("RootCollider")
+        if root and root:IsA("BasePart") then
+            local frame = safeFrame(root.CFrame)
+            if frame then records[player].lastWorldCFrame = frame end
+        end
     end
     local saved = Store.Save(player)
     return saved

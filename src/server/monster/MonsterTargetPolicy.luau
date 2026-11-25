@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
+local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
 local MonsterTargetPolicy = {}
 local ATTACK_ARC_DEGREES = 110
 local VERTICAL_TOLERANCE = 5
@@ -70,7 +71,7 @@ local function acquireNearestTarget(agent: any): Model?
     for _, player in ipairs(Players:GetPlayers()) do
         local character = player.Character
         local targetRoot = rootOf(character)
-        if targetIsValid(character) and targetRoot then
+        if targetIsValid(character) and targetRoot and Isolation.Allows(agent.model, character) then
             local distance = horizontalDistance(agent.root.Position, targetRoot.Position)
             if distance <= closestDistance then closestDistance = distance; closest = character end
         end
@@ -80,7 +81,7 @@ end
 
 local function attackStillConnects(agent: any, target: Model): boolean
     local targetRoot = rootOf(target)
-    if not targetIsValid(target) or not targetRoot then return false end
+    if not targetIsValid(target) or not targetRoot or not Isolation.Allows(agent.model, target) then return false end
     local delta = horizontalDelta(agent.root.Position, targetRoot.Position)
     if delta.Magnitude > attackRadius(agent) or math.abs(targetRoot.Position.Y - agent.root.Position.Y) > VERTICAL_TOLERANCE then return false end
     if delta.Magnitude > 0.001 then

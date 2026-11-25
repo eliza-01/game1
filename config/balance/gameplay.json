@@ -1,0 +1,926 @@
+{
+  "schemaVersion": 1,
+  "rules": {
+    "baseDamage": 5,
+    "critChance": 8,
+    "upgradePercent": 6.67,
+    "maxUpgrade": 10,
+    "headshotMultiplier": 1.5,
+    "critMultiplier": 2
+  },
+  "levels": [
+    {
+      "level": 1,
+      "hp": 100,
+      "xpNext": 60
+    },
+    {
+      "level": 2,
+      "hp": 120,
+      "xpNext": 125
+    },
+    {
+      "level": 3,
+      "hp": 145,
+      "xpNext": 220
+    },
+    {
+      "level": 4,
+      "hp": 170,
+      "xpNext": 335
+    },
+    {
+      "level": 5,
+      "hp": 200,
+      "xpNext": 480
+    },
+    {
+      "level": 6,
+      "hp": 230,
+      "xpNext": 650
+    },
+    {
+      "level": 7,
+      "hp": 265,
+      "xpNext": 845
+    },
+    {
+      "level": 8,
+      "hp": 300,
+      "xpNext": 1065
+    },
+    {
+      "level": 9,
+      "hp": 335,
+      "xpNext": 1310
+    },
+    {
+      "level": 10,
+      "hp": 370,
+      "xpNext": 1585
+    },
+    {
+      "level": 11,
+      "hp": 410,
+      "xpNext": 1885
+    },
+    {
+      "level": 12,
+      "hp": 445,
+      "xpNext": 2220
+    },
+    {
+      "level": 13,
+      "hp": 485,
+      "xpNext": 2580
+    },
+    {
+      "level": 14,
+      "hp": 530,
+      "xpNext": 2970
+    },
+    {
+      "level": 15,
+      "hp": 570,
+      "xpNext": 3380
+    },
+    {
+      "level": 16,
+      "hp": 615,
+      "xpNext": 3825
+    },
+    {
+      "level": 17,
+      "hp": 660,
+      "xpNext": 4290
+    },
+    {
+      "level": 18,
+      "hp": 705,
+      "xpNext": 4790
+    },
+    {
+      "level": 19,
+      "hp": 750,
+      "xpNext": 5310
+    },
+    {
+      "level": 20,
+      "hp": 800,
+      "xpNext": 5860
+    },
+    {
+      "level": 21,
+      "hp": 850,
+      "xpNext": 6435
+    },
+    {
+      "level": 22,
+      "hp": 900,
+      "xpNext": 7040
+    },
+    {
+      "level": 23,
+      "hp": 950,
+      "xpNext": 7670
+    },
+    {
+      "level": 24,
+      "hp": 1005,
+      "xpNext": 8330
+    },
+    {
+      "level": 25,
+      "hp": 1060,
+      "xpNext": 9010
+    },
+    {
+      "level": 26,
+      "hp": 1115,
+      "xpNext": 9725
+    },
+    {
+      "level": 27,
+      "hp": 1170,
+      "xpNext": 10460
+    },
+    {
+      "level": 28,
+      "hp": 1230,
+      "xpNext": 11230
+    },
+    {
+      "level": 29,
+      "hp": 1290,
+      "xpNext": 12020
+    },
+    {
+      "level": 30,
+      "hp": 1350,
+      "xpNext": 12840
+    },
+    {
+      "level": 31,
+      "hp": 1410,
+      "xpNext": 13685
+    },
+    {
+      "level": 32,
+      "hp": 1475,
+      "xpNext": 14560
+    },
+    {
+      "level": 33,
+      "hp": 1540,
+      "xpNext": 15460
+    },
+    {
+      "level": 34,
+      "hp": 1605,
+      "xpNext": 16390
+    },
+    {
+      "level": 35,
+      "hp": 1670,
+      "xpNext": 0
+    }
+  ],
+  "weapons": [
+    {
+      "id": "weapon_001",
+      "level": 1,
+      "type": "sword",
+      "rarity": "common",
+      "damage": 15,
+      "price": 0,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 30
+    },
+    {
+      "id": "weapon_002",
+      "level": 1,
+      "type": "dagger",
+      "rarity": "common",
+      "damage": 11,
+      "price": 0,
+      "attackSpeedDelta": 35,
+      "radius": 3,
+      "arc": 80,
+      "upgradePrice": 30
+    },
+    {
+      "id": "weapon_003",
+      "level": 1,
+      "type": "bigsword",
+      "rarity": "common",
+      "damage": 21,
+      "price": 0,
+      "attackSpeedDelta": -25,
+      "radius": 10,
+      "arc": 125,
+      "upgradePrice": 30
+    },
+    {
+      "id": "weapon_004",
+      "level": 1,
+      "type": "bow",
+      "rarity": "common",
+      "damage": 18,
+      "price": 0,
+      "attackSpeedDelta": -15,
+      "radius": 40,
+      "arc": 108,
+      "upgradePrice": 30
+    },
+    {
+      "id": "weapon_005",
+      "level": 10,
+      "type": "sword",
+      "rarity": "common",
+      "damage": 40,
+      "price": 1000,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 300
+    },
+    {
+      "id": "weapon_006",
+      "level": 10,
+      "type": "dagger",
+      "rarity": "common",
+      "damage": 31,
+      "price": 1000,
+      "attackSpeedDelta": 35,
+      "radius": 3,
+      "arc": 80,
+      "upgradePrice": 300
+    },
+    {
+      "id": "weapon_007",
+      "level": 10,
+      "type": "bigsword",
+      "rarity": "common",
+      "damage": 53,
+      "price": 1000,
+      "attackSpeedDelta": -25,
+      "radius": 10,
+      "arc": 125,
+      "upgradePrice": 300
+    },
+    {
+      "id": "weapon_008",
+      "level": 10,
+      "type": "bow",
+      "rarity": "common",
+      "damage": 47,
+      "price": 1000,
+      "attackSpeedDelta": -15,
+      "radius": 40,
+      "arc": 108,
+      "upgradePrice": 300
+    },
+    {
+      "id": "weapon_009",
+      "level": 20,
+      "type": "sword",
+      "rarity": "common",
+      "damage": 75,
+      "price": 2000,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 600
+    },
+    {
+      "id": "weapon_010",
+      "level": 20,
+      "type": "dagger",
+      "rarity": "common",
+      "damage": 59,
+      "price": 2000,
+      "attackSpeedDelta": 35,
+      "radius": 3,
+      "arc": 80,
+      "upgradePrice": 600
+    },
+    {
+      "id": "weapon_011",
+      "level": 20,
+      "type": "bigsword",
+      "rarity": "common",
+      "damage": 99,
+      "price": 2000,
+      "attackSpeedDelta": -25,
+      "radius": 10,
+      "arc": 125,
+      "upgradePrice": 600
+    },
+    {
+      "id": "weapon_012",
+      "level": 20,
+      "type": "bow",
+      "rarity": "common",
+      "damage": 87,
+      "price": 2000,
+      "attackSpeedDelta": -15,
+      "radius": 40,
+      "arc": 108,
+      "upgradePrice": 600
+    },
+    {
+      "id": "weapon_013",
+      "level": 30,
+      "type": "sword",
+      "rarity": "common",
+      "damage": 120,
+      "price": 3000,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 900
+    },
+    {
+      "id": "weapon_014",
+      "level": 30,
+      "type": "dagger",
+      "rarity": "common",
+      "damage": 95,
+      "price": 3000,
+      "attackSpeedDelta": 35,
+      "radius": 3,
+      "arc": 80,
+      "upgradePrice": 900
+    },
+    {
+      "id": "weapon_015",
+      "level": 30,
+      "type": "bigsword",
+      "rarity": "common",
+      "damage": 157,
+      "price": 3000,
+      "attackSpeedDelta": -25,
+      "radius": 10,
+      "arc": 125,
+      "upgradePrice": 900
+    },
+    {
+      "id": "weapon_016",
+      "level": 30,
+      "type": "bow",
+      "rarity": "common",
+      "damage": 139,
+      "price": 3000,
+      "attackSpeedDelta": -15,
+      "radius": 40,
+      "arc": 108,
+      "upgradePrice": 900
+    },
+    {
+      "id": "weapon_017",
+      "level": 5,
+      "type": "sword",
+      "rarity": "common",
+      "damage": 26,
+      "price": 500,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 150
+    },
+    {
+      "id": "weapon_018",
+      "level": 5,
+      "type": "dagger",
+      "rarity": "common",
+      "damage": 20,
+      "price": 500,
+      "attackSpeedDelta": 35,
+      "radius": 3,
+      "arc": 80,
+      "upgradePrice": 150
+    },
+    {
+      "id": "weapon_019",
+      "level": 5,
+      "type": "bigsword",
+      "rarity": "common",
+      "damage": 35,
+      "price": 500,
+      "attackSpeedDelta": -25,
+      "radius": 10,
+      "arc": 125,
+      "upgradePrice": 150
+    },
+    {
+      "id": "weapon_020",
+      "level": 5,
+      "type": "bow",
+      "rarity": "common",
+      "damage": 31,
+      "price": 500,
+      "attackSpeedDelta": -15,
+      "radius": 40,
+      "arc": 108,
+      "upgradePrice": 150
+    },
+    {
+      "id": "weapon_021",
+      "level": 15,
+      "type": "sword",
+      "rarity": "common",
+      "damage": 58,
+      "price": 1500,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 450
+    },
+    {
+      "id": "weapon_022",
+      "level": 15,
+      "type": "dagger",
+      "rarity": "common",
+      "damage": 45,
+      "price": 1500,
+      "attackSpeedDelta": 35,
+      "radius": 3,
+      "arc": 80,
+      "upgradePrice": 450
+    },
+    {
+      "id": "weapon_023",
+      "level": 15,
+      "type": "bigsword",
+      "rarity": "common",
+      "damage": 76,
+      "price": 1500,
+      "attackSpeedDelta": -25,
+      "radius": 10,
+      "arc": 125,
+      "upgradePrice": 450
+    },
+    {
+      "id": "weapon_024",
+      "level": 15,
+      "type": "bow",
+      "rarity": "common",
+      "damage": 67,
+      "price": 1500,
+      "attackSpeedDelta": -15,
+      "radius": 40,
+      "arc": 108,
+      "upgradePrice": 450
+    },
+    {
+      "id": "weapon_025",
+      "level": 25,
+      "type": "sword",
+      "rarity": "common",
+      "damage": 98,
+      "price": 2500,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 750
+    },
+    {
+      "id": "weapon_026",
+      "level": 25,
+      "type": "dagger",
+      "rarity": "common",
+      "damage": 77,
+      "price": 2500,
+      "attackSpeedDelta": 35,
+      "radius": 3,
+      "arc": 80,
+      "upgradePrice": 750
+    },
+    {
+      "id": "weapon_027",
+      "level": 25,
+      "type": "bigsword",
+      "rarity": "common",
+      "damage": 128,
+      "price": 2500,
+      "attackSpeedDelta": -25,
+      "radius": 10,
+      "arc": 125,
+      "upgradePrice": 750
+    },
+    {
+      "id": "weapon_028",
+      "level": 25,
+      "type": "bow",
+      "rarity": "common",
+      "damage": 113,
+      "price": 2500,
+      "attackSpeedDelta": -15,
+      "radius": 40,
+      "arc": 108,
+      "upgradePrice": 750
+    },
+    {
+      "id": "weapon_029",
+      "level": 35,
+      "type": "sword",
+      "rarity": "common",
+      "damage": 142,
+      "price": 3500,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 1050
+    },
+    {
+      "id": "weapon_030",
+      "level": 35,
+      "type": "dagger",
+      "rarity": "common",
+      "damage": 113,
+      "price": 3500,
+      "attackSpeedDelta": 35,
+      "radius": 3,
+      "arc": 80,
+      "upgradePrice": 1050
+    },
+    {
+      "id": "weapon_031",
+      "level": 35,
+      "type": "bigsword",
+      "rarity": "common",
+      "damage": 186,
+      "price": 3500,
+      "attackSpeedDelta": -25,
+      "radius": 10,
+      "arc": 125,
+      "upgradePrice": 1050
+    },
+    {
+      "id": "weapon_032",
+      "level": 35,
+      "type": "bow",
+      "rarity": "common",
+      "damage": 165,
+      "price": 3500,
+      "attackSpeedDelta": -15,
+      "radius": 40,
+      "arc": 108,
+      "upgradePrice": 1050
+    }
+  ],
+  "armor": [
+    {
+      "id": "armor_001",
+      "level": 1,
+      "hp": 0,
+      "price": 0
+    },
+    {
+      "id": "armor_002",
+      "level": 5,
+      "hp": 70,
+      "price": 250
+    },
+    {
+      "id": "armor_003",
+      "level": 10,
+      "hp": 130,
+      "price": 500
+    },
+    {
+      "id": "armor_004",
+      "level": 15,
+      "hp": 200,
+      "price": 750
+    },
+    {
+      "id": "armor_005",
+      "level": 20,
+      "hp": 280,
+      "price": 1000
+    },
+    {
+      "id": "armor_006",
+      "level": 25,
+      "hp": 370,
+      "price": 1250
+    },
+    {
+      "id": "armor_007",
+      "level": 30,
+      "hp": 470,
+      "price": 1500
+    },
+    {
+      "id": "armor_008",
+      "level": 35,
+      "hp": 585,
+      "price": 1750
+    }
+  ],
+  "monsters": [
+    {
+      "id": "monster_001",
+      "level": 1,
+      "hp": 96,
+      "damage": 10,
+      "xp": 12,
+      "gold": 25
+    },
+    {
+      "id": "monster_002",
+      "level": 2,
+      "hp": 102,
+      "damage": 12,
+      "xp": 21,
+      "gold": 30
+    },
+    {
+      "id": "monster_003",
+      "level": 3,
+      "hp": 108,
+      "damage": 15,
+      "xp": 32,
+      "gold": 32
+    },
+    {
+      "id": "monster_004",
+      "level": 4,
+      "hp": 120,
+      "damage": 17,
+      "xp": 42,
+      "gold": 35
+    },
+    {
+      "id": "monster_005",
+      "level": 5,
+      "hp": 126,
+      "damage": 20,
+      "xp": 54,
+      "gold": 35
+    },
+    {
+      "id": "monster_006",
+      "level": 6,
+      "hp": 138,
+      "damage": 23,
+      "xp": 65,
+      "gold": 40
+    },
+    {
+      "id": "monster_007",
+      "level": 7,
+      "hp": 144,
+      "damage": 27,
+      "xp": 77,
+      "gold": 40
+    },
+    {
+      "id": "monster_008",
+      "level": 8,
+      "hp": 150,
+      "damage": 30,
+      "xp": 89,
+      "gold": 45
+    },
+    {
+      "id": "monster_009",
+      "level": 9,
+      "hp": 162,
+      "damage": 34,
+      "xp": 110,
+      "gold": 45
+    },
+    {
+      "id": "monster_010",
+      "level": 10,
+      "hp": 300,
+      "damage": 37,
+      "xp": 133,
+      "gold": 50
+    },
+    {
+      "id": "monster_011",
+      "level": 11,
+      "hp": 318,
+      "damage": 41,
+      "xp": 150,
+      "gold": 53
+    },
+    {
+      "id": "monster_012",
+      "level": 12,
+      "hp": 342,
+      "damage": 46,
+      "xp": 168,
+      "gold": 56
+    },
+    {
+      "id": "monster_013",
+      "level": 13,
+      "hp": 360,
+      "damage": 50,
+      "xp": 187,
+      "gold": 59
+    },
+    {
+      "id": "monster_014",
+      "level": 14,
+      "hp": 372,
+      "damage": 55,
+      "xp": 206,
+      "gold": 62
+    },
+    {
+      "id": "monster_015",
+      "level": 15,
+      "hp": 384,
+      "damage": 59,
+      "xp": 225,
+      "gold": 65
+    },
+    {
+      "id": "monster_016",
+      "level": 16,
+      "hp": 396,
+      "damage": 64,
+      "xp": 245,
+      "gold": 68
+    },
+    {
+      "id": "monster_017",
+      "level": 17,
+      "hp": 414,
+      "damage": 69,
+      "xp": 265,
+      "gold": 71
+    },
+    {
+      "id": "monster_018",
+      "level": 18,
+      "hp": 426,
+      "damage": 73,
+      "xp": 285,
+      "gold": 74
+    },
+    {
+      "id": "monster_019",
+      "level": 19,
+      "hp": 438,
+      "damage": 78,
+      "xp": 305,
+      "gold": 77
+    },
+    {
+      "id": "monster_020",
+      "level": 20,
+      "hp": 576,
+      "damage": 84,
+      "xp": 326,
+      "gold": 80
+    },
+    {
+      "id": "monster_021",
+      "level": 21,
+      "hp": 600,
+      "damage": 89,
+      "xp": 346,
+      "gold": 83
+    },
+    {
+      "id": "monster_022",
+      "level": 22,
+      "hp": 624,
+      "damage": 94,
+      "xp": 367,
+      "gold": 86
+    },
+    {
+      "id": "monster_023",
+      "level": 23,
+      "hp": 648,
+      "damage": 99,
+      "xp": 387,
+      "gold": 89
+    },
+    {
+      "id": "monster_024",
+      "level": 24,
+      "hp": 672,
+      "damage": 105,
+      "xp": 408,
+      "gold": 92
+    },
+    {
+      "id": "monster_025",
+      "level": 25,
+      "hp": 696,
+      "damage": 110,
+      "xp": 429,
+      "gold": 95
+    },
+    {
+      "id": "monster_026",
+      "level": 26,
+      "hp": 714,
+      "damage": 116,
+      "xp": 450,
+      "gold": 98
+    },
+    {
+      "id": "monster_027",
+      "level": 27,
+      "hp": 738,
+      "damage": 121,
+      "xp": 471,
+      "gold": 101
+    },
+    {
+      "id": "monster_028",
+      "level": 28,
+      "hp": 762,
+      "damage": 127,
+      "xp": 493,
+      "gold": 104
+    },
+    {
+      "id": "monster_029",
+      "level": 29,
+      "hp": 786,
+      "damage": 133,
+      "xp": 514,
+      "gold": 107
+    },
+    {
+      "id": "monster_030",
+      "level": 30,
+      "hp": 900,
+      "damage": 139,
+      "xp": 535,
+      "gold": 110
+    },
+    {
+      "id": "monster_031",
+      "level": 31,
+      "hp": 936,
+      "damage": 145,
+      "xp": 556,
+      "gold": 113
+    },
+    {
+      "id": "monster_032",
+      "level": 32,
+      "hp": 972,
+      "damage": 151,
+      "xp": 578,
+      "gold": 116
+    },
+    {
+      "id": "monster_033",
+      "level": 33,
+      "hp": 1014,
+      "damage": 157,
+      "xp": 599,
+      "gold": 119
+    },
+    {
+      "id": "monster_034",
+      "level": 34,
+      "hp": 1050,
+      "damage": 164,
+      "xp": 621,
+      "gold": 122
+    },
+    {
+      "id": "monster_035",
+      "level": 35,
+      "hp": 1086,
+      "damage": 170,
+      "xp": 642,
+      "gold": 125
+    }
+  ],
+  "weaponBindings": {
+    "newbie_bow": "weapon_004",
+    "newbie_dagger": "weapon_002",
+    "newbie_axe": "weapon_001",
+    "newbie_saber_01": "weapon_001",
+    "newbie_sword_01": "weapon_001",
+    "dragon_divider": "weapon_009",
+    "guards_sword_01": "weapon_001",
+    "warsmiths_hummer_01": "weapon_001"
+  },
+  "monsterBindings": {
+    "gremlin": "monster_001"
+  },
+  "test": {
+    "x": 236.646,
+    "y": -53.76,
+    "z": 49.04,
+    "yaw": 137.647,
+    "maxGroup": 12
+  }
+}

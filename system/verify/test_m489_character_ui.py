@@ -49,7 +49,7 @@ class CharacterUiM489(unittest.TestCase):
             self.assertIn('["' + locale + '"] = "', m.split('local FLAGS')[1].split('local function corner')[0])
         self.assertIn('FLAGS[locale] .. "  " .. Catalog.locales[locale]', m)
         self.assertIn('selectionCaption.Text = "1/5"', p)
-        self.assertIn('"creation.selection_level", {level = 0}', p)
+        self.assertIn('"creation.selection_level", {level = level or 1}', p)
         self.assertNotIn('selectionHint', p)
         self.assertNotIn('creation.session_only', c)
         for key, expected in [('selection_title','Select character'), ('human_male','Human Male'), ('human_female','Human Female'), ('selection_level','Level {level}')]:

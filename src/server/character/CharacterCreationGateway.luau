@@ -1,6 +1,7 @@
 --!strict
 -- Explicit player lifecycle: creation -> selection -> gameplay. Never spawn on join.
 local Players = game:GetService("Players")
+local Balance = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("balance"):WaitForChild("Balance"))
 local SavedColors = require(script.Parent:WaitForChild("CharacterCreationSavedColorStore"))
 local Gateway = {}
 Gateway.__index = Gateway
@@ -119,6 +120,7 @@ function Gateway:Bind(remotes: Folder)
     switch.Parent = remotes
     switch.OnServerInvoke = function(player: Player)
         return self:Request(player, function()
+            if player:GetAttribute("Game1GameplayTestActive") == true then return {ok=false,error="leave_gameplay_test_first"} end
             if not self.enabled or self.pending[player] or player:GetAttribute("CharacterCreationStatus") ~= "world" then
                 return {ok = false, error = "not_in_world"}
             end
@@ -160,6 +162,7 @@ function Gateway:Join(player: Player)
             player:SetAttribute("CharacterProfilePersisted", false)
             return
         end
+        player:SetAttribute("CharacterLevel", Balance.LevelForXP(if record then record.xp else 0))
         if record then
             self:Stage(player, "selection")
         else

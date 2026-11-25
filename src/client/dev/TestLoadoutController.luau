@@ -591,8 +591,6 @@ local function createGui()
         collapse.Text = "×"
         collapse.Position = UDim2.fromOffset(PANEL_WIDTH - 42, 7)
         collapse.Size = UDim2.fromOffset(28, 28)
-        launcher.BackgroundColor3 = if collapsed then COLORS.control else COLORS.controlSelected
-        launcher.TextColor3 = if collapsed then COLORS.text else COLORS.accent
         panel.Visible = not collapsed
     end
     launcher.Activated:Connect(function()
@@ -605,6 +603,7 @@ local function createGui()
         setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
     end)
     setCollapsed(playerGui:GetAttribute(DEBUG_PANEL_OPEN_ATTRIBUTE) ~= DEBUG_PANEL_ID)
+    StudioDebugDock.Bind(DEBUG_PANEL_ID, launcher, panel, PANEL_WIDTH)
 
     return gui, character, category, weapon, meta, runtimeStats, radiusBox, radiusMinus, radiusPlus, radiusReset, radiusToggle, volumeToggle, targetHitboxToggle, rangeBox, rangeControls, rangeToggle, apply, status, statusDot
 end

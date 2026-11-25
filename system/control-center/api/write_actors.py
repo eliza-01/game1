@@ -87,7 +87,10 @@ def route(path, body, deps):
 
     if path == "/api/weapons":
         try:
-            return out(200, weapons.register(body()))
+            payload = body()
+            if any(key in payload for key in ("statModifiers", "attackRadiusStuds", "meleeArcAngleDegrees", "rarity")):
+                return out(400, {"error": "Gameplay attributes are edited in Database → Balance"})
+            return out(200, weapons.register(payload))
         except Exception as error:
             return out(400, {"error": str(error)})
 

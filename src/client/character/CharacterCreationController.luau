@@ -449,7 +449,7 @@ function Controller.Start()
             Panel.SetSubmitting(controls, false, "")
         end
         if stage == "selection" then
-            Panel.SetSelection(controls, if selectedReady then selected else nil)
+            Panel.SetSelection(controls, if selectedReady then selected else nil, tonumber(player:GetAttribute("CharacterLevel")))
             title.Text = Language.Translate("creation.selection_title")
             subtitle.Text = ""
         elseif stage == "loading" then
@@ -748,6 +748,7 @@ function Controller.Start()
     player:GetAttributeChangedSignal("CharacterCreationPending"):Connect(sync)
     player:GetAttributeChangedSignal("CharacterCreationStatus"):Connect(sync)
     player:GetAttributeChangedSignal("CharacterProfilePersisted"):Connect(refresh)
+    player:GetAttributeChangedSignal("CharacterLevel"):Connect(refresh)
     Language.Changed:Connect(refresh)
     refresh()
     sync()

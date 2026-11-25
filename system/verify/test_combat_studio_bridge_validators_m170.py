@@ -61,9 +61,9 @@ class CoreContractsM170Tests(unittest.TestCase):
 
     def test_missing_critical_multiplier_reports_original_error(self):
         with self.intercept("src/server/combat/DamageService.luau", lambda s: s.replace(
-                "CRITICAL_DAMAGE_MULTIPLIER = 2", "CRITICAL_DAMAGE_MULTIPLIER = 9")):
+                "CRITICAL_DAMAGE_MULTIPLIER = Balance.Rules.critMultiplier", "CRITICAL_DAMAGE_MULTIPLIER = 9")):
             problems, _ = self.combat()
-        self.assertIn("critical damage contract missing CRITICAL_DAMAGE_MULTIPLIER = 2", problems)
+        self.assertIn("critical damage contract missing CRITICAL_DAMAGE_MULTIPLIER = Balance.Rules.critMultiplier", problems)
 
     def test_combat_contracts_keep_diagnostic_order(self):
         with self.intercept("src/server/combat/AttackService.luau", lambda s: s.replace(

@@ -18,10 +18,10 @@ def within(root, point, radius):
     return dx*dx + dz*dz <= (radius + .15)**2 and abs(dy) <= radius + .15
 
 
-def regen(hp, maximum, elapsed, state="Alive"):
+def regen(hp, maximum, elapsed, state="Alive", rate=0):
     if state != "Alive" or hp <= 0 or hp >= maximum:
         return hp
-    return min(maximum, hp + elapsed*5)
+    return min(maximum, hp + elapsed*rate)
 
 
 class TestBowRadius(unittest.TestCase):
@@ -58,17 +58,19 @@ class TestBowRadius(unittest.TestCase):
 class TestHealth(unittest.TestCase):
     def test_regeneration_is_authoritative_rate_and_alive_only(self):
         for hp, delta, expected in ((30, .2, 31), (30, 1, 35), (99.5, 1, 100)):
-            self.assertEqual(regen(hp, 100, delta), expected)
-        self.assertEqual(regen(40, 100, 1, 'Dying'), 40)
-        self.assertEqual(regen(0, 100, 1), 0)
+            self.assertEqual(regen(hp, 100, delta, rate=5), expected)
+            self.assertEqual(regen(hp, 100, delta), hp)
+        self.assertEqual(regen(40, 100, 1, 'Dying', rate=5), 40)
+        self.assertEqual(regen(0, 100, 1, rate=5), 0)
         regen_service = code('src/server/character/CharacterRegenerationService.luau')
         self.assertIn('RunService.Heartbeat:Connect(', regen_service)
         self.assertIn('Players:GetPlayers()', regen_service)
-        self.assertIn('character:GetAttribute("LifeState") == "Alive"', regen_service)
-        self.assertIn('character:GetAttribute("Damageable") == true', regen_service)
-        self.assertIn('Config.RegenerationHPPerSecond * elapsed', regen_service)
+        healing = code('src/server/character/CharacterHealing.luau')
+        self.assertIn('character:GetAttribute("LifeState") ~= "Alive"', healing)
+        self.assertIn('character:GetAttribute("Damageable") ~= true', healing)
+        self.assertIn('Healing.Restore(character, rate * elapsed)', regen_service)
         self.assertIn('CharacterRegenerationService', code('src/server/bootstrap/ServiceCatalog.luau'))
-        self.assertIn('RegenerationHPPerSecond = 5', code('src/shared/character/CharacterStatsConfig.luau'))
+        self.assertIn('RegenerationHPPerSecond = 0', code('src/shared/character/CharacterStatsConfig.luau'))
 
     def test_no_top_hud_and_overhead_visibility_and_tweens(self):
         self.assertFalse((ROOT / 'src/client/character/PlayerStatusController.luau').exists())

@@ -13,6 +13,7 @@ end
 
 function ActorCombatTargeting.Valid(target: Model?): boolean
     return target ~= nil and target.Parent ~= nil
+        and target:GetAttribute("Game1GameplayTestOwner") == nil
         and target:GetAttribute("Damageable") == true
         and target:GetAttribute("LifeState") == "Alive"
         and ActorCombatTargeting.Root(target) ~= nil

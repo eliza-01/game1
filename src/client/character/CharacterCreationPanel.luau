@@ -410,12 +410,12 @@ function Panel.SetMode(views: any, stage: string)
     views.layout()
 end
 
-function Panel.SetSelection(views: any, archetype: string?)
+function Panel.SetSelection(views: any, archetype: string?, level: number?)
     views.selectionCaption.Visible = archetype ~= nil
     views.selectionLevel.Visible = archetype ~= nil
     views.selectionName.Text = if not archetype then Language.Translate("creation.loading_profile")
         else Language.Translate(if archetype == "human_male" then "creation.human_male" else "creation.human_female")
-    views.selectionLevel.Text = Language.Translate("creation.selection_level", {level = 0})
+    views.selectionLevel.Text = Language.Translate("creation.selection_level", {level = level or 1})
 end
 
 -- Animate by elapsed time, not by percent updates; no idle RenderStepped work.

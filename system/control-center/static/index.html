@@ -39,20 +39,21 @@
 <button id="nav-characters" class="asset-section active" type="button"><b>characters</b><small>models · rigs</small></button>
 <button id="nav-animations" class="asset-section" type="button"><b>animations</b><small>profiles · clips</small></button>
 <button id="nav-animation-speed" class="asset-section" type="button"><b>animation speed</b><small>stat → playback scaling</small></button>
-<button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures · stats</small></button>
+<button id="nav-weapons" class="asset-section" type="button"><b>weapons</b><small>models · textures</small></button>
 <button id="nav-npcs" class="asset-section" type="button"><b>NPCs</b><small>1hs rigs · animations · spawns</small></button>
 <button id="nav-monsters" class="asset-section" type="button"><b>monsters</b><small>rigs · stats · animations</small></button>
 <button id="nav-locations" class="asset-section" type="button"><b>locations</b><small>polygon registry · studio authoring</small></button>
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>flora · structure · prop</small></button>
 <button id="nav-place-registry" class="asset-section" type="button"><b>place registry</b><small>location assets · audit · repair · revisions</small></button>
 <button id="nav-lod-manager" class="asset-section" type="button"><b>LOD Manager</b><small>scan · snapshots · readiness</small></button>
-<button id="nav-database" class="asset-section" type="button"><b>database</b><small>asset audit · ID history</small></button>
-<div id="database-nav" class="database-subnav" hidden><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button></div>
+<button id="nav-database" class="asset-section" type="button"><b>database</b><small>balance · asset history</small></button>
+<div id="database-nav" class="database-subnav" hidden><button id="nav-balance" type="button" class="database-subnav-item">Balance</button><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button><button id="nav-balance-logs" type="button" class="database-subnav-item">Logs</button></div>
 <button id="nav-atlas" class="asset-section" type="button"><b>atlas</b><small>variants · consumers · retirement</small></button>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-mechanics" class="asset-section" type="button"><b>mechanics</b><small>tech cards · sockets · scripts</small></button>
 <button id="nav-timelines" class="asset-section" type="button"><b>timelines</b><small>attack animation events</small></button>
 <button id="nav-options" class="asset-section" type="button"><b>options</b><small>common runtime settings</small></button>
+<button id="nav-test" class="asset-section" type="button"><b>test</b><small>gameplay · arena · equipment</small></button>
 <button id="nav-kanban" class="asset-section" type="button"><b>development kanban</b><small>tasks · contracts · evidence</small></button>
 </div>
 <div id="character-rail">
@@ -655,15 +656,10 @@
 
 <div id="weapons-view" hidden>
 <div class="panel hero">
-<div><span class="eyebrow">weapon assets · canonical game1 registry</span><h2>weapons</h2><p>one weapon owns one canonical fbx, zero or more textures, one animation context, additive stat modifiers and stable roblox asset ids. the imported model pivot is the grip reference, matching the reference project attachment contract.</p></div>
+<div><span class="eyebrow">weapon assets · canonical game1 registry</span><h2>weapons</h2><p>FBX, textures, weapon type and Roblox Asset IDs. Gameplay records and model bindings live in Database → Balance.</p></div>
 <div class="metrics"><div><b id="weapon-metric-total">0</b><span>registered</span></div><div><b id="weapon-metric-published">0</b><span>published</span></div><div><b id="weapon-metric-active">0</b><span>startup</span></div></div>
 </div>
 <div class="panel runtime-card"><div id="weapon-runtime-state" class="runtime-state bootstrap"><strong>unarmed</strong><span>no startup weapon selected.</span></div><div id="weapon-publication-state" class="publication-missing">open cloud: checking…</div></div>
-<div class="panel character-card">
-<div class="section-title"><div><span>attack movement by weapon type</span><h3>live lower-body locomotion policy</h3></div></div>
-<small class="hint">all values are authored data, not controller constants. movement % is a fraction of RunSpeed used for the complete attack. legs select which locomotion clip stays live under the upper-body attack. animation set maps the gameplay type to its animation context.</small>
-<div id="weapon-attack-movement-rules" class="weapon-attack-movement-rules"><span class="muted">loading attack movement rules…</span></div>
-</div>
 <details class="panel character-card game1-weapon-atlas-index"><summary>Legacy atlases · import and naming</summary>
 <div class="section-title"><div><span>shared textures</span><h3>Published atlas library</h3></div>
 <button id="weapon-index-published" type="button">Index existing weapon images</button></div>
@@ -672,12 +668,12 @@
 </details>
 <div class="weapon-workflow weapon-workflow-m309">
 <details id="weapon-register-disclosure" class="panel character-card weapon-register-panel"><summary>Register new weapon</summary>
-<span class="eyebrow">01 · identity and stats</span><h3>register weapon</h3>
+<span class="eyebrow">01 · model identity</span><h3>register weapon</h3>
 <div class="character-grid"><label>name en<input id="weapon-name-en" autocomplete="off"></label><label>name ru<input id="weapon-name-ru" autocomplete="off"></label></div>
 <label>slug<input id="weapon-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
-<div class="character-grid"><label>type<select id="weapon-type"></select></label><label>rarity<select id="weapon-rarity"></select></label></div>
-<div class="weapon-stats-grid"><label>attack delta<input id="weapon-stat-damage" type="number" step="1" value="0"></label><label>attack speed delta<input id="weapon-stat-attack-speed" type="number" step="1" value="0"></label><label>attack radius · studs<input id="weapon-attack-radius" type="number" min="1" max="420" step="0.5" value="7"></label><label id="weapon-melee-arc-field">Melee Arc Angle · degrees <abbr title="Total horizontal melee sector, 108° = 54° to each side of the character's look direction. Set per weapon; bow is unchanged.">(?)</abbr><input id="weapon-melee-arc-angle" type="number" min="1" max="360" step="1" value="108"></label></div>
-<small class="hint">damage and attack speed are additive modifiers. attack radius is an absolute server-authoritative reach in Roblox studs and is visualized from Studio Test Loadout.</small>
+<div class="character-grid"><label>type<select id="weapon-type"></select></label></div>
+<small class="muted">Игровые характеристики и привязки — Database → Balance.</small>
+
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
 <div class="picker"><button id="choose-weapon-model" type="button">choose fbx</button><small id="picked-weapon-model">fbx not selected</small></div>
@@ -694,7 +690,7 @@
 </details>
 <div class="panel character-card">
 <div class="section-title"><div><span>versioned registry</span><h3>registered weapons <small id="weapon-visible-count" class="muted"></small></h3></div><div class="weapon-list-actions"><label>type filter<select id="weapon-table-type"><option value="all">all types</option></select></label><button id="validate-weapons" type="button">refresh</button></div></div>
-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>rarity</th><th>stats</th><th>Model / Texture</th><th>Atlas resolutions</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>active</th><th>weapon</th><th>type</th><th>Model / Texture</th><th>Atlas resolutions</th><th>status</th><th>actions</th></tr></thead><tbody id="weapon-rows"></tbody></table></div>
 <div id="weapon-details" class="details"><span class="muted">select a weapon.</span></div>
 </div>
 </div>
@@ -915,11 +911,38 @@
   </section>
 </div>
 
+<div id="test-view" hidden>
+  <div class="panel hero"><div><span class="eyebrow">game1 · Studio only</span><h2>Gameplay Test</h2></div></div>
+  <section class="panel">
+    <div class="section-title"><div><span>01 · Test origin</span><h3>Player spawn / orientation</h3></div><div class="actions"><button id="gameplay-test-reload" type="button">Refresh</button><button id="gameplay-test-save" type="button" class="primary" disabled>Save</button></div></div>
+    <div class="details-grid" id="gameplay-test-config"></div>
+    <p id="gameplay-test-status" role="status" aria-live="polite" class="muted"></p>
+    <p class="muted">Rojo Sync → Play → Gameplay → Enter test. Select loadout and monster, then Visit or Start group. No persistent XP, gold or inventory changes.</p>
+  </section>
+  <section class="panel"><div class="section-title"><div><span>02 · Database</span><h3>Test tiers</h3></div></div><div class="table-wrap" id="gameplay-test-tiers"></div></section>
+</div>
 <div id="database-view" hidden>
 <div class="panel hero">
-<div><span class="eyebrow">game1 · read-only audit database</span><h2>Database</h2><p>История публикаций и замен Roblox Asset ID из MySQL. Просмотр не изменяет зарегистрированные ассеты, атласы и Roblox Studio.</p></div>
+<div><span class="eyebrow">game1 · gameplay & asset database</span><h2>Database</h2></div>
 </div>
-<div class="panel database-history-panel">
+<div id="balance-panel" class="panel">
+<div class="section-title"><div><span>01 · Gameplay</span><h3>Balance · LVL 1–35</h3></div><div class="actions"><button id="balance-reload" type="button">Refresh</button><button id="balance-save" class="primary" type="button" disabled>Save balance</button></div></div>
+<div id="balance-tabs" class="actions"></div>
+<div id="balance-content" class="table-wrap"></div>
+<p id="balance-status" role="status" aria-live="polite" class="muted"></p>
+<details class="panel character-card"><summary>Attack movement · animation context</summary>
+<div class="section-title"><div><span>attack movement by weapon type</span><h3>live lower-body locomotion policy</h3></div></div>
+<small class="hint">all values are authored data, not controller constants. movement % is a fraction of RunSpeed used for the complete attack. legs select which locomotion clip stays live under the upper-body attack. animation set maps the gameplay type to its animation context.</small>
+<div id="weapon-attack-movement-rules" class="weapon-attack-movement-rules"><span class="muted">loading attack movement rules…</span></div>
+</details>
+
+</div>
+<div id="balance-logs-panel" class="panel database-history-panel" hidden>
+<div class="section-title"><div><span>Database</span><h3>Logs</h3></div><button id="balance-logs-refresh" type="button">Refresh</button></div>
+<div id="balance-logs-status" role="status" aria-live="polite" class="muted"></div>
+<ol id="balance-logs-rows" aria-label="Patch balance changes"></ol>
+</div>
+<div id="database-history-panel" class="panel database-history-panel" hidden>
 <div class="section-title"><div><span>01 · Database</span><h3>Asset History</h3></div><button id="asset-audit-refresh" type="button">refresh</button></div>
 <p class="muted">Нажми на имя модели, чтобы скопировать slug, или на любой Roblox ID, чтобы скопировать число. История Studio Sync показывает ID-ссылку на модель, а не фактическую замену геометрии.</p>
 <div class="database-history-filters">
@@ -1212,7 +1235,7 @@
 <div id="app-busy-overlay" class="app-busy-overlay" hidden><div class="app-busy-card"><div class="app-busy-spinner" aria-hidden="true"></div><div id="app-busy-text">Processing…</div></div></div>
 <script src="publication-descriptions.js?v=1"></script>
 <script src="asset-name-defaults.js?v=437"></script>
-<script src="character-assets.js?v=468"></script>
+<script src="character-assets.js?v=521"></script>
 <script src="asset-section-order.js?v=1"></script>
 <script src="character-animation-ui.js?v=474"></script>
 <script src="animation-publish-queue-core.js?v=474"></script>
@@ -1249,13 +1272,15 @@
 <script src="lod-reuse-picker.js?v=411"></script>
 <script src="location-asset-workflow.js?v=453"></script>
 <script src="asset-audit.js?v=2"></script>
+<script src="game-balance.js?v=521"></script>
+<script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
 <script src="options.js?v=479"></script>
 <script src="character-creation-options.js?v=505"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
-<script src="weapon-assets.js?v=437"></script>
-<script src="weapon-workflow.js?v=309"></script>
+<script src="weapon-assets.js?v=514"></script>
+<script src="weapon-workflow.js?v=514"></script>
 <script src="arrow-assets.js?v=437"></script>
 <script src="monster-assets.js?v=437"></script>
 <script src="npc-assets.js?v=437"></script>

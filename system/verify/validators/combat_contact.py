@@ -73,7 +73,7 @@ def check_combat_contact_contracts(root: Path, report_error: Callable[[str], Non
             report_error(f'M358 Studio debug visualization missing {required}')
     if 'HeadshotAimRay' not in preview or 'CanQuery = false' not in preview:
         report_error('M358 Studio preview must keep a non-querying headshot aim guide')
-    for required in ['HeadshotDamageMultiplier = 2', 'MeleeDefaultArcAngle = 108',
+    for required in ['HeadshotDamageMultiplier = Balance.Rules.headshotMultiplier', 'MeleeDefaultArcAngle = 108',
                      'MeleeVerticalPadding = 1.5']:
         if required not in config:
             report_error(f'M358 melee default/config missing {required}')

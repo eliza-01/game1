@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local CharacterMovementConfig = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("character"):WaitForChild("CharacterMovementConfig"))
+local Balance = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("balance"):WaitForChild("Balance"))
 local MonsterInitialAttributes = {}
 local function finite(value: any, fallback: number): number
     local number = tonumber(value)
@@ -15,10 +16,15 @@ end
 local function applyMonsterAttributes(model: Model, definition: any, record: any, instanceId: string)
     local stats = definition.stats or {}
     local behavior = definition.behavior or {}
-    local maxHP = math.max(1, finite(stats.MaxHP, 100))
+    local balance = Balance.MonsterForModel(tostring(definition.slug or record.monsterSlug or ""))
+    if record.testOwner then balance = Balance.Monster(record.testBalanceId) end
+    local maxHP = if balance then balance.hp else math.max(1, finite(stats.MaxHP, 100))
+    model:SetAttribute("MonsterBalanceId", if balance then balance.id else "")
+    model:SetAttribute("RewardXP", if balance then balance.xp else 0)
+    model:SetAttribute("RewardGold", if balance then balance.gold else 0)
     model:SetAttribute("Game1MonsterRuntime", true)
     model:SetAttribute("MonsterSlug", tostring(definition.slug or record.monsterSlug or ""))
-    local level = tonumber(stats.Level)
+    local level = if balance then balance.level else tonumber(stats.Level)
     if level and level > 0 and level < 100000 and level == math.floor(level) then
         model:SetAttribute("Level", level)
     end
@@ -33,15 +39,21 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("CombatUntilServerTime", 0)
     model:SetAttribute("MaxHP", maxHP)
     model:SetAttribute("HP", maxHP)
-    model:SetAttribute("Damage", math.max(0, finite(stats.Damage, 10)))
+    model:SetAttribute("Damage", if balance then balance.damage else math.max(0, finite(stats.Damage, 10)))
     model:SetAttribute("AttackSpeed", math.max(1, finite(stats.AttackSpeed, 100)))
     model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
     local debugLocomotion = tostring(Workspace:GetAttribute("Game1MonsterDebugLocomotionMode") or "Walk")
     model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
     model:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
-    model:SetAttribute("Defense", math.max(0, finite(stats.Defense, 0)))
+    model:SetAttribute("Defense", if balance then 0 else math.max(0, finite(stats.Defense, 0)))
     local aggressive = behavior.aggressive == true
+    if record.testOwner then
+        model:SetAttribute("Game1GameplayTestOwner", record.testOwner)
+        model:SetAttribute("GameplayTestKind", record.testKind)
+        aggressive = false -- group is armed atomically after every member is ready
+    end
     local aggroRadius = math.max(0, finite(behavior.aggroRadiusStuds, 16))
+    if record.testOwner then aggroRadius = 120 end
     local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
     -- Leash belongs to this spawn record, never to the monster species.
     local homeRadius = math.clamp(finite(record.homeRadiusStuds, 150), 1, 10000)

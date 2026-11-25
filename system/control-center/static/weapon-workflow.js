@@ -32,11 +32,6 @@ window.game1WeaponWorkflow = (() => {
       slug:item.slug,nameEn:d.querySelector('[data-ww-name]').value.trim(),
       nameRu:d.querySelector('[data-ww-name-ru]').value.trim(),
       weaponType:d.querySelector('[data-ww-type]').value,
-      rarity:d.querySelector('[data-ww-rarity]').value,
-      attackRadiusStuds:Number(d.querySelector('[data-ww-radius]').value),
-      meleeArcAngleDegrees:Number(d.querySelector('[data-ww-arc]')?.value||108),
-      statModifiers:{Damage:Number(d.querySelector('[data-ww-damage]').value),
-        AttackSpeed:Number(d.querySelector('[data-ww-speed]').value)},
     };
   }
   async function update(payload){
@@ -56,11 +51,7 @@ window.game1WeaponWorkflow = (() => {
       `<label>Name EN<input data-ww-name value="${e(item.name_en)}"></label>`+
       `<label>Name RU<input data-ww-name-ru value="${e(item.name_ru)}"></label>`+
       `<label>Type<select data-ww-type>${(weaponState.data?.options?.weaponTypes||[]).map(v=>`<option value="${e(v)}" ${v===item.weapon_type?'selected':''}>${e(v)}</option>`).join('')}</select></label>`+
-      `<label>Rarity<select data-ww-rarity>${(weaponState.data?.options?.rarities||[]).map(v=>`<option value="${e(v)}" ${v===item.rarity?'selected':''}>${e(v)}</option>`).join('')}</select></label>`+
-      `<label>Attack delta<input data-ww-damage type="number" step="1" value="${e(item.stat_modifiers?.Damage||0)}"></label>`+
-      `<label>Attack speed delta<input data-ww-speed type="number" step="1" value="${e(item.stat_modifiers?.AttackSpeed||0)}"></label>`+
-      `<label>Range · studs<input data-ww-radius type="number" min="1" max="420" step="0.5" value="${e(item.attack_radius_studs||7)}"></label>`+
-      (item.weapon_type==='bow'?'':`<label>Melee Arc Angle · degrees <abbr title="Total horizontal attack angle, centered on character facing. 108° = 54° to either side. Only affects melee, not bows.">(?)</abbr><input data-ww-arc type="number" min="1" max="360" step="1" value="${e(item.melee_arc_angle_degrees??108)}"></label>`)+
+      `<small class="muted">Gameplay attributes: Database → Balance</small>`+
       `<label>Stable slug<input value="${e(item.slug)}" readonly></label></div>`+
       (warning?`<p class="weapon-edit-warning">This weapon is registered as <b>${e(item.weapon_type)}</b> although its name suggests a bow. The <b>bow</b> animation set will not be selected until you explicitly change Type and save. Sync Rojo afterward.</p>`:'')+
       `<div class="actions">${button('save','Apply Changes',busy)}${button('startup','Set startup',busy)}${button('unarmed','Unarmed startup',busy)}${button('delete','Delete registration',busy)}</div>`,'Revision '+Number(item.revision||1));
@@ -115,13 +106,11 @@ window.game1WeaponWorkflow = (() => {
     if(key==='save'){
       const data=readForm(dialog());
       if(!data.nameEn) return notice('Name EN required',true),render();
-      if(!Number.isFinite(data.attackRadiusStuds))return notice('Invalid range',true),render();
       return run('Saving identity',async()=>{await update(data);notice('Identity updated. No Roblox publication or Studio Sync performed.');});
     }
     if(key==='save-model')return run('Registering new FBX revision',async()=>{
       if(!state.pendingModel)return;
       await update({slug:item.slug,nameEn:item.name_en,nameRu:item.name_ru,weaponType:item.weapon_type,
-        rarity:item.rarity,attackRadiusStuds:item.attack_radius_studs,statModifiers:item.stat_modifiers,
         modelSourcePath:state.pendingModel});
       state.pendingModel='';notice('FBX revision registered. Publish Model explicitly.');
     });

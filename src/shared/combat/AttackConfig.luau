@@ -1,3 +1,4 @@
+local Balance = require(script.Parent.Parent:WaitForChild("balance"):WaitForChild("Balance"))
 return table.freeze({
     Range = 7,
     MaxAimDistance = 420,
@@ -5,7 +6,7 @@ return table.freeze({
     -- Head/body boxes are precomputed once from visual-mesh bounds. Arc
     -- contact deals normal melee damage; headshot is a separate live
     -- reticle-ray classification and can upgrade at most one target per attack.
-    HeadshotDamageMultiplier = 2,
+    HeadshotDamageMultiplier = Balance.Rules.headshotMultiplier,
     HeadshotAimOriginMaxDistance = 24,
 
     -- M360: exactly one authoritative contact snapshot at authored HitEnd.

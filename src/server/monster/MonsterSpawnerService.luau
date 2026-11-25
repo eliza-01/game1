@@ -22,6 +22,8 @@ local MonsterDeathLifecycle = require(script.Parent:WaitForChild("MonsterDeathLi
 local MonsterIdlePresentation = require(script.Parent:WaitForChild("MonsterIdlePresentation"))
 local MonsterPopulationController = require(script.Parent:WaitForChild("MonsterPopulationController"))
 local MonsterSpawnPresentation = require(script.Parent:WaitForChild("MonsterSpawnPresentation"))
+local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
+local TestAppearance = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestAppearance"))
 local MonsterSpawnerService = {}
 local started = false
 local spawnRandom = Random.new()
@@ -137,6 +139,7 @@ local function spawnOne(state: any): Model?
     end
 
     local model = template:Clone()
+    if record.testOwner then state.testConstructing = model end
     local instanceId = tostring(record.spawnId or "spawn") .. "-" .. tostring(math.floor(os.clock() * 1000)) .. "-" .. tostring(spawnRandom:NextInteger(1000, 9999))
     model.Name = slug .. "_" .. instanceId:sub(-4)
     model.Parent = ensureMonstersFolder()
@@ -148,8 +151,8 @@ local function spawnOne(state: any): Model?
     end
     local animationRootBridgeCount = MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)
     model:SetAttribute("RuntimeAnimationRootBridgeCount", animationRootBridgeCount)
-    local surface = spawnGeometry:RandomSpawnPoint(record)
-    local yaw = spawnRandom:NextNumber(0, math.pi * 2)
+    local surface = if record.testOwner then record.testSurface else spawnGeometry:RandomSpawnPoint(record)
+    local yaw = if record.testOwner then math.rad(record.testYaw) else spawnRandom:NextNumber(0, math.pi * 2)
     MonsterRigBuilder.GroundAlign(model, surface, yaw)
     MonsterInitialAttributes.Apply(model, definition, record, instanceId)
     local navigationRoot, humanoid = MonsterRigBuilder.CreateNavigationRig(model, visual, visualRoot, surface, yaw)
@@ -160,7 +163,14 @@ local function spawnOne(state: any): Model?
     end
     -- Preserve the ground-level home before the underground reveal moves the rig.
     model:SetAttribute("MonsterHomePosition", navigationRoot.Position)
-    local riseFromGround = definition.behavior and definition.behavior.riseFromGround == true
+    if record.testOwner then
+        local row = assert(Balance.Monster(record.testBalanceId))
+        local color = Balance.Grade.Color(row.level)
+        TestAppearance.Tint(visual, color)
+        TestAppearance.Label(model, ("Монстр_%s · LVL %d\n%d HP · %d ATK"):format(row.id:sub(-3), row.level, row.hp, row.damage), color)
+        -- Line targets use the normal mobile rig, but never wander or proximity-aggro.
+    end
+    local riseFromGround = not record.testOwner and definition.behavior and definition.behavior.riseFromGround == true
     local spawnPresentation = MonsterSpawnPresentation.Prepare(model, visual, navigationRoot, humanoid, riseFromGround)
     local hitbox = EntityHitboxService.Attach(model, visual)
     model:SetAttribute("CombatHitboxCount", hitbox.count)
@@ -188,7 +198,7 @@ local function spawnOne(state: any): Model?
     idlePresentation.playBaseIdle(model, entry)
     spawnPresentation:Start(function()
         if state.instances[model] == entry and not entry.dying then
-            wanderController:Start(state, model, entry)
+            if not record.testOwner then wanderController:Start(state, model, entry) end
         end
     end)
 
@@ -263,6 +273,25 @@ end
 -- Population owns spawn records, live slots, maxAlive and delayed respawns.
 -- The callback is injected to keep instance construction and presentation in Spawner.
 population = MonsterPopulationController.new(spawnOne)
+
+function MonsterSpawnerService.TestTemplateSize(): Vector3?
+    local definition = monsterDefinition("gremlin")
+    local template = definition and resolvePath(tostring(definition.serverStoragePath or ""))
+    return if template and template:IsA("Model") then template:GetExtentsSize() else nil
+end
+function MonsterSpawnerService.AddTest(record: any): any
+    assert(started and record.testOwner and Balance.Monster(record.testBalanceId), "Invalid test spawn")
+    return population:AddTest(record, function(state, model)
+        if state.instances[model] then releaseInstance(state, model, false)
+        elseif model.Parent then model:Destroy() end
+    end)
+end
+function MonsterSpawnerService.FillTest(state: any): Model?
+    return population:FillTest(state)
+end
+function MonsterSpawnerService.RemoveTest(state: any)
+    population:RemoveTest(state)
+end
 
 function MonsterSpawnerService.Start()
     if started then

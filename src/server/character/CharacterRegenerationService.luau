@@ -5,6 +5,8 @@ local RunService = game:GetService("RunService")
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
     :WaitForChild("character"):WaitForChild("CharacterStatsConfig"))
 
+local Healing = require(script.Parent:WaitForChild("CharacterHealing"))
+
 local CharacterRegenerationService = {}
 local started = false
 local accumulator = 0
@@ -13,6 +15,7 @@ local STEP = 0.2
 function CharacterRegenerationService.Start()
     if started then return end
     started = true
+    if not RunService:IsStudio() and Config.RegenerationHPPerSecond <= 0 then return end
     RunService.Heartbeat:Connect(function(dt)
         accumulator += math.clamp(dt, 0, 0.5)
         if accumulator < STEP then return end
@@ -20,14 +23,9 @@ function CharacterRegenerationService.Start()
         accumulator = 0
         for _, player in ipairs(Players:GetPlayers()) do
             local character = player.Character
-            if character and character.Parent
-                and character:GetAttribute("LifeState") == "Alive"
-                and character:GetAttribute("Damageable") == true then
-                local maxHP = math.max(0, tonumber(character:GetAttribute("MaxHP")) or 0)
-                local hp = math.clamp(tonumber(character:GetAttribute("HP")) or 0, 0, maxHP)
-                if hp > 0 and hp < maxHP then
-                    character:SetAttribute("HP", math.min(maxHP, hp + Config.RegenerationHPPerSecond * elapsed))
-                end
+            if character then
+                local rate = Config.RegenerationHPPerSecond + Healing.TestRate(character, "GameplayTestRegen")
+                if rate > 0 then Healing.Restore(character, rate * elapsed) end
             end
         end
     end)

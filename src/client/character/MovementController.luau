@@ -128,7 +128,7 @@ local function baseMoveSpeedForCurrentState(targetCharacter: Model): number
 		targetCharacter:GetAttribute("CharacterArchetype"),
 		targetCharacter:GetAttribute("RunSpeed"),
 		movementMode
-	)
+	) * CharacterMovementConfig.TestTrackRunMultiplier(targetCharacter, movementMode)
 end
 
 local function bindCharacter(newCharacter: Model)
@@ -197,11 +197,13 @@ local function bindCharacter(newCharacter: Model)
 	-- Movement owns jump state; animation only reads these presentation attributes.
 	newCharacter:SetAttribute("AnimationAirborne", false)
 	newCharacter:SetAttribute("AnimationJumpSequence", 0)
-	newCharacter:GetAttributeChangedSignal("RunSpeed"):Connect(function()
-		if character == newCharacter and controllerManager then
-			controllerManager.BaseMoveSpeed = baseMoveSpeedForCurrentState(newCharacter)
-		end
-	end)
+	for _, attribute in ipairs({"RunSpeed", "GameplayTestOnTrack"}) do
+		newCharacter:GetAttributeChangedSignal(attribute):Connect(function()
+			if character == newCharacter and controllerManager then
+				controllerManager.BaseMoveSpeed = baseMoveSpeedForCurrentState(newCharacter)
+			end
+		end)
+	end
 
 	print("[game1] Custom movement bound")
 end
@@ -443,7 +445,7 @@ local function applyMovementMode(walkModifierActive: boolean, backwardActive: bo
 				character:GetAttribute("CharacterArchetype"),
 				character:GetAttribute("RunSpeed"),
 				nextMode
-			)
+			) * CharacterMovementConfig.TestTrackRunMultiplier(character, nextMode)
 		end
 	end
 	if character and movementMode ~= nextMode then

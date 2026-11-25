@@ -206,16 +206,22 @@ function Debug.Start()
         stopPreview()
         status.Text="Saved profile restored (no changes persisted)"
     end)
+    local playerGui = player:WaitForChild("PlayerGui")
+    local function syncPanel()
+        local open = playerGui:GetAttribute("Game1DebugPanelOpen") == "HP"
+        if panel.Visible == open then return end
+        panel.Visible = open
+        if open then render(); forward() else stopPreview() end
+    end
     launcher.Activated:Connect(function()
-        panel.Visible=not panel.Visible
-        if panel.Visible then render(); forward()
-        else stopPreview() end
+        playerGui:SetAttribute("Game1DebugPanelOpen", if panel.Visible then "" else "HP")
     end)
     close.Activated:Connect(function()
-        panel.Visible=false
-        stopPreview()
+        if playerGui:GetAttribute("Game1DebugPanelOpen") == "HP" then playerGui:SetAttribute("Game1DebugPanelOpen", "") end
     end)
-    render()
+    playerGui:GetAttributeChangedSignal("Game1DebugPanelOpen"):Connect(syncPanel)
+    StudioDebugDock.Bind("HP", launcher, panel, 356)
+    render(); syncPanel()
 end
 
 return table.freeze(Debug)

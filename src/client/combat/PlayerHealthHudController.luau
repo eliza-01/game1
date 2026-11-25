@@ -14,6 +14,7 @@ local border: UIStroke? = nil
 local track: Frame? = nil
 local fill: Frame? = nil
 local caption: TextLabel? = nil
+local progressionCaption: TextLabel? = nil
 local tween: Tween? = nil
 local first = true
 
@@ -76,6 +77,20 @@ local function build(parent: PlayerGui)
     caption.TextStrokeColor3 = Color3.new(0, 0, 0)
     caption.TextStrokeTransparency = 0
     caption.Parent = plate
+
+    progressionCaption = Instance.new("TextLabel")
+    progressionCaption.Name = "ProgressionValue"
+    progressionCaption.BackgroundTransparency = 1
+    progressionCaption.Position = UDim2.new(0, 0, 1, 2)
+    progressionCaption.Size = UDim2.new(1, 0, 0, 18)
+    progressionCaption.Font = Enum.Font.GothamBold
+    progressionCaption.TextColor3 = Color3.new(1, 1, 1)
+    progressionCaption.TextStrokeTransparency = 0.15
+    progressionCaption.TextScaled = true
+    local constraint = Instance.new("UITextSizeConstraint")
+    constraint.MaxTextSize = 13
+    constraint.Parent = progressionCaption
+    progressionCaption.Parent = plate
 end
 
 local function update()
@@ -102,6 +117,19 @@ local function update()
     end
 end
 
+local function updateProgression()
+    if not progressionCaption then return end
+    local model = watched
+    progressionCaption.Visible = model ~= nil and model:GetAttribute("XP") ~= nil
+    if not model then return end
+    local level = tonumber(model:GetAttribute("Level")) or 1
+    local xp = tonumber(model:GetAttribute("XPIntoLevel")) or 0
+    local nextXP = tonumber(model:GetAttribute("XPNext")) or 0
+    local gold = tonumber(model:GetAttribute("Gold")) or 0
+    progressionCaption.Text = if nextXP > 0 then string.format("LVL %d  ·  XP %d/%d  ·  G %d", level, xp, nextXP, gold)
+        else string.format("LVL %d  ·  MAX  ·  G %d", level, gold)
+end
+
 local function applyStyle()
     if not plate or not border or not track or not caption then return end
     local spec = Settings.Current().screen
@@ -125,8 +153,12 @@ local function bind(character: Model?)
         for _, key in ipairs({"HP", "MaxHP", "LifeState"}) do
             table.insert(connections, character:GetAttributeChangedSignal(key):Connect(update))
         end
+        for _, key in ipairs({"Level", "XP", "XPIntoLevel", "XPNext", "Gold"}) do
+            table.insert(connections, character:GetAttributeChangedSignal(key):Connect(updateProgression))
+        end
     end
     update()
+    updateProgression()
 end
 
 function Controller.Start()

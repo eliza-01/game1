@@ -159,6 +159,7 @@ local function setTestAttackRadius(player: Player, value: any)
     if not character then
         return { ok = false, error = "character is not spawned" }
     end
+    if player:GetAttribute("Game1GameplayTestActive") == true then return {ok=false,error="Use Gameplay Test"} end
     if value == nil or value == false or tostring(value) == "default" then
         player:SetAttribute("Game1TestAttackRadiusOverride", nil)
         local radius = weaponRadiusForCharacter(character)
@@ -177,6 +178,7 @@ end
 
 local function applyLoadout(player: Player, archetypeValue: any, weaponSlugValue: any)
     if not PublishedDebugAccess.ServerAllowed(player) then return {ok=false, error="Developer debug access denied"} end
+    if player:GetAttribute("Game1GameplayTestActive") == true then return {ok=false,error="Use Gameplay Test"} end
     local archetype = string.lower(tostring(archetypeValue or ""))
     local weaponSlug = string.lower(tostring(weaponSlugValue or ""))
     if archetype == "" or not CharacterService.IsAvailable(archetype) then
@@ -225,6 +227,7 @@ local function bindPlayer(player: Player)
             if not PublishedDebugAccess.ServerAllowed(player) or player.Parent ~= Players or player.Character ~= character then
                 return
             end
+            if player:GetAttribute("Game1GameplayTestActive") == true then return end
             if player:GetAttribute("Game1TestLoadoutActive") ~= true then
                 return
             end

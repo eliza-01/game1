@@ -431,6 +431,7 @@ local function mountPanel(gui: ScreenGui)
             player.PlayerGui:SetAttribute("Game1DebugPanelOpen", "")
         end
     end)
+    StudioDebugDock.Bind("HS", opener, panel, 390)
     refresh.Activated:Connect(draw)
     keyButton.Activated:Connect(function()
         local result = invoke("SetTestHouseKeyOwned", not keyOwned)

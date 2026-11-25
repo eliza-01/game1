@@ -1,0 +1,51 @@
+"""Static contracts and seed validation for the Studio-only gameplay arena."""
+from pathlib import Path
+import json, math, unittest
+ROOT=Path(__file__).resolve().parents[2]
+def read(path): return (ROOT/path).read_text(encoding='utf8')
+class GameplayTest(unittest.TestCase):
+    def test_seed_and_grades(self):
+        data=json.loads(read('config/balance/gameplay.json'))
+        self.assertEqual(sorted({w['level'] for w in data['weapons']}),[1,5,10,15,20,25,30,35])
+        self.assertEqual(len({w['id'] for w in data['weapons']}),32)
+        self.assertEqual(len(data['monsters']),35)
+        self.assertEqual(len(data['armor']),8)
+        grade=read('src/shared/balance/EquipmentGrade.luau')
+        self.assertIn('math.floor(level / 10) + 1',grade)
+        self.assertIn('math.max(1, (band - 1) * 10)',grade)
+        self.assertIn('"SS", "SSS"',grade)
+        self.assertIn('level < required',read('src/server/dev/GameplayTestLoadout.luau'))
+    def test_geometry(self):
+        data=json.loads(read('config/balance/gameplay.json'))
+        t=data['test']; self.assertTrue(all(math.isfinite(t[k]) for k in ('x','y','z','yaw')))
+        self.assertTrue(1<=t['maxGroup']<=12)
+        arena=read('src/server/dev/GameplayTestArena.luau')
+        self.assertIn('2 * (reach + size.Magnitude) + 4',arena)
+        self.assertIn('row.type ~= "bow"',arena)
+        self.assertIn('(index - 1) * spacing',arena)
+        self.assertIn('2 * math.pi / count',arena)
+        self.assertIn('Weapons.CloneTestDisplay(row.type)',arena)
+        self.assertIn('Arena.Support(supports, point, 18)',arena)
+    def test_cleanup_and_isolation(self):
+        service=read('src/server/dev/GameplayTestService.luau')
+        self.assertIn('RunService:IsStudio() and Access.ServerAllowed(player)',service)
+        self.assertIn('s.generation += 1',service)
+        self.assertIn('character:GetAttribute("LifeState") == "Dying"',service)
+        self.assertIn('Arena.Clear(s.group)',service)
+        self.assertIn('s.generation == generation',service)
+        self.assertIn('model:SetAttribute("GameplayTestArmed", true)',service)
+        self.assertIn('s.folder:Destroy()',service)
+        self.assertIn('Players.PlayerRemoving:Connect',service)
+        self.assertIn('testNoRespawn',read('src/server/monster/MonsterPopulationController.luau'))
+        self.assertIn('Game1GameplayTestOwner',read('src/server/character/CharacterProgressionService.luau'))
+        self.assertIn('Game1GameplayTestOwner',read('src/server/character/CharacterCreationProfileStore.luau'))
+        self.assertIn('GameplayTestLoadout.Origin()',read('src/server/character/CharacterService.luau'))
+    def test_wiring(self):
+        self.assertIn('GameplayTestService',read('src/server/bootstrap/ServiceCatalog.luau'))
+        self.assertIn('GameplayTestController',read('src/client/init.client.luau'))
+        self.assertIn('GameplayTestIsolation',read('src/server/combat/DamageService.luau'))
+        self.assertIn('GameplayTestIsolation',read('src/server/combat/MeleeTargetQuery.luau'))
+        self.assertIn('GameplayTestIsolation',read('src/server/combat/BowHitscanService.luau'))
+        self.assertIn('gameplay-test.js',read('system/control-center/static/index.html'))
+        self.assertIn("request('/api/balance'",read('system/control-center/static/gameplay-test.js'))
+if __name__=='__main__': unittest.main()

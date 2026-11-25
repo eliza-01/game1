@@ -37,7 +37,7 @@ local function collect(): {Model}
     local folder = Workspace:FindFirstChild("Monsters")
     if not folder then return result end
     for _, child in ipairs(folder:GetChildren()) do
-        if child:IsA("Model") and child:GetAttribute("Game1MonsterRuntime") == true then table.insert(result, child) end
+        if child:IsA("Model") and child:GetAttribute("Game1MonsterRuntime") == true and child:GetAttribute("Game1GameplayTestOwner") == nil then table.insert(result, child) end
     end
     table.sort(result, function(a, b)
         local al = tostring(a:GetAttribute("MonsterSlug") or a.Name) .. tostring(a:GetAttribute("MonsterInstanceId") or "")

@@ -229,7 +229,7 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     function view.SetSegments(showName: boolean, showHP: boolean)
         -- Compare actual GUI properties even if the policy did not change:
         -- a Studio reset or another presentation controller may have hidden it.
-        showNameRequested = showName
+        showNameRequested = showName and model:GetAttribute("Game1GameplayTestOwner") == nil
         showHpRequested = showHP
         applySegments()
     end

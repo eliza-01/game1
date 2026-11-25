@@ -18,8 +18,11 @@ local CharacterCreationPreviewService = require(script.Parent:WaitForChild("Char
 local CharacterCreationStreamingService = require(script.Parent:WaitForChild("CharacterCreationStreamingService"))
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
 local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigService"))
+local VoidRecovery = require(script.Parent:WaitForChild("CharacterVoidRecovery"))
 local CharacterAssemblyBuilder = require(script.Parent:WaitForChild("CharacterAssemblyBuilder"))
 local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
+local Progression = require(script.Parent:WaitForChild("CharacterProgressionService"))
+local GameplayTestLoadout = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestLoadout"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
@@ -234,7 +237,7 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
     character:SetAttribute("CombatUntilServerTime", 0)
     character:SetAttribute("MovementController", "ControllerManager")
     character:SetAttribute("VisualController", "AnimationController")
-    CharacterStatsService.Initialize(character, if row then row.stats else nil)
+    CharacterStatsService.Initialize(character, if row then row.stats else nil, Progression.LevelForPlayer(player))
     if reviveOnSpawn == true then
         -- Return-to-town spawns at full stats, but stays non-interactive until the
         -- owning client finishes the authored revive presentation. Movement, combat
@@ -244,7 +247,9 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
         character:SetAttribute("RevivePending", true)
     end
 
-    local rig = CharacterRigService.Build(character, spawnOverride or CharacterRigService.SpawnCFrame(player), template, row == nil)
+    GameplayTestLoadout.Mark(player, character)
+    local testFrame = if GameplayTestLoadout.Get(player) then GameplayTestLoadout.Origin() else nil
+    local rig = CharacterRigService.Build(character, testFrame or spawnOverride or CharacterRigService.SpawnCFrame(player), template, row == nil)
     if temporaryTemplate then template:Destroy() end
     if not rig then
         character:Destroy()
@@ -255,9 +260,15 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
     character.Parent = Workspace
     CharacterRigService.Finish(rig)
     player.Character = character
+    Progression.Attach(player, character)
     if appearance then creationSelections[player] = appearance end
     require(script.Parent:WaitForChild("FaceEmotionService")).Bind(character)
-    WeaponEquipService.EquipStartup(character)
+    if GameplayTestLoadout.Get(player) then
+        local ok, reason = GameplayTestLoadout.Apply(player, character)
+        if not ok then warn("[game1][gameplay-test] " .. tostring(reason)) end
+    else
+        WeaponEquipService.EquipStartup(character)
+    end
 
     local hitboxes = EntityHitboxService.Attach(character, rig.visual)
     character:SetAttribute("CombatHitboxCount", hitboxes.count)
@@ -297,6 +308,7 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
         end
     end)
 
+    VoidRecovery.Watch(player, character, testFrame)
     spawning[player] = nil
     print(("[game1] character ready: %s · %s · asset %d · hitboxes %d · visual root %s")
         :format(
@@ -324,7 +336,7 @@ function CharacterService.ListAvailable(): { any }
     return rows
 end
 
-function CharacterService.Respawn(player: Player, archetypeId: string?): Model?
+function CharacterService.Respawn(player: Player, archetypeId: string?, spawnOverride: CFrame?): Model?
     if player.Parent ~= Players then
         return nil
     end
@@ -338,7 +350,7 @@ function CharacterService.Respawn(player: Player, archetypeId: string?): Model?
     if requested ~= "" and not CharacterService.IsAvailable(requested) then
         return nil
     end
-    return createCharacter(player, requested)
+    return createCharacter(player, requested, nil, nil, spawnOverride)
 end
 
 function CharacterService.ReturnToTown(player: Player): (boolean, string?)
@@ -383,6 +395,25 @@ function CharacterService.Start()
     end
     started = true
     Players.CharacterAutoLoads = false
+    Progression.Start()
+    VoidRecovery.Start(function(player: Player)
+        return player.Parent == Players and not spawning[player]
+            and (GameOptions.CharacterCreationSettings().enabled ~= true
+                or player:GetAttribute("CharacterCreationStatus") == "world")
+    end, function(player: Player, fallen: Model)
+        local archetype = tostring(fallen:GetAttribute("CharacterArchetype") or player:GetAttribute("SelectedCharacterArchetype") or "")
+        local weapon = tostring(fallen:GetAttribute("EquippedWeaponSlug") or "")
+        local isTest = GameplayTestLoadout.Get(player) ~= nil
+        local replacement = CharacterService.Respawn(player, archetype)
+        if not replacement then return false end
+        if not isTest then
+            -- Preserve the selected weapon; the test path reapplies its full transient loadout.
+            if weapon == "" then WeaponEquipService.Unequip(replacement)
+            elseif replacement:GetAttribute("EquippedWeaponSlug") ~= weapon then WeaponEquipService.Equip(replacement, weapon) end
+        end
+        print("[game1][void-recovery] restored " .. player.Name)
+        return true
+    end)
 
     local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes") or Instance.new("Folder")
     remotes.Name = "Game1Remotes"

@@ -249,12 +249,20 @@ function Debug.Start()
         render();preview()
     end)
     restore.Activated:Connect(stop)
-    local function toggle()
-        panel.Visible=not panel.Visible
-        if panel.Visible then render();preview() else stop() end
+    local function syncPanel()
+        local open = playerGui:GetAttribute("Game1DebugPanelOpen") == "UI"
+        if panel.Visible == open then return end
+        panel.Visible = open
+        if open then render(); preview() else stop() end
     end
-    launcher.Activated:Connect(toggle)
-    close.Activated:Connect(function()panel.Visible=false;stop()end)
-    render()
+    launcher.Activated:Connect(function()
+        playerGui:SetAttribute("Game1DebugPanelOpen", if panel.Visible then "" else "UI")
+    end)
+    close.Activated:Connect(function()
+        if playerGui:GetAttribute("Game1DebugPanelOpen") == "UI" then playerGui:SetAttribute("Game1DebugPanelOpen", "") end
+    end)
+    playerGui:GetAttributeChangedSignal("Game1DebugPanelOpen"):Connect(syncPanel)
+    Dock.Bind("UI", launcher, panel, 356)
+    render(); syncPanel()
 end
 return table.freeze(Debug)

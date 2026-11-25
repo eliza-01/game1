@@ -98,6 +98,9 @@ function ServiceCatalog.Build(root: Instance)
             local TestLoadoutService = require(dev:WaitForChild("TestLoadoutService"))
             TestLoadoutService.Start()
         end},
+        {name = "GameplayTestService", critical = false, dependsOn = {"CharacterService", "MonsterAIService", "PublishedDebugAccessService"}, start = function()
+            require(dev:WaitForChild("GameplayTestService")).Start()
+        end},
         {name = "HouseSocketDebugService", critical = false, dependsOn = {"HouseSocketService"}, start = function()
             require(dev:WaitForChild("HouseSocketDebugService")).Start()
         end},

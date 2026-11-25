@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Geometry = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("combat"):WaitForChild("MeleeArcGeometry"))
 local EntityHitboxService = require(script.Parent:WaitForChild("EntityHitboxService"))
 
+local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
 local MeleeTargetQuery = {}
 
 function MeleeTargetQuery.Height(root: BasePart, padding: number): (number, number)
@@ -42,7 +43,7 @@ function MeleeTargetQuery.Find(character: Model, root: BasePart, reach: number, 
     params.RespectCanCollide = true
     params.IgnoreWater = false
     for _, candidate in ipairs(candidates) do
-        if MeleeTargetQuery.IsUnobstructed(character, candidate.model, root, candidate.hit.hitPosition, params) then
+        if Isolation.Allows(character, candidate.model) and MeleeTargetQuery.IsUnobstructed(character, candidate.model, root, candidate.hit.hitPosition, params) then
             table.insert(results, candidate)
         end
     end

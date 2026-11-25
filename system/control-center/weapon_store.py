@@ -397,7 +397,7 @@ class WeaponStore:
         if not SLUG_RE.fullmatch(slug):
             raise ValueError("weapon slug must be lowercase snake_case")
         weapon_type = str(payload.get("weaponType", old.get("weapon_type") if old else "") or "").strip().lower()
-        rarity = str(payload.get("rarity", old.get("rarity") if old else "") or "").strip().lower()
+        rarity = str(payload.get("rarity", old.get("rarity") if old else "common") or "").strip().lower()
         if weapon_type not in WEAPON_TYPES:
             raise ValueError("weapon type must be dagger, sword, bigsword or bow")
         if rarity not in RARITIES:

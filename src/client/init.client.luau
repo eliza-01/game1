@@ -89,6 +89,14 @@ end)
 if not floraOk then warn("[game1][client] flora effect startup failed: " .. tostring(floraError)) end
 require(script:WaitForChild("world"):WaitForChild("BoneOrbController")).Start()
 require(script:WaitForChild("world"):WaitForChild("BoneFireController")).Start()
+-- Gameplay test must not depend on another debug controller's startup or RPC.
+task.spawn(function()
+    local ok, err = pcall(function()
+        local module = assert(DevRoot:WaitForChild("GameplayTestController", 20), "GameplayTestController missing")
+        require(module).Start()
+    end)
+    if not ok then warn("[game1][gameplay-test] client startup failed: " .. tostring(err)) end
+end)
 HouseSocketDebugController.Start()
 require(DevRoot:WaitForChild("CameraDebugController")).Start()
 require(DevRoot:WaitForChild("HealthUiDebugController")).Start()

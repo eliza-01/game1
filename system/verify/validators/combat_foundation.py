@@ -15,7 +15,7 @@ class CombatFoundationSources(NamedTuple):
 
 def check_combat_foundation(ROOT: Path, err: Callable[[str], None]):
     damage_text = (ROOT / "src/server/combat/DamageService.luau").read_text(encoding="utf-8")
-    for required in ["CritChance", "CRITICAL_DAMAGE_MULTIPLIER = 2", "criticalRandom:NextNumber", "damageBeforeDefense"]:
+    for required in ["CritChance", "CRITICAL_DAMAGE_MULTIPLIER = Balance.Rules.critMultiplier", "criticalRandom:NextNumber", "damageBeforeDefense"]:
         if required not in damage_text:
             err(f"critical damage contract missing {required}")
 

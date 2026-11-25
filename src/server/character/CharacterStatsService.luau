@@ -2,6 +2,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
 local Config = require(CharacterShared:WaitForChild("CharacterStatsConfig"))
+local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
 
 local Service = {}
 local BASE_PREFIX = "Base"
@@ -49,7 +50,7 @@ local function recompute(character: Model)
     character:SetAttribute("MoveSpeed", tonumber(character:GetAttribute("RunSpeed")) or Config.Default.RunSpeed)
 end
 
-function Service.Initialize(character: Model, startingStats: any?)
+function Service.Initialize(character: Model, startingStats: any?, progressionLevel: number?)
     local d = Config.Default
     local stats = if type(startingStats) == "table" then startingStats else {}
     local function value(stat: string): number
@@ -57,17 +58,25 @@ function Service.Initialize(character: Model, startingStats: any?)
     end
 
     modifierSources[character] = {}
-    setBase(character, "Level", value("Level"))
-    setBase(character, "MaxHP", value("MaxHP"))
-    setBase(character, "Damage", value("Damage"))
-    setBase(character, "Defense", value("Defense"))
+    local level = Balance.Level(progressionLevel or 1)
+    setBase(character, "Level", level.level)
+    setBase(character, "MaxHP", level.hp)
+    setBase(character, "Damage", Balance.Rules.baseDamage)
+    setBase(character, "Defense", 0)
     setBase(character, "AttackSpeed", value("AttackSpeed"))
     setBase(character, "RunSpeed", value("RunSpeed"))
-    setBase(character, "CritChance", value("CritChance"))
+    setBase(character, "CritChance", Balance.Rules.critChance)
     character:SetAttribute("MoveSpeed", value("RunSpeed"))
-    character:SetAttribute("HP", value("MaxHP"))
+    character:SetAttribute("HP", level.hp)
     character:SetAttribute("Damageable", true)
     character:SetAttribute("LifeState", "Alive")
+end
+
+function Service.SetProgressionLevel(character: Model, levelNumber: number)
+    local level = Balance.Level(levelNumber)
+    character:SetAttribute("BaseLevel", level.level)
+    character:SetAttribute("BaseMaxHP", level.hp)
+    recompute(character)
 end
 
 function Service.SetModifierSource(character: Model, sourceId: string, modifiers: any)

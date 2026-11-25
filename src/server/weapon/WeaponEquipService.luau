@@ -6,6 +6,27 @@ local WeaponShared = Shared:WaitForChild("weapon")
 local CombatShared = Shared:WaitForChild("combat")
 local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local WeaponRegistry = require(WeaponShared:WaitForChild("WeaponRegistry"))
+local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
+
+-- Only the Database owns gameplay stats. Asset rows supply geometry and sockets.
+local function gameplayRow(slug: string, testStats: any?, upgrade: number?): any?
+    local model = WeaponRegistry.weapons and WeaponRegistry.weapons[slug]
+    if not model then return nil end
+    local stats = testStats or Balance.WeaponForModel(slug, model.weaponType)
+    if not stats then return nil end
+    local row = table.clone(model)
+    row.balanceId = stats.id
+    local grade, requiredLevel = Balance.Grade.ForLevel(stats.level)
+    row.requiredLevel = requiredLevel
+    row.grade = grade
+    row.weaponType = stats.type
+    row.price = stats.price
+    row.rarity = stats.rarity
+    row.attackRadiusStuds = stats.radius
+    row.meleeArcAngleDegrees = stats.arc
+    row.statModifiers = {Damage = Balance.WeaponDamage(stats, upgrade or 0), AttackSpeed = stats.attackSpeedDelta}
+    return row
+end
 local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
 local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
 
@@ -137,6 +158,9 @@ end
 
 function WeaponEquipService.Unequip(character: Model)
     clearWeapon(character)
+    character:SetAttribute("EquippedWeaponBalanceId", "")
+    character:SetAttribute("EquippedWeaponRequiredLevel", nil)
+    character:SetAttribute("EquippedWeaponGrade", nil)
     character:SetAttribute("EquippedWeaponSlug", "")
     character:SetAttribute("EquippedWeaponType", "")
     character:SetAttribute("EquippedWeaponRarity", "")
@@ -148,12 +172,20 @@ function WeaponEquipService.Unequip(character: Model)
     CharacterStatsService.ApplyModifiers(character, {})
 end
 
-function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, string?)
+function WeaponEquipService.Equip(character: Model, slugValue: any, testId: string?, upgrade: number?): (boolean, string?)
     local slug = string.lower(tostring(slugValue or ""))
-    local row = WeaponRegistry.weapons and WeaponRegistry.weapons[slug]
+    local row = gameplayRow(slug)
+    if testId then
+        if character:GetAttribute("GameplayTestKind") ~= "player" then return false, "Test override denied" end
+        local stats = Balance.Weapon(testId)
+        local model = WeaponRegistry.weapons[slug]
+        if not stats or not model or (model.weaponType ~= stats.type and not (stats.type == "bigsword" and model.weaponType == "sword")) then
+            return false, "Incompatible test model"
+        end
+        row = gameplayRow(slug, stats, upgrade)
+    end
     if not row then
-        WeaponEquipService.Unequip(character)
-        return false, "weapon is not registered: " .. slug
+        return false, "weapon model has no compatible Database binding: " .. slug
     end
 
     local template = findByStudioPath(tostring(row.serverStoragePath or ""))
@@ -191,6 +223,9 @@ function WeaponEquipService.Equip(character: Model, slugValue: any): (boolean, s
     purgeLegacyWeaponBox(weapon)
     weapon.Parent = character
 
+    character:SetAttribute("EquippedWeaponBalanceId", row.balanceId)
+    character:SetAttribute("EquippedWeaponRequiredLevel", row.requiredLevel)
+    character:SetAttribute("EquippedWeaponGrade", row.grade)
     character:SetAttribute("EquippedWeaponSlug", slug)
     character:SetAttribute("EquippedWeaponType", tostring(row.weaponType or ""))
     character:SetAttribute("EquippedWeaponRarity", tostring(row.rarity or ""))
@@ -208,7 +243,7 @@ end
 -- Reuses the runtime grip and bone solver of Equip(); weapon OBBs are legacy.
 function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: string, modelName: string): (Model?, any?, string?)
     local slug = string.lower(tostring(slugValue or ""))
-    local row = WeaponRegistry.weapons and WeaponRegistry.weapons[slug]
+    local row = gameplayRow(slug) or (WeaponRegistry.weapons and WeaponRegistry.weapons[slug])
     if not row or row.status ~= "PUBLISHED" then
         return nil, row, "weapon not registered/published: " .. slug
     end
@@ -246,13 +281,14 @@ function WeaponEquipService.GetAvailable(slugValue: any): any?
     if slug == "" then
         return nil
     end
-    return WeaponRegistry.weapons and WeaponRegistry.weapons[slug] or nil
+    return gameplayRow(slug)
 end
 
 function WeaponEquipService.ListAvailable(): { any }
     local rows = {}
-    for slug, row in pairs(WeaponRegistry.weapons or {}) do
-        if tonumber(row.modelAssetId) then
+    for slug in pairs(WeaponRegistry.weapons or {}) do
+        local row = gameplayRow(slug)
+        if row and tonumber(row.modelAssetId) then
             table.insert(rows, {
                 slug = tostring(slug),
                 nameEn = tostring(row.nameEn or slug),
@@ -275,6 +311,37 @@ function WeaponEquipService.ListAvailable(): { any }
     return rows
 end
 
+function WeaponEquipService.TestModel(weaponType: string): (string?, boolean)
+    local preferred = {sword="newbie_sword_01", dagger="newbie_dagger", bow="newbie_bow"}
+    local candidates = {}
+    for slug, row in pairs(WeaponRegistry.weapons or {}) do
+        if row.weaponType == weaponType and tonumber(row.modelAssetId) then table.insert(candidates, slug) end
+    end
+    table.sort(candidates)
+    if preferred[weaponType] then table.insert(candidates, 1, preferred[weaponType]) end
+    for _, slug in ipairs(candidates) do
+        local row = WeaponRegistry.weapons[slug]
+        local model = row and findByStudioPath(tostring(row.serverStoragePath or ""))
+        if model and model:IsA("Model") then return slug, false end
+    end
+    if weaponType == "bigsword" then
+        local slug = WeaponEquipService.TestModel("sword")
+        return slug, true
+    end
+    return nil, false
+end
+
+-- Purely visual Studio showcase: no combat, sockets, or stats on the stand.
+function WeaponEquipService.CloneTestDisplay(weaponType: string): Model?
+    local slug = WeaponEquipService.TestModel(weaponType)
+    local row = slug and WeaponRegistry.weapons[slug]
+    local template = row and findByStudioPath(tostring(row.serverStoragePath or ""))
+    if not template or not template:IsA("Model") then return nil end
+    local model = template:Clone()
+    prepareWeapon(model)
+    return model
+end
+
 function WeaponEquipService.EquipStartup(character: Model)
     local player = game:GetService("Players"):GetPlayerFromCharacter(character)
     -- A playtest choice survives respawn in this session; never read a
@@ -285,6 +352,12 @@ function WeaponEquipService.EquipStartup(character: Model)
     character:SetAttribute("WeaponLoadoutSource", if selected then "playtest-selector" else "startup")
     if slug == "" then
         WeaponEquipService.Unequip(character)
+        return
+    end
+    local row = gameplayRow(slug)
+    if not row or (not selected and row.requiredLevel > (tonumber(character:GetAttribute("Level")) or 1)) then
+        WeaponEquipService.Unequip(character)
+        warn("[game1][weapon] startup requires a compatible, level-eligible Database binding: " .. slug)
         return
     end
     local ok, reason = WeaponEquipService.Equip(character, slug)

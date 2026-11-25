@@ -51,6 +51,7 @@ end
 
 local function selectWeapon(player: Player, request: any)
     if not Access.ServerAllowed(player) then return {ok = false, error = "Developer debug access denied"} end
+    if player:GetAttribute("Game1GameplayTestActive") == true then return {ok=false,error="Use Gameplay Test"} end
     if not Config.Enabled then return { ok = false, error = "Выбор оружия отключён" } end
     if typeof(request) ~= "string" or #request > 80 then
         return { ok = false, error = "Некорректный ID оружия" }

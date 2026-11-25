@@ -7,11 +7,15 @@ local CombatFeedbackService = require(script.Parent:WaitForChild("CombatFeedback
 local CombatStateService = require(script.Parent:WaitForChild("CombatStateService"))
 local ActorDamageSignals = require(script.Parent:WaitForChild("ActorDamageSignals"))
 
+local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
+local Healing = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterHealing"))
 local DamageService = {}
 local criticalRandom = Random.new()
-local CRITICAL_DAMAGE_MULTIPLIER = 2
+local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
+local CRITICAL_DAMAGE_MULTIPLIER = Balance.Rules.critMultiplier
 
 function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number, headshot: boolean?): (number, boolean)
+    if not Isolation.Allows(attacker, target) then return 0, false end
     if target:GetAttribute("Damageable") ~= true or target:GetAttribute("LifeState") ~= "Alive" then
         if AttackConfig.DebugLogs then
             print(("[game1][DAMAGE] REJECT target=%s damageable=%s lifeState=%s"):format(
@@ -55,6 +59,8 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number,
         target:SetAttribute("DeathStartedAt", os.clock())
     end
 
+    -- Only HP actually removed (not overkill) contributes to lifesteal.
+    Healing.OnDamage(attacker, target, hp - newHP)
     ActorDamageSignals.Publish(attacker, target, normalizedRawDamage, finalDamage, killed)
     CombatFeedbackService.PublishDamage(attacker, target, finalDamage, critical, headshot == true)
 

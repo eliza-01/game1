@@ -190,13 +190,30 @@ function Mount.CloneAligned(slug: string, sourceSocket: string, target: Attachme
     return model
 end
 
--- Pivot-mounted prop. The target Bone HEAD / Attachment position becomes the
--- exact authored Model pivot, without substituting a grip or geometry bound.
+-- Pivot-mounted prop. The selected visual Origin matches the target Bone HEAD
+-- / Attachment, with the full rotation used by Blender Bone Socket.
 function Mount.CloneOnPivot(slug: string, target: Attachment): Model?
     local source = prototype(slug)
     if not source then return nil end
     local model = source:Clone()
-    local ok, reason = PivotSocketMount.Align(model, target)
+    -- The Blender addon follows the selected object's origin, not its rig's.
+    -- Resolve the actual visual mesh by its published name; keep the carrier
+    -- and all other parts in the same assembly, but do not mount by carrier.
+    local visual: MeshPart? = nil
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("MeshPart") and part.Name == slug then
+            if visual then
+                warn("[game1][house-socket-mount] ambiguous visual origin: " .. slug)
+                model:Destroy(); return nil
+            end
+            visual = part
+        end
+    end
+    if not visual then
+        warn("[game1][house-socket-mount] missing visual origin: " .. slug)
+        model:Destroy(); return nil
+    end
+    local ok, reason = PivotSocketMount.Align(model, target, visual)
     if not ok then
         warn("[game1][house-socket-mount] pivot mount failed: " .. slug .. " (" .. tostring(reason) .. ")")
         model:Destroy()

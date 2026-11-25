@@ -2,6 +2,7 @@
 -- Presentation shell: responsive right-hand character editor with a fixed header,
 -- gender switch, category navigation and sticky actions. Only the active category
 -- scrolls; this module has no knowledge of assets, spawning or game state.
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 local Panel = {}
@@ -11,7 +12,8 @@ local GOLD = Color3.fromRGB(215, 179, 115)
 local DARK = Color3.fromRGB(17, 24, 30)
 local NORMAL = Color3.fromRGB(39, 51, 58)
 local ACTIVE = Color3.fromRGB(81, 107, 98)
-local TABS = {"hair", "eyebrows", "eyes", "head"}
+local TABS = table.freeze({"hair", "eyebrows", "eyes", "head"})
+Panel.Categories = TABS
 
 local function rounded(parent: Instance, radius: number)
     local corner = Instance.new("UICorner")
@@ -49,7 +51,7 @@ local function action(parent: Instance, name: string, size: UDim2, position: UDi
     button.Position = position
     button.BackgroundColor3 = if primary then GOLD else NORMAL
     button.TextColor3 = if primary then DARK else INK
-    button.Font = Enum.Font.GothamSemibold
+    button.Font = Enum.Font.GothamBold
     button.TextSize = 15
     button.TextWrapped = true
     button.AutoButtonColor = true
@@ -59,7 +61,44 @@ local function action(parent: Instance, name: string, size: UDim2, position: UDi
     return button
 end
 
-local function uiParent(parent: Instance, settings: any)
+local function buildStickman(parent: Instance): Frame
+    local runner = Instance.new("Frame")
+    runner.Name = "LoadingRunner"
+    runner.BackgroundTransparency = 1
+    runner.Size = UDim2.fromOffset(28, 38)
+    runner.Parent = parent
+
+    local head = Instance.new("Frame")
+    head.Name = "Head"
+    head.Size = UDim2.fromOffset(10, 10)
+    head.Position = UDim2.fromOffset(9, 0)
+    head.BackgroundColor3 = INK
+    head.BorderSizePixel = 0
+    head.Parent = runner
+    rounded(head, 10)
+
+    local function limb(name: string, size: Vector2, pos: Vector2, rotation: number, color: Color3)
+        local item = Instance.new("Frame")
+        item.Name = name
+        item.Size = UDim2.fromOffset(size.X, size.Y)
+        item.Position = UDim2.fromOffset(pos.X, pos.Y)
+        item.BackgroundColor3 = color
+        item.BorderSizePixel = 0
+        item.Rotation = rotation
+        item.Parent = runner
+        rounded(item, math.min(size.X, size.Y))
+        return item
+    end
+
+    limb("Body", Vector2.new(3, 14), Vector2.new(12, 10), 0, INK)
+    limb("LeftArm", Vector2.new(3, 12), Vector2.new(6, 13), 55, INK)
+    limb("RightArm", Vector2.new(3, 12), Vector2.new(16, 12), -42, INK)
+    limb("LeftLeg", Vector2.new(3, 12), Vector2.new(8, 22), 45, INK)
+    limb("RightLeg", Vector2.new(3, 12), Vector2.new(15, 22), -55, INK)
+    return runner
+end
+
+local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGui)
     local root = Instance.new("Frame")
     root.Name = "CharacterCreationPanel"
     root.AnchorPoint = Vector2.new(1, 0.5)
@@ -76,29 +115,19 @@ local function uiParent(parent: Instance, settings: any)
     gradient.Rotation = 90
     gradient.Color = ColorSequence.new(Color3.fromRGB(33, 44, 50), DARK)
     gradient.Parent = root
-    local goldLine = Instance.new("Frame")
-    goldLine.Name = "GoldAccent"
-    goldLine.BackgroundColor3 = GOLD
-    goldLine.BorderSizePixel = 0
-    goldLine.Size = UDim2.new(1, 0, 0, 3)
-    goldLine.Parent = root
     local header = Instance.new("Frame")
     header.Name = "Header"
     header.BackgroundTransparency = 1
     header.Position = UDim2.fromOffset(22, 16)
     header.Size = UDim2.new(1, -44, 0, 70)
     header.Parent = root
-    local eyebrow = text(header, "GameBrand", 11, Enum.Font.GothamBold, GOLD)
-    eyebrow.Text = "GAME1  /  CHARACTER"
-    eyebrow.Position = UDim2.fromOffset(0, 0)
-    eyebrow.Size = UDim2.new(1, 0, 0, 19)
     local heading = text(header, "CreationTitle", 25, Enum.Font.GothamBold, INK)
-    heading.Position = UDim2.fromOffset(0, 20)
+    heading.Position = UDim2.fromOffset(0, 0)
     heading.Size = UDim2.new(1, -58, 0, 34)
-    local tagline = text(header, "CreationSubtitle", 12, Enum.Font.Gotham, MUTED)
+    local tagline = text(header, "CreationSubtitle", 12, Enum.Font.GothamBold, MUTED)
     tagline.TextWrapped = true
     tagline.TextTruncate = Enum.TextTruncate.None
-    tagline.Position = UDim2.fromOffset(0, 53)
+    tagline.Position = UDim2.fromOffset(0, 34)
     tagline.Size = UDim2.new(1, -58, 0, 40)
     local genders = Instance.new("Frame")
     genders.Name = "GenderSelection"
@@ -117,7 +146,7 @@ local function uiParent(parent: Instance, settings: any)
     local tabButtons: {[string]: TextButton} = {}
     for i, key in ipairs(TABS) do
         local button = action(tabs, "Tab" .. key, UDim2.new(0.25, -6, 1, 0), UDim2.new((i - 1) * 0.25, 3, 0, 0), false)
-        button.Font = Enum.Font.GothamMedium
+        button.Font = Enum.Font.GothamBold
         button.TextSize = 13
         tabButtons[key] = button
     end
@@ -142,15 +171,17 @@ local function uiParent(parent: Instance, settings: any)
     local selectionCaption = text(selectionCard, "SelectionCaption", 12, Enum.Font.GothamBold, GOLD)
     selectionCaption.Position = UDim2.fromOffset(18, 14)
     selectionCaption.Size = UDim2.new(1, -36, 0, 24)
-    selectionCaption.Text = "GAME1  /  CHARACTER SLOT 01"
+    selectionCaption.Text = "1/5"
     local selectionName = text(selectionCard, "SelectionName", 24, Enum.Font.GothamBold, INK)
-    selectionName.Position = UDim2.fromOffset(18, 45)
-    selectionName.Size = UDim2.new(1, -36, 0, 43)
-    local selectionHint = text(selectionCard, "SelectionHint", 13, Enum.Font.Gotham, MUTED)
-    selectionHint.TextWrapped = true
-    selectionHint.TextTruncate = Enum.TextTruncate.None
-    selectionHint.Position = UDim2.fromOffset(18, 99)
-    selectionHint.Size = UDim2.new(1, -36, 0, 36)
+    selectionName.Position = UDim2.fromOffset(18, 34)
+    selectionName.Size = UDim2.new(1, -36, 0, 34)
+    selectionName.TextScaled = true
+    local nameLimit = Instance.new("UITextSizeConstraint")
+    nameLimit.MaxTextSize = 24
+    nameLimit.Parent = selectionName
+    local selectionLevel = text(selectionCard, "SelectionLevel", 15, Enum.Font.GothamBold, MUTED)
+    selectionLevel.Position = UDim2.fromOffset(18, 70)
+    selectionLevel.Size = UDim2.new(1, -36, 0, 24)
 
     local content = Instance.new("ScrollingFrame")
     content.Name = "AppearanceContent"
@@ -159,7 +190,7 @@ local function uiParent(parent: Instance, settings: any)
     content.ScrollBarThickness = 4
     content.ScrollBarImageColor3 = GOLD
     content.ScrollingDirection = Enum.ScrollingDirection.Y
-    content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    content.AutomaticCanvasSize = Enum.AutomaticSize.None
     content.CanvasSize = UDim2.fromOffset(0, 0)
     content.Position = UDim2.fromOffset(22, 230)
     content.Size = UDim2.new(1, -44, 1, -376)
@@ -178,6 +209,31 @@ local function uiParent(parent: Instance, settings: any)
     vertical.Padding = UDim.new(0, 12)
     vertical.SortOrder = Enum.SortOrder.LayoutOrder
     vertical.Parent = editor
+    local canvasDirty = true
+    local function invalidateCanvas() canvasDirty = true end
+    vertical:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(invalidateCanvas)
+    content:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(invalidateCanvas)
+    -- Keep the old canvas while Render replaces all controls. Only commit a
+    -- settled layout, never the transient empty/zero-height editor.
+    local canvasConnection = RunService.PreRender:Connect(function()
+        if not canvasDirty or not content.Visible then return end
+        canvasDirty = false
+        local position = content.CanvasPosition
+        -- The editor's top-level rows have explicit pixel heights. Measuring
+        -- them directly avoids stale AbsoluteContentSize during a rebuild.
+        local height, rows = 12, 0
+        for _, child in editor:GetChildren() do
+            if child:IsA("GuiObject") and child.Visible then
+                height += child.Size.Y.Offset
+                rows += 1
+            end
+        end
+        height += math.max(0, rows - 1) * vertical.Padding.Offset
+        content.CanvasSize = UDim2.fromOffset(0, height)
+        content.CanvasPosition = Vector2.new(0, math.clamp(position.Y, 0,
+            math.max(0, height - content.AbsoluteWindowSize.Y)))
+    end)
+    root.Destroying:Connect(function() canvasConnection:Disconnect() end)
     local footer = Instance.new("Frame")
     footer.Name = "CreationActions"
     footer.AnchorPoint = Vector2.new(0, 1)
@@ -193,7 +249,7 @@ local function uiParent(parent: Instance, settings: any)
     footLine.Size = UDim2.new(1, 0, 0, 1)
     footLine.Parent = footer
     local enter = action(footer, "EnterWorld", UDim2.new(1, 0, 0, 48), UDim2.fromOffset(0, 4), true)
-    local status = text(footer, "CreationStatus", 12, Enum.Font.GothamMedium, Color3.fromRGB(238, 187, 154))
+    local status = text(footer, "CreationStatus", 12, Enum.Font.GothamBold, Color3.fromRGB(238, 187, 154))
     status.TextWrapped = true
     status.TextTruncate = Enum.TextTruncate.None
     status.Position = UDim2.fromOffset(0, 109)
@@ -203,7 +259,7 @@ local function uiParent(parent: Instance, settings: any)
     overlay.Name = "CreationSubmittingOverlay"
     overlay.Size = UDim2.fromScale(1, 1)
     overlay.BackgroundColor3 = DARK
-    overlay.BackgroundTransparency = 0.12
+    overlay.BackgroundTransparency = 0
     overlay.BorderSizePixel = 0
     overlay.Text = ""
     overlay.AutoButtonColor = false
@@ -211,14 +267,65 @@ local function uiParent(parent: Instance, settings: any)
     overlay.Active = true
     overlay.ZIndex = 100
     overlay.Visible = false
-    overlay.Parent = parent
-    local overlayLabel = text(overlay, "Message", 22, Enum.Font.GothamSemibold, GOLD)
-    overlayLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-    overlayLabel.Position = UDim2.fromScale(0.5, 0.5)
-    overlayLabel.Size = UDim2.new(0.9, 0, 0, 80)
+    overlay.Parent = overlayParent
+    local overlayCard = Instance.new("Frame")
+    overlayCard.Name = "LoadingCard"
+    overlayCard.AnchorPoint = Vector2.new(0.5, 0.5)
+    overlayCard.Position = UDim2.fromScale(0.5, 0.5)
+    overlayCard.Size = UDim2.fromOffset(460, 190)
+    overlayCard.BackgroundColor3 = Color3.fromRGB(24, 34, 39)
+    overlayCard.BorderSizePixel = 0
+    overlayCard.ZIndex = 101
+    overlayCard.Parent = overlay
+    rounded(overlayCard, 16)
+    stroke(overlayCard, Color3.fromRGB(144, 143, 119), 0.47)
+    local overlayLabel = text(overlayCard, "Message", 22, Enum.Font.GothamBold, GOLD)
+    overlayLabel.AnchorPoint = Vector2.new(0.5, 0)
+    overlayLabel.Position = UDim2.fromScale(0.5, 0)
+    overlayLabel.Size = UDim2.new(0.88, 0, 0, 60)
     overlayLabel.TextXAlignment = Enum.TextXAlignment.Center
+    overlayLabel.TextYAlignment = Enum.TextYAlignment.Bottom
     overlayLabel.TextWrapped = true
-    overlayLabel.ZIndex = 101
+    overlayLabel.ZIndex = 102
+    local runnerLane = Instance.new("Frame")
+    runnerLane.Name = "RunnerLane"
+    runnerLane.AnchorPoint = Vector2.new(0.5, 0)
+    runnerLane.Position = UDim2.new(0.5, 0, 0, 74)
+    runnerLane.Size = UDim2.new(0.82, 0, 0, 42)
+    runnerLane.BackgroundTransparency = 1
+    runnerLane.ZIndex = 102
+    runnerLane.Parent = overlayCard
+    local runner = buildStickman(runnerLane)
+    runner.AnchorPoint = Vector2.new(0.5, 0)
+    runner.Position = UDim2.new(0, 14, 0, 2)
+    runner.ZIndex = 103
+    for _, child in ipairs(runner:GetDescendants()) do if child:IsA("GuiObject") then child.ZIndex = 103 end end
+    local progressTrack = Instance.new("Frame")
+    progressTrack.Name = "ProgressTrack"
+    progressTrack.AnchorPoint = Vector2.new(0.5, 0)
+    progressTrack.Position = UDim2.new(0.5, 0, 0, 126)
+    progressTrack.Size = UDim2.new(0.82, 0, 0, 16)
+    progressTrack.BackgroundColor3 = Color3.fromRGB(42, 55, 62)
+    progressTrack.BorderSizePixel = 0
+    progressTrack.ClipsDescendants = true
+    progressTrack.ZIndex = 102
+    progressTrack.Parent = overlayCard
+    rounded(progressTrack, 12)
+    local progressFill = Instance.new("Frame")
+    progressFill.Name = "Fill"
+    progressFill.Size = UDim2.new(0, 0, 1, 0)
+    progressFill.BackgroundColor3 = GOLD
+    progressFill.BorderSizePixel = 0
+    progressFill.ZIndex = 103
+    progressFill.Parent = progressTrack
+    rounded(progressFill, 12)
+    local progressValue = text(overlayCard, "ProgressValue", 14, Enum.Font.GothamBold, INK)
+    progressValue.AnchorPoint = Vector2.new(0.5, 0)
+    progressValue.Position = UDim2.new(0.5, 0, 0, 148)
+    progressValue.Size = UDim2.new(0.82, 0, 0, 24)
+    progressValue.TextXAlignment = Enum.TextXAlignment.Center
+    progressValue.ZIndex = 102
+    progressValue.Text = ""
     -- Safe-area dimensions also handle camera replacement, rotation and resize.
     local function resize()
         local viewport = if parent:IsA("ScreenGui") then parent.AbsoluteSize else Vector2.new(1280, 720)
@@ -230,26 +337,26 @@ local function uiParent(parent: Instance, settings: any)
         local selection = mode == "selection"
         local requested = tonumber(if mobile then settings.mobilePanelWidthPx else settings.desktopPanelWidthPx) or 460
         local width = math.max(1, math.min(math.max(if mobile then 300 else 410, requested), viewport.X - 20))
-        local availableHeight = if portrait then math.floor(viewport.Y * 0.56) else viewport.Y - 24
-        local height = math.max(1, math.min(if editing then 850 elseif selection then 420 else 180, availableHeight))
+        local availableHeight = if portrait and editing then math.floor(viewport.Y * 0.56) else viewport.Y - 24
+        local height = math.max(1, math.min(if editing then 850 elseif selection then 250 else 180, availableHeight))
         root.Size = UDim2.fromOffset(width, height)
         root.AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.new(1, 0.5)
         root.Position = if portrait then UDim2.new(0.5, 0, 1, -8)
             else UDim2.new(1, if mobile then -10 else -16, 0.5, 0)
         header.Position = UDim2.fromOffset(16, if compact then 8 else 16)
         header.Size = UDim2.new(1, -32, 0, if compact then 50 else 82)
-        heading.Position = UDim2.fromOffset(0, if compact then 14 else 20)
+        heading.Position = UDim2.fromOffset(0, 0)
         heading.Size = UDim2.new(1, 0, 0, 31)
         heading.TextSize = if compact then 19 else 25
-        tagline.Visible = not compact or not editing
-        tagline.Position = UDim2.fromOffset(0, if compact then 43 else 53)
+        tagline.Visible = editing and not compact or mode == "storage_unavailable"
+        tagline.Position = UDim2.fromOffset(0, 34)
         tagline.Size = UDim2.new(1, 0, 0, 40)
-        genders.Position = UDim2.fromOffset(16, if compact then 58 else 105)
+        genders.Position = UDim2.fromOffset(16, if compact then 42 else 86)
         genders.Size = UDim2.new(1, -32, 0, if compact then 40 else 46)
         local visibleCount = 0
         for _, button in pairs(tabButtons) do if button.Visible then visibleCount += 1 end end
         local rows = if mobile and not compact and visibleCount > 2 then 2 else 1
-        local tabY = if compact then 104 else 160
+        local tabY = if compact then 88 else 141
         local tabHeight = if visibleCount == 0 then 0 elseif rows == 2 then 86 else 40
         tabs.Position = UDim2.fromOffset(16, tabY)
         tabs.Size = UDim2.new(1, -32, 0, tabHeight)
@@ -279,22 +386,30 @@ local function uiParent(parent: Instance, settings: any)
         enter.Size = UDim2.new(1, 0, 0, enterHeight)
         status.Position = UDim2.fromOffset(0, enterY + enterHeight + 3)
         status.Size = UDim2.new(1, 0, 0, math.max(18, footerHeight - enterY - enterHeight - 3))
-        selectionCard.Position = UDim2.fromOffset(16, if compact then 92 else 112)
-        selectionCard.Size = UDim2.new(1, -32, 0, if compact then 100 else 150)
-        selectionHint.Visible = not compact
+        selectionCard.Position = UDim2.fromOffset(16, 48)
+        local cardHeight = math.max(1, height - 48 - footerHeight - bottom)
+        selectionCard.Size = UDim2.new(1, -32, 0, cardHeight)
+        selectionCaption.Position = UDim2.fromOffset(18, 6)
+        selectionCaption.Size = UDim2.new(1, -36, 0.23, 0)
+        selectionName.Position = UDim2.new(0, 18, 0.27, 0)
+        selectionName.Size = UDim2.new(1, -36, 0.36, 0)
+        selectionLevel.Position = UDim2.new(0, 18, 0.66, 0)
+        selectionLevel.Size = UDim2.new(1, -36, 0.26, 0)
+        overlayCard.Size = UDim2.fromOffset(math.max(1, math.min(viewport.X - 32, 460)), 190)
     end
     if parent:IsA("ScreenGui") then parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize) end
     resize()
     return {panel = root, title = heading, subtitle = tagline,
         male = male, female = female, enter = enter,
-        overlay = overlay, overlayLabel = overlayLabel,
-        status = status, tabs = tabButtons, content = content, editor = editor,
-        selectionCard = selectionCard, selectionName = selectionName, selectionHint = selectionHint,
+        overlay = overlay, overlayCard = overlayCard, overlayLabel = overlayLabel,
+        overlayRunner = runner, overlayTrack = progressTrack, overlayFill = progressFill, overlayValue = progressValue,
+        status = status, tabs = tabButtons, content = content, editor = editor, invalidateCanvas = invalidateCanvas,
+        selectionCard = selectionCard, selectionName = selectionName, selectionLevel = selectionLevel, selectionCaption = selectionCaption,
         genders = genders, tabBar = tabs, separator = separator, layout = resize}
 end
 
-function Panel.Create(parent: Instance, settings: any): any
-    return uiParent(parent, settings)
+function Panel.Create(parent: Instance, settings: any, overlayParent: ScreenGui): any
+    return uiParent(parent, settings, overlayParent)
 end
 
 -- Selection is deliberately a separate UI mode, not a continuation of the editor.
@@ -315,14 +430,64 @@ function Panel.SetMode(views: any, stage: string)
 end
 
 function Panel.SetSelection(views: any, archetype: string?)
-    views.selectionName.Text = if not archetype then "—" else Language.Translate(if archetype == "human_male" then "creation.male" else "creation.female")
-    views.selectionHint.Text = Language.Translate(if archetype then "creation.selection_subtitle" else "creation.loading_profile")
+    views.selectionCaption.Visible = archetype ~= nil
+    views.selectionLevel.Visible = archetype ~= nil
+    views.selectionName.Text = if not archetype then Language.Translate("creation.loading_profile")
+        else Language.Translate(if archetype == "human_male" then "creation.human_male" else "creation.human_female")
+    views.selectionLevel.Text = Language.Translate("creation.selection_level", {level = 0})
 end
 
-function Panel.SetSubmitting(views: any, busy: boolean, message: string)
+-- Animate by elapsed time, not by percent updates; no idle RenderStepped work.
+local function setRunnerPose(runner: Frame, time: number)
+    local stride = math.sin(time * math.pi * 5)
+    local leftArm = runner:FindFirstChild("LeftArm") :: Frame
+    local rightArm = runner:FindFirstChild("RightArm") :: Frame
+    local leftLeg = runner:FindFirstChild("LeftLeg") :: Frame
+    local rightLeg = runner:FindFirstChild("RightLeg") :: Frame
+    leftArm.Rotation = 15 + 55 * stride
+    rightArm.Rotation = -15 - 55 * stride
+    leftLeg.Rotation = 48 * stride
+    rightLeg.Rotation = -48 * stride
+end
+
+local function setOverlay(views: any, busy: boolean, message: string, progress: number?)
     views.overlayLabel.Text = message
     views.overlay.Visible = busy
     views.overlay.Modal = busy
+    views.overlayProgress = if progress ~= nil then math.clamp(progress, 0, 1) else nil
+    if not busy then
+        if views.runnerConnection then views.runnerConnection:Disconnect(); views.runnerConnection = nil end
+        return
+    end
+    local function render()
+        local elapsed = os.clock() - views.runnerStart
+        local value = views.overlayProgress
+        local position = if value ~= nil then value else (math.sin(elapsed * 2.6) + 1) * 0.5
+        views.overlayFill.Size = UDim2.new(if value ~= nil then value else 0.22, 0, 1, 0)
+        views.overlayFill.Position = UDim2.new(if value ~= nil then 0 else position * 0.78, 0, 0, 0)
+        views.overlayValue.Text = if value ~= nil then string.format("%d%%", math.floor(value * 100 + 0.5)) else ""
+        views.overlayRunner.Position = UDim2.new(position, 14 - 28 * position, 0, 2 - 2 * math.abs(math.sin(elapsed * math.pi * 5)))
+        setRunnerPose(views.overlayRunner, elapsed)
+    end
+    if not views.runnerConnection then
+        views.runnerStart = os.clock()
+        views.runnerConnection = RunService.RenderStepped:Connect(render)
+        if not views.runnerCleanupBound then
+            views.runnerCleanupBound = true
+            views.overlay.Destroying:Once(function()
+                if views.runnerConnection then views.runnerConnection:Disconnect(); views.runnerConnection = nil end
+            end)
+        end
+    end
+    render()
+end
+
+function Panel.SetLoading(views: any, busy: boolean, message: string, progress: number)
+    setOverlay(views, busy, message, progress)
+end
+
+function Panel.SetSubmitting(views: any, busy: boolean, message: string, progress: number?)
+    setOverlay(views, busy, message, progress)
 end
 
 function Panel.UpdateTabs(views: any, selected: boolean, active: string?, visible: {[string]: boolean})

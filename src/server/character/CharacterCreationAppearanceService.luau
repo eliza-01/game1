@@ -3,13 +3,13 @@
 -- This module owns selection validation; gameplay/preview share the same recipe.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local FaceMaterials = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationMaterials"))
 local AppearanceRegistry = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationAppearanceRegistry"))
 local EyeColors = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationEyeColors"))
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
 local Service = {}
 local OPTIONS = {hair = true, head = true, eyes = true, eyebrows = true}
 local COLORS = {hair = true, eyes = true, eyebrows = true}
-local MATERIALS = {hair = true, eyes = true}
 
 local function archetypeRow(id: string): any?
     local characters = require(Shared:WaitForChild("character"):WaitForChild("CharacterRegistry"))
@@ -39,7 +39,7 @@ local function defaultId(entries: any, slot: string): string
     return id
 end
 
-function Service.Resolve(archetype: any, values: any): (any?, any?, string?)
+function Service.Resolve(archetype: any, values: any, savedProfile: boolean?): (any?, any?, string?)
     if type(archetype) ~= "string" or (archetype ~= "human_male" and archetype ~= "human_female") then
         return nil, nil, "invalid_archetype"
     end
@@ -87,19 +87,24 @@ function Service.Resolve(archetype: any, values: any): (any?, any?, string?)
     local provided = if values.materials == nil then {} else values.materials
     if type(provided) ~= "table" then return nil, nil, "invalid_materials" end
     for key in pairs(provided) do
-        if not MATERIALS[key] then return nil, nil, "unknown_material_channel" end
+        if type(key) ~= "string" or not FaceMaterials.Slot(key) then return nil, nil, "unknown_material_channel" end
     end
     local allowed = GameOptions.CharacterCreationSettings().materialChoices or {}
     local selectedMaterials = {}
-    for _, group in ipairs({"hair", "eyes"}) do
-        local slot = if group == "hair" then "hair" else "eye_l"
+    for _, group in ipairs(FaceMaterials.Groups) do
+        local slot = FaceMaterials.Slot(group) :: string
         local choices = allowed[group] or {"Plastic"}
         local material = provided[group]
         if material == nil then
             local inherited = (row.assembly.parts[slot] or {}).material or "Plastic"
             material = if table.find(choices, inherited) then inherited else "Plastic"
         end
-        if not table.find(choices, material) or Enum.Material[material] == nil then
+        -- Older saved profiles may contain retired materials. Never allow an
+        -- untrusted new selection to use this compatibility path.
+        if savedProfile and type(material) == "string" and not table.find(choices, material) then
+            material = "Plastic"
+        end
+        if type(material) ~= "string" or not table.find(choices, material) or Enum.Material[material] == nil then
             return nil, nil, "invalid_" .. group .. "_material"
         end
         selectedMaterials[group] = material
@@ -112,14 +117,14 @@ function Service.Resolve(archetype: any, values: any): (any?, any?, string?)
         -- Preserve the authored atlas for the head; it is not a color-only slot.
         recipe.parts[slot] = if slot == "head" and selected.head == (row.assembly.parts.head or {}).id
             then table.clone(row.assembly.parts.head) else table.clone(chosen[slot].part)
-        recipe.parts[slot].material = (row.assembly.parts[slot] or {}).material or "Plastic"
+        recipe.parts[slot].material = selectedMaterials[slot]
     end
     for _, group in ipairs({"eyes", "eyebrows"}) do
         local item = chosen[group]
         for _, side in ipairs({"l", "r"}) do
             local slot = if group == "eyes" then "eye_" .. side else "eyebrow_" .. side
             recipe.parts[slot] = table.clone(if side == "l" then item.left else item.right)
-            recipe.parts[slot].material = if group == "eyes" then selectedMaterials.eyes else (row.assembly.parts[slot] or {}).material or "Plastic"
+            recipe.parts[slot].material = if group == "eyes" then selectedMaterials.eyes else selectedMaterials.eyebrows
             if group == "eyes" then recipe.parts[slot].color = eyes[side]
             elseif safeColors.eyebrows then recipe.parts[slot].color = safeColors.eyebrows
             else recipe.parts[slot].color = (row.assembly.parts[slot] or {}).color or "#000000" end

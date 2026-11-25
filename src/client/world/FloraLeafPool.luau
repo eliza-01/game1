@@ -31,6 +31,9 @@ function Pool.Start(slug: string, capacity: number): boolean
     folder.Parent = ReplicatedStorage -- stays referenced independent of Workspace LOD
     local base = source:Clone()
     base.Anchored, base.CanCollide, base.CanTouch, base.CanQuery = true, false, false, false
+    -- A tumbling thin leaf must remain visible from either side. This is
+    -- local VFX policy, not a change to the published Location asset.
+    base.DoubleSided = true
     local override = (asset.meshOptions or {})[source.Name] or (asset.meshOptions or {})[slug]
     local settings = if override and override.appearanceMode then override else asset
     local applied = Appearance.Apply(base, {

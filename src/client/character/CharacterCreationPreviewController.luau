@@ -5,9 +5,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local FaceMaterials = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationMaterials"))
 local CharacterAnimationRegistry = require(Shared:WaitForChild("character"):WaitForChild("CharacterAnimationRegistry"))
 local StageVisibility = require(script.Parent:WaitForChild("CharacterCreationStageVisibility"))
+local BoneModelMount = require(Shared:WaitForChild("rig"):WaitForChild("BoneModelMount"))
 local Mounts = require(script.Parent:WaitForChild("BoneMountedAttachmentController"))
+local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
+local Turntable = require(script.Parent:WaitForChild("CharacterPreviewTurntable"))
 local Controller = {}
 Controller.__index = Controller
 
@@ -78,8 +82,8 @@ local function applyMaterials(model: Model, materials: any)
         if object:IsA("MeshPart") then
             local slot = object:GetAttribute("CharacterPartSlot")
             local channel = object:GetAttribute("HairColorChannel")
-            local materialName = if slot == "eye_l" or slot == "eye_r" then materials.eyes
-                else if slot == "hair" or type(channel) == "string" then materials.hair else nil
+            local group = FaceMaterials.GroupForPart(slot, channel)
+            local materialName = if group then materials[group] else nil
             if type(materialName) == "string" then
                 local material = Enum.Material[materialName]
                 if material then object.Material = material end
@@ -111,20 +115,47 @@ local function playIdle(model: Model, archetype: string): AnimationTrack?
     return nil
 end
 
-function Controller.new(settings: any)
+function Controller.new(settings: any, canRotate: () -> boolean)
     local localFolder = Instance.new("Folder")
     localFolder.Name = "Game1CharacterCreationLocalPreviews"
     localFolder.Parent = Workspace
     local hidden = StageVisibility.Hide(stageFolder())
-    return setmetatable({settings = settings, folder = localFolder, models = {} :: {[string]: Model},
-        hidden = hidden, tracks = {} :: {[string]: AnimationTrack}}, Controller)
+    local models: {[string]: Model} = {}
+    return setmetatable({settings = settings, folder = localFolder, models = models,
+        hidden = hidden, tracks = {} :: {[string]: AnimationTrack},
+        turntable = Turntable.new(models, canRotate)}, Controller)
 end
 
-function Controller:Set(archetype: string, templateName: string, choice: any, stage: string?, isCurrent: (() -> boolean)?, anchors: any?): boolean
+local function templateReady(template: Model): boolean
+    local count = template:GetAttribute("Game1PreviewDescendantCount")
+    if type(count) ~= "number" or count ~= #template:GetDescendants() or not template.PrimaryPart then return false end
+    local imported = template:FindFirstChild("ImportedRig")
+    if not imported or not imported:FindFirstChild("rig_carrier") then return false end
+    local expected = template:GetAttribute("Game1AssemblyHairPieceCount")
+    if type(expected) ~= "number" then return false end
+    local hair = imported:FindFirstChild("CharacterHairComponent")
+    if expected == 0 then return hair == nil end
+    if not hair or not hair:IsA("Model") or hair:GetAttribute("Game1HairPieceCount") ~= expected
+        or not BoneModelMount.HairReady(hair) then return false end
+    local root = hair.PrimaryPart
+    local name = root and root:GetAttribute("HairTargetBoneName")
+    return type(name) == "string" and BoneModelMount.FindHairBone(template, name) ~= nil
+end
+
+function Controller:Set(archetype: string, templateName: string, choice: any, stage: string?, isCurrent: (() -> boolean)?, anchors: any?, onPreloadProgress: ((number) -> ())?): boolean
     local available = ReplicatedStorage:WaitForChild("Game1CharacterCreationTemplates", 12)
     local template = available and available:WaitForChild(templateName, 12)
     if not self.folder.Parent or not template or not template:IsA("Model") then return false end
     if isCurrent and not isCurrent() then return false end
+    local replicationDeadline = os.clock() + 12
+    while not templateReady(template) do
+        if not self.folder.Parent or (isCurrent and not isCurrent()) then return false end
+        if os.clock() >= replicationDeadline then
+            warn("[game1][character-creation] incomplete preview template: " .. templateName)
+            return false
+        end
+        RunService.Heartbeat:Wait()
+    end
     local gender = if archetype == "human_male" then "male" else "female"
     local target = asCFrame(self.settings, gender, stage, anchors)
     local other = asCFrame(self.settings, if gender == "male" then "female" else "male")
@@ -137,6 +168,7 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
         return false
     end
     local instance = template:Clone()
+    if not templateReady(instance) then instance:Destroy(); return false end
     local visibility: {[BasePart]: number} = {}
     instance.Name = archetype .. "Preview"
     for _, object in ipairs(instance:GetDescendants()) do
@@ -150,11 +182,15 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
         end
     end
     instance:PivotTo(target)
-    instance.Parent = self.folder
     print(string.format("[game1][character-creation] %s preview positioned (%.3f, %.3f, %.3f), yaw %.3f",
         gender, target.Position.X, target.Position.Y, target.Position.Z, math.deg(select(2, target:ToOrientation()))))
     paint(instance, choice.colors or {})
     applyMaterials(instance, choice.materials or {})
+    if not MeshPreloader.PreloadModel(instance, isCurrent, onPreloadProgress) then
+        instance:Destroy()
+        return false
+    end
+    instance.Parent = self.folder
     Mounts.RegisterPreview(instance)
     local track = playIdle(instance, archetype)
     local function current(): boolean
@@ -192,7 +228,11 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
     -- Choices can change while the animation asset is loading.
     paint(instance, choice.colors or {})
     applyMaterials(instance, choice.materials or {})
-    Mounts.UpdateCharacter(instance)
+    self.turntable:Place(archetype, instance, target)
+    if not Mounts.UpdateCharacter(instance) then
+        warn("[game1][character-creation] hair mount not ready: " .. archetype)
+        return discard()
+    end
     local previous = self.models[archetype]
     self.models[archetype] = instance
     self.tracks[archetype] = track
@@ -208,6 +248,7 @@ function Controller:KeepOnly(archetype: string)
             model:Destroy()
             self.models[id] = nil
             self.tracks[id] = nil
+            self.turntable:Remove(id)
         end
     end
 end
@@ -223,6 +264,7 @@ function Controller:Materials(archetype: string, materials: any)
 end
 
 function Controller:Destroy()
+    self.turntable:Destroy()
     for _, model in pairs(self.models) do Mounts.UnregisterPreview(model) end
     self.folder:Destroy()
     StageVisibility.Restore(self.hidden)

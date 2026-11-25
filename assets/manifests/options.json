@@ -326,17 +326,43 @@
     "materialChoices": {
       "hair": [
         "Plastic",
-        "SmoothPlastic",
+        "Slate",
         "Fabric",
-        "Neon",
-        "Metal",
-        "Sand"
+        "SmoothPlastic",
+        "Sandstone",
+        "Grass",
+        "LeafyGrass",
+        "Concrete"
       ],
       "eyes": [
         "Plastic",
+        "Slate",
+        "Fabric",
         "SmoothPlastic",
-        "Glass",
-        "Neon"
+        "Sandstone",
+        "Grass",
+        "LeafyGrass",
+        "Concrete"
+      ],
+      "eyebrows": [
+        "Plastic",
+        "Slate",
+        "Fabric",
+        "SmoothPlastic",
+        "Sandstone",
+        "Grass",
+        "LeafyGrass",
+        "Concrete"
+      ],
+      "head": [
+        "Plastic",
+        "Slate",
+        "Fabric",
+        "SmoothPlastic",
+        "Sandstone",
+        "Grass",
+        "LeafyGrass",
+        "Concrete"
       ]
     },
     "views": {

@@ -59,16 +59,16 @@ local function save(player: Player, value: any)
     player:SetAttribute(ATTRIBUTE, value)
     player:SetAttribute(READY, true)
     if not store then
-        return {ok = false, error = "save_unavailable", locale = value}
+        return {ok = true, persisted = false, locale = value}
     end
     local ok, reason = pcall(function()
         store:SetAsync(keyFor(player), value)
     end)
     if not ok then
         warn("[game1][language] preference save unavailable:", tostring(reason))
-        return {ok = false, error = "save_unavailable", locale = value}
+        return {ok = true, persisted = false, locale = value}
     end
-    return {ok = true, locale = value}
+    return {ok = true, persisted = true, locale = value}
 end
 
 function Service.Start()

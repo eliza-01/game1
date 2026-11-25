@@ -414,8 +414,8 @@ function CharacterService.Start()
         function(player: Player, archetype: string, selected: any?, location: CFrame?): Model?
             return createCharacter(player, archetype, nil, selected, location)
         end,
-        function(archetype: string, selection: any): (any?, string?)
-            local recipe, checked, reason = CharacterCreationAppearanceService.Resolve(archetype, selection)
+        function(archetype: string, selection: any, savedProfile: boolean?): (any?, string?)
+            local recipe, checked, reason = CharacterCreationAppearanceService.Resolve(archetype, selection, savedProfile)
             if not recipe then return nil, reason end
             return checked, nil
         end,

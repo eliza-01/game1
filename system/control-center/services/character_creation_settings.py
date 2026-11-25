@@ -13,6 +13,9 @@ VIEW_ROLES = ('overview', 'male_body', 'female_body', 'male_face', 'female_face'
 
 CAMERA_VIEWS = {'SelectionOverview': {'cframe': [194.504593, -304.755432, 170.894653, -0.192445204, -0.290456295, 0.937336683, 3.72528985e-09, 0.955191374, 0.295989007, -0.981307685, 0.0569616668, -0.183822021], 'fov': 70}, 'MaleFullBody': {'cframe': [182.015625, -308.425964, 170.331039, -0.708430588, -0.162659898, 0.68678087, 7.45057971e-09, 0.973080039, 0.230468094, -0.705780566, 0.163270652, -0.689359605], 'fov': 70}, 'FemaleFullBody': {'cframe': [185.124832, -309.109985, 166.462067, 0.395562619, -0.160015583, 0.904392183, 3.72529074e-09, 0.984705806, 0.174225584, -0.91843909, -0.0689171255, 0.389512748], 'fov': 70}, 'MaleFace': {'cframe': [180.331024, -308.415009, 172.346603, -0.723042011, -0.109602585, 0.682053983, -0.0, 0.987333477, 0.158659428, -0.690804124, 0.114717431, -0.713883519], 'fov': 70}, 'FemaleFace': {'cframe': [182.726929, -308.539276, 166.062881, 0.310615152, -0.11110054, 0.944020629, -0.0, 0.993145883, 0.116882019, -0.950535774, -0.036305327, 0.308486134], 'fov': 70}}
 
+FACE_MATERIALS = ('Plastic', 'Slate', 'Fabric', 'SmoothPlastic', 'Sandstone', 'Grass', 'LeafyGrass', 'Concrete')
+MATERIAL_GROUPS = ('hair', 'eyes', 'eyebrows', 'head')
+
 DEFAULTS = {
     'enabled': False,  # opt-in until Studio Play composition is verified
     'useStudioAnchors': True,
@@ -30,10 +33,7 @@ DEFAULTS = {
         'eyes': ['#3A6483', '#638B5A', '#795333'],
         'eyebrows': ['#161616', '#765034', '#E2BD83'],
     },
-    'materialChoices': {
-        'hair': ['Plastic', 'SmoothPlastic', 'Fabric', 'Neon', 'Metal', 'Sand'],
-        'eyes': ['Plastic', 'SmoothPlastic', 'Glass', 'Neon'],
-    },
+    'materialChoices': {group: list(FACE_MATERIALS) for group in MATERIAL_GROUPS},
     'views': CAMERA_VIEWS,
 }
 
@@ -63,11 +63,12 @@ def normalize_character_creation(value, base=None):
                     raise ValueError(f'characterCreation.colorPresets.{channel}: three hex colors required')
             item = {channel: [color.upper() for color in colors] for channel, colors in item.items()}
         elif key == 'materialChoices':
-            allowed = {'Plastic', 'SmoothPlastic', 'Fabric', 'Neon', 'Metal', 'Sand', 'Glass', 'Wood', 'Leather'}
-            if not isinstance(item, dict) or set(item) != {'hair', 'eyes'}:
-                raise ValueError('characterCreation.materialChoices: hair/eyes required')
+            allowed = set(FACE_MATERIALS)
+            if not isinstance(item, dict) or set(item) != set(MATERIAL_GROUPS):
+                raise ValueError('characterCreation.materialChoices: hair/eyes/eyebrows/head required')
             if any(not isinstance(materials, list) or not 1 <= len(materials) <= 8
-                   or len(materials) != len(set(materials)) or any(m not in allowed for m in materials)
+                   or any(not isinstance(m, str) or m not in allowed for m in materials)
+                   or len(materials) != len(set(materials))
                    or 'Plastic' not in materials for materials in item.values()):
                 raise ValueError('characterCreation.materialChoices: valid unique Roblox materials including Plastic required')
             item = {channel: list(materials) for channel, materials in item.items()}

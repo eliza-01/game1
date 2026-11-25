@@ -72,7 +72,9 @@ class FloorAndCharacterSceneM485(unittest.TestCase):
         self.assertIn('local face = activeTab ~= nil', controller)
         self.assertIn('parent:GetPropertyChangedSignal("AbsoluteSize")', panel)
         self.assertIn('local portrait = mobile and viewport.X < viewport.Y', panel)
-        self.assertIn('if not archetype then "—"', panel)
+        self.assertIn('if not archetype then Language.Translate("creation.loading_profile")', panel)
+        self.assertIn('views.selectionCaption.Visible = archetype ~= nil', panel)
+        self.assertIn('views.selectionLevel.Visible = archetype ~= nil', panel)
         for value in ('true', 'false'):
             self.assertIn(f'SetAttribute("Game1CharacterSceneInputBlocked", {value})', controller)
         self.assertIn('UiInputGuard.IsWorldSuspended()', guard)

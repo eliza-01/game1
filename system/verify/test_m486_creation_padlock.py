@@ -13,7 +13,7 @@ class CreationPadlockM486(unittest.TestCase):
         p = src('src/client/character/CharacterCreationPanel.luau')
         self.assertNotIn('ToggleFace', c + p)
         self.assertIn('local face = activeTab ~= nil', c)
-        self.assertIn('visible[category] = #entries > 1 or (#entries == 1 and category ~= "head")', c)
+        self.assertIn('visible[category] = #entries > 1 or (#entries == 1 and (category ~= "head"', c)
         self.assertIn('activeTab = if activeTab == category then nil else category', c)
         self.assertIn('if activeTab and not visible[activeTab] then activeTab = nil end', c)
         self.assertIn('if #entries > 1 then', src('src/client/character/CharacterCreationAppearanceView.luau'))

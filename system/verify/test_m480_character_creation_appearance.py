@@ -77,7 +77,7 @@ class PreviewAssemblyM480(unittest.TestCase):
         ui = (ROOT/'src/client/character/CharacterCreationController.luau').read_text()
         view = (ROOT/'src/client/character/CharacterCreationAppearanceView.luau').read_text()
         panel = (ROOT/'src/client/character/CharacterCreationPanel.luau').read_text()
-        self.assertIn('Panel.Create(gui, settings)', ui)
+        self.assertIn('Panel.Create(gui, settings, FullScreenLayer.Create(', ui)
         self.assertIn('root.AnchorPoint = Vector2.new(1, 0.5)', panel)
         self.assertIn('root.Position = UDim2.new(1, -16', panel)
         self.assertIn('local content = Instance.new("ScrollingFrame")', panel)

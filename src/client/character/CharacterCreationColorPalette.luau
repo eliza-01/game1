@@ -19,7 +19,7 @@ local function button(parent: Instance, name: string): TextButton
     result.Name = name
     result.BackgroundColor3 = Color3.fromRGB(57, 76, 79)
     result.TextColor3 = Color3.fromRGB(245, 238, 219)
-    result.Font = Enum.Font.GothamSemibold
+    result.Font = Enum.Font.GothamBold
     result.TextSize = 15
     result.BorderSizePixel = 0
     result.ZIndex = 36
@@ -139,7 +139,7 @@ function Picker.new(parent: Frame)
     field.Size = UDim2.new(1, -110, 0, 43)
     field.TextColor3 = Color3.fromRGB(248, 241, 221)
     field.BackgroundColor3 = Color3.fromRGB(46, 59, 68)
-    field.Font = Enum.Font.Code
+    field.Font = Enum.Font.GothamBold
     field.TextSize = 18
     field.ClearTextOnFocus = false
     field.PlaceholderText = "#RRGGBB"

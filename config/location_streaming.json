@@ -3,7 +3,8 @@
   "modes": {
     "stone_fence_02": "lod1",
     "stone_pillar_03": "lod1",
-    "stone_ladder_02": "lod1"
+    "stone_ladder_02": "lod1",
+    "mid_tree_02": "lod1"
   },
   "workspace": {
     "streamingEnabled": true,
@@ -261,6 +262,11 @@
       "hide": 400
     },
     "blossom_tree_02": {
+      "lod1": 120,
+      "lod2": 260,
+      "hide": 400
+    },
+    "mid_tree_02": {
       "lod1": 120,
       "lod2": 260,
       "hide": 400

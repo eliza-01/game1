@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "slug": "dry_tree_02",
-  "sourceSha256": "c6213af70f4fc3a1198424bb1cd72e1aa72ebd7dd12c5feac7dd85729af3e811",
+  "sourceSha256": "6505c8e4935defcffb5871c565fdbee40f9976ba1e901aa6becad0ecb6e6a812",
   "analysis": {
     "schemaVersion": 1,
     "meshes": [
       {
         "name": "dry_tree_02",
         "armature": "",
-        "vertices": 189,
+        "vertices": 175,
         "bones": [],
         "influencedBones": [],
         "role": "visual",

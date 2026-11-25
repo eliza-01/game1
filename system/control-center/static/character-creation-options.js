@@ -20,7 +20,7 @@ function game1CreationOptionsRender(settings){
   for(const channel of ['hair','eyes','eyebrows']){
     creationId('option-creation-colors-'+channel).value=(value.colorPresets?.[channel]||[]).join(', ');
   }
-  for(const channel of ['hair','eyes']){
+  for(const channel of ['hair','eyes','eyebrows','head']){
     creationId('option-creation-materials-'+channel).value=(value.materialChoices?.[channel]||[]).join(', ');
   }
   creationId('option-creation-transition').value=String(value.transitionSeconds??0.9);
@@ -65,8 +65,8 @@ function game1CreationOptionsRead(){
     colorPresets[channel]=colors;
   }
   const materialChoices={};
-  const allowed=new Set(['Plastic','SmoothPlastic','Fabric','Neon','Metal','Sand','Glass','Wood','Leather']);
-  for(const channel of ['hair','eyes']){
+  const allowed=new Set(['Plastic', 'Slate', 'Fabric', 'SmoothPlastic', 'Sandstone', 'Grass', 'LeafyGrass', 'Concrete']);
+  for(const channel of ['hair','eyes','eyebrows','head']){
     const materials=creationId('option-creation-materials-'+channel).value.split(',').map(x=>x.trim());
     if(!materials.length||materials.length>8||!materials.includes('Plastic')||new Set(materials).size!==materials.length||materials.some(x=>!allowed.has(x)))
       throw Error('materials '+channel+': unique valid materials with Plastic required');

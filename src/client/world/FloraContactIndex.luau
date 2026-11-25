@@ -1,6 +1,6 @@
 --!strict
--- Immutable spatial index of uncollidable authored flora. In Studio Play,
--- query actual Model bounds; compiled Runtime MUST use the verified LOD
+-- Event-maintained spatial index of uncollidable authored flora. In Studio Play,
+-- query actual visual MeshPart bounds; compiled Runtime MUST use the verified LOD
 -- placement manifest because its visual MeshParts are stripped from Workspace.
 -- No Touched, physics queries or per-frame scanning.
 local Workspace = game:GetService("Workspace")
@@ -9,20 +9,32 @@ local RunService = game:GetService("RunService")
 local World = ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world")
 local Registry = require(World:WaitForChild("LocationAssetRegistry"))
 local Contract = require(World:WaitForChild("LocationRuntimeManifestContract"))
+local Physics = require(World:WaitForChild("MeshPhysicsCore"))
 local Index = {}
 local CELL = 32
 local MAX_CELLS_PER_VOLUME = 100
-local entries: {[Model]: any} = {}
+local entries: {[Model]: {any}} = {}
+local watched: {[Model]: RBXScriptConnection} = {}
+local dirty: {[Model]: boolean} = {}
+local compiledCount = 0
 local buckets: {[string]: {[any]: boolean}} = {}
 local started = false
 local compiledTargets: {[string]: boolean} = {}
 local function key(x: number, z: number): string return x .. ":" .. z end
 local function cell(x: number): number return math.floor(x / CELL) end
-local function isFlora(slug: any): boolean
-    if type(slug) ~= "string" then return false end
+local function canonicalFlora(slug: any): string?
+    if type(slug) ~= "string" then return nil end
+    slug = (Registry.aliases or {})[slug] or slug
     local asset = Registry.assets[slug]
-    return asset ~= nil and asset.status == "PUBLISHED"
-        and (asset.category == "tree" or asset.category == "bush")
+    if asset and asset.status == "PUBLISHED" and (asset.category == "tree" or asset.category == "bush") then
+        return slug
+    end
+    return nil
+end
+local function isFlora(slug: any): boolean return canonicalFlora(slug) ~= nil end
+local function modelSlug(model: Model): string?
+    return canonicalFlora(model:GetAttribute("Game1DecoAssetSlug"))
+        or canonicalFlora(model:GetAttribute("LandscapeAssetSlug"))
 end
 
 local function insert(frame: CFrame, size: Vector3, model: Model?): any?
@@ -57,19 +69,57 @@ local function erase(record)
     end
 end
 local function unregister(model: Model)
-    local record = entries[model]
-    if not record then return end
+    local records = entries[model]
+    if not records then return end
     entries[model] = nil
-    erase(record)
+    for _, record in ipairs(records) do erase(record) end
 end
 local function register(model: Model)
-    if entries[model] or not model:IsDescendantOf(Workspace) then return end
-    local slug = model:GetAttribute("Game1DecoAssetSlug") or model:GetAttribute("LandscapeAssetSlug")
-    if not isFlora(slug) or compiledTargets[slug] then return end
-    local ok, frame, size = pcall(function() return model:GetBoundingBox() end)
-    if not ok then return end
-    local record = insert(frame, size, model)
-    if record then entries[model] = record end
+    -- Streaming can deliver an empty Model, followed by separate MeshParts.
+    -- Replace its old volumes when geometry arrives or leaves, not just once.
+    unregister(model)
+    if not model:IsDescendantOf(Workspace) then return end
+    local slug = modelSlug(model)
+    if not slug or compiledTargets[slug] then return end
+    local records = {}
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("MeshPart") and not Physics.IsLocationCarrier(part)
+            and not Physics.IsCollider(part.Name) and part:GetAttribute("Game1DecoPhysicsOnly") ~= true then
+            local record = insert(part.CFrame, part.Size, model)
+            if record then table.insert(records, record) end
+        end
+    end
+    if #records > 0 then entries[model] = records end
+end
+local function schedule(model: Model)
+    if dirty[model] then return end
+    dirty[model] = true
+    task.defer(function()
+        if not dirty[model] then return end
+        dirty[model] = nil
+        if watched[model] then register(model) end
+    end)
+end
+local function watch(model: Model)
+    if watched[model] then return end
+    watched[model] = model.AttributeChanged:Connect(function(name)
+        if name == "Game1DecoAssetSlug" or name == "LandscapeAssetSlug" then schedule(model) end
+    end)
+end
+local function unwatch(model: Model)
+    local connection = watched[model]
+    if connection then connection:Disconnect(); watched[model] = nil end
+    dirty[model] = nil
+    unregister(model)
+end
+local function geometryChanged(part: Instance)
+    local node = part.Parent
+    while node and node ~= Workspace do
+        if node:IsA("Model") and (entries[node] or modelSlug(node)) then
+            schedule(node)
+        end
+        node = node.Parent
+    end
 end
 
 local function frame(values): CFrame
@@ -101,34 +151,42 @@ local function runtimeIndex(): boolean
         if isFlora(placement.slug) then
             if placement.components then
                 for _, component in ipairs(placement.components) do
-                    insert(frame(component.cframe), Vector3.new(table.unpack(component.size)), nil)
+                    if insert(frame(component.cframe), Vector3.new(table.unpack(component.size)), nil) then compiledCount += 1 end
                 end
             else
-                insert(frame(placement.cframe), Vector3.new(table.unpack(placement.size)), nil)
+                if insert(frame(placement.cframe), Vector3.new(table.unpack(placement.size)), nil) then compiledCount += 1 end
             end
         end
     end
     return true
 end
-function Index.Start()
-    if started then return end
+local initialized = false
+function Index.Stats(): (number, number, number)
+    local models, volumes = 0, 0
+    for _, records in pairs(entries) do models += 1; volumes += #records end
+    return models, volumes, compiledCount
+end
+function Index.Start(): boolean
+    if started then return initialized end
     started = true
-    -- Runtime streamed types use manifest bounds; disabled/nonstreamed flora
-    -- continue to be recognized from ordinary Workspace models.
-    if not runtimeIndex() then return end
-    -- One initial Workspace inventory, later maintained by events.
-    for _, object in ipairs(Workspace:GetDescendants()) do
-        if object:IsA("Model") then register(object) end
-    end
+    if not runtimeIndex() then return false end
     Workspace.DescendantAdded:Connect(function(obj)
-        if obj:IsA("Model") then
-            register(obj)
-            if not entries[obj] then task.defer(register, obj) end
-        end
+        if obj:IsA("Model") then watch(obj); schedule(obj)
+        elseif obj:IsA("MeshPart") then geometryChanged(obj) end
     end)
     Workspace.DescendantRemoving:Connect(function(obj)
-        if obj:IsA("Model") then unregister(obj) end
+        if obj:IsA("Model") then unwatch(obj)
+        elseif obj:IsA("MeshPart") then geometryChanged(obj) end
     end)
+    -- One initial inventory. Subsequent work is coalesced per changed model;
+    -- no full Workspace scans during movement or render ticks.
+    for _, object in ipairs(Workspace:GetDescendants()) do
+        if object:IsA("Model") then watch(object); register(object) end
+    end
+    initialized = true
+    local models, volumes, compiled = Index.Stats()
+    print(("[game1][flora] contact index ready · %d live plants · %d mesh bounds · %d compiled bounds"):format(models, volumes, compiled))
+    return true
 end
 -- The first value is an identity token, not a physics collider or Model.
 function Index.Find(point: Vector3, padding: number): (any?, Vector3?)
@@ -139,10 +197,7 @@ function Index.Find(point: Vector3, padding: number): (any?, Vector3?)
     local best = math.huge
     for record in pairs(bucket) do
         local model = record.model
-        if model and not model:IsDescendantOf(Workspace) then
-            unregister(model)
-            continue
-        end
+        if model and not model:IsDescendantOf(Workspace) then continue end
         local localPoint = record.frame:PointToObjectSpace(point)
         local half = record.size * 0.5
         local closest = Vector3.new(math.clamp(localPoint.X, -half.X, half.X),

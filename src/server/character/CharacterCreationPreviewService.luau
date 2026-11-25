@@ -59,6 +59,8 @@ function Service:Prepare(archetype: string, selection: any): (string?, string?)
     local id = "Preview" .. tostring(self.count)
     template.Name = id
     template.Archivable = true
+    -- The RPC may arrive before all descendants/attributes replicate.
+    template:SetAttribute("Game1PreviewDescendantCount", #template:GetDescendants())
     template.Parent = self.folder
     self.cache[key] = id
     self.building[key] = nil

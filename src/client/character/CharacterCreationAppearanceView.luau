@@ -16,7 +16,7 @@ local function heading(parent: Instance, name: string, order: number, height: nu
     local item = Instance.new("TextLabel")
     item.Name = "CategoryHeading"
     item.BackgroundTransparency = 1
-    item.Font = Enum.Font.GothamSemibold
+    item.Font = Enum.Font.GothamBold
     item.TextColor3 = INK
     item.TextSize = 17
     item.TextXAlignment = Enum.TextXAlignment.Left
@@ -27,31 +27,11 @@ local function heading(parent: Instance, name: string, order: number, height: nu
     return item
 end
 
-local function lockHeading(parent: Instance, name: string, order: number, height: number,
-    locked: boolean, toggle: (() -> ())?)
-    local row = Instance.new("Frame")
-    row.Name = "ColorHeading"
-    row.BackgroundTransparency = 1
-    row.LayoutOrder = order
-    row.Size = UDim2.new(1, 0, 0, height)
-    row.Parent = parent
-
-    local title = Instance.new("TextLabel")
-    title.Name = "CategoryHeading"
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamSemibold
-    title.TextColor3 = INK
-    title.TextSize = 17
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Text = name
-    title.Size = UDim2.new(1, -54, 1, 0)
-    title.Parent = row
-
+local function lockButton(parent: Instance, order: number, locked: boolean, toggle: (() -> ())?)
     local button = Instance.new("TextButton")
     button.Name = "SyncLock"
-    button.AnchorPoint = Vector2.new(1, 0.5)
-    button.Position = UDim2.new(1, 0, 0.5, 0)
-    button.Size = UDim2.fromOffset(40, 34)
+    button.Size = UDim2.fromOffset(36, 46)
+    button.LayoutOrder = order
     button.BackgroundColor3 = Color3.fromRGB(42, 55, 62)
     button.TextColor3 = if locked then GOLD else INK
     button.Font = Enum.Font.GothamBold
@@ -59,7 +39,7 @@ local function lockHeading(parent: Instance, name: string, order: number, height
     button.Text = if locked then "🔒" else "🔓"
     button.AutoButtonColor = toggle ~= nil
     button.Active = toggle ~= nil
-    button.Parent = row
+    button.Parent = parent
     rounded(button, 9)
     local border = Instance.new("UIStroke")
     border.Color = if locked then GOLD else Color3.fromRGB(105, 118, 119)
@@ -73,11 +53,12 @@ local function options(parent: Instance, title: string, values: any, current: st
     local grid = Instance.new("Frame")
     grid.Name = "Variants"
     grid.BackgroundTransparency = 1
-    grid.Size = UDim2.new(1, 0, 0, math.ceil(#values / 2) * 62)
+    grid.Size = UDim2.new(1, 0, 0, math.ceil(#values / 4) * 54)
     grid.LayoutOrder = order + 1
     grid.Parent = parent
     local layout = Instance.new("UIGridLayout")
-    layout.CellSize = UDim2.new(0.5, -6, 0, 54)
+    layout.CellSize = UDim2.fromOffset(46, 46)
+    layout.FillDirectionMaxCells = 4
     layout.CellPadding = UDim2.new(0, 8, 0, 8)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = grid
@@ -85,11 +66,10 @@ local function options(parent: Instance, title: string, values: any, current: st
         local button = Instance.new("TextButton")
         button.Name = option.id
         button.LayoutOrder = i
-        button.Font = Enum.Font.GothamSemibold
+        button.Font = Enum.Font.GothamBold
         button.TextSize = 14
         button.TextColor3 = INK
-        local short = option.id:match("_m(%d+)_") or tostring(i)
-        button.Text = string.format("%02d  ·  %s", i, short)
+        button.Text = tostring(i)
         button.BackgroundColor3 = if option.id == current then Color3.fromRGB(75, 107, 96) else Color3.fromRGB(42, 55, 62)
         button.Parent = grid
         rounded(button, 10)
@@ -124,70 +104,155 @@ end
 local function colorPicker(parent: Instance, title: string, current: string?, order: number,
     presets: {string}, pick: (string) -> (), custom: () -> (), eyeLock: boolean?,
     toggleEyeLock: (() -> ())?)
-    if eyeLock == nil then heading(parent, title, order, 36)
-    else lockHeading(parent, title, order, 36, eyeLock, toggleEyeLock) end
+    heading(parent, title, order, 36)
     local holder = Instance.new("Frame")
     holder.Name = "ColorPresets"
     holder.BackgroundTransparency = 1
     holder.LayoutOrder = order + 1
-    holder.Size = UDim2.new(1, 0, 0, 58)
+    holder.Size = UDim2.new(1, 0, 0, 46)
     holder.Parent = parent
-    local layout = Instance.new("UIListLayout")
-    layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.Padding = UDim.new(0, 7)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = holder
+    local presetRow = Instance.new("Frame")
+    presetRow.Name = "PresetRow"
+    presetRow.BackgroundTransparency = 1
+    presetRow.Size = UDim2.fromOffset(math.max(0, #presets * 51 - 7), 46)
+    presetRow.Parent = holder
     for index, hex in ipairs(presets) do
-        swatch(holder, hex, "Preset" .. tostring(index), index, current, function() pick(hex) end)
+        swatch(presetRow, hex, "Preset" .. tostring(index), index, current, function() pick(hex) end)
     end
+    local actions = Instance.new("Frame")
+    actions.Name = "ColorActions"
+    actions.BackgroundTransparency = 1
+    local actionWidth = if eyeLock == nil then 112 else 155
+    actions.Size = UDim2.fromOffset(actionWidth, 46)
+    actions.Parent = holder
+    local actionLayout = Instance.new("UIListLayout")
+    actionLayout.FillDirection = Enum.FillDirection.Horizontal
+    actionLayout.Padding = UDim.new(0, 7)
+    actionLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    actionLayout.Parent = actions
+    local function resize()
+        local width = if holder.AbsoluteSize.X > 0 then holder.AbsoluteSize.X
+            elseif parent:IsA("GuiObject") then parent.AbsoluteSize.X else 0
+        local columns = math.max(1, math.floor((width + 7) / 51))
+        local presetWidth = math.max(0, math.min(columns, #presets) * 51 - 7)
+        local rows = math.ceil(#presets / columns)
+        presetRow.Size = UDim2.fromOffset(presetWidth, math.max(0, rows * 53 - 7))
+        local inline = rows <= 1 and presetWidth + (if #presets > 0 then 7 else 0) + actionWidth <= width
+        actions.Position = if inline then UDim2.fromOffset(presetWidth + (if #presets > 0 then 7 else 0), 0)
+            else UDim2.fromOffset(0, rows * 53)
+        holder.Size = UDim2.new(1, 0, 0, if inline then 46 else rows * 53 + 46)
+    end
+    -- Fixed cells wrap when Options adds more presets; the Custom/lock pair never splits.
+    local grid = Instance.new("UIGridLayout")
+    grid.CellSize = UDim2.fromOffset(44, 46)
+    grid.CellPadding = UDim2.fromOffset(7, 7)
+    grid.SortOrder = Enum.SortOrder.LayoutOrder
+    grid.Parent = presetRow
+    holder:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize)
+    resize()
     local customButton = Instance.new("TextButton")
     customButton.Name = "CustomColor"
     customButton.Text = Language.Translate("creation.custom_color")
-    customButton.Font = Enum.Font.GothamSemibold
+    customButton.Font = Enum.Font.GothamBold
     customButton.TextSize = 14
+    customButton.TextWrapped = true
     customButton.TextColor3 = INK
     customButton.BackgroundColor3 = Color3.fromRGB(42, 55, 62)
     customButton.Size = UDim2.fromOffset(112, 46)
-    customButton.LayoutOrder = 4
-    customButton.Parent = holder
+    customButton.LayoutOrder = 1
+    customButton.Parent = actions
     rounded(customButton, 10)
     customButton.Activated:Connect(custom)
+    if eyeLock ~= nil then lockButton(actions, 2, eyeLock, toggleEyeLock) end
 end
 
 local function materialPicker(parent: Instance, title: string, materials: {string},
     current: string, order: number, pick: (string) -> ())
     if #materials <= 1 then return end
     heading(parent, title, order, 34)
+    local selectedIndex = table.find(materials, current) or 1
+    local selector = Instance.new("Frame")
+    selector.Name = "MaterialSelector"
+    selector.BackgroundTransparency = 1
+    selector.Size = UDim2.new(1, 0, 0, 206)
+    selector.LayoutOrder = order + 1
+    selector.Parent = parent
+
+    local function button(name: string, label: string, container: Instance): TextButton
+        local item = Instance.new("TextButton")
+        item.Name = name
+        item.Text = label
+        item.Font = Enum.Font.GothamBold
+        item.TextSize = 15
+        item.TextColor3 = INK
+        item.BackgroundColor3 = Color3.fromRGB(42, 55, 62)
+        item.BorderSizePixel = 0
+        item.Parent = container
+        rounded(item, 9)
+        return item
+    end
+
+    local previous = button("PreviousMaterial", "‹", selector)
+    previous.Size = UDim2.fromOffset(44, 44)
+    previous.TextSize = 28
+    local nextButton = button("NextMaterial", "›", selector)
+    nextButton.Size = UDim2.fromOffset(44, 44)
+    nextButton.Position = UDim2.new(1, -44, 0, 0)
+    nextButton.TextSize = 28
+    local nameButton = heading(selector, materials[selectedIndex], 0, 44)
+    nameButton.Name = "MaterialName"
+    nameButton.TextXAlignment = Enum.TextXAlignment.Center
+    nameButton.TextSize = 15
+    nameButton.BackgroundTransparency = 0
+    nameButton.BackgroundColor3 = Color3.fromRGB(42, 55, 62)
+    rounded(nameButton, 9)
+    nameButton.Position = UDim2.fromOffset(51, 0)
+    nameButton.Size = UDim2.new(1, -102, 0, 44)
+    nameButton.TextTruncate = Enum.TextTruncate.AtEnd
+    local border = Instance.new("UIStroke")
+    border.Color = GOLD
+    border.Transparency = 0.45
+    border.Parent = nameButton
+
+    -- Existing Options order is authoritative for both arrows and numeric cells.
+    -- Keep the picker inside the scroll layout rather than over other controls.
     local list = Instance.new("Frame")
     list.Name = "MaterialOptions"
     list.BackgroundTransparency = 1
-    list.Size = UDim2.new(1, 0, 0, math.ceil(#materials / 2) * 47)
-    list.LayoutOrder = order + 1
-    list.Parent = parent
+    list.Position = UDim2.fromOffset(0, 52)
+    list.Size = UDim2.new(1, 0, 0, 154)
+    list.Visible = true
+    list.Parent = selector
     local grid = Instance.new("UIGridLayout")
-    grid.CellSize = UDim2.new(0.5, -5, 0, 40)
-    grid.CellPadding = UDim2.fromOffset(8, 7)
+    grid.CellSize = UDim2.fromOffset(46, 46)
+    grid.CellPadding = UDim2.fromOffset(8, 8)
+    grid.FillDirectionMaxCells = 3
+    grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
     grid.SortOrder = Enum.SortOrder.LayoutOrder
     grid.Parent = list
     for i, material in ipairs(materials) do
-        local button = Instance.new("TextButton")
-        button.Name = "Material" .. material
-        button.LayoutOrder = i
-        button.Text = material
-        button.TextSize = 13
-        button.Font = Enum.Font.GothamSemibold
-        button.TextColor3 = INK
-        button.BackgroundColor3 = if current == material then Color3.fromRGB(75, 107, 96) else Color3.fromRGB(42, 55, 62)
-        button.Parent = list
-        rounded(button, 9)
-        button.Activated:Connect(function() pick(material) end)
+        local item = button("Material" .. material, tostring(i), list)
+        item.LayoutOrder = i
+        if i == selectedIndex then
+            item.BackgroundColor3 = Color3.fromRGB(75, 107, 96)
+            local selectedBorder = Instance.new("UIStroke")
+            selectedBorder.Color = GOLD
+            selectedBorder.Parent = item
+        end
+        item.Activated:Connect(function() pick(material) end)
     end
+    local function step(delta: number)
+        local index = (selectedIndex - 1 + delta) % #materials + 1
+        pick(materials[index])
+    end
+    previous.Activated:Connect(function() step(-1) end)
+    nextButton.Activated:Connect(function() step(1) end)
 end
 
 function View.Render(root: Frame, catalog: any?, selected: any?,
     onPart: (string, string) -> (), onColor: (string, string, string?) -> (), activeTab: string?,
     settings: any, onMaterial: (string, string) -> (), onCustomColor: (string, string?, string?) -> (),
-    eyeColorsLocked: boolean, toggleEyeColorsLocked: (() -> ())?)
+    eyeColorsLocked: boolean, toggleEyeColorsLocked: ((string) -> ())?)
     for _, object in ipairs(root:GetChildren()) do
         if object:IsA("GuiObject") then object:Destroy() end
     end
@@ -219,27 +284,25 @@ function View.Render(root: Frame, catalog: any?, selected: any?,
                 function() onCustomColor("hair", channel, current) end, nil, nil)
             order += 3
         end
-        materialPicker(root, Language.Translate("creation.hair_material"),
-            (settings.materialChoices or {}).hair or {"Plastic"}, (selected.materials or {}).hair or "Plastic",
-            order, function(value) onMaterial("hair", value) end)
     elseif group == "eyebrows" then
         local current = (selected.colors or {}).eyebrows
         colorPicker(root, Language.Translate("creation.eyebrows_color"), current, order,
             presets, function(hex) onColor(group, hex, nil) end,
             function() onCustomColor(group, nil, current) end, nil, nil)
+        order += 3
     elseif group == "eyes" then
         for _, side in ipairs({"l", "r"}) do
             local current = selected.colors.eyes[side]
             colorPicker(root, Language.Translate("creation.eye_" .. side .. "_color"), current, order,
                 presets, function(hex) onColor(group, hex, side) end,
                 function() onCustomColor(group, side, current) end, eyeColorsLocked,
-                toggleEyeColorsLocked)
+                if toggleEyeColorsLocked then function() toggleEyeColorsLocked(side) end else nil)
             order += 3
         end
-        materialPicker(root, Language.Translate("creation.eyes_material"),
-            (settings.materialChoices or {}).eyes or {"Plastic"},
-            (selected.materials or {}).eyes or "Plastic", order,
-            function(value) onMaterial("eyes", value) end)
     end
+    materialPicker(root, Language.Translate("creation." .. group .. "_material"),
+        (settings.materialChoices or {})[group] or {"Plastic"},
+        (selected.materials or {})[group] or "Plastic", order,
+        function(value) onMaterial(group, value) end)
 end
 return View

@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local FaceMaterials = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationMaterials"))
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
 local CharacterRegistry = require(Shared:WaitForChild("character"):WaitForChild("CharacterRegistry"))
 local SelectionScene = require(Shared:WaitForChild("character"):WaitForChild("CharacterSelectionScene"))
@@ -13,8 +14,12 @@ local EyeColors = require(Shared:WaitForChild("character"):WaitForChild("Charact
 local Catalog = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationAppearanceRegistry"))
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 local CameraController = require(script.Parent:WaitForChild("CameraController"))
+local Mounts = require(script.Parent:WaitForChild("BoneMountedAttachmentController"))
+local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
 local Preview = require(script.Parent:WaitForChild("CharacterCreationPreviewController"))
 local Editor = require(script.Parent:WaitForChild("CharacterCreationAppearanceView"))
+local EyeEdit = require(script.Parent:WaitForChild("CharacterCreationEyeEdit"))
+local FullScreenLayer = require(script.Parent.Parent:WaitForChild("FullScreenLayer"))
 local Panel = require(script.Parent:WaitForChild("CharacterCreationPanel"))
 local Controller = {}
 local started = false
@@ -30,8 +35,7 @@ local function defaults(id: string): any
     local row = archetype(id)
     local parts = (row and row.assembly and row.assembly.parts) or {}
     local options = (Catalog.archetypes or {})[id] or {}
-    local selected = {materials = {hair = (parts.hair or {}).material or "Plastic",
-        eyes = (parts.eye_l or {}).material or "Plastic"},
+    local selected = {materials = {},
         colors = {hair = table.clone((parts.hair or {}).colors or {}),
         eyes = EyeColors.Defaults(parts), eyebrows = (parts.eyebrow_l or {}).color or "#000000"}}
     for _, group in ipairs({"hair", "head", "eyes", "eyebrows"}) do
@@ -44,7 +48,9 @@ local function defaults(id: string): any
         end
     end
     local allowed = GameOptions.CharacterCreationSettings().materialChoices or {}
-    for _, group in ipairs({"hair", "eyes"}) do
+    for _, group in ipairs(FaceMaterials.Groups) do
+        local slot = FaceMaterials.Slot(group) :: string
+        selected.materials[group] = (parts[slot] or {}).material or "Plastic"
         if not table.find(allowed[group] or {"Plastic"}, selected.materials[group]) then
             selected.materials[group] = "Plastic"
         end
@@ -73,11 +79,13 @@ function Controller.Start()
     curtain.BackgroundColor3 = Color3.fromRGB(12, 17, 21)
     curtain.BorderSizePixel = 0
     curtain.Active = true
+    curtain:SetAttribute("WorldInputPassthrough", true)
     curtain.ZIndex = 1
-    curtain.Parent = gui
+    curtain.Parent = FullScreenLayer.Create(gui, "Game1CreationCurtain", gui.DisplayOrder - 1)
     local curtainTween: Tween? = nil
     local function cover(opaque: boolean)
         if curtainTween then curtainTween:Cancel(); curtainTween = nil end
+        curtain.Active = opaque
         if opaque then
             curtain.BackgroundTransparency = 0
         else
@@ -86,7 +94,7 @@ function Controller.Start()
         end
     end
     -- All presentation geometry is owned by the responsive panel module.
-    local controls = Panel.Create(gui, settings)
+    local controls = Panel.Create(gui, settings, FullScreenLayer.Create(gui, "Game1CreationOverlay", 302))
     local title = controls.title
     local subtitle = controls.subtitle
     local editor = controls.editor
@@ -97,9 +105,9 @@ function Controller.Start()
     local lastStage = ""
     local pending = false
     local choices: {[string]: any} = {human_male = defaults("human_male"), human_female = defaults("human_female")}
-    local eyeLocks: {[string]: boolean} = {
-        human_male = choices.human_male.colors.eyes.l == choices.human_male.colors.eyes.r,
-        human_female = choices.human_female.colors.eyes.l == choices.human_female.colors.eyes.r,
+    local eyeLocks: {[string]: EyeEdit.State} = {
+        human_male = EyeEdit.New(choices.human_male.colors.eyes),
+        human_female = EyeEdit.New(choices.human_female.colors.eyes),
     }
     local revisions: {[string]: number} = {human_male = 0, human_female = 0}
     local currentPreview: any? = nil
@@ -112,6 +120,9 @@ function Controller.Start()
     local leaving = false
     local activeScene: boolean? = nil
     local selectionAnchors: SelectionScene.Anchors? = nil
+    local bootstrapPending: {[string]: boolean} = {}
+    local bootstrapProgress: {[string]: number} = {}
+    local worldProgress: number? = nil
     local function remoteFor(name: string): RemoteFunction?
         local remotes = ReplicatedStorage:WaitForChild("Game1Remotes", 15)
         local item = remotes and remotes:WaitForChild(name, 15)
@@ -123,6 +134,36 @@ function Controller.Start()
     local female = controls.female :: TextButton
     local enter = controls.enter :: TextButton
     local status = controls.status :: TextLabel
+
+    local function bootstrapTotals(): (number, number)
+        local total, completed = 0, 0
+        for _, id in ipairs({"human_male", "human_female"}) do
+            total += 1
+            if bootstrapPending[id] ~= true then completed += 1 end
+        end
+        return total, completed
+    end
+
+    local function refreshBootstrapOverlay()
+        local total, completed = bootstrapTotals()
+        local busy = stage == "creation" and total > 0 and completed < total
+        if not busy then
+            bootstrapProgress = {}
+            Panel.SetLoading(controls, false, "", 1)
+            return
+        end
+        local partial = 0
+        for id in pairs(bootstrapPending) do partial += bootstrapProgress[id] or 0 end
+        local progress = math.clamp((completed + partial) / total, 0, 1)
+        Panel.SetLoading(controls, true, Language.Translate("creation.loading_appearance_assets"), progress)
+    end
+
+    local function markBootstrapDone(id: string)
+        if bootstrapPending[id] ~= true then return end
+        bootstrapPending[id] = nil
+        bootstrapProgress[id] = nil
+        refreshBootstrapOverlay()
+    end
 
     local function showStage(snap: boolean?)
         if stage == "selection" then
@@ -168,6 +209,7 @@ function Controller.Start()
                 local reason = if ok and type(response) == "table" then response.error else "network"
                 warn("[game1][character-creation] preview failed: " .. tostring(reason))
                 previewError[id] = true
+                markBootstrapDone(id)
                 refresh()
                 return
             end
@@ -197,11 +239,20 @@ function Controller.Start()
                 end
                 if not isCurrent() then return end
             end
-            local called, created = pcall(preview.Set, preview, id, response.template, choices[id], stage, isCurrent, selectionAnchors)
+            if bootstrapPending[id] == true then bootstrapProgress[id] = 0; refreshBootstrapOverlay() end
+            -- Preserve the shared selection-scene contract: preview.Set(..., stage, isCurrent, selectionAnchors)
+            local preloadProgress = if bootstrapPending[id] == true then function(progress: number)
+                if bootstrapPending[id] ~= true or not isCurrent() then return end
+                bootstrapProgress[id] = progress
+                refreshBootstrapOverlay()
+            end else nil
+            local called, created = pcall(preview.Set, preview, id, response.template, choices[id], stage, isCurrent, selectionAnchors,
+                preloadProgress)
             if not isCurrent() then return end
             ready[id] = called and created == true
             previewError[id] = not ready[id]
             if not ready[id] then warn("[game1][character-creation] preview placement failed: " .. tostring(created)) end
+            markBootstrapDone(id)
             if ready[id] and not sceneReady then
                 sceneReady = showStage(true) == true
                 if sceneReady then cover(false) else ready[id] = false; previewError[id] = true end
@@ -225,9 +276,8 @@ function Controller.Start()
     local function paint(group: string, value: string, channel: string?)
         if stage ~= "creation" or not selected or pending or leaving then return end
         local values = choices[selected]
-        if group == "eyes" and channel and eyeLocks[selected] then
-            values.colors[group]["l"] = value
-            values.colors[group]["r"] = value
+        if group == "eyes" and channel then
+            values.colors.eyes = EyeEdit.Paint(values.colors.eyes, channel, value, eyeLocks[selected].locked)
         elseif channel then values.colors[group][channel] = value
         else values.colors[group] = value end
         refresh()
@@ -247,14 +297,11 @@ function Controller.Start()
         local function preview(hex: string)
             if not id or not currentPreview then return end
             local temporary = table.clone(choices[id].colors)
-            if channel then
+            if group == "eyes" and channel then
+                temporary.eyes = EyeEdit.Paint(temporary.eyes, channel, hex, eyeLocks[id].locked)
+            elseif channel then
                 temporary[group] = table.clone(temporary[group] or {})
-                if group == "eyes" and eyeLocks[id] then
-                    temporary[group]["l"] = hex
-                    temporary[group]["r"] = hex
-                else
-                    temporary[group][channel] = hex
-                end
+                temporary[group][channel] = hex
             else temporary[group] = hex end
             currentPreview:Colors(id, temporary)
         end
@@ -264,6 +311,23 @@ function Controller.Start()
             if id and currentPreview then currentPreview:Colors(id, choices[id].colors) end
         end)
     end
+    local function visibleCategories(id: string?): {[string]: boolean}
+        local catalog = if id then (Catalog.archetypes or {})[id] else nil
+        local visible = {}
+        for _, category in ipairs(Panel.Categories) do
+            local entries = (catalog and catalog[category]) or {}
+            visible[category] = #entries > 1 or (#entries == 1 and (category ~= "head"
+                or #((settings.materialChoices or {})[category] or {}) > 1))
+        end
+        return visible
+    end
+    local function firstCategory(id: string): string?
+        local visible = visibleCategories(id)
+        for _, category in ipairs(Panel.Categories) do
+            if visible[category] then return category end
+        end
+        return nil
+    end
     refresh = function()
         title.Text = Language.Translate("creation.title")
         subtitle.Text = Language.Translate("creation.subtitle")
@@ -272,12 +336,7 @@ function Controller.Start()
         enter.Text = Language.Translate(if stage == "creation" then "creation.create" else "creation.enter")
         male.BackgroundColor3 = if selected == "human_male" then Color3.fromRGB(81, 107, 98) else Color3.fromRGB(39, 51, 58)
         female.BackgroundColor3 = if selected == "human_female" then Color3.fromRGB(81, 107, 98) else Color3.fromRGB(39, 51, 58)
-        local catalog = if selected then (Catalog.archetypes or {})[selected] else nil
-        local visible = {}
-        for _, category in ipairs({"hair", "eyebrows", "eyes", "head"}) do
-            local entries = (catalog and catalog[category]) or {}
-            visible[category] = #entries > 1 or (#entries == 1 and category ~= "head")
-        end
+        local visible = visibleCategories(selected)
         if activeTab and not visible[activeTab] then activeTab = nil end
         Panel.UpdateTabs(controls, stage == "creation" and selected ~= nil and not pending, activeTab, visible)
         local selectedReady = selected ~= nil and ready[selected] == true
@@ -295,23 +354,30 @@ function Controller.Start()
         if stage == "creation" then
             Editor.Render(editor, if selected then (Catalog.archetypes or {})[selected] else nil,
                 if selected then choices[selected] else nil, pick, paint, activeTab,
-                settings, material, customColor, if selected then eyeLocks[selected] else true,
-                function()
+                settings, material, customColor, if selected then eyeLocks[selected].locked else true,
+                function(side: string)
                     if stage ~= "creation" or not selected or pending or leaving then return end
-                    eyeLocks[selected] = not eyeLocks[selected]
+                    palette:Close()
+                    local values = choices[selected]
+                    values.colors.eyes = EyeEdit.Toggle(eyeLocks[selected], values.colors.eyes, side)
                     refresh()
+                    if currentPreview then currentPreview:Colors(selected, values.colors) end
                 end)
+            controls.invalidateCanvas()
         end
         Panel.SetMode(controls, stage)
-        Panel.SetSubmitting(controls, submitting, Language.Translate(
-            if leaving or (submitting and stage == "selection") then "creation.entering_world" else "creation.working"))
+        if submitting then
+            Panel.SetSubmitting(controls, true, Language.Translate(
+                if leaving or (submitting and stage == "selection") then "creation.entering_world" else "creation.working"), worldProgress)
+        elseif next(bootstrapPending) then
+            refreshBootstrapOverlay()
+        else
+            Panel.SetSubmitting(controls, false, "")
+        end
         if stage == "selection" then
             Panel.SetSelection(controls, if selectedReady then selected else nil)
             title.Text = Language.Translate("creation.selection_title")
-            subtitle.Text = Language.Translate(if selectedReady then "creation.selection_subtitle" else "creation.loading_profile")
-            if selectedReady and not busy and status.Text == "" and player:GetAttribute("CharacterProfilePersisted") == false then
-                status.Text = Language.Translate("creation.session_only")
-            end
+            subtitle.Text = ""
         elseif stage == "loading" then
             title.Text = Language.Translate("creation.loading_profile")
             subtitle.Text = ""
@@ -327,7 +393,7 @@ function Controller.Start()
     male.Activated:Connect(function()
         if pending or leaving or stage ~= "creation" then return end
         palette:Close()
-        selected = "human_male"; activeTab = nil
+        selected = "human_male"; activeTab = firstCategory("human_male")
         status.Text = ""
         controls.content.CanvasPosition = Vector2.zero
         refresh(); showStage()
@@ -335,12 +401,12 @@ function Controller.Start()
     female.Activated:Connect(function()
         if pending or leaving or stage ~= "creation" then return end
         palette:Close()
-        selected = "human_female"; activeTab = nil
+        selected = "human_female"; activeTab = firstCategory("human_female")
         status.Text = ""
         controls.content.CanvasPosition = Vector2.zero
         refresh(); showStage()
     end)
-    for _, key in ipairs({"hair", "eyebrows", "eyes", "head"}) do
+    for _, key in ipairs(Panel.Categories) do
         local category = key
         controls.tabs[category].Activated:Connect(function()
             if stage ~= "creation" or not selected or pending or leaving then return end
@@ -389,6 +455,7 @@ function Controller.Start()
         palette:Close()
         pending = true
         submitting = true
+        worldProgress = nil
         status.Text = ""
         refresh()
         local chosen = selected
@@ -447,6 +514,7 @@ function Controller.Start()
         revisions.human_female += 1
         palette:Close()
         submitting = not active
+        worldProgress = nil
         Panel.SetSubmitting(controls, submitting, Language.Translate("creation.entering_world"))
         cover(true)
         if currentPreview then currentPreview:Destroy(); currentPreview = nil end
@@ -461,14 +529,25 @@ function Controller.Start()
             selected = nil
             ready = {}; previewError = {}; readFailed = false; sceneReady = false; selectionAnchors = nil
             status.Text = ""
-            if stage == "creation" or stage == "selection" then currentPreview = Preview.new(settings) end
+            bootstrapPending = {}
+            bootstrapProgress = {}
+            Panel.SetLoading(controls, false, "", 1)
+            if stage == "creation" or stage == "selection" then
+                currentPreview = Preview.new(settings, function()
+                    return gui.Enabled and sceneReady and not pending and not leaving and not submitting
+                        and not controls.overlay.Visible and not palette.root.Visible
+                        and next(bootstrapPending) == nil
+                end)
+            end
             if stage == "creation" then
                 choices.human_male = defaults("human_male")
                 choices.human_female = defaults("human_female")
                 for id, choice in pairs(choices) do
-                    eyeLocks[id] = choice.colors.eyes.l == choice.colors.eyes.r
+                    eyeLocks[id] = EyeEdit.New(choice.colors.eyes)
                 end
-                refresh(); showStage(true)
+                bootstrapPending = {human_male = true, human_female = true}
+                bootstrapProgress = {}
+                refresh(); showStage(true); refreshBootstrapOverlay()
                 requestPreview("human_male")
                 requestPreview("human_female")
             elseif stage == "selection" then
@@ -495,6 +574,34 @@ function Controller.Start()
                     RunService.RenderStepped:Wait()
                 end
                 if epoch ~= token then return end
+                -- Server spawn/replication has no byte-count contract: show an
+                -- indeterminate bar until the actual local character is available.
+                local model = player.Character
+                if model then
+                    local function current(): boolean
+                        return epoch == token and player.Character == model and leaving
+                    end
+                    -- The camera root can replicate before the visual compound.
+                    -- Wait for the assembly's real readiness, not a fixed delay.
+                    local actor = archetype(tostring(model:GetAttribute("CharacterArchetype") or selected or ""))
+                    if actor and actor.visualMode == "assembly" then
+                        local deadline = os.clock() + 12
+                        while current() and not Mounts.HairAssemblyReady(model) and os.clock() < deadline do
+                            RunService.Heartbeat:Wait()
+                        end
+                        if not current() then return end
+                        if not Mounts.HairAssemblyReady(model) then
+                            warn("[game1][character-creation] world hair replication incomplete; follower will retry")
+                        end
+                    end
+                    local ok, loaded = pcall(MeshPreloader.PreloadModel, model, current, function(progress: number)
+                        if not current() then return end
+                        worldProgress = progress
+                        Panel.SetSubmitting(controls, true, Language.Translate("creation.entering_world"), worldProgress)
+                    end)
+                    if epoch ~= token then return end
+                    if not ok or not loaded then warn("[game1][character-creation] world preload incomplete: " .. tostring(loaded)) end
+                end
                 controls.panel.Visible = false
                 submitting = false
                 Panel.SetSubmitting(controls, false, "")

@@ -465,7 +465,12 @@ class OptionsStore:
             payload['uiPresentation'] = upgraded_ui
             changed = True
         # Extend the existing scene contract without resetting authored camera views.
-        normalized_creation = normalize_character_creation({}, payload['characterCreation'])
+        creation = payload['characterCreation']
+        old_materials = creation.get('materialChoices')
+        if isinstance(old_materials, dict) and set(old_materials) == {'hair', 'eyes'}:
+            creation['materialChoices'] = deepcopy(CREATION_DEFAULTS['materialChoices'])
+            changed = True
+        normalized_creation = normalize_character_creation({}, creation)
         if normalized_creation != payload['characterCreation']:
             payload['characterCreation'] = normalized_creation
             changed = True

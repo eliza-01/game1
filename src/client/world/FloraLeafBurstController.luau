@@ -15,6 +15,8 @@ local active: {any} = {}
 local lastContact = -math.huge
 local sampleElapsed, drawElapsed = 0, 0
 local lastPosition: Vector3? = nil
+local lastRoot: BasePart? = nil
+local reportedContact = false
 local function rootPart(): BasePart?
     local char = Players.LocalPlayer.Character
     if not char then return nil end
@@ -86,7 +88,8 @@ local function sample(dt: number)
     if sampleElapsed < 0.12 then return end
     sampleElapsed = 0
     local root = rootPart()
-    if not root then lastPosition = nil; return end
+    if not root then lastPosition = nil; lastRoot = nil; return end
+    if root ~= lastRoot then lastRoot = root; lastPosition = root.Position; return end
     local position = root.Position
     local previous = lastPosition
     lastPosition = position
@@ -97,16 +100,23 @@ local function sample(dt: number)
     if movement.Magnitude < 0.25 or movement.Magnitude > 12 then return end
     local now = os.clock()
     if now - lastContact < (config.cooldownSeconds or 1.5) then return end
-    -- Contact around waist level with the actual rotated geometry bounds,
-    -- not the origin/pivot of the entire tree (often underground).
-    local model, contact = Index.Find(position + Vector3.new(0, 1.5, 0), config.contactPaddingStuds or 1.25)
-    if (not model or not contact) and movement.Magnitude > 1 then
-        -- A player may cross a thin bush between two 120 ms samples.
-        model, contact = Index.Find((position + previous) * 0.5 + Vector3.new(0, 1.5, 0),
-            config.contactPaddingStuds or 1.25)
+    -- Test the physical root and the torso above it. The previous waist-only
+    -- sample could miss low bushes; midpoint samples cover quick crossings.
+    local padding = config.contactPaddingStuds or 1.25
+    local model, contact = Index.Find(position, padding)
+    if not model then model, contact = Index.Find(position + Vector3.new(0, 1.5, 0), padding) end
+    if not model and movement.Magnitude > 1 then
+        local midpoint = (position + previous) * 0.5
+        model, contact = Index.Find(midpoint, padding)
+        if not model then model, contact = Index.Find(midpoint + Vector3.new(0, 1.5, 0), padding) end
     end
     if not model or not contact then return end
     lastContact = now -- global cap, including simultaneous overlapping plants
+    if not reportedContact then
+        reportedContact = true
+        local models, volumes, compiled = Index.Stats()
+        print(("[game1][flora] first contact · %d live plants · %d mesh bounds · %d compiled bounds"):format(models, volumes, compiled))
+    end
     emit(contact, movement)
 end
 function Controller.Start()
@@ -120,7 +130,10 @@ function Controller.Start()
             warn("[game1][flora] VFX disabled: leaf asset unavailable")
             return
         end
-        Index.Start()
+        if not Index.Start() then
+            warn("[game1][flora] VFX disabled: contact index unavailable")
+            return
+        end
         RunService.Heartbeat:Connect(function(dt)
             sample(dt)
             render(dt)

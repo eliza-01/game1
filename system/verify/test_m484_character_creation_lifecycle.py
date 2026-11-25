@@ -31,7 +31,7 @@ class CharacterLifecycleM484(unittest.TestCase):
         self.assertIn('self:Stage(player, "selection")', create)
         enter = gateway.split('enter.OnServerInvoke = function')[1].split('switch.OnServerInvoke = function')[0]
         self.assertIn('self.profiles.Get(player)', enter)
-        self.assertIn('self.validate(record.archetype, record.appearance)', enter)
+        self.assertIn('self.validate(record.archetype, record.appearance, true)', enter)
         self.assertIn('self.profiles.SpawnFrame(player)', enter)
         self.assertIn('self.spawn(player, record.archetype, checked', enter)
         self.assertIn('self.pending[player] = nil', enter)

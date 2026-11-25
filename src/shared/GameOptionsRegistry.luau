@@ -236,8 +236,10 @@ return table.freeze({
 			eyebrows = table.freeze({"#161616", "#765034", "#E2BD83"}),
 		}),
 		materialChoices = table.freeze({
-			hair = table.freeze({"Plastic", "SmoothPlastic", "Fabric", "Neon", "Metal", "Sand"}),
-			eyes = table.freeze({"Plastic", "SmoothPlastic", "Glass", "Neon"}),
+			hair = table.freeze({"Plastic", "Slate", "Fabric", "SmoothPlastic", "Sandstone", "Grass", "LeafyGrass", "Concrete"}),
+			eyes = table.freeze({"Plastic", "Slate", "Fabric", "SmoothPlastic", "Sandstone", "Grass", "LeafyGrass", "Concrete"}),
+			eyebrows = table.freeze({"Plastic", "Slate", "Fabric", "SmoothPlastic", "Sandstone", "Grass", "LeafyGrass", "Concrete"}),
+			head = table.freeze({"Plastic", "Slate", "Fabric", "SmoothPlastic", "Sandstone", "Grass", "LeafyGrass", "Concrete"}),
 		}),
 		views = table.freeze({
 			SelectionOverview = table.freeze({

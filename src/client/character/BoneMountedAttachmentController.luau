@@ -32,22 +32,26 @@ local function resolveMount(model: Model, kind: string): (string?, string?)
     return tostring(root:GetAttribute("HairTargetBoneName") or ""), "CharacterMount"
 end
 
-local function updateMount(character: Model, model: Model, kind: string)
+local function updateMount(character: Model, model: Model, kind: string): boolean
     local name, gripName = resolveMount(model, kind)
-    if not name or name == "" or not gripName then return end
+    if not name or name == "" or not gripName then return false end
     local state: MountState? = cache[model]
     if not state or state.character ~= character or state.kind ~= kind
-        or state.targetName ~= name or not state.bone.Parent or not state.grip.Parent then
-        local bone = BoneModelMount.FindBone(character, name)
-        local grip = model:FindFirstChild(gripName, true)
+        or state.targetName ~= name or not state.bone:IsDescendantOf(character) or not state.grip:IsDescendantOf(model)
+        or (kind == "hair" and state.grip.Parent ~= model.PrimaryPart) then
+        local bone = if kind == "hair" then BoneModelMount.FindHairBone(character, name)
+            else BoneModelMount.FindBone(character, name)
+        local root = model.PrimaryPart
+        local grip = if kind == "hair" then (root and root:FindFirstChild(gripName))
+            else model:FindFirstChild(gripName, true)
         if not bone or not grip or not grip:IsA("Attachment") then
             cache[model] = nil
-            return
+            return false
         end
         state = { character = character, bone = bone, grip = grip, targetName = name, kind = kind }
         cache[model] = state
     end
-    BoneModelMount.Place(model, state.grip, BoneModelMount.SocketFrame(state.bone, kind))
+    return BoneModelMount.Place(model, state.grip, BoneModelMount.SocketFrame(state.bone, kind))
 end
 
 local function findHairModel(character: Model): Model?
@@ -59,15 +63,16 @@ local function findHairModel(character: Model): Model?
     return if group and group:IsA("Model") then group else nil
 end
 
-local function updateCharacter(character: Model)
+local function updateCharacter(character: Model): boolean
     local hair = findHairModel(character)
-    if hair then updateMount(character, hair, "hair") end
+    local hairReady = if hair then updateMount(character, hair, "hair") else true
     for _, weaponName in { "EquippedWeapon", "EquippedWeaponRight", "EquippedWeaponLeft" } do
         local weapon = character:FindFirstChild(weaponName)
         if weapon and weapon:IsA("Model") then
             updateMount(character, weapon, "weapon")
         end
     end
+    return hairReady
 end
 
 local function update()
@@ -86,6 +91,18 @@ local function update()
             end
         end
     end
+end
+
+-- The assembly declares its expected hair count even when no hair group has
+-- arrived yet. Callers at a loading boundary must not treat absence as ready.
+function BoneMountedAttachmentController.HairAssemblyReady(character: Model): boolean
+    local visual = character:FindFirstChild("Visual") or character
+    local expected = visual:GetAttribute("Game1AssemblyHairPieceCount")
+    if type(expected) ~= "number" then return false end
+    local hair = findHairModel(character)
+    if expected == 0 then return hair == nil end
+    if not hair or hair:GetAttribute("Game1HairPieceCount") ~= expected then return false end
+    return updateMount(character, hair, "hair")
 end
 
 -- The Studio timeline preview shares the exact mount method without starting

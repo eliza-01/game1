@@ -4544,11 +4544,65 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            0.0,
+            1.2566070556640625,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "meshId": "76164662538545",
+          "size": [
+            1.9831712245941162,
+            2.487790584564209,
+            2.289968729019165
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              0.049560546875,
+              1.2353057861328125,
+              0.023529052734375,
+              -0.1635063737630844,
+              0.0,
+              -0.986542284488678,
+              0.0,
+              1.0,
+              0.0,
+              0.986542284488678,
+              0.0,
+              -0.1635063737630844
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              1.602492332458496,
+              2.4296247959136963,
+              1.7671406269073486
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "b47bacdebf0f1469ba96732c377bb1b4c074440dcf1a603452032fcbe785e0c5",
       "surfaceMaterial": "wood",
       "appearanceMode": "material",
       "visualMaterial": "Plastic",
@@ -18023,11 +18077,227 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 7,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -0.0035400390625,
+            12.717021942138672,
+            1.5775146484375,
+            0.9999999403953552,
+            0.0,
+            1.4901161193847656e-08,
+            0.0,
+            1.000000238418579,
+            0.0,
+            1.4901161193847656e-08,
+            0.0,
+            1.000000238418579
+          ],
+          "meshId": "125906236487400",
+          "size": [
+            29.228878021240234,
+            14.136857986450195,
+            17.50328826904297
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0001",
+            "localCFrame": [
+              9.2259521484375,
+              12.072074890136719,
+              -2.072357177734375,
+              -0.7976004481315613,
+              0.5968755483627319,
+              -0.08702358603477478,
+              -0.11552821844816208,
+              -0.009563909843564034,
+              0.9932582974433899,
+              0.5920193195343018,
+              0.8022770285606384,
+              0.07658413797616959
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              3.396854877471924,
+              10.732552528381348,
+              1.639768123626709
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0002",
+            "localCFrame": [
+              6.70489501953125,
+              8.494762420654297,
+              -0.618896484375,
+              -0.2317519634962082,
+              0.9433284997940063,
+              -0.23753370344638824,
+              0.06334132701158524,
+              0.2582969069480896,
+              0.9639869332313538,
+              0.9707106947898865,
+              0.20836016535758972,
+              -0.11961248517036438
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              1.0711256265640259,
+              5.759342193603516,
+              0.9488833546638489
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0003",
+            "localCFrame": [
+              2.25244140625,
+              6.021003723144531,
+              -0.949951171875,
+              -0.09415388852357864,
+              0.7028192281723022,
+              -0.7051101326942444,
+              0.09970849752426147,
+              0.7113524675369263,
+              0.6957270503044128,
+              0.9905521869659424,
+              -0.00480005145072937,
+              -0.13705365359783173
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              1.5977232456207275,
+              5.759342193603516,
+              1.3494428396224976
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0004",
+            "localCFrame": [
+              0.164642333984375,
+              2.8604087829589844,
+              -0.383453369140625,
+              -0.19080108404159546,
+              0.12297709286212921,
+              -0.9738950133323669,
+              0.0,
+              0.992121696472168,
+              0.12527863681316376,
+              0.9816288352012634,
+              0.02390330098569393,
+              -0.1892978996038437
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.128390073776245,
+              5.759342193603516,
+              2.0
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0005",
+            "localCFrame": [
+              -7.94622802734375,
+              13.613723754882812,
+              -1.588104248046875,
+              -0.8009671568870544,
+              0.5968755483627319,
+              0.04681112989783287,
+              0.05123686045408249,
+              -0.009563914500176907,
+              0.9986408352851868,
+              0.596511960029602,
+              0.8022770285606384,
+              -0.022921644151210785
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              3.396854877471924,
+              10.732552528381348,
+              1.639768123626709
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0006",
+            "localCFrame": [
+              -0.631622314453125,
+              6.513332366943359,
+              -0.01068115234375,
+              0.06536981463432312,
+              -0.5249508023262024,
+              -0.8486185073852539,
+              -0.31554776430130005,
+              0.7959222793579102,
+              -0.5166600346565247,
+              0.9466555118560791,
+              0.3015536665916443,
+              -0.11361777782440186
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              1.5848766565322876,
+              5.759342193603516,
+              1.639768123626709
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0007",
+            "localCFrame": [
+              2.320648193359375,
+              17.219913482666016,
+              1.1417236328125,
+              0.3295283913612366,
+              0.9419602751731873,
+              0.06420277059078217,
+              -0.31485018134117126,
+              0.045527081936597824,
+              0.948049008846283,
+              0.8901014924049377,
+              -0.33262336254119873,
+              0.31157881021499634
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              3.396854877471924,
+              5.759342193603516,
+              1.639768123626709
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "e4eb027db65da18cef5c85ca6057eb990f036c77367845a1a014298b3061e681",
       "surfaceMaterial": "wood",
       "appearanceMode": "material",
       "visualMaterial": "Plastic",
@@ -18548,15 +18818,15 @@
       "name_en": "Dry Tree 02",
       "category": "tree",
       "model_path": "assets/source/location-assets/tree/dry_tree_02/model/dry_tree_02.fbx",
-      "model_sha256": "c6213af70f4fc3a1198424bb1cd72e1aa72ebd7dd12c5feac7dd85729af3e811",
-      "model_asset_id": "122879791308408",
-      "model_published_sha256": "c6213af70f4fc3a1198424bb1cd72e1aa72ebd7dd12c5feac7dd85729af3e811",
+      "model_sha256": "6505c8e4935defcffb5871c565fdbee40f9976ba1e901aa6becad0ecb6e6a812",
+      "model_asset_id": "77023458683193",
+      "model_published_sha256": "6505c8e4935defcffb5871c565fdbee40f9976ba1e901aa6becad0ecb6e6a812",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 1,
+      "revision": 2,
       "created_at": 1795456238.6875873,
-      "updated_at": 1795456269.2092946,
-      "published_at": 1795456269.2092946,
+      "updated_at": 1795618052.9774475,
+      "published_at": 1795618052.9774475,
       "surface_material": "wood",
       "alpha_enabled": 0,
       "appearance_mode": "material",
@@ -18579,7 +18849,7 @@
           {
             "name": "dry_tree_02",
             "armature": "",
-            "vertices": 189,
+            "vertices": 175,
             "bones": [],
             "influencedBones": [],
             "role": "visual",
@@ -18602,18 +18872,18 @@
         "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "bones": [],
         "carrierName": null,
-        "inventoryHash": "d0db848e2f4ffe63ecb590c57c9194442df9e48c4f756371f33eb542b7e00cdb",
+        "inventoryHash": "546d4a6775599ddb177a932c5ae4dfe4133330d5e235a273ef9bf4d1a8daa235",
         "parts": [
           {
             "name": "dry_tree_02",
             "role": "visual",
-            "vertices": 189
+            "vertices": 175
           }
         ],
         "rigKind": "static",
         "schemaVersion": 2,
         "sourceSha256": "",
-        "structuralHash": "9c2fc1c0d27007fa021b43cbbb6fd381fb3475bdaf00314345169d7403417c9a"
+        "structuralHash": "b026104700b2a3667a4d0b6743bb8439fcb2eab78ae77158f36fdf7e95bc0631"
       },
       "needsFbxInspection": false,
       "legacyStaticPublication": false,
@@ -18630,12 +18900,311 @@
           "texture_asset_id": "105914573093195"
         }
       },
-      "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintNeedsCapture": true,
+      "collisionBlueprintRetainedRevision": 1,
       "collisionBlueprintRevision": 0,
       "collisionBlueprintPartCount": 0,
       "collisionBlueprint": null,
       "collisionBlueprintSha256": "",
+      "surfaceMaterial": "wood",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "wood",
+        "label": "Wood",
+        "robloxMaterial": "Wood",
+        "soundFamily": "wood"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 2,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Tree",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "121582752762340",
+          "name": "dry_tree_02"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "slug": "mid_tree_02",
+      "name_en": "Mid Tree 02",
+      "category": "tree",
+      "model_path": "assets/source/location-assets/tree/mid_tree_02/model/mid_tree_02.fbx",
+      "model_sha256": "824984d237272f48c442064f16065ac28fbdbb838019654c6b6ebe59954879cb",
+      "model_asset_id": "133416543444090",
+      "model_published_sha256": "824984d237272f48c442064f16065ac28fbdbb838019654c6b6ebe59954879cb",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 1,
+      "created_at": 1795616361.5907905,
+      "updated_at": 1795616376.6437564,
+      "published_at": 1795616376.6437564,
+      "surface_material": "wood",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 1,
+        "status": "PUBLISHED",
+        "sourcePath": "assets/source/location-assets/tree/mid_tree_02/lod/lod1.fbx",
+        "sourceSha256": "0e80a6ec13e875e9b436571c83d19d180a8158ec54a8677c6e2cb811fcf92ee4",
+        "publishedSha256": "0e80a6ec13e875e9b436571c83d19d180a8158ec54a8677c6e2cb811fcf92ee4",
+        "modelAssetId": "93826309717536",
+        "moderationState": "Approved",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "crown",
+            "armature": "",
+            "vertices": 132,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "leaves",
+            "armature": "",
+            "vertices": 204,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "trunk",
+            "armature": "",
+            "vertices": 274,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "9530c00c1ee8ed308fdeb77fbbf1697ee53eb44b8112e14f5f69151943e38720",
+        "parts": [
+          {
+            "name": "crown",
+            "role": "visual",
+            "vertices": 132
+          },
+          {
+            "name": "leaves",
+            "role": "visual",
+            "vertices": 204
+          },
+          {
+            "name": "trunk",
+            "role": "visual",
+            "vertices": 274
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "24e508731099b340066d29dc7bfc19f09754b0cb791e32d051d8612c9c1a48d2"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "crown": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#4C8A00",
+          "visualMaterial": "Grass"
+        },
+        "leaves": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 71,
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "82028913618222"
+        },
+        "trunk": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 86,
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "105914573093195"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 3,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -0.50885009765625,
+            10.472236633300781,
+            -0.93585205078125,
+            1.0,
+            -1.1641532182693481e-09,
+            2.9802322387695312e-08,
+            -1.1641532182693481e-08,
+            1.0000003576278687,
+            0.0,
+            1.4901161193847656e-08,
+            6.51925802230835e-09,
+            1.0000004768371582
+          ],
+          "meshId": "106238536951392",
+          "size": [
+            14.415281295776367,
+            10.808537483215332,
+            10.772369384765625
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0001",
+            "localCFrame": [
+              0.5306396484375,
+              11.32891845703125,
+              -0.12188720703125,
+              -0.42694291472435,
+              -0.8034344911575317,
+              0.414985328912735,
+              -0.8995798826217651,
+              0.330636590719223,
+              -0.2853703200817108,
+              0.09206698089838028,
+              -0.49514931440353394,
+              -0.8639165163040161
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.0,
+              12.332204818725586,
+              2.0
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0002",
+            "localCFrame": [
+              -0.13336181640625,
+              6.4593505859375,
+              0.04815673828125,
+              -0.9818711280822754,
+              0.032130204141139984,
+              -0.18680636584758759,
+              0.034960754215717316,
+              0.9993184804916382,
+              -0.01187666691839695,
+              0.1862974315881729,
+              -0.018192240968346596,
+              -0.9823253154754639
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.0,
+              12.74996566772461,
+              2.0
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0003",
+            "localCFrame": [
+              -3.34735107421875,
+              10.122764587402344,
+              -0.142425537109375,
+              0.1142367422580719,
+              -0.9639143347740173,
+              -0.24045613408088684,
+              -0.9777374267578125,
+              -0.15196947753429413,
+              0.14469186961650848,
+              -0.1760125458240509,
+              0.21857379376888275,
+              -0.9598155617713928
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              2.0,
+              5.884756565093994,
+              1.4161220788955688
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "8196bf4d3944720d61dc96e3ec51b1f59de0fc5011182b8c415b9c7d552bec0e",
       "surfaceMaterial": "wood",
       "appearanceMode": "material",
       "visualMaterial": "Plastic",
@@ -18664,8 +19233,16 @@
       "category_label": "Tree",
       "publishedVisualMeshes": [
         {
-          "meshId": "124281961299450",
-          "name": "dry_tree_02"
+          "meshId": "106238536951392",
+          "name": "crown"
+        },
+        {
+          "meshId": "111138512260887",
+          "name": "trunk"
+        },
+        {
+          "meshId": "126653615812989",
+          "name": "leaves"
         }
       ],
       "aliases": []
@@ -18791,11 +19368,65 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 1,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -0.016082763671875,
+            6.843898773193359,
+            0.3547821044921875,
+            1.0000001192092896,
+            0.0,
+            0.0,
+            0.0,
+            1.000000238418579,
+            0.0,
+            0.0,
+            0.0,
+            1.0000001192092896
+          ],
+          "meshId": "76844904318861",
+          "size": [
+            5.349287509918213,
+            13.66395092010498,
+            5.215169906616211
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "Part",
+            "localCFrame": [
+              -0.06085205078125,
+              5.476558685302734,
+              0.2774658203125,
+              -0.9062661528587341,
+              0.0,
+              0.4227076470851898,
+              0.0,
+              1.0000001192092896,
+              0.0,
+              -0.4227076470851898,
+              0.0,
+              -0.9062661528587341
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              1.7212716341018677,
+              11.413520812988281,
+              1.4057356119155884
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "6472bf5bf31d3a9faf730abcae9022308b1324d51789232101432613c92b2a9e",
       "surfaceMaterial": "default",
       "appearanceMode": "material",
       "visualMaterial": "Plastic",
@@ -18836,8 +19467,8 @@
     }
   ],
   "summary": {
-    "registered": 42,
-    "published": 42,
+    "registered": 43,
+    "published": 43,
     "changed": 0
   }
 }

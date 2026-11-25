@@ -41,4 +41,9 @@ assert(saved.characterCreation.enabled);
 assert.equal(saved.characterCreation.transitionSeconds,1.25);
 assert.deepStrictEqual(Object.keys(saved.characterCreation.views),order);
 assert.equal(saved.characterCreation.views.FemaleFace.cframe.length,12);
+const faceMaterials=['Plastic','Slate','Fabric','SmoothPlastic','Sandstone','Grass','LeafyGrass','Concrete'];
+for(const group of ['hair','eyes','eyebrows','head']){
+  assert.equal(node('option-creation-materials-'+group).value,faceMaterials.join(', '));
+  assert.equal(JSON.stringify(saved.characterCreation.materialChoices[group]),JSON.stringify(faceMaterials));
+}
 console.log('m479 character creation options ui passed');

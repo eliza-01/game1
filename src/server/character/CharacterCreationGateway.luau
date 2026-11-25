@@ -6,7 +6,7 @@ Gateway.__index = Gateway
 
 function Gateway.new(enabled: boolean, available: (string) -> boolean,
     spawn: (Player, string, any?, CFrame?) -> Model?,
-    validate: (string, any) -> (any?, string?), profiles: any, dismiss: (Player) -> ()): any
+    validate: (string, any, boolean?) -> (any?, string?), profiles: any, dismiss: (Player) -> ()): any
     return setmetatable({enabled = enabled, available = available, spawn = spawn,
         validate = validate, profiles = profiles, dismiss = dismiss,
         busy = {} :: {[Player]: boolean}, pending = {} :: {[Player]: boolean}, nextRequest = {} :: {[Player]: number}}, Gateway)
@@ -42,7 +42,7 @@ function Gateway:Bind(remotes: Folder)
             if stage == "selection" and existing then
                 -- A retry after commit must acknowledge the existing character,
                 -- never create a second one or overwrite its appearance.
-                local checked, problem = self.validate(existing.archetype, existing.appearance)
+                local checked, problem = self.validate(existing.archetype, existing.appearance, true)
                 if not checked then return {ok = false, error = problem or "saved_appearance_invalid"} end
                 self.profiles.SetValidatedAppearance(player, checked)
                 return {ok = true, mode = "selection", archetype = existing.archetype,
@@ -61,7 +61,7 @@ function Gateway:Bind(remotes: Folder)
             if not created then return {ok = false, error = "character_save_failed"} end
             local record = self.profiles.Get(player)
             if not record then return {ok = false, error = "character_save_failed"} end
-            local savedAppearance, savedProblem = self.validate(record.archetype, record.appearance)
+            local savedAppearance, savedProblem = self.validate(record.archetype, record.appearance, true)
             if not savedAppearance then return {ok = false, error = savedProblem or "saved_appearance_invalid"} end
             self.profiles.SetValidatedAppearance(player, savedAppearance)
             player:SetAttribute("CharacterProfilePersisted", persisted)
@@ -82,7 +82,7 @@ function Gateway:Bind(remotes: Folder)
         end
         local record = self.profiles.Get(player)
         if not record then return {ok = false, error = "character_unavailable"} end
-        local checked, problem = self.validate(record.archetype, record.appearance)
+        local checked, problem = self.validate(record.archetype, record.appearance, true)
         if not checked then return {ok = false, error = problem or "saved_appearance_invalid"} end
         self.profiles.SetValidatedAppearance(player, checked)
         return {ok = true, archetype = record.archetype, appearance = checked}
@@ -100,7 +100,7 @@ function Gateway:Bind(remotes: Folder)
             self.nextRequest[player] = os.clock() + 1
             local record = self.profiles.Get(player)
             if not record or not self.available(record.archetype) then return {ok = false, error = "character_unavailable"} end
-            local checked, problem = self.validate(record.archetype, record.appearance)
+            local checked, problem = self.validate(record.archetype, record.appearance, true)
             if not checked then return {ok = false, error = problem or "saved_appearance_invalid"} end
             self.profiles.SetValidatedAppearance(player, checked)
             local model = self.spawn(player, record.archetype, checked, self.profiles.SpawnFrame(player))

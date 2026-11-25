@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "slug": "mid_tree_02",
+  "sourceSha256": "824984d237272f48c442064f16065ac28fbdbb838019654c6b6ebe59954879cb",
+  "analysis": {
+    "schemaVersion": 1,
+    "meshes": [
+      {
+        "name": "crown",
+        "armature": "",
+        "vertices": 132,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "leaves",
+        "armature": "",
+        "vertices": 204,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      },
+      {
+        "name": "trunk",
+        "armature": "",
+        "vertices": 274,
+        "bones": [],
+        "influencedBones": [],
+        "role": "visual",
+        "physics": {
+          "role": "visual",
+          "canCollide": null,
+          "canQuery": null,
+          "canTouch": false,
+          "doubleSided": false,
+          "collisionFidelity": null,
+          "physicsOnly": false
+        }
+      }
+    ],
+    "hasCollider": false,
+    "armatures": [],
+    "unassignedArmatures": []
+  }
+}

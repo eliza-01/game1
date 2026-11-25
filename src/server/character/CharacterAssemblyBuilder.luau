@@ -84,6 +84,7 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
     local wrapper = Instance.new("Model")
     wrapper.Name = "assembled_character"
     local ok, reason = pcall(function()
+        wrapper:SetAttribute("Game1AssemblyHairPieceCount", 0)
         local imported = Instance.new("Model")
         imported.Name = "ImportedRig"
         imported.Parent = wrapper
@@ -142,13 +143,16 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
                         local group = assert(hairGroup, "rigid hair must have a component Model")
                         -- Identical anchored Model mount as equipped weapons. No
                         -- physics welds between the rigid hair pieces.
-                        BoneModelMount.Place(group, anchor, BoneModelMount.SocketFrame(target, "hair"))
-                        for _, piece in group:GetChildren() do
-                            if piece:IsA("BasePart") then piece.Anchored = true end
-                        end
                         mesh:SetAttribute("Game1HairAttachment", true)
                         mesh:SetAttribute("HairTargetBoneName", target.Name)
                         mesh:SetAttribute("HairAttachmentMode", "bone-model-mount")
+                        BoneModelMount.CaptureHairOffsets(group, anchor)
+                        wrapper:SetAttribute("Game1AssemblyHairPieceCount", group:GetAttribute("Game1HairPieceCount"))
+                        assert(BoneModelMount.Place(group, anchor, BoneModelMount.SocketFrame(target, "hair")),
+                            "incomplete hair compound: " .. part.id)
+                        for _, piece in group:GetChildren() do
+                            if piece:IsA("BasePart") then piece.Anchored = true end
+                        end
                         runtimeHairGrip = true
                     else
                         -- Skinned accessory rig uses its authored socket Bone.

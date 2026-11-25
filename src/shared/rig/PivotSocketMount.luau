@@ -1,12 +1,14 @@
 --!strict
--- Generic full-frame placement by model pivot. Use when the authored Model
--- pivot is the attachment contract and no inner socket should be resolved.
-local SocketFacing = require(script.Parent.Parent.world.SocketFacing)
+-- Rigid Bone Socket: match the imported socket's HEAD and world rotation.
+-- Both the imported MeshPart pivot and Bone already use Roblox CFrames.
+-- Do not apply another Blender-to-Roblox axis conversion at mount time.
 local Mount = {}
 
-local function frame(socket: Attachment): CFrame
-    local isBone = socket:IsA("Bone")
-    return SocketFacing.FullFrame(if isBone then (socket :: Bone).TransformedWorldCFrame else socket.WorldCFrame, isBone)
+function Mount.TargetFrame(socket: Attachment): CFrame
+    if socket:IsA("Bone") then
+        return (socket :: Bone).TransformedWorldCFrame
+    end
+    return socket.WorldCFrame
 end
 
 local function matches(a: CFrame, b: CFrame): boolean
@@ -15,11 +17,15 @@ local function matches(a: CFrame, b: CFrame): boolean
         and a.UpVector:Dot(b.UpVector) >= 0.99999
 end
 
-function Mount.Align(model: Model, target: Attachment): (boolean, string?)
+function Mount.Align(model: Model, target: Attachment, origin: BasePart): (boolean, string?)
     if not target.Parent then return false, "missing_target" end
-    local targetFrame = frame(target)
-    model:PivotTo(targetFrame)
-    if not matches(model:GetPivot(), targetFrame) then return false, "alignment_failed" end
+    if not origin:IsDescendantOf(model) then return false, "missing_origin" end
+    local targetFrame = Mount.TargetFrame(target)
+    -- Move the entire assembly by the selected object's pivot delta. The
+    -- rig_carrier stays PrimaryPart and its native PivotOffset is untouched.
+    local delta = targetFrame * origin:GetPivot():Inverse()
+    model:PivotTo(delta * model:GetPivot())
+    if not matches(origin:GetPivot(), targetFrame) then return false, "alignment_failed" end
     return true, nil
 end
 

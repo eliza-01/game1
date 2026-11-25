@@ -4,6 +4,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local State = require(script.Parent:WaitForChild("LanguageState"))
+local FullScreenLayer = require(script.Parent.Parent:WaitForChild("FullScreenLayer"))
 local Catalog = require(ReplicatedStorage:WaitForChild("Game1Shared")
     :WaitForChild("localization"):WaitForChild("GameTextCatalog"))
 local Controller = {}
@@ -11,6 +12,9 @@ local started = false
 
 local ORDER = {"ru-ru", "en-us", "de-de", "zh-cn", "it-it", "es-es",
     "fr-fr", "pt-br", "ja-jp", "ko-kr"}
+local FLAGS = table.freeze({["ru-ru"] = "🇷🇺", ["en-us"] = "🇺🇸", ["de-de"] = "🇩🇪",
+    ["zh-cn"] = "🇨🇳", ["it-it"] = "🇮🇹", ["es-es"] = "🇪🇸", ["fr-fr"] = "🇫🇷",
+    ["pt-br"] = "🇧🇷", ["ja-jp"] = "🇯🇵", ["ko-kr"] = "🇰🇷"})
 
 local function corner(parent: Instance, radius: number)
     local value = Instance.new("UICorner")
@@ -22,7 +26,7 @@ local function label(parent: Instance, name: string, text: string, size: number,
     local result = Instance.new("TextLabel")
     result.Name = name
     result.BackgroundTransparency = 1
-    result.Font = Enum.Font.Gotham
+    result.Font = Enum.Font.GothamBold
     result.Text = text
     result.TextSize = size
     result.TextColor3 = Color3.fromRGB(235, 241, 248)
@@ -48,7 +52,7 @@ function Controller.Start()
     launcher.AnchorPoint = Vector2.new(1, 0)
     launcher.Position = UDim2.new(1, -12, 0, 8)
     launcher.Size = UDim2.fromOffset(44, 44)
-    launcher.Font = Enum.Font.GothamSemibold
+    launcher.Font = Enum.Font.GothamBold
     launcher.TextSize = 27
     launcher.BackgroundColor3 = Color3.fromRGB(25, 40, 52)
     launcher.TextColor3 = Color3.fromRGB(247, 249, 250)
@@ -63,6 +67,18 @@ function Controller.Start()
     shade.Visible = false
     shade.Active = true
     shade.Parent = gui
+    -- Keep picker/launcher inside Core UI safe insets, but shade the entire viewport.
+    local backdrop = Instance.new("Frame")
+    backdrop.Name = "FullViewportBackdrop"
+    backdrop.Size = UDim2.fromScale(1, 1)
+    backdrop.BackgroundColor3 = shade.BackgroundColor3
+    backdrop.BackgroundTransparency = shade.BackgroundTransparency
+    backdrop.BorderSizePixel = 0
+    backdrop.Active = true
+    backdrop.Visible = false
+    backdrop.Parent = FullScreenLayer.Create(gui, "Game1LanguageBackdrop", 300)
+    shade.BackgroundTransparency = 1
+    shade:GetPropertyChangedSignal("Visible"):Connect(function() backdrop.Visible = shade.Visible end)
 
     local panel = Instance.new("Frame")
     panel.Name = "LanguagePicker"
@@ -111,7 +127,7 @@ function Controller.Start()
         item.Name = "Settings_" .. tab
         item.Position = UDim2.new((order - 1) / 4, 9, 0, 93)
         item.Size = UDim2.new(0.25, -17, 0, 40)
-        item.Font = Enum.Font.GothamSemibold
+        item.Font = Enum.Font.GothamBold
         item.TextSize = 12
         item.TextColor3 = Color3.fromRGB(240, 238, 222)
         item.BackgroundColor3 = Color3.fromRGB(44, 59, 71)
@@ -142,10 +158,10 @@ function Controller.Start()
         button.Name = locale
         button.LayoutOrder = order
         button.Size = UDim2.fromOffset(150, 44)
-        button.Font = Enum.Font.GothamMedium
+        button.Font = Enum.Font.GothamBold
         button.TextSize = 15
         button.TextColor3 = Color3.fromRGB(238, 245, 249)
-        button.Text = Catalog.locales[locale]
+        button.Text = FLAGS[locale] .. "  " .. Catalog.locales[locale]
         button.TextTruncate = Enum.TextTruncate.AtEnd
         button.Parent = list
         corner(button, 8)
@@ -215,7 +231,6 @@ function Controller.Start()
         chosen = previous
         settingsTab = "language"
         status.Text = ""
-        status:SetAttribute("Game1SaveFailed", false)
         close.Visible = hasChosen or player:GetAttribute("Game1LanguageChoice") ~= nil
         shade.Visible = true
         paint()
@@ -254,7 +269,6 @@ function Controller.Start()
             chosen = locale
             State.SetLocale(locale)
             status.Text = ""
-            status:SetAttribute("Game1SaveFailed", false)
             paint()
         end)
     end
@@ -270,28 +284,22 @@ function Controller.Start()
         if pending then return end
         pending = true
         State.SetLocale(chosen)
-        paint()
-        status.Text = State.Translate("language.loading")
+        hasChosen = true
+        shade.Visible = false
         task.spawn(function()
-            local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
-            local remote = remotes and remotes:FindFirstChild("SetPlayerLanguage")
+            local remotes = ReplicatedStorage:WaitForChild("Game1Remotes", 5)
+            local remote = remotes and remotes:WaitForChild("SetPlayerLanguage", 5)
             local ok, response = false, nil
             if remote and remote:IsA("RemoteFunction") then
                 ok, response = pcall(function() return remote:InvokeServer(chosen) end)
             end
             pending = false
-            if ok and typeof(response) == "table" and response.ok == true then
-                status.Text = State.Translate("language.saved")
-                shade.Visible = false
-            else
-                -- Do not keep the player captive: a second click continues
-                -- with a session-only language if DataStore has no API access.
-                if status:GetAttribute("Game1SaveFailed") == true then
-                    shade.Visible = false
-                else
-                    status:SetAttribute("Game1SaveFailed", true)
-                    status.Text = State.Translate("language.unsaved")
-                end
+            -- The locale is already active locally. Persistence is optional;
+            -- never require a second Continue for a session-only preference.
+            if not ok or typeof(response) ~= "table" or response.ok ~= true then
+                warn("[game1][language] preference confirmation unavailable; using local session locale")
+            elseif response.persisted == false then
+                warn("[game1][language] preference applied for this session only")
             end
         end)
     end)

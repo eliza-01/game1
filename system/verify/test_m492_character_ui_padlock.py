@@ -24,7 +24,7 @@ class CharacterUiPadlockM492(unittest.TestCase):
         for removed in ('GameBrand', 'GoldAccent', 'GAME1  /  CHARACTER', '"Sword"'):
             self.assertNotIn(removed, panel)
         self.assertIn('RunService.RenderStepped:Connect(render)', panel)
-        self.assertIn('setRunnerPose(views.overlayRunner, elapsed)', panel)
+        self.assertIn('views.overlayRunnerPose(elapsed)', panel)
         self.assertIn('views.runnerConnection:Disconnect()', panel)
         self.assertIn('else position * 0.78', panel)
         self.assertIn('if value ~= nil then string.format', panel)

@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local SavedColors = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationSavedColors"))
 local FaceMaterials = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationMaterials"))
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
 local CharacterRegistry = require(Shared:WaitForChild("character"):WaitForChild("CharacterRegistry"))
@@ -193,6 +194,30 @@ function Controller.Start()
     end
 
     local refresh: () -> ()
+    local savedColors: {string} = {}
+    local savedBusy = false
+    local function paletteRequest(action: string, value: string?)
+        if savedBusy then return end
+        savedBusy = true
+        palette:SetSaving(true, if action == "save" then "creation.palette_saving" else nil)
+        task.spawn(function()
+            local remote = remoteFor("CharacterCreationSavedColors")
+            local ok, result = false, nil
+            if remote then
+                ok, result = Request.Invoke(remote, function() return player.Parent == Players end, 20, action, value)
+            end
+            savedBusy = false
+            if ok and type(result) == "table" and result.ok == true then
+                savedColors = SavedColors.Normalize(result.colors)
+                palette:SetSavedColors(savedColors)
+                palette:SetSaving(false, if not result.persisted then "creation.palette_session_only"
+                    elseif action == "save" then "creation.palette_saved" else nil)
+                if stage == "creation" then refresh() end
+            else
+                palette:SetSaving(false, "creation.palette_save_failed")
+            end
+        end)
+    end
     local function requestPreview(id: string)
         local current = table.clone(choices[id])
         -- Geometry request is independent of live color/material edits.
@@ -336,7 +361,7 @@ function Controller.Start()
         if currentPreview then currentPreview:Materials(selected, choices[selected].materials) end
         react(selected)
     end
-    local function customColor(group: string, channel: string?, value: string?)
+    local function customColor(group: string, channel: string?, value: string?, titleText: string)
         if stage ~= "creation" or not selected or pending or leaving or warming then return end
         local id = selected
         local function preview(hex: string)
@@ -354,7 +379,7 @@ function Controller.Start()
             paint(group, hex, channel)
         end, function()
             if id and currentPreview then currentPreview:Colors(id, choices[id].colors) end
-        end)
+        end, titleText, function(hex) paletteRequest("save", hex) end)
     end
     local function visibleCategories(id: string?): {[string]: boolean}
         local catalog = if id then (Catalog.archetypes or {})[id] else nil
@@ -407,7 +432,7 @@ function Controller.Start()
                     refresh()
                     if currentPreview then currentPreview:Colors(selected, values.colors) end
                     react(selected)
-                end)
+                end, savedColors)
             controls.invalidateCanvas()
         end
         Panel.SetMode(controls, stage)
@@ -442,20 +467,24 @@ function Controller.Start()
     male.Activated:Connect(function()
         if pending or leaving or next(bootstrapPending) ~= nil or stage ~= "creation" then return end
         palette:Close()
+        local changed = selected ~= "human_male" or activeTab ~= firstCategory("human_male")
         if selected and selected ~= "human_male" then reactionPending[selected] = nil end
         selected = "human_male"; activeTab = firstCategory("human_male")
         status.Text = ""
         controls.content.CanvasPosition = Vector2.zero
         refresh(); showStage()
+        if changed then react("human_male") end
     end)
     female.Activated:Connect(function()
         if pending or leaving or next(bootstrapPending) ~= nil or stage ~= "creation" then return end
         palette:Close()
+        local changed = selected ~= "human_female" or activeTab ~= firstCategory("human_female")
         if selected and selected ~= "human_female" then reactionPending[selected] = nil end
         selected = "human_female"; activeTab = firstCategory("human_female")
         status.Text = ""
         controls.content.CanvasPosition = Vector2.zero
         refresh(); showStage()
+        if changed then react("human_female") end
     end)
     for _, key in ipairs(Panel.Categories) do
         local category = key
@@ -466,6 +495,7 @@ function Controller.Start()
             activeTab = if activeTab == category then nil else category
             controls.content.CanvasPosition = Vector2.zero
             refresh(); showStage()
+            react(selected)
         end)
     end
     local function readSelection()
@@ -613,6 +643,7 @@ function Controller.Start()
                 end, function() return selected, stage == "creation" end)
             end
             if stage == "creation" then
+                paletteRequest("read", nil)
                 choices.human_male = defaults("human_male")
                 choices.human_female = defaults("human_female")
                 for id, choice in pairs(choices) do

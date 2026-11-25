@@ -58,7 +58,7 @@ class FaceMaterialsM493(unittest.TestCase):
 
     def test_picker_and_live_preview_use_every_group(self):
         view = source('src/client/character/CharacterCreationAppearanceView.luau')
-        self.assertIn('grid.FillDirectionMaxCells = 3', view)
+        self.assertIn('grid.FillDirectionMaxCells = columns', view)
         self.assertIn('tostring(i), list)', view)
         self.assertIn('(selectedIndex - 1 + delta) % #materials + 1', view)
         self.assertNotIn('nameButton.Activated:Connect', view)

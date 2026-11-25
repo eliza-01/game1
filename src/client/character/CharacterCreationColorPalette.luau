@@ -2,6 +2,7 @@
 -- Continuous HSV canvas. Preview changes immediately; Apply commits, Cancel restores.
 local UserInputService = game:GetService("UserInputService")
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
+local SavedRow = require(script.Parent:WaitForChild("CharacterCreationSavedColorRow"))
 local Picker = {}
 Picker.__index = Picker
 
@@ -32,7 +33,7 @@ function Picker.new(parent: Frame)
     local overlay = Instance.new("ScrollingFrame")
     overlay.Name = "ColorPaletteOverlay"
     overlay.Size = UDim2.fromScale(1, 1)
-    overlay.CanvasSize = UDim2.fromOffset(0, 544)
+    overlay.CanvasSize = UDim2.fromOffset(0, 600)
     overlay.ScrollingDirection = Enum.ScrollingDirection.Y
     overlay.ScrollBarThickness = 3
     overlay.BackgroundColor3 = Color3.fromRGB(14, 22, 29)
@@ -43,9 +44,11 @@ function Picker.new(parent: Frame)
     round(overlay, 16)
     local title = Instance.new("TextLabel")
     title.Name = "PaletteTitle"
+    title.Text = ""
     title.BackgroundTransparency = 1
     title.Position = UDim2.fromOffset(20, 22)
-    title.Size = UDim2.new(1, -100, 0, 34)
+    title.Size = UDim2.new(1, -40, 0, 34)
+    title.TextWrapped = true
     title.TextColor3 = Color3.fromRGB(245, 238, 219)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 19
@@ -169,16 +172,37 @@ function Picker.new(parent: Frame)
     preview.ZIndex = 35
     preview.Parent = overlay
     round(preview, 8)
+    local saved = SavedRow.Create(overlay, 35)
+    saved.Position = UDim2.fromOffset(20, 460)
+    saved.Size = UDim2.new(1, -110, 0, 46)
+    local save = button(overlay, "SaveCustomColor")
+    save.Position = UDim2.new(1, -77, 0, 460)
+    save.Size = UDim2.fromOffset(57, 43)
+    save.Text = "💾"
+    save.TextSize = 23
+    local saveStatus = Instance.new("TextLabel")
+    saveStatus.Name = "SavedColorStatus"
+    saveStatus.BackgroundTransparency = 1
+    saveStatus.Position = UDim2.fromOffset(20, 509)
+    saveStatus.Size = UDim2.new(1, -40, 0, 24)
+    saveStatus.TextColor3 = Color3.fromRGB(198, 207, 210)
+    saveStatus.TextSize = 12
+    saveStatus.Font = Enum.Font.GothamBold
+    saveStatus.TextWrapped = true
+    saveStatus.Text = ""
+    saveStatus.ZIndex = 36
+    saveStatus.Parent = overlay
     local apply = button(overlay, "ApplyColor")
-    apply.Position = UDim2.fromOffset(20, 470)
+    apply.Position = UDim2.fromOffset(20, 540)
     apply.Size = UDim2.new(0.5, -25, 0, 46)
     apply.BackgroundColor3 = Color3.fromRGB(76, 120, 100)
     local cancel = button(overlay, "CancelColor")
-    cancel.Position = UDim2.new(0.5, 5, 0, 470)
+    cancel.Position = UDim2.new(0.5, 5, 0, 540)
     cancel.Size = UDim2.new(0.5, -25, 0, 46)
 
     local h, s, v = 0, 0, 1
-    local initial = "#FFFFFF"
+    local onSave: ((string) -> ())? = nil
+    local savedColors: {string} = {}
     local onPreview: ((string) -> ())? = nil
     local onCommit: ((string) -> ())? = nil
     local onCancel: (() -> ())? = nil
@@ -197,6 +221,7 @@ function Picker.new(parent: Frame)
         local chosen = hex(Color3.fromHSV(h, s, v))
         preview.BackgroundColor3 = Color3.fromHSV(h, s, v)
         field.Text = chosen
+        SavedRow.Select(saved, chosen)
         cursor.Position = UDim2.fromScale(h, 1 - s)
         valueCursor.Position = UDim2.fromScale(v, 0.5)
         darken.BackgroundTransparency = v
@@ -209,6 +234,16 @@ function Picker.new(parent: Frame)
         display(emit)
         return true
     end
+    local function updateSaved(colors: {string})
+        savedColors = colors
+        SavedRow.Render(saved, savedColors, hex(Color3.fromHSV(h, s, v)), function(value)
+            setHex(value, true)
+        end)
+    end
+    save.Activated:Connect(function()
+        if not overlay.Visible or not save.Active or not onSave then return end
+        if setHex(field.Text, true) then onSave(hex(Color3.fromHSV(h, s, v))) end
+    end)
     local function coordinate(which: string, position: Vector2)
         local object = if which == "canvas" then canvas else valueBar
         local size = object.AbsoluteSize
@@ -252,29 +287,45 @@ function Picker.new(parent: Frame)
         setHex(field.Text, true)
         overlay.Visible = false
         if onCommit then onCommit(hex(Color3.fromHSV(h, s, v))) end
-        onPreview, onCommit, onCancel = nil, nil, nil
+        onPreview, onCommit, onCancel, onSave = nil, nil, nil, nil
     end)
     cancel.Activated:Connect(function()
         overlay.Visible = false
         if onCancel then onCancel() end
-        onPreview, onCommit, onCancel = nil, nil, nil
+        onPreview, onCommit, onCancel, onSave = nil, nil, nil, nil
     end)
-    return setmetatable({root = overlay, apply = apply, cancel = cancel,
+    return setmetatable({root = overlay, apply = apply, cancel = cancel, title = title,
+        save = save, saveStatus = saveStatus, updateSaved = updateSaved,
+        setSaveCallback = function(callback) onSave = callback end,
         setHex = setHex, setCallbacks = function(previewCallback, commitCallback, cancelCallback)
             onPreview, onCommit, onCancel = previewCallback, commitCallback, cancelCallback
         end, cancelPreview = function() if onCancel then onCancel() end end}, Picker)
 end
 
-function Picker:Open(current: string?, onPreview: (string) -> (), onCommit: (string) -> (), onCancel: () -> ())
+function Picker:Open(current: string?, onPreview: (string) -> (), onCommit: (string) -> (), onCancel: () -> (),
+    titleText: string, onSave: (string) -> ())
     self.setCallbacks(onPreview, onCommit, onCancel)
+    self.setSaveCallback(onSave)
+    self.title.Text = titleText
+    self.root.CanvasPosition = Vector2.zero
     self.root.Visible = true
     self.setHex(if type(current) == "string" then current else "#765034", false)
     self.apply.Text = Language.Translate("creation.palette_apply")
     self.cancel.Text = Language.Translate("feedback.cancel")
 end
+function Picker:SetSavedColors(colors: {string})
+    self.updateSaved(colors)
+end
+function Picker:SetSaving(busy: boolean, statusKey: string?)
+    self.save.Active = not busy
+    self.save.AutoButtonColor = not busy
+    self.save.TextTransparency = if busy then 0.5 else 0
+    self.saveStatus.Text = if statusKey then Language.Translate(statusKey) else ""
+end
 function Picker:Close()
     if self.root.Visible then self.cancelPreview() end
     self.root.Visible = false
     self.setCallbacks(nil, nil, nil)
+    self.setSaveCallback(nil)
 end
 return Picker

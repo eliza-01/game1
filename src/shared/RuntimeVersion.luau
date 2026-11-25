@@ -1,1 +1,1 @@
-return table.freeze({ Version = "2026.11.25.506", SourceDigest = "game1-m506-retired-debug-cleanup" })
+return table.freeze({ Version = "2026.11.25.512", SourceDigest = "game1-m512-rebased-custom-colors-runner" })

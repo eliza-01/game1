@@ -36,19 +36,33 @@ function Reactions.Pool(registry: any, archetype: string, weights: any): ({any},
     return result, total
 end
 
-function Reactions.Choose(pool: {any}, total: number, rng: Random): any?
-    if total <= 0 then return nil end
+-- Exclude entire emotion groups, not merely the individual numbered clip.
+-- With fewer than three eligible groups, skip rather than violate the window.
+function Reactions.Choose(pool: {any}, total: number, rng: Random, recent: {string}?): (any?, string?)
+    if recent then
+        total = 0
+        for _, entry in ipairs(pool) do
+            if not table.find(recent, entry.group) then total += entry.weight end
+        end
+    end
+    if total <= 0 then return nil, nil end
     local cursor = rng:NextNumber(0, total)
     for _, entry in ipairs(pool) do
+        if recent and table.find(recent, entry.group) then continue end
         cursor -= entry.weight
-        if cursor <= 0 then return entry.rows[rng:NextInteger(1, #entry.rows)] end
+        if cursor <= 0 then return entry.rows[rng:NextInteger(1, #entry.rows)], entry.group end
     end
-    return nil
+    return nil, nil
+end
+
+function Reactions.Remember(recent: {string}, group: string)
+    table.insert(recent, group)
+    if #recent > 2 then table.remove(recent, 1) end
 end
 
 function Reactions.new(settings: any)
     return setmetatable({settings = settings or {}, active = {} :: {[Model]: Active},
-        pools = {} :: {[string]: any}}, Reactions)
+        pools = {} :: {[string]: any}, recent = {} :: {string}}, Reactions)
 end
 
 function Reactions:Remove(model: Model)
@@ -72,9 +86,9 @@ function Reactions:Play(model: Model, archetype: string)
         cached = {pool = pool, total = total}
         self.pools[archetype] = cached
     end
-    local clip = Reactions.Choose(cached.pool, cached.total, random)
+    local clip, group = Reactions.Choose(cached.pool, cached.total, random, self.recent)
     local animator = model:FindFirstChildWhichIsA("Animator", true)
-    if not clip or not animator then return end
+    if not clip or not group or not animator then return end
     local animation = Instance.new("Animation")
     animation.Name = "CharacterCreationReaction"
     animation.AnimationId = clip.animationId
@@ -93,6 +107,8 @@ function Reactions:Play(model: Model, archetype: string)
     end)
     local played = pcall(function() track:Play(FADE) end)
     if not played then self:Remove(model); return end
+    -- Session-wide history survives model replacement and switching archetype.
+    Reactions.Remember(self.recent, group)
     -- A failed asset may never produce Ended. Free the slot, without blocking UI.
     task.delay(8, function()
         if self.active[model] == active and track.Length <= 0 then
@@ -105,5 +121,6 @@ end
 function Reactions:Destroy()
     for model in pairs(self.active) do self:Remove(model) end
     table.clear(self.pools)
+    table.clear(self.recent)
 end
 return Reactions

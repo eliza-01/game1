@@ -1,6 +1,7 @@
 --!strict
 -- Explicit player lifecycle: creation -> selection -> gameplay. Never spawn on join.
 local Players = game:GetService("Players")
+local SavedColors = require(script.Parent:WaitForChild("CharacterCreationSavedColorStore"))
 local Gateway = {}
 Gateway.__index = Gateway
 
@@ -28,6 +29,7 @@ function Gateway:Request(player: Player, operation: () -> any): any
     return result
 end
 function Gateway:Bind(remotes: Folder)
+    if self.enabled then SavedColors.Bind(remotes) end
     local create = remotes:FindFirstChild("CharacterCreationSelect") or Instance.new("RemoteFunction")
     assert(create:IsA("RemoteFunction"), "CharacterCreationSelect must be RemoteFunction")
     create.Name = "CharacterCreationSelect"
@@ -168,6 +170,7 @@ function Gateway:Join(player: Player)
     end)
 end
 function Gateway:Leave(player: Player)
+    SavedColors.Forget(player)
     self.pending[player] = nil
     self.nextRequest[player] = nil
 end

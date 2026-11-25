@@ -27,7 +27,7 @@ class CreationMeshPreloadM490(unittest.TestCase):
 
     def test_panel_has_progress_overlay_and_runner(self):
         code = src('src/client/character/CharacterCreationPanel.luau')
-        self.assertIn('local function buildStickman(parent: Instance): Frame', code)
+        self.assertIn('LoadingRunner.Build(runnerLane, INK, 103)', code)
         self.assertIn('progressTrack.Name = "ProgressTrack"', code)
         self.assertIn('function Panel.SetLoading(views: any, busy: boolean, message: string, progress: number)', code)
         self.assertIn('views.overlayRunner.Position', code)

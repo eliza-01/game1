@@ -2,6 +2,7 @@
 -- Published, rig-compatible appearance picker. The shell owns navigation;
 -- this view renders only one active category to avoid a giant scrolling form.
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
+local SavedRow = require(script.Parent:WaitForChild("CharacterCreationSavedColorRow"))
 local View = {}
 local INK = Color3.fromRGB(243, 235, 218)
 local GOLD = Color3.fromRGB(215, 179, 115)
@@ -103,7 +104,7 @@ end
 
 local function colorPicker(parent: Instance, title: string, current: string?, order: number,
     presets: {string}, pick: (string) -> (), custom: () -> (), eyeLock: boolean?,
-    toggleEyeLock: (() -> ())?)
+    toggleEyeLock: (() -> ())?, savedColors: {string})
     heading(parent, title, order, 36)
     local holder = Instance.new("Frame")
     holder.Name = "ColorPresets"
@@ -164,6 +165,11 @@ local function colorPicker(parent: Instance, title: string, current: string?, or
     rounded(customButton, 10)
     customButton.Activated:Connect(custom)
     if eyeLock ~= nil then lockButton(actions, 2, eyeLock, toggleEyeLock) end
+    if #savedColors > 0 then
+        local saved = SavedRow.Create(parent, 1)
+        saved.LayoutOrder = order + 2
+        SavedRow.Render(saved, savedColors, current, pick)
+    end
 end
 
 local function materialPicker(parent: Instance, title: string, materials: {string},
@@ -174,7 +180,10 @@ local function materialPicker(parent: Instance, title: string, materials: {strin
     local selector = Instance.new("Frame")
     selector.Name = "MaterialSelector"
     selector.BackgroundTransparency = 1
-    selector.Size = UDim2.new(1, 0, 0, 206)
+    local columns, cellHeight, gap = 4, 46, 8
+    local rows = math.ceil(#materials / columns)
+    local gridHeight = rows * cellHeight + (rows - 1) * gap
+    selector.Size = UDim2.new(1, 0, 0, 52 + gridHeight)
     selector.LayoutOrder = order + 1
     selector.Parent = parent
 
@@ -220,16 +229,24 @@ local function materialPicker(parent: Instance, title: string, materials: {strin
     list.Name = "MaterialOptions"
     list.BackgroundTransparency = 1
     list.Position = UDim2.fromOffset(0, 52)
-    list.Size = UDim2.new(1, 0, 0, 154)
+    list.Size = UDim2.new(1, 0, 0, gridHeight)
     list.Visible = true
     list.Parent = selector
     local grid = Instance.new("UIGridLayout")
-    grid.CellSize = UDim2.fromOffset(46, 46)
-    grid.CellPadding = UDim2.fromOffset(8, 8)
-    grid.FillDirectionMaxCells = 3
+    grid.CellSize = UDim2.fromOffset(46, cellHeight)
+    grid.CellPadding = UDim2.fromOffset(gap, gap)
+    grid.FillDirectionMaxCells = columns
     grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
     grid.SortOrder = Enum.SortOrder.LayoutOrder
     grid.Parent = list
+    local function resizeCells()
+        local width = list.AbsoluteSize.X
+        if width <= 0 then return end
+        local cellWidth = math.clamp(math.floor((width - (columns - 1) * gap) / columns), 1, 46)
+        grid.CellSize = UDim2.fromOffset(cellWidth, cellHeight)
+    end
+    list:GetPropertyChangedSignal("AbsoluteSize"):Connect(resizeCells)
+    resizeCells()
     for i, material in ipairs(materials) do
         local item = button("Material" .. material, tostring(i), list)
         item.LayoutOrder = i
@@ -251,8 +268,8 @@ end
 
 function View.Render(root: Frame, catalog: any?, selected: any?,
     onPart: (string, string) -> (), onColor: (string, string, string?) -> (), activeTab: string?,
-    settings: any, onMaterial: (string, string) -> (), onCustomColor: (string, string?, string?) -> (),
-    eyeColorsLocked: boolean, toggleEyeColorsLocked: ((string) -> ())?)
+    settings: any, onMaterial: (string, string) -> (), onCustomColor: (string, string?, string?, string) -> (),
+    eyeColorsLocked: boolean, toggleEyeColorsLocked: ((string) -> ())?, savedColors: {string})
     for _, object in ipairs(root:GetChildren()) do
         if object:IsA("GuiObject") then object:Destroy() end
     end
@@ -283,22 +300,22 @@ function View.Render(root: Frame, catalog: any?, selected: any?,
             colorPicker(root, title,
                 current, order, (settings.colorPresets or {}).hair or {},
                 function(hex) onColor("hair", hex, channel) end,
-                function() onCustomColor("hair", channel, current) end, nil, nil)
+                function() onCustomColor("hair", channel, current, title) end, nil, nil, savedColors)
             order += 3
         end
     elseif group == "eyebrows" then
         local current = (selected.colors or {}).eyebrows
         colorPicker(root, Language.Translate("creation.eyebrows_color"), current, order,
             presets, function(hex) onColor(group, hex, nil) end,
-            function() onCustomColor(group, nil, current) end, nil, nil)
+            function() onCustomColor(group, nil, current, Language.Translate("creation.eyebrows_color")) end, nil, nil, savedColors)
         order += 3
     elseif group == "eyes" then
         for _, side in ipairs({"l", "r"}) do
             local current = selected.colors.eyes[side]
             colorPicker(root, Language.Translate("creation.eye_" .. side .. "_color"), current, order,
                 presets, function(hex) onColor(group, hex, side) end,
-                function() onCustomColor(group, side, current) end, eyeColorsLocked,
-                if toggleEyeColorsLocked then function() toggleEyeColorsLocked(side) end else nil)
+                function() onCustomColor(group, side, current, Language.Translate("creation.eye_" .. side .. "_color")) end, eyeColorsLocked,
+                if toggleEyeColorsLocked then function() toggleEyeColorsLocked(side) end else nil, savedColors)
             order += 3
         end
     end

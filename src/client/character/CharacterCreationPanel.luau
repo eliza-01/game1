@@ -5,6 +5,7 @@
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
+local LoadingRunner = require(script.Parent:WaitForChild("CharacterLoadingRunner"))
 local Panel = {}
 local INK = Color3.fromRGB(241, 234, 218)
 local MUTED = Color3.fromRGB(179, 189, 193)
@@ -59,43 +60,6 @@ local function action(parent: Instance, name: string, size: UDim2, position: UDi
     rounded(button, 10)
     stroke(button, if primary then GOLD else Color3.fromRGB(88, 102, 109), if primary then 0.45 else 0.72)
     return button
-end
-
-local function buildStickman(parent: Instance): Frame
-    local runner = Instance.new("Frame")
-    runner.Name = "LoadingRunner"
-    runner.BackgroundTransparency = 1
-    runner.Size = UDim2.fromOffset(28, 38)
-    runner.Parent = parent
-
-    local head = Instance.new("Frame")
-    head.Name = "Head"
-    head.Size = UDim2.fromOffset(10, 10)
-    head.Position = UDim2.fromOffset(9, 0)
-    head.BackgroundColor3 = INK
-    head.BorderSizePixel = 0
-    head.Parent = runner
-    rounded(head, 10)
-
-    local function limb(name: string, size: Vector2, pos: Vector2, rotation: number, color: Color3)
-        local item = Instance.new("Frame")
-        item.Name = name
-        item.Size = UDim2.fromOffset(size.X, size.Y)
-        item.Position = UDim2.fromOffset(pos.X, pos.Y)
-        item.BackgroundColor3 = color
-        item.BorderSizePixel = 0
-        item.Rotation = rotation
-        item.Parent = runner
-        rounded(item, math.min(size.X, size.Y))
-        return item
-    end
-
-    limb("Body", Vector2.new(3, 14), Vector2.new(12, 10), 0, INK)
-    limb("LeftArm", Vector2.new(3, 12), Vector2.new(6, 13), 55, INK)
-    limb("RightArm", Vector2.new(3, 12), Vector2.new(16, 12), -42, INK)
-    limb("LeftLeg", Vector2.new(3, 12), Vector2.new(8, 22), 45, INK)
-    limb("RightLeg", Vector2.new(3, 12), Vector2.new(15, 22), -55, INK)
-    return runner
 end
 
 local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGui)
@@ -306,11 +270,9 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     runnerLane.BackgroundTransparency = 1
     runnerLane.ZIndex = 102
     runnerLane.Parent = overlayCard
-    local runner = buildStickman(runnerLane)
+    local runner, runnerPose = LoadingRunner.Build(runnerLane, INK, 103)
     runner.AnchorPoint = Vector2.new(0.5, 0)
-    runner.Position = UDim2.new(0, 14, 0, 2)
-    runner.ZIndex = 103
-    for _, child in ipairs(runner:GetDescendants()) do if child:IsA("GuiObject") then child.ZIndex = 103 end end
+    runner.Position = UDim2.new(0, LoadingRunner.Width / 2, 0, 0)
     local progressTrack = Instance.new("Frame")
     progressTrack.Name = "ProgressTrack"
     progressTrack.AnchorPoint = Vector2.new(0.5, 0)
@@ -419,7 +381,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     return {panel = root, title = heading, subtitle = tagline,
         male = male, female = female, enter = enter, newCharacter = newCharacter,
         overlay = overlay, overlayCard = overlayCard, overlayLabel = overlayLabel, recovery = recovery,
-        overlayRunner = runner, overlayTrack = progressTrack, overlayFill = progressFill, overlayValue = progressValue,
+        overlayRunner = runner, overlayRunnerPose = runnerPose, overlayTrack = progressTrack, overlayFill = progressFill, overlayValue = progressValue,
         status = status, tabs = tabButtons, content = content, editor = editor, invalidateCanvas = invalidateCanvas,
         selectionCard = selectionCard, selectionName = selectionName, selectionLevel = selectionLevel, selectionCaption = selectionCaption,
         genders = genders, tabBar = tabs, separator = separator, layout = resize}
@@ -457,18 +419,6 @@ function Panel.SetSelection(views: any, archetype: string?)
 end
 
 -- Animate by elapsed time, not by percent updates; no idle RenderStepped work.
-local function setRunnerPose(runner: Frame, time: number)
-    local stride = math.sin(time * math.pi * 5)
-    local leftArm = runner:FindFirstChild("LeftArm") :: Frame
-    local rightArm = runner:FindFirstChild("RightArm") :: Frame
-    local leftLeg = runner:FindFirstChild("LeftLeg") :: Frame
-    local rightLeg = runner:FindFirstChild("RightLeg") :: Frame
-    leftArm.Rotation = 15 + 55 * stride
-    rightArm.Rotation = -15 - 55 * stride
-    leftLeg.Rotation = 48 * stride
-    rightLeg.Rotation = -48 * stride
-end
-
 local function setOverlay(views: any, busy: boolean, message: string, progress: number?)
     views.recovery.Visible = false
     views.overlayTrack.Visible = true
@@ -489,8 +439,9 @@ local function setOverlay(views: any, busy: boolean, message: string, progress: 
         views.overlayFill.Size = UDim2.new(if value ~= nil then value else 0.22, 0, 1, 0)
         views.overlayFill.Position = UDim2.new(if value ~= nil then 0 else position * 0.78, 0, 0, 0)
         views.overlayValue.Text = if value ~= nil then string.format("%d%%", math.floor(value * 100 + 0.5)) else ""
-        views.overlayRunner.Position = UDim2.new(position, 14 - 28 * position, 0, 2 - 2 * math.abs(math.sin(elapsed * math.pi * 5)))
-        setRunnerPose(views.overlayRunner, elapsed)
+        local runnerPosition = LoadingRunner.Travel(elapsed)
+        views.overlayRunner.Position = UDim2.new(runnerPosition, LoadingRunner.Width * (0.5 - runnerPosition), 0, -1.5 * math.abs(math.sin(elapsed * math.pi * 3.3)))
+        views.overlayRunnerPose(elapsed)
     end
     if not views.runnerConnection then
         views.runnerStart = os.clock()

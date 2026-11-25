@@ -30,7 +30,7 @@ class CreationUiM498(unittest.TestCase):
         self.assertIn('local title = Language.Translate("creation.hair_color")', view)
         self.assertIn('if channel ~= "primary" then title ..= " · " .. channel end', view)
         self.assertIn('function(hex) onColor("hair", hex, channel) end', view)
-        self.assertIn('function() onCustomColor("hair", channel, current) end', view)
+        self.assertIn('function() onCustomColor("hair", channel, current, title) end', view)
 
     def test_brightness_handle_follows_same_value_for_all_inputs(self):
         palette = source('src/client/character/CharacterCreationColorPalette.luau')

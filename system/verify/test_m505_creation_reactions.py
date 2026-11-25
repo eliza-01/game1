@@ -65,7 +65,7 @@ class CreationReactionTests(unittest.TestCase):
         code = read(base+'CharacterCreationController.luau')
         self.assertIn('reactionPending[selected] = true', code)
         self.assertIn('if stage == "creation" and selected == id then preview:React(id) end', code)
-        self.assertEqual(code.count('react(selected)'), 3)
+        self.assertEqual(code.count('react(selected)'), 4)
         self.assertIn('function() return selected, stage == "creation" end', code)
         reaction = read(base+'CharacterCreationReactions.luau')
         self.assertIn('Merge.Rows', reaction)

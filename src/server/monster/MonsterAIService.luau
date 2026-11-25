@@ -15,6 +15,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GameOptions = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("GameOptions"))
 
+local Retreat = require(script.Parent:WaitForChild("MonsterRangedRetreat"))
 local MonsterAIService = {}
 local started = false
 local random = Random.new()
@@ -40,6 +41,7 @@ local AttackMovement = table.freeze({
 })
 
 local function leaveCombat(agent: any)
+    Retreat.Clear(agent)
     Facing.Stop(agent.model)
     CombatState.ClearTarget(agent)
     agent.retaliating = false
@@ -55,6 +57,7 @@ end
 
 local function beginReturn(agent: any)
     if agent.returning then return end
+    Retreat.Clear(agent)
     -- Invalidate pending attack hit events BEFORE clearing the target.
     agent.attacking = false
     agent.attackSerial += 1
@@ -87,7 +90,7 @@ local function outsideHome(agent: any, position: Vector3): boolean
 end
 
 local function updateTarget(agent: any, now: number)
-    if agent.target and targetIsValid(agent.target) then return end
+    if agent.target and targetIsValid(agent.target) and TargetPolicy.AllowsTarget(agent, agent.target) then return end
     if agent.target then beginReturn(agent); return end
     if not aggressive(agent) or now < agent.nextTargetScanAt then return end
     agent.nextTargetScanAt = now + TARGET_SCAN_INTERVAL
@@ -101,8 +104,9 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
     if attempted <= 0 or killed or not attacker or not Players:GetPlayerFromCharacter(attacker) then return end
     if not TargetPolicy.IsValid(attacker) or monster:GetAttribute("LifeState") ~= "Alive" then return end
     local agent = Lifecycle.Find(monster)
-    if not agent or not agent.active then return end
+    if not agent or not agent.active or not TargetPolicy.AllowsTarget(agent, attacker) then return end
     if agent.target ~= attacker or agent.returning then
+        Retreat.Clear(agent)
         CombatState.Enter(agent, attacker)
         agent.lastDamageAt = os.clock() -- New encounter starts an inactivity clock.
     elseif applied > 0 then
@@ -110,7 +114,7 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
     end
     agent.returning = false
     agent.retaliating = true
-    if agent.model:GetAttribute("MonsterSpawning") == true or agent.attacking then return end
+    if agent.model:GetAttribute("MonsterSpawning") == true or agent.attacking or Retreat.Waiting(agent) then return end
     local targetRoot = rootOf(attacker)
     if not targetRoot then return end
     if horizontalDistance(agent.root.Position, targetRoot.Position) <= attackRadius(agent) then
@@ -118,7 +122,7 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
         AttackExecutor.FaceDirection(agent, targetRoot.Position - agent.root.Position)
         Presentation.PlayCombatIdle(agent)
         AttackExecutor.Begin(agent, attacker, AttackMovement, random)
-    else
+    elseif not TargetPolicy.IsStationary(agent.model) then
         setState(agent, "Chase")
         AttackExecutor.ClearPursuit(agent)
         Presentation.PlayRun(agent)
@@ -169,6 +173,10 @@ local function runAgent(agent: any)
         end
         local targetRoot = rootOf(target)
         local distance = if targetRoot then horizontalDistance(agent.root.Position, targetRoot.Position) else 0
+        if not agent.attacking and targetRoot and Retreat.Step(agent, targetRoot, now) then
+            setState(agent, "Retreat")
+            continue
+        end
         local action = CombatState.Decide(agent.attacking, targetRoot ~= nil, distance, attackRadius(agent))
         if action == "AttackActive" then
             -- Active-attack movement is owned by maintainAttackPursuit().
@@ -179,6 +187,15 @@ local function runAgent(agent: any)
             AttackExecutor.FaceDirection(agent, targetRoot.Position - agent.root.Position)
             Presentation.PlayCombatIdle(agent)
             AttackExecutor.Begin(agent, target, AttackMovement, random)
+        elseif action == "Chase" and TargetPolicy.IsStationary(agent.model) then
+            -- A line shooter can retreat locally, but never chase along the lane.
+            if horizontalDistance(agent.root.Position, agent.home) > 1 then
+                beginReturn(agent)
+                updateReturn(agent)
+            else
+                stopNavigation(agent)
+                Presentation.PlayCombatIdle(agent)
+            end
         elseif action == "Chase" then
             setState(agent, "Chase")
             AttackExecutor.ClearPursuit(agent)

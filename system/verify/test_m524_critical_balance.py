@@ -77,7 +77,7 @@ class CriticalBalance(unittest.TestCase):
         ui = read('src/client/dev/GameplayTestController.luau')
         for key in ('Crit buff · %','Crit bonus · pp','Crit damage · ×','Effective crit','critPercent=critPercent,critFlat=critFlat,critMultiplier=critMultiplier'):
             self.assertIn(key, ui)
-        self.assertIn("'damage','critChance','xp','gold'", read('system/control-center/static/game-balance.js'))
+        self.assertIn("'damage','critChance','xp','gold','attackRange'", read('system/control-center/static/game-balance.js'))
         self.assertTrue(any(row['patch']==524 for row in logs.load()['entries']))
 
 

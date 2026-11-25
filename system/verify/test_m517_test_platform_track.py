@@ -11,28 +11,26 @@ class TestPlatformTrack(unittest.TestCase):
     def test_common_floor_and_track(self):
         arena = read('src/server/dev/GameplayTestArena.luau')
         service = read('src/server/dev/GameplayTestService.luau')
-        self.assertIn('Arena.BuildLinePlatform(folder, origin, #Balance.Monsters, s.spacing, size)', service)
-        self.assertIn('local floorY = -CharacterConfig.RootAnchorOffset', arena)
+        layout = read('src/server/dev/GameplayTestLayout.luau')
+        self.assertIn('Arena.BuildLinePlatform(folder, origin, s.spacing, size)', service)
+        self.assertIn('local floorY = -CharacterConfig.RootAnchorOffset', layout)
         self.assertIn('local surface = point\n    if kind ~= "line" then', arena)
-        self.assertIn('deck(parent, "MonsterPlatform", platformTop', arena)
-        self.assertIn('deck(parent, "SprintTrack", trackTop', arena)
-        self.assertIn('backEdge - trackWidth / 2', arena)
+        self.assertIn('deck(parent, "MonsterPlatform", layout.platformTop', arena)
+        self.assertIn('deck(parent, track.name, track.top', arena)
         self.assertIn('math.ceil(width / 1024)', arena)
-        self.assertIn('point + Vector3.new(0, CharacterConfig.RootAnchorOffset, 0)', service)
-        # Across representative template sizes, every target is inside a continuous deck.
+        self.assertIn('Arena.Warp(character, s.layout.slots[monster.id].visit)', service)
+        self.assertIn('math.ceil(maxLevel / 2)', layout)
         for count in (1, 35):
             for sx, sy, sz in ((2, 4, 2), (5, 8, 6), (20, 30, 20)):
                 spacing = math.ceil(2 * (40 + math.sqrt(sx*sx + sy*sy + sz*sz)) + 4)
-                margin = max(12, math.ceil(12*(max(sx, sz)+2)/(2*math.pi))+4)
-                width = (count-1)*spacing + 2*margin
-                center = (count-1)*spacing/2
-                self.assertTrue(all(abs(i*spacing-center)+sx/2 <= width/2 for i in range(count)))
+                margin = max(12, max(sx,sz)/2+4, math.ceil(12*(max(sx, sz)+2)/(2*math.pi))+4)
+                cols = math.ceil(count / 2)
+                width = (cols-1)*spacing + 2*margin
+                center = (cols-1)*spacing/2
+                self.assertTrue(all(abs(i*spacing-center)+sx/2 <= width/2 for i in range(cols)))
                 n = math.ceil(width/1024)
                 self.assertLessEqual(width/n, 1024)
                 self.assertAlmostEqual(n*(width/n), width)
-                back = -24-max(8, sz/2+4)
-                self.assertGreaterEqual(-24-sz/2, back)
-                self.assertEqual((back-12/2)+12/2, back)
 
     def test_speed_and_cleanup(self):
         arena = read('src/server/dev/GameplayTestArena.luau')

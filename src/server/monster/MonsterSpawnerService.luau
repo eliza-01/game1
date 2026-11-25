@@ -167,8 +167,8 @@ local function spawnOne(state: any): Model?
         local row = assert(Balance.Monster(record.testBalanceId))
         local color = Balance.Grade.Color(row.level)
         TestAppearance.Tint(visual, color)
-        TestAppearance.Label(model, ("Монстр_%s · LVL %d\n%d HP · %d ATK"):format(row.id:sub(-3), row.level, row.hp, row.damage), color)
-        -- Line targets use the normal mobile rig, but never wander or proximity-aggro.
+        TestAppearance.Label(model, ("Монстр_%s · %s · LVL %d\n%d HP · %d ATK"):format(row.id:sub(-3), row.type, row.level, row.hp, row.damage), color)
+        -- Test targets never wander; only ranged approach lanes enable proximity aggro.
     end
     local riseFromGround = not record.testOwner and definition.behavior and definition.behavior.riseFromGround == true
     local spawnPresentation = MonsterSpawnPresentation.Prepare(model, visual, navigationRoot, humanoid, riseFromGround)

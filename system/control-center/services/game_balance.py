@@ -23,7 +23,7 @@ FIELDS = {
                 'upgradePrice': (0, 100000000)},
     'armor': {'level': (1, 35), 'hp': (0, 1000000), 'price': (0, 100000000)},
     'monsters': {'level': (1, 35), 'hp': (1, 1000000), 'damage': (0, 1000000),
-                 'xp': (0, 100000000), 'gold': (0, 100000000), 'critChance': (0, 50)},
+                 'xp': (0, 100000000), 'gold': (0, 100000000), 'critChance': (0, 50), 'attackRange': (1, 100), 'attackSpeed': (1, 400)},
 }
 RULES = {'baseDamage': (0, 100000), 'baseAttackSpeed': (25, 400), 'critChance': (0, 50), 'maxCritChance': (1, 50), 'upgradePercent': (0, 100),
          'maxUpgrade': (0, 20), 'headshotMultiplier': (1, 5), 'critMultiplier': (1, 5)}
@@ -36,7 +36,7 @@ def number(v, lo, hi, label, integral=True):
 
 
 def validate(data):
-    if not isinstance(data, dict) or set(data) != {'schemaVersion','rules','levels','weapons','armor','monsters','weaponBindings','monsterBindings','test'} or data['schemaVersion'] != 1:
+    if not isinstance(data, dict) or set(data) != {'schemaVersion','rules','levels','weapons','armor','monsters','weaponBindings','monsterBindings','test'} or data['schemaVersion'] != 3:
         raise ValueError('Invalid balance schema')
     if not isinstance(data['rules'], dict) or set(data['rules']) != set(RULES):
         raise ValueError('Invalid rules')
@@ -47,13 +47,14 @@ def validate(data):
     for axis in ('x','y','z'): number(data['test'][axis], -100000, 100000, axis, False)
     number(data['test']['yaw'], -360, 360, 'yaw', False)
     number(data['test']['maxGroup'], 1, 12, 'maxGroup')
-    counts = {'levels': 35, 'weapons': 34, 'armor': 8, 'monsters': 35}
+    counts = {'levels': 35, 'weapons': 34, 'armor': 8, 'monsters': 70}
     for group, fields in FIELDS.items():
         rows = data[group]
         if not isinstance(rows, list) or len(rows) != counts[group]:
             raise ValueError(f'{group}: expected {counts[group]} rows')
         for i, row in enumerate(rows, 1):
             extra = {'level'} if group == 'levels' else {'id'}
+            if group == 'monsters': extra.add('type')
             if group == 'weapons':
                 extra |= {'type','rarity'}
                 if isinstance(row, dict) and row.get('type') == 'dualswords': extra.add('recipe')
@@ -67,6 +68,12 @@ def validate(data):
                 if row['id'] != f'{prefix}_{i:03d}': raise ValueError(f'{group}: stable ID required')
             for field, (lo, hi) in fields.items():
                 number(row[field], lo, hi, f'{group}.{i}.{field}', field not in ('radius','arc','critChance'))
+            if group == 'monsters':
+                expected_type = 'melee' if i <= 35 else 'ranged'
+                if row['type'] != expected_type or row['level'] != (i - 1) % 35 + 1:
+                    raise ValueError('Monster type / level sequence invalid')
+                if row['type'] == 'ranged' and row['attackRange'] < 8:
+                    raise ValueError('Ranged attack range must be at least 8 studs')
             if group == 'weapons' and (row['type'] not in TYPES or row['rarity'] not in RARITIES):
                 raise ValueError('Invalid weapon type / rarity')
     swords = {r['id']: r for r in data['weapons'] if r['type'] == 'sword'}

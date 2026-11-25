@@ -41,7 +41,7 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("MaxHP", maxHP)
     model:SetAttribute("HP", maxHP)
     model:SetAttribute("Damage", if balance then balance.damage else math.max(0, finite(stats.Damage, 10)))
-    model:SetAttribute("AttackSpeed", math.max(1, finite(stats.AttackSpeed, 100)))
+    model:SetAttribute("AttackSpeed", if balance then balance.attackSpeed else math.max(1, finite(stats.AttackSpeed, 100)))
     model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
     local debugLocomotion = tostring(Workspace:GetAttribute("Game1MonsterDebugLocomotionMode") or "Walk")
     model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
@@ -55,7 +55,14 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     end
     local aggroRadius = math.max(0, finite(behavior.aggroRadiusStuds, 16))
     if record.testOwner then aggroRadius = 120 end
-    local attackRadius = math.max(0, finite(behavior.attackRadiusStuds, 3))
+    local attackRadius = if balance then balance.attackRange else math.max(0, finite(behavior.attackRadiusStuds, 3))
+    model:SetAttribute("MonsterCombatType", if balance then balance.type else "melee")
+    if record.testApproachFrame and record.testApproachSize then
+        model:SetAttribute("GameplayTestApproachFrame", record.testApproachFrame)
+        model:SetAttribute("GameplayTestApproachSize", record.testApproachSize)
+        aggressive = true
+        aggroRadius = attackRadius
+    end
     -- Leash belongs to this spawn record, never to the monster species.
     local homeRadius = math.clamp(finite(record.homeRadiusStuds, 150), 1, 10000)
     model:SetAttribute("MonsterAuthoredAggressive", aggressive)

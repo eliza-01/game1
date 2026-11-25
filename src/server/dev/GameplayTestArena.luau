@@ -8,6 +8,7 @@ local AttackConfig = require(Shared:WaitForChild("combat"):WaitForChild("AttackC
 local Spawner = require(script.Parent.Parent:WaitForChild("monster"):WaitForChild("MonsterSpawnerService"))
 local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
 local Appearance = require(script.Parent:WaitForChild("GameplayTestAppearance"))
+local Layout = require(script.Parent:WaitForChild("GameplayTestLayout"))
 local Arena = {}
 local serial = 0
 
@@ -41,7 +42,7 @@ function Arena.Support(parent: Instance, point: Vector3, width: number)
     pad.Parent = parent
 end
 -- A single continuous deck, tiled only if a Part would exceed the engine size limit.
-local function deck(parent: Instance, name: string, top: CFrame, width: number, depth: number, color: Color3)
+local function deck(parent: Instance, name: string, top: CFrame, width: number, depth: number, color: Color3, overlay: boolean?)
     local folder = Instance.new("Folder")
     folder.Name = name
     folder.Parent = parent
@@ -50,8 +51,9 @@ local function deck(parent: Instance, name: string, top: CFrame, width: number, 
     for index = 1, count do
         local part = Instance.new("Part")
         part.Name = name .. "_" .. index
-        part.Size = Vector3.new(segment, 1, depth)
-        part.CFrame = top * CFrame.new(-width / 2 + (index - 0.5) * segment, -0.5, 0)
+        part.Size = Vector3.new(segment, if overlay then 0.05 else 1, depth)
+        part.CFrame = top * CFrame.new(-width / 2 + (index - 0.5) * segment, if overlay then 0.025 else -0.5, 0)
+        if overlay then part.CanCollide = false; part.CanTouch = false; part.CanQuery = false end
         part.Anchored = true
         part.Material = Enum.Material.SmoothPlastic
         part.Color = color
@@ -62,19 +64,18 @@ local function deck(parent: Instance, name: string, top: CFrame, width: number, 
     return folder
 end
 
-function Arena.BuildLinePlatform(parent: Instance, origin: CFrame, count: number, spacing: number, size: Vector3): (CFrame, Vector3)
-    local groupMargin = math.max(12, math.ceil(Balance.Test.maxGroup * (math.max(size.X, size.Z) + 2) / (2 * math.pi)) + 4)
-    local width = (count - 1) * spacing + 2 * groupMargin
-    local centerX = (count - 1) * spacing / 2
-    local backEdge = -24 - math.max(8, size.Z / 2 + 4)
-    local frontEdge = groupMargin
-    local floorY = -CharacterConfig.RootAnchorOffset
-    local platformTop = origin * CFrame.new(centerX, floorY, (backEdge + frontEdge) / 2)
-    deck(parent, "MonsterPlatform", platformTop, width, frontEdge - backEdge, Color3.fromRGB(65, 73, 78))
-    local trackWidth = 12
-    local trackTop = origin * CFrame.new(centerX, floorY, backEdge - trackWidth / 2)
-    deck(parent, "SprintTrack", trackTop, width, trackWidth, Color3.fromRGB(45, 115, 98))
-    return trackTop, Vector3.new(width, 0, trackWidth)
+function Arena.BuildLinePlatform(parent: Instance, origin: CFrame, spacing: number, size: Vector3): any
+    local layout = Layout.Build(origin, Balance.Monsters, Balance.MaxLevel, spacing, size, Balance.Test.maxGroup)
+    deck(parent, "MonsterPlatform", layout.platformTop, layout.width, layout.depth, Color3.fromRGB(65, 73, 78))
+    for _, track in ipairs(layout.tracks) do
+        deck(parent, track.name, track.top, track.size.X, track.size.Z, Color3.fromRGB(45, 115, 98), true)
+    end
+    for id, slot in pairs(layout.slots) do
+        if slot.approachFrame then
+            deck(parent, "Approach_" .. id, slot.approachFrame, slot.approachSize.X, slot.approachSize.Z, Color3.fromRGB(106, 92, 63), true)
+        end
+    end
+    return layout
 end
 
 function Arena.IsOnTrack(trackTop: CFrame, trackSize: Vector3, rootPosition: Vector3): boolean
@@ -104,16 +105,12 @@ function Arena.ShowWeapons(parent: Instance, origin: CFrame, character: Model)
         end
     end
 end
-function Arena.LinePoint(origin: CFrame, index: number, spacing: number): Vector3
-    -- One line across the forward half-plane; level 1 is directly in front of spawn.
-    return origin:PointToWorldSpace(Vector3.new((index - 1) * spacing, -CharacterConfig.RootAnchorOffset, -24))
-end
 function Arena.GroupPoint(origin: CFrame, index: number, count: number, size: Vector3): Vector3
     local radius = math.max(9, count * (math.max(size.X, size.Z) + 2) / (2 * math.pi))
     local angle = (index - 1) * 2 * math.pi / count
     return origin:PointToWorldSpace(Vector3.new(math.sin(angle) * radius, -CharacterConfig.RootAnchorOffset, -math.cos(angle) * radius))
 end
-function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing: Vector3, states: {any}, supports: Instance): Model?
+function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing: Vector3, states: {any}, supports: Instance, slot: any?): Model?
     serial += 1
     -- The line uses the exact authored deck plane, never the surrounding terrain.
     local surface = point
@@ -129,6 +126,7 @@ function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing
         spawnRadius = 0, homeRadiusStuds = 150, maxAlive = 1, respawnSeconds = 2,
         testOwner = owner.UserId, testKind = kind, testBalanceId = row.id,
         testNoRespawn = kind == "group", testYaw = yaw, testSurface = surface,
+        testApproachFrame = slot and slot.approachFrame, testApproachSize = slot and slot.approachSize,
     })
     table.insert(states, state) -- Registered BEFORE any yielding construction.
     return Spawner.FillTest(state)

@@ -15,6 +15,7 @@ local TargetPolicy = require(script.Parent:WaitForChild("MonsterTargetPolicy"))
 local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
 
+local Retreat = require(script.Parent:WaitForChild("MonsterRangedRetreat"))
 local MonsterAttackExecutor = {}
 local ATTACK_PURSUIT_SPEED_MULTIPLIER = 1.65
 MonsterAttackExecutor.PursuitSpeedMultiplier = ATTACK_PURSUIT_SPEED_MULTIPLIER
@@ -88,9 +89,23 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
     local row = Presentation.WeightedRow(agent.attackRows, random)
     if not row then return end
     local percent = AnimationSpeedScaling.ResolveForAnimation(agent.model, "attack", row.animationId)
+    -- A bound monster must consume its Database AS even when the authored
+    -- clip has no AttackSpeed scaling rule (the current Gremlin attack).
+    local rule = AnimationSpeedScaling.RuleForAnimation(agent.model, "attack", row.animationId)
+    if tostring(agent.model:GetAttribute("MonsterBalanceId") or "") ~= ""
+        and (not rule or rule.stat ~= "AttackSpeed") then
+        percent = math.clamp(percent * finite(agent.model:GetAttribute("AttackSpeed"), 100) / 100, 1, 400)
+    end
     local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent)
     if not timing then return end
 
+    local cycleDuration = timing.duration
+    if Retreat.IsRanged(agent.model) then
+        -- Reserve a portion of the existing cycle, not a new cooldown.
+        local fittedPercent = Retreat.FitPercent(timing, percent)
+        timing = AttackTimelineConfig.ResolveRuntime(row.clipId, fittedPercent)
+        percent = fittedPercent
+    end
     agent.attacking = true
     Facing.Track(agent.model, agent.root, agent.humanoid, target, rootOf)
     agent.attackSerial += 1
@@ -99,13 +114,17 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
     local now = os.clock()
     agent.attackEndsAt = now + duration
     agent.nextAttackAt = agent.attackEndsAt
+    if Retreat.IsRanged(agent.model) then
+        agent.nextAttackAt = now + math.max(duration, cycleDuration)
+        agent.retreatPending = agent.nextAttackAt > agent.attackEndsAt + 0.1
+    end
     setState(agent, "Attack")
     movement.StopNavigation(agent)
     Presentation.PlayAttack(agent, row, percent)
     agent.model:SetAttribute("MonsterAttackPhase", "Windup")
     local targetRoot = rootOf(target)
     if targetRoot then MonsterAttackExecutor.FaceDirection(agent, targetRoot.Position - agent.root.Position) end
-    maintainAttackPursuit(agent, target, serial, movement)
+    if not Retreat.IsRanged(agent.model) then maintainAttackPursuit(agent, target, serial, movement) end
 
     local hit = timing.events and timing.events.Hit
     local hitTime = math.max(0, finite(hit and hit.time, duration * 0.5))

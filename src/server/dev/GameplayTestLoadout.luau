@@ -33,7 +33,7 @@ function Loadout.Validate(request: any): (any?, string?)
     if not critValid then return nil, critReason end
     local valid, recoveryReason = Healing.ValidateTestRates(regen, vampiric)
     if not valid then return nil, recoveryReason end
-    if type(level) ~= "number" or level < 1 or level > #Balance.Monsters or level % 1 ~= 0 then return nil, "Invalid player level" end
+    if type(level) ~= "number" or level < 1 or level > Balance.MaxLevel or level % 1 ~= 0 then return nil, "Invalid player level" end
     if type(upgrade) ~= "number" or upgrade < 0 or upgrade > Balance.Rules.maxUpgrade or upgrade % 1 ~= 0 then return nil, "Invalid upgrade" end
     if type(request.weapon) ~= "string" or type(request.armor) ~= "string" then return nil, "Invalid equipment IDs" end
     local weapon = if request.weapon == "" then nil else Balance.Weapon(request.weapon)

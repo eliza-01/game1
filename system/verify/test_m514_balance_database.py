@@ -25,7 +25,7 @@ class BalanceDatabase(unittest.TestCase):
     def test_registry_projection_and_ids(self):
         self.assertEqual(b.OUTPUT.read_text(encoding='utf8'),b.render(self.data))
         self.assertEqual(len(self.data['levels']),35)
-        self.assertEqual(len(self.data['monsters']),35)
+        self.assertEqual(len(self.data['monsters']),70)
         # Individual values are editable; do not pin the user's balance.
         self.assertEqual(len(self.data['weapons']),34)
         self.assertEqual(len(self.data['armor']),8)

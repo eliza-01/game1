@@ -4,8 +4,8 @@
   const gradeNames=['Newbie','D','C','B','A','S','SS','SSS'];
   window.game1EquipmentGrade=level=>{const band=Math.max(0,Math.min(7,Math.floor(level/10)));return {name:gradeNames[band]+(level%10>=5?'+':''),required:Math.max(1,band*10)}};
   const groups={rules:'Character',levels:'Levels',weapons:'Weapons',armor:'Armor',monsters:'Monsters',bindings:'Model bindings'};
-  const fields={levels:['level','hp','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','level','hp','damage','critChance','xp','gold']};
-  const names={level:'LVL',hp:'HP',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
+  const fields={levels:['level','hp','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed']};
+  const names={attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
   const labels={weapon:'Оружие',armor:'Броня',monster:'Монстр'};
   const label=id=>{const [kind,n]=id.split('_');return `${labels[kind]||kind}_${n}`};
   const node=(tag,text)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el};
@@ -20,7 +20,7 @@
     const all=new Map(models.map(model=>[model.slug,model]));for(const slug of Object.keys(bindings))if(!all.has(slug))all.set(slug,{slug});
     for(const model of all.values()){
       const tr=node('tr');cell(tr,model.slug);const options=[['','—']];
-      for(const r of rows)if(kind==='Monster model'||r.type===model.type)options.push([r.id,`${label(r.id)} · LVL ${r.level}`]);
+      for(const r of rows)if(kind==='Monster model'||r.type===model.type)options.push([r.id,`${label(r.id)} · ${r.type} · LVL ${r.level}`]);
       if(bindings[model.slug]&&!options.some(v=>v[0]===bindings[model.slug]))options.push([bindings[model.slug],`${label(bindings[model.slug])} · incompatible / retired`]);
       cell(tr,select(options,bindings[model.slug]||'',value=>{if(value)bindings[model.slug]=value;else delete bindings[model.slug];change()}));body.append(tr);
     }

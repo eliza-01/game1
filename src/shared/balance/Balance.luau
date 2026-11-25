@@ -5,14 +5,19 @@ Balance.Rules = Registry.rules
 Balance.Test = Registry.test
 Balance.Weapons = Registry.weapons
 Balance.Monsters = Registry.monsters
+Balance.MaxLevel = #Registry.levels
 Balance.Armors = Registry.armor
 Balance.Grade = require(script.Parent:WaitForChild("EquipmentGrade"))
 local weapons: {[string]: any} = {}
 local monsters: {[string]: any} = {}
+local monstersByType: {[string]: {[number]: any}} = {melee={}, ranged={}}
 local armor: {[string]: any} = {}
 local thresholds: {number} = {0}
 for _, row in ipairs(Registry.weapons) do weapons[row.id] = row end
-for _, row in ipairs(Registry.monsters) do monsters[row.id] = row end
+for _, row in ipairs(Registry.monsters) do
+    monsters[row.id] = row
+    monstersByType[row.type][row.level] = row
+end
 for _, row in ipairs(Registry.armor) do armor[row.id] = row end
 for level = 2, #Registry.levels do
     thresholds[level] = thresholds[level - 1] + Registry.levels[level - 1].xpNext
@@ -49,6 +54,10 @@ function Balance.Weapon(id: string): any?
 end
 function Balance.Monster(id: string): any?
     return monsters[id]
+end
+function Balance.MonsterAt(level: number, kind: string): any?
+    local rows = monstersByType[kind]
+    return if rows then rows[level] else nil
 end
 function Balance.WeaponDamage(row: any, upgrade: number): number
     local rank = math.clamp(math.floor(upgrade), 0, Registry.rules.maxUpgrade)

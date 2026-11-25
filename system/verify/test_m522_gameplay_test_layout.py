@@ -29,7 +29,7 @@ class CompactGameplay(unittest.TestCase):
         self.assertIn('Balance.Grade.ForLevel(weapon().level)', UI)
         self.assertIn('return math.max(required, armor().level)', UI)
         self.assertIn('level = math.max(level, minimumLevel()); refreshLevel()', UI)
-        self.assertIn('math.clamp(level + d, minimumLevel(), #Balance.Monsters)', UI)
+        self.assertIn('math.clamp(level + d, minimumLevel(), Balance.MaxLevel)', UI)
         self.assertEqual(UI.count('); ensureLevel()'), 2)
         registry = json.loads((ROOT / 'config/balance/gameplay.json').read_text(encoding='utf8'))
         for w in registry['weapons']:

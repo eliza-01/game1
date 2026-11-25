@@ -11,7 +11,6 @@ local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild
 local Spawner = require(script.Parent.Parent:WaitForChild("monster"):WaitForChild("MonsterSpawnerService"))
 local Loadout = require(script.Parent:WaitForChild("GameplayTestLoadout"))
 local Arena = require(script.Parent:WaitForChild("GameplayTestArena"))
-local CharacterConfig = require(Shared:WaitForChild("character"):WaitForChild("CharacterConfig"))
 local Service = {}
 local session: any = nil
 local started = false
@@ -57,11 +56,16 @@ local function bindTrack(s: any)
         local character = s.player.Character
         if not character then return end
         local root = character:FindFirstChild("RootCollider")
-        local onTrack = character:GetAttribute("LifeState") == "Alive"
+        local eligible = character:GetAttribute("LifeState") == "Alive"
             and character:GetAttribute("GameplayTestKind") == "player"
             and character:GetAttribute("Game1GameplayTestOwner") == s.player.UserId
             and root ~= nil and root:IsA("BasePart")
-            and Arena.IsOnTrack(s.trackTop, s.trackSize, root.Position)
+        local onTrack = false
+        if eligible and root and root:IsA("BasePart") then
+            for _, track in ipairs(s.layout.tracks) do
+                if Arena.IsOnTrack(track.top, track.size, root.Position) then onTrack = true; break end
+            end
+        end
         if (character:GetAttribute("GameplayTestOnTrack") == true) ~= onTrack then
             character:SetAttribute("GameplayTestOnTrack", if onTrack then true else nil)
         end
@@ -91,7 +95,7 @@ local function enter(player: Player, selection: any)
     s.folder = folder
     local groupSupports = Instance.new("Folder"); groupSupports.Name = "GroupSupports"; groupSupports.Parent = folder; s.groupSupports = groupSupports
     local origin = Loadout.Origin()
-    s.trackTop, s.trackSize = Arena.BuildLinePlatform(folder, origin, #Balance.Monsters, s.spacing, size)
+    s.layout = Arena.BuildLinePlatform(folder, origin, s.spacing, size)
     session = s
     bindTrack(s)
     Loadout.Set(player, selection)
@@ -104,10 +108,10 @@ local function enter(player: Player, selection: any)
     if replacement:GetAttribute("GameplayTestError") then return result(false, "Weapon unavailable; change loadout or Exit") end
     Arena.ShowWeapons(folder, origin, replacement)
     local count = 0
-    for index, row in ipairs(Balance.Monsters) do
+    for _, row in ipairs(Balance.Monsters) do
         if not active(s) then return result(false, "Test cancelled") end
-        local point = Arena.LinePoint(origin, index, s.spacing)
-        local monster = Arena.Add(player, row, "line", point, -origin.LookVector, s.line, s.folder)
+        local slot = s.layout.slots[row.id]
+        local monster = Arena.Add(player, row, "line", slot.point, slot.facing, s.line, s.folder, slot)
         if monster then count += 1 end
     end
     return result(count == #Balance.Monsters, ("Line: %d/%d · spacing %d studs"):format(count, #Balance.Monsters, s.spacing))
@@ -127,7 +131,7 @@ local function apply(s: any, selection: any)
     end
     return result(true, if selection.weapon and selection.weapon.type == "dualswords" and character:GetAttribute("AnimationWeaponSet") == "1hs" then "Applied · dualswords 1hs animation preview" elseif selection.placeholder then "Applied · sword visual placeholder" else "Loadout applied")
 end
-local function startGroup(s: any, level: number, count: number)
+local function startGroup(s: any, row: any, count: number)
     local character = alive(s.player)
     if not character then return result(false, "Respawn first") end
     clearGroup(s)
@@ -135,7 +139,6 @@ local function startGroup(s: any, level: number, count: number)
     local origin = Loadout.Origin()
     Arena.Warp(character, origin)
     character:SetAttribute("HP", character:GetAttribute("MaxHP"))
-    local row = Balance.Monsters[level]
     local models = {}
     local function current(): boolean
         return active(s) and s.generation == generation and alive(s.player) == character
@@ -161,7 +164,7 @@ local function startGroup(s: any, level: number, count: number)
                 model:SetAttribute("GameplayTestArmed", true)
                 model:SetAttribute("MonsterAggressive", true)
             end
-            return result(true, ("Group started: %d × LVL %d"):format(count, level))
+            return result(true, ("Group started: %d × %s LVL %d"):format(count, row.type, row.level))
         end
         if os.clock() >= deadline then clearGroup(s); return result(false, "Group readiness timeout") end
         task.wait(0.05)
@@ -203,22 +206,21 @@ local function dispatch(player: Player, action: any, request: any)
         return result(ok, if ok then "Recovery settings applied" else tostring(reason))
     end
     if action == "stop" then clearGroup(s); return result(true, "Group cleared") end
+    local monster = if type(request.monsterId) == "string" then Balance.Monster(request.monsterId) else nil
     if action == "apply" or action == "start" then
         local selection, reason = Loadout.Validate(request)
         if not selection then return result(false, tostring(reason)) end
-        if action == "start" and (not validInt(request.monsterLevel, #Balance.Monsters) or not validInt(request.count, Balance.Test.maxGroup)) then return result(false, "Invalid group") end
+        if action == "start" and (not monster or not validInt(request.count, Balance.Test.maxGroup)) then return result(false, "Invalid group") end
         local applied = apply(s, selection)
         if not applied.ok or action == "apply" then return applied end
-        return startGroup(s, request.monsterLevel, request.count)
+        return startGroup(s, monster, request.count)
     end
-    if action == "visit" and validInt(request.monsterLevel, #Balance.Monsters) then
+    if action == "visit" and monster then
         local character = alive(player)
         if not character then return result(false, "Respawn first") end
         if character:GetAttribute("AttackEndsAt") ~= nil then return result(false, "Finish current attack first") end
         clearGroup(s)
-        local origin = Loadout.Origin()
-        local point = Arena.LinePoint(origin, request.monsterLevel, s.spacing) - origin.LookVector * 5
-        Arena.Warp(character, CFrame.new(point + Vector3.new(0, CharacterConfig.RootAnchorOffset, 0)) * origin.Rotation)
+        Arena.Warp(character, s.layout.slots[monster.id].visit)
         return result(true, "At selected monster")
     end
     return result(false, "Unknown action")

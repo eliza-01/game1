@@ -132,6 +132,7 @@ function Controller.Start()
         local layout = Instance.new("UIListLayout"); layout.Padding = UDim.new(0, 4); layout.SortOrder = Enum.SortOrder.LayoutOrder; layout.Parent = body
         local status = label(panel, "Enter test to begin", UDim2.new(1, -20, 0, 26)); status.Position = UDim2.new(0, 10, 1, -27); status.TextColor3 = colors.muted
         local level, monsterLevel, count, upgrade = 1, 1, 1, 0
+        local monsterType = "melee"
         local weapons = {{id="", level=1, type="hands", damage=0}}
         for _, entry in ipairs(Balance.Weapons) do table.insert(weapons, entry) end
         table.sort(weapons, function(a,b) if a.level == b.level then return a.id < b.id end return a.level < b.level end)
@@ -145,7 +146,7 @@ function Controller.Start()
         local first = row(body, 46); horizontal(first)
         local refreshLevel = picker(cell(first, "Level"), "Level", function()
             return ("LVL %d\n%d HP"):format(level, Balance.Level(level).hp)
-        end, function(d) level = math.clamp(level + d, minimumLevel(), #Balance.Monsters) end)
+        end, function(d) level = math.clamp(level + d, minimumLevel(), Balance.MaxLevel) end)
         local function ensureLevel()
             level = math.max(level, minimumLevel()); refreshLevel()
         end
@@ -167,9 +168,19 @@ function Controller.Start()
             return ("+%d\n%d ATK"):format(upgrade, Balance.Rules.baseDamage + Balance.WeaponDamage(weapon(),upgrade))
         end, function(d) upgrade=wrap(upgrade+1,d,Balance.Rules.maxUpgrade+1)-1 end)
         local third = row(body, 46); horizontal(third)
-        picker(cell(third, "Monster"), "Monster", function()
-            local m=Balance.Monsters[monsterLevel]; return ("LVL %d\n%d HP · %d ATK"):format(monsterLevel,m.hp,m.damage)
-        end, function(d) monsterLevel=wrap(monsterLevel,d,#Balance.Monsters) end)
+        local monsterCell = cell(third, "Monster")
+        local function selectedMonster() return assert(Balance.MonsterAt(monsterLevel, monsterType)) end
+        local refreshMonster = picker(monsterCell, "Monster", function()
+            local m=selectedMonster(); return ("LVL %d · %d HP\n%d ATK · %g studs"):format(m.level,m.hp,m.damage,m.attackRange)
+        end, function(d) monsterLevel=wrap(monsterLevel,d,Balance.MaxLevel) end)
+        local kindButton = contentButton(monsterCell, "Ranged", 15)
+        kindButton.Text = "Melee"; kindButton.TextSize = 11
+        kindButton.AnchorPoint = Vector2.new(1, 0); kindButton.Position = UDim2.new(1, 0, 0, 0); kindButton.ZIndex = 2
+        kindButton.Activated:Connect(function()
+            monsterType = if monsterType == "melee" then "ranged" else "melee"
+            kindButton.Text = if monsterType == "melee" then "Melee" else "Ranged"
+            refreshMonster()
+        end)
         local group = cell(third, "Group")
         local start = contentButton(group, "Start", 30); start.BackgroundColor3=colors.accent
         start.AnchorPoint = Vector2.new(1, 0); start.Position = UDim2.new(1, 0, 0, 16)
@@ -239,7 +250,7 @@ function Controller.Start()
                 if not valid then status.Text = tostring(reason); return end
             end
             busy = true; status.Text = "Working…"
-            local payload = {level=level,weapon=weapon().id,armor=armor().id,upgrade=upgrade,monsterLevel=monsterLevel,count=count,regen=regen,vampiric=vampiric,critPercent=critPercent,critFlat=critFlat,critMultiplier=critMultiplier}
+            local payload = {level=level,weapon=weapon().id,armor=armor().id,upgrade=upgrade,monsterId=selectedMonster().id,count=count,regen=regen,vampiric=vampiric,critPercent=critPercent,critFlat=critFlat,critMultiplier=critMultiplier}
             task.spawn(function()
                 -- Respect the server's 0.35 second minimum between requests.
                 local delaySeconds = 0.4 - (os.clock() - lastRequestAt)

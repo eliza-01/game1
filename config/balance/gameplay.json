@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "rules": {
     "baseDamage": 5,
     "baseAttackSpeed": 180,
@@ -699,7 +699,10 @@
       "damage": 10,
       "xp": 12,
       "gold": 25,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_002",
@@ -708,7 +711,10 @@
       "damage": 12,
       "xp": 21,
       "gold": 30,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_003",
@@ -717,7 +723,10 @@
       "damage": 15,
       "xp": 32,
       "gold": 32,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_004",
@@ -726,7 +735,10 @@
       "damage": 17,
       "xp": 42,
       "gold": 35,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_005",
@@ -735,7 +747,10 @@
       "damage": 20,
       "xp": 54,
       "gold": 35,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_006",
@@ -744,7 +759,10 @@
       "damage": 23,
       "xp": 65,
       "gold": 40,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_007",
@@ -753,7 +771,10 @@
       "damage": 27,
       "xp": 77,
       "gold": 40,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_008",
@@ -762,7 +783,10 @@
       "damage": 30,
       "xp": 89,
       "gold": 45,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_009",
@@ -771,7 +795,10 @@
       "damage": 34,
       "xp": 110,
       "gold": 45,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_010",
@@ -780,7 +807,10 @@
       "damage": 37,
       "xp": 133,
       "gold": 50,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_011",
@@ -789,7 +819,10 @@
       "damage": 41,
       "xp": 150,
       "gold": 53,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_012",
@@ -798,7 +831,10 @@
       "damage": 46,
       "xp": 168,
       "gold": 56,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_013",
@@ -807,7 +843,10 @@
       "damage": 50,
       "xp": 187,
       "gold": 59,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_014",
@@ -816,7 +855,10 @@
       "damage": 55,
       "xp": 206,
       "gold": 62,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_015",
@@ -825,7 +867,10 @@
       "damage": 59,
       "xp": 225,
       "gold": 65,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_016",
@@ -834,7 +879,10 @@
       "damage": 64,
       "xp": 245,
       "gold": 68,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_017",
@@ -843,7 +891,10 @@
       "damage": 69,
       "xp": 265,
       "gold": 71,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_018",
@@ -852,7 +903,10 @@
       "damage": 73,
       "xp": 285,
       "gold": 74,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_019",
@@ -861,7 +915,10 @@
       "damage": 78,
       "xp": 305,
       "gold": 77,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_020",
@@ -870,7 +927,10 @@
       "damage": 84,
       "xp": 326,
       "gold": 80,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_021",
@@ -879,7 +939,10 @@
       "damage": 89,
       "xp": 346,
       "gold": 83,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_022",
@@ -888,7 +951,10 @@
       "damage": 94,
       "xp": 367,
       "gold": 86,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_023",
@@ -897,7 +963,10 @@
       "damage": 99,
       "xp": 387,
       "gold": 89,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_024",
@@ -906,7 +975,10 @@
       "damage": 105,
       "xp": 408,
       "gold": 92,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_025",
@@ -915,7 +987,10 @@
       "damage": 110,
       "xp": 429,
       "gold": 95,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_026",
@@ -924,7 +999,10 @@
       "damage": 116,
       "xp": 450,
       "gold": 98,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_027",
@@ -933,7 +1011,10 @@
       "damage": 121,
       "xp": 471,
       "gold": 101,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_028",
@@ -942,7 +1023,10 @@
       "damage": 127,
       "xp": 493,
       "gold": 104,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_029",
@@ -951,7 +1035,10 @@
       "damage": 133,
       "xp": 514,
       "gold": 107,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_030",
@@ -960,7 +1047,10 @@
       "damage": 139,
       "xp": 535,
       "gold": 110,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_031",
@@ -969,7 +1059,10 @@
       "damage": 145,
       "xp": 556,
       "gold": 113,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_032",
@@ -978,7 +1071,10 @@
       "damage": 151,
       "xp": 578,
       "gold": 116,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_033",
@@ -987,7 +1083,10 @@
       "damage": 157,
       "xp": 599,
       "gold": 119,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_034",
@@ -996,7 +1095,10 @@
       "damage": 164,
       "xp": 621,
       "gold": 122,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
     },
     {
       "id": "monster_035",
@@ -1005,7 +1107,430 @@
       "damage": 170,
       "xp": 642,
       "gold": 125,
-      "critChance": 5
+      "critChance": 5,
+      "type": "melee",
+      "attackRange": 5,
+      "attackSpeed": 100
+    },
+    {
+      "id": "monster_036",
+      "level": 1,
+      "hp": 106,
+      "damage": 13,
+      "xp": 12,
+      "gold": 25,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_037",
+      "level": 2,
+      "hp": 112,
+      "damage": 16,
+      "xp": 21,
+      "gold": 30,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_038",
+      "level": 3,
+      "hp": 119,
+      "damage": 19,
+      "xp": 32,
+      "gold": 32,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_039",
+      "level": 4,
+      "hp": 132,
+      "damage": 22,
+      "xp": 42,
+      "gold": 35,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_040",
+      "level": 5,
+      "hp": 139,
+      "damage": 26,
+      "xp": 54,
+      "gold": 35,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_041",
+      "level": 6,
+      "hp": 152,
+      "damage": 30,
+      "xp": 65,
+      "gold": 40,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_042",
+      "level": 7,
+      "hp": 158,
+      "damage": 35,
+      "xp": 77,
+      "gold": 40,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_043",
+      "level": 8,
+      "hp": 165,
+      "damage": 39,
+      "xp": 89,
+      "gold": 45,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_044",
+      "level": 9,
+      "hp": 178,
+      "damage": 44,
+      "xp": 110,
+      "gold": 45,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_045",
+      "level": 10,
+      "hp": 330,
+      "damage": 48,
+      "xp": 133,
+      "gold": 50,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_046",
+      "level": 11,
+      "hp": 350,
+      "damage": 53,
+      "xp": 150,
+      "gold": 53,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_047",
+      "level": 12,
+      "hp": 376,
+      "damage": 60,
+      "xp": 168,
+      "gold": 56,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_048",
+      "level": 13,
+      "hp": 396,
+      "damage": 65,
+      "xp": 187,
+      "gold": 59,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_049",
+      "level": 14,
+      "hp": 409,
+      "damage": 71,
+      "xp": 206,
+      "gold": 62,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_050",
+      "level": 15,
+      "hp": 422,
+      "damage": 76,
+      "xp": 225,
+      "gold": 65,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_051",
+      "level": 16,
+      "hp": 436,
+      "damage": 83,
+      "xp": 245,
+      "gold": 68,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_052",
+      "level": 17,
+      "hp": 455,
+      "damage": 89,
+      "xp": 265,
+      "gold": 71,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_053",
+      "level": 18,
+      "hp": 469,
+      "damage": 95,
+      "xp": 285,
+      "gold": 74,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_054",
+      "level": 19,
+      "hp": 482,
+      "damage": 101,
+      "xp": 305,
+      "gold": 77,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_055",
+      "level": 20,
+      "hp": 634,
+      "damage": 109,
+      "xp": 326,
+      "gold": 80,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_056",
+      "level": 21,
+      "hp": 660,
+      "damage": 115,
+      "xp": 346,
+      "gold": 83,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_057",
+      "level": 22,
+      "hp": 686,
+      "damage": 122,
+      "xp": 367,
+      "gold": 86,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_058",
+      "level": 23,
+      "hp": 713,
+      "damage": 128,
+      "xp": 387,
+      "gold": 89,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_059",
+      "level": 24,
+      "hp": 739,
+      "damage": 136,
+      "xp": 408,
+      "gold": 92,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_060",
+      "level": 25,
+      "hp": 766,
+      "damage": 142,
+      "xp": 429,
+      "gold": 95,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_061",
+      "level": 26,
+      "hp": 785,
+      "damage": 150,
+      "xp": 450,
+      "gold": 98,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_062",
+      "level": 27,
+      "hp": 812,
+      "damage": 157,
+      "xp": 471,
+      "gold": 101,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_063",
+      "level": 28,
+      "hp": 838,
+      "damage": 164,
+      "xp": 493,
+      "gold": 104,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_064",
+      "level": 29,
+      "hp": 865,
+      "damage": 172,
+      "xp": 514,
+      "gold": 107,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_065",
+      "level": 30,
+      "hp": 990,
+      "damage": 180,
+      "xp": 535,
+      "gold": 110,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_066",
+      "level": 31,
+      "hp": 1030,
+      "damage": 188,
+      "xp": 556,
+      "gold": 113,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_067",
+      "level": 32,
+      "hp": 1069,
+      "damage": 196,
+      "xp": 578,
+      "gold": 116,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_068",
+      "level": 33,
+      "hp": 1115,
+      "damage": 203,
+      "xp": 599,
+      "gold": 119,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_069",
+      "level": 34,
+      "hp": 1155,
+      "damage": 212,
+      "xp": 621,
+      "gold": 122,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
+    },
+    {
+      "id": "monster_070",
+      "level": 35,
+      "hp": 1195,
+      "damage": 220,
+      "xp": 642,
+      "gold": 125,
+      "critChance": 5,
+      "type": "ranged",
+      "attackRange": 40,
+      "attackSpeed": 77
     }
   ],
   "weaponBindings": {

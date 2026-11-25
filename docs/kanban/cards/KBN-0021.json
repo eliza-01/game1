@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0021",
+  "title": "Balance · оружие, монстры и модель боя TTK",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0021.md",
+  "specSha256": "bf21f66950848c46d1acec517e0726f224264e77d69307ba18286746bf60a109",
+  "dependsOn": [
+    "KBN-0019",
+    "KBN-0020"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-25T18:19:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0021-T01",
+      "title": "Снять фактические HitEnd/release/timing, attack radius, arc и скорость передвижения по типам оружия",
+      "done": false
+    },
+    {
+      "id": "KBN-0021-T02",
+      "title": "Вывести HP и damage монстров из целевых TTK и количества ударов",
+      "done": false
+    },
+    {
+      "id": "KBN-0021-T03",
+      "title": "Сравнить single-target, multi-target, bow, headshot и crit, мобильность и препятствия",
+      "done": false
+    },
+    {
+      "id": "KBN-0021-T04",
+      "title": "Проверить дискретное число ударов, overkill, промахи, downtime, регенерацию и входящий урон",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0021-A01",
+      "title": "Таблица DPS/TTK по уровням, оружию, группам целей и PC/mobile",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0021-A02",
+      "title": "Headshot и multi-target не дают неконтролируемого превосходства; проверены границы сектора",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0021-A03",
+      "title": "Цели TTK согласованы и подтверждены сценариями реального боя",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

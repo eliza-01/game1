@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0019",
+  "title": "Balance · каноническая база статов и предметов",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0019.md",
+  "specSha256": "b85fb29b536f8412a80f12c6f5dfc11006a40d88731f88f2d2085626f3235ada",
+  "dependsOn": [
+    "KBN-0018"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-25T18:19:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0019-T01",
+      "title": "Утвердить единицы и набор публичных статов, порядок flat/percent модификаторов и округления",
+      "done": false
+    },
+    {
+      "id": "KBN-0019-T02",
+      "title": "Спроектировать схемы уровней, оружия, брони, бижутерии, сетов, навыков, монстров, лута и экономики",
+      "done": false
+    },
+    {
+      "id": "KBN-0019-T03",
+      "title": "Разделить gameplay ID и визуальные asset slug/ID, определить версии и ссылки",
+      "done": false
+    },
+    {
+      "id": "KBN-0019-T04",
+      "title": "Определить источник истины, редактор, детерминированный экспорт, валидацию и миграцию",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0019-A01",
+      "title": "Нет дублей идентификаторов, dangling refs и невалидных чисел",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0019-A02",
+      "title": "Одни входы дают идентичные выходы и digest",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0019-A03",
+      "title": "Смена визуального ассета не меняет боевой баланс; откат snapshot проверен",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

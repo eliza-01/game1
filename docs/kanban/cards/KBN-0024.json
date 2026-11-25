@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0024",
+  "title": "Balance · интеграция, мобильная приёмка и публикация",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0024.md",
+  "specSha256": "28fab91974ed42ba395ca81b376d74ab4f6ffa3cb7e35e78573eda1b0cd86ceb",
+  "dependsOn": [
+    "KBN-0023",
+    "KBN-0003",
+    "KBN-0017"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-25T18:19:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0024-T01",
+      "title": "Подключить согласованный snapshot к существующему серверному расчёту без параллельной legacy-системы",
+      "done": false
+    },
+    {
+      "id": "KBN-0024-T02",
+      "title": "Проверить HUD, сравнение предметов, уровни, локализацию и читаемость на мобильном",
+      "done": false
+    },
+    {
+      "id": "KBN-0024-T03",
+      "title": "Провести PC/Android сессии, замеры TTK, XP, времени до первого действия и награды",
+      "done": false
+    },
+    {
+      "id": "KBN-0024-T04",
+      "title": "Проверить два клиента, persistence, актуальный XML Preflight и отдельный Runtime draft",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0024-A01",
+      "title": "Серверные расчёты и интерфейс согласованы; повторный вход сохраняет прогресс",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0024-A02",
+      "title": "15-минутная сессия проверена на телефоне и PC, есть замеры и версия",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0024-A03",
+      "title": "Runtime Preflight, cloud asset access и DEV публикация подтверждены владельцем",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

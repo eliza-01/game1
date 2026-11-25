@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0018",
+  "title": "Balance · аудит действующего Game1 и reference RobloxLineage",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0018.md",
+  "specSha256": "4f65c9c4e4b5d061b6813b923ae51f105c71effb27ddf0aef1712b2dbd262124",
+  "dependsOn": [],
+  "revision": 1,
+  "updatedAt": "2026-11-25T18:19:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0018-T01",
+      "title": "Инвентаризировать producer/consumer всех боевых статов, экипировки, NPC и монстров",
+      "done": false
+    },
+    {
+      "id": "KBN-0018-T02",
+      "title": "Отделить действующие механики от исторических WeaponAttackVolume и старых документов",
+      "done": false
+    },
+    {
+      "id": "KBN-0018-T03",
+      "title": "Проверить происхождение, лицензии, схему и контрольные суммы reference",
+      "done": false
+    },
+    {
+      "id": "KBN-0018-T04",
+      "title": "Зафиксировать исходные метрики боя, перемещения, загрузки и мобильного управления",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0018-A01",
+      "title": "Карта фактических контрактов с путями, единицами, дефолтами и источниками",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0018-A02",
+      "title": "Проверки melee, bow, headshot, нескольких целей в Studio и на телефоне",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0018-A03",
+      "title": "Reference воспроизводим, расхождения и ограничения документированы",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

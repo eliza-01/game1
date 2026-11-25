@@ -6,7 +6,8 @@
 
 ## Наиболее актуальная точка входа
 
-- **[Kanban · актуальное состояние 17 карточек](kanban/STATUS_2026-11-22_M439.md)** — проверка источников и открытая Studio/Android-приёмка; [спецификации карточек](kanban/README.md).
+- **[Kanban · историческая сверка первых 17 карточек](kanban/STATUS_2026-11-22_M439.md)** — проверка источников и открытая Studio/Android-приёмка; [спецификации карточек](kanban/README.md).
+- **[Balance · план следующего этапа](kanban/BALANCE_PLAN_RU.md)** — KBN-0018–0024, актуальный melee и 15-минутная прогрессия (PROPOSED).
 - **[Текущее ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md)** и **[Архитектурная карта](architecture/CURRENT_ARCHITECTURE_RU.md)** — текущие приоритеты и реальные границы сервера, клиента, систем авторинга.
 - **[Mechanics · аудит всех четырёх разделов M447](workflows/MECHANICS_RUNTIME_GAPS_M447_RU.md)** — House/NPC/Monster/Character, незавершённые механики, persistence, Runtime/Studio критерии; [как устроен каталог](workflows/MECHANICS_HOUSE_CATALOG_M436_RU.md).
 - **[Камин и костёр · M442](workflows/CAMPFIRE_AND_FIREPLACE_M442_RU.md)** — единая механика готовки, условный дым, мобильный/ПК dock, HUD и редактируемые параметры.
@@ -18,7 +19,7 @@
 | --- | --- | --- |
 | [M230 — Legacy Placement Compatibility](workflows/REAL_ESTATE_PLACEMENT_LEGACY_COMPAT_M230_RU.md) | Place и Place all доступны для старых Model-pivot биндов без повторного Bind; новые бинды используют точный house pivot | **CURRENT · STUDIO SMOKE REQUIRED** |
 | [M229 — Real Estate Placement rotation](workflows/REAL_ESTATE_PLACEMENT_ROTATION_M229_RU.md) | Bind измеряет author house pivot, Place выравнивает по тому же anchor; сохранение точного house pivot для новых Bind; прежний запрет legacy Place отменён M230 | **CURRENT CAPTURE / HISTORICAL LEGACY POLICY** |
-| [M228 — Combat reticle primary melee](workflows/COMBAT_RETICLE_PRIMARY_MELEE_M228_RU.md) | Прицельная цель в AttackRadius получает урон независимо от объёма меча, дополнительные пересечения и один headshot сохраняются | **CURRENT · STUDIO PLAY REQUIRED** |
+| [M228 — Combat reticle primary melee](workflows/COMBAT_RETICLE_PRIMARY_MELEE_M228_RU.md) | Исторический контракт до M358/M360; актуальный melee — серверный сектор и один HitEnd, headshot только допустимой цели | **HISTORICAL · SUPERSEDED BY M358/M360** |
 | [M227 — Real Estate Place all / Clear all](workflows/REAL_ESTATE_BULK_PLOT_PREVIEW_M227_RU.md) | Пакетная постановка выбранного дома по сохранённым Bind и удаление всех управляемых preview; одна Studio Undo-операция | **CURRENT · STUDIO SMOKE REQUIRED** |
 | [M226 — Studio plugin installer recovery](workflows/STUDIO_PLUGIN_INSTALLER_LOCK_RECOVERY_M226_RU.md) | Ошибка file-lock при копировании Game1Bridge: проверка SHA-256, безопасный retry и восстановление после частичной установки M225 | **CURRENT** |
 | [M223 — Asset Manager: Atlas и Plot Place/Clear](workflows/ASSET_MANAGER_ATLAS_PLOT_PREVIEW_M223_RU.md) | Sidebar order, централизованный Atlas Registry с retirement/историей, авторский Place/Clear домов по сохранённым Bind | **CURRENT · STUDIO SMOKE REQUIRED** |

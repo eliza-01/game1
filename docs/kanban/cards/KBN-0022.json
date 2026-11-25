@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0022",
+  "title": "Balance · награды, лут, экономика и навыки",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0022.md",
+  "specSha256": "919dc869d0edba78b9aaa9c8ec6c84293010d97b6b6f92499e3d5e5ba83f1c87",
+  "dependsOn": [
+    "KBN-0019",
+    "KBN-0020",
+    "KBN-0021"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-25T18:19:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0022-T01",
+      "title": "Определить единое серверное событие убийства, attribution и правила наград",
+      "done": false
+    },
+    {
+      "id": "KBN-0022-T02",
+      "title": "Спроектировать loot tables, XP, золото, цены и источники/стоки",
+      "done": false
+    },
+    {
+      "id": "KBN-0022-T03",
+      "title": "Согласовать редкость, апгрейды и бонусы комплектов, навыки и cooldown",
+      "done": false
+    },
+    {
+      "id": "KBN-0022-T04",
+      "title": "Симулировать накопление валюты, доступность улучшений, повторные сессии и эксплуатацию наград",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0022-A01",
+      "title": "Одно убийство не выдаёт награды повторно; сервер проверяет получателя",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0022-A02",
+      "title": "Первое улучшение доступно в согласованный интервал сессии",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0022-A03",
+      "title": "Таблицы лута валидны; экономические сценарии и миграция сохранений проверены",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

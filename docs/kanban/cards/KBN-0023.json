@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0023",
+  "title": "Balance Lab · Control Center, симулятор и regression oracle",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0023.md",
+  "specSha256": "0eae5e7de007d5ef5379e7c2a44736bf2896c2b78e878ac750af338084a02ba4",
+  "dependsOn": [
+    "KBN-0019",
+    "KBN-0020",
+    "KBN-0021",
+    "KBN-0022"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-25T18:19:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0023-T01",
+      "title": "Создать изолированный редактор Balance: Progression, Weapons, Armor, Jewelry, Monsters, Skills, Loot, Economy",
+      "done": false
+    },
+    {
+      "id": "KBN-0023-T02",
+      "title": "Сделать независимые калькуляторы snapshot, DPS/TTK, сравнения экипировки и Session Simulator 15/30/60",
+      "done": false
+    },
+    {
+      "id": "KBN-0023-T03",
+      "title": "Создать golden vectors, seed для случайности, пограничные тесты и diff ревизий",
+      "done": false
+    },
+    {
+      "id": "KBN-0023-T04",
+      "title": "Добавить детерминированный экспорт в runtime после согласования, preview и rollback",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0023-A01",
+      "title": "Ручной расчёт, Python oracle и серверный расчёт совпадают в согласованной погрешности",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0023-A02",
+      "title": "Невалидный snapshot не публикуется; экспорт воспроизводим",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0023-A03",
+      "title": "Симулятор показывает допущения, не выдаёт модель за реальные метрики",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

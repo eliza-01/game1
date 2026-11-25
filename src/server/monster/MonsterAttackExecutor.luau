@@ -16,6 +16,7 @@ local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
 
 local Retreat = require(script.Parent:WaitForChild("MonsterRangedRetreat"))
+local Skills = require(script.Parent:WaitForChild("MonsterSkills"))
 local MonsterAttackExecutor = {}
 local ATTACK_PURSUIT_SPEED_MULTIPLIER = 1.65
 MonsterAttackExecutor.PursuitSpeedMultiplier = ATTACK_PURSUIT_SPEED_MULTIPLIER
@@ -96,6 +97,7 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
         and (not rule or rule.stat ~= "AttackSpeed") then
         percent = math.clamp(percent * finite(agent.model:GetAttribute("AttackSpeed"), 100) / 100, 1, 400)
     end
+    percent = math.clamp(percent * finite(agent.model:GetAttribute("SkillAttackSpeedMultiplier"), 1), 1, 400)
     local timing = AttackTimelineConfig.ResolveRuntime(row.clipId, percent)
     if not timing then return end
 
@@ -138,7 +140,8 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
             -- Do not snap yaw on Hit: shared tracker already follows the target.
         end
         if TargetPolicy.AttackStillConnects(agent, target) then
-            local damage, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0))
+            local damage, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0) * finite(agent.model:GetAttribute("SkillDamageMultiplier"), 1))
+            if damage > 0 and not killed then Skills.OnHit(agent.model,target) end
             HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true, rootOf(target) and rootOf(target).Position or nil)
             agent.model:SetAttribute("LastMonsterAttackDamage", damage)
             agent.model:SetAttribute("MonsterAttackPhase", if damage > 0 then "Hit" else "Miss")

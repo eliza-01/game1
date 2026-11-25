@@ -108,7 +108,8 @@ local function scheduleMeleeArc(player: Player, character: Model, root: BasePart
         if not session or session.serial ~= serial or session.clientAttackId ~= clientAttackId
             or session.character ~= character or player.Character ~= character
             or not character.Parent or session.environmentBlocked
-            or character:GetAttribute("LifeState") ~= "Alive" then return end
+            or character:GetAttribute("LifeState") ~= "Alive"
+            or session.stunEpoch ~= (tonumber(character:GetAttribute("SkillStunEpoch")) or 0) then return end
         local currentRoot = character:FindFirstChild("RootCollider")
         if not currentRoot or not currentRoot:IsA("BasePart") then return end
         if session.weaponType ~= tostring(character:GetAttribute("EquippedWeaponType") or "")
@@ -238,6 +239,7 @@ local function finishBowRelease(player: Player, pending: any): boolean
         or player.Character ~= character
         or character:GetAttribute("LifeState") ~= "Alive"
         or character:GetAttribute("AttackSerial") ~= pending.serial
+        or pending.stunEpoch ~= (tonumber(character:GetAttribute("SkillStunEpoch")) or 0)
         or string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) ~= "bow" then
         return false
     end
@@ -301,6 +303,7 @@ local function beginBowRelease(player: Player, character: Model, root: BasePart,
     local pending = {
         character = character,
         serial = serial,
+        stunEpoch = tonumber(character:GetAttribute("SkillStunEpoch")) or 0,
         clientAttackId = clientAttackId,
         releaseAt = os.clock() + releaseTime,
         releaseReached = false,
@@ -357,6 +360,7 @@ local function attack(player: Player, payload: any)
         return
     end
 
+    if character:GetAttribute("SkillStunned") == true then return end
     local descriptor = allowedAttackDescriptor(character, clipId)
     if not descriptor then
         if Config.DebugLogs then

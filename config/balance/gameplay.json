@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "rules": {
     "baseDamage": 5,
     "baseAttackSpeed": 180,
@@ -1551,6 +1551,195 @@
     "y": -53.76,
     "z": 49.04,
     "yaw": 137.647,
-    "maxGroup": 12
-  }
+    "maxGroup": 12,
+    "skilledEnabled": true
+  },
+  "skills": [
+    {
+      "id": "skill_poison",
+      "name": "Poison",
+      "owner": "monster",
+      "effect": "poison",
+      "duration": 4,
+      "cooldown": 12,
+      "power": 15,
+      "tick": 1
+    },
+    {
+      "id": "skill_bleed",
+      "name": "Bleed",
+      "owner": "monster",
+      "effect": "bleed",
+      "duration": 5,
+      "cooldown": 15,
+      "power": 15,
+      "tick": 1
+    },
+    {
+      "id": "skill_slow",
+      "name": "Slow",
+      "owner": "monster",
+      "effect": "slow",
+      "duration": 4,
+      "cooldown": 15,
+      "power": 30,
+      "tick": 0
+    },
+    {
+      "id": "skill_root",
+      "name": "Root",
+      "owner": "monster",
+      "effect": "root",
+      "duration": 2,
+      "cooldown": 15,
+      "power": 100,
+      "tick": 0
+    },
+    {
+      "id": "skill_stun",
+      "name": "Stun",
+      "owner": "monster",
+      "effect": "stun",
+      "duration": 1.5,
+      "cooldown": 18,
+      "power": 100,
+      "tick": 0
+    },
+    {
+      "id": "skill_silence",
+      "name": "Global Silence",
+      "owner": "monster",
+      "effect": "silence",
+      "duration": 4,
+      "cooldown": 20,
+      "power": 100,
+      "tick": 0
+    },
+    {
+      "id": "skill_might",
+      "name": "Might",
+      "owner": "monster",
+      "effect": "might",
+      "duration": 6,
+      "cooldown": 24,
+      "power": 25,
+      "tick": 0
+    },
+    {
+      "id": "skill_haste",
+      "name": "Haste",
+      "owner": "monster",
+      "effect": "haste",
+      "duration": 6,
+      "cooldown": 24,
+      "power": 25,
+      "tick": 0
+    }
+  ],
+  "skilledMonsters": [
+    {
+      "id": "skilled_poison",
+      "level": 20,
+      "type": "melee",
+      "skills": [
+        {
+          "skillId": "skill_poison",
+          "downgrade": true,
+          "trigger": "hit",
+          "hpBelow": 50
+        }
+      ]
+    },
+    {
+      "id": "skilled_bleed",
+      "level": 20,
+      "type": "melee",
+      "skills": [
+        {
+          "skillId": "skill_bleed",
+          "downgrade": true,
+          "trigger": "hit",
+          "hpBelow": 50
+        }
+      ]
+    },
+    {
+      "id": "skilled_slow",
+      "level": 20,
+      "type": "melee",
+      "skills": [
+        {
+          "skillId": "skill_slow",
+          "downgrade": true,
+          "trigger": "hit",
+          "hpBelow": 50
+        }
+      ]
+    },
+    {
+      "id": "skilled_root",
+      "level": 20,
+      "type": "melee",
+      "skills": [
+        {
+          "skillId": "skill_root",
+          "downgrade": true,
+          "trigger": "hit",
+          "hpBelow": 50
+        }
+      ]
+    },
+    {
+      "id": "skilled_stun",
+      "level": 20,
+      "type": "melee",
+      "skills": [
+        {
+          "skillId": "skill_stun",
+          "downgrade": true,
+          "trigger": "hit",
+          "hpBelow": 50
+        }
+      ]
+    },
+    {
+      "id": "skilled_silence",
+      "level": 20,
+      "type": "melee",
+      "skills": [
+        {
+          "skillId": "skill_silence",
+          "downgrade": true,
+          "trigger": "hit",
+          "hpBelow": 50
+        }
+      ]
+    },
+    {
+      "id": "skilled_might",
+      "level": 20,
+      "type": "melee",
+      "skills": [
+        {
+          "skillId": "skill_might",
+          "downgrade": true,
+          "trigger": "hpBelow",
+          "hpBelow": 50
+        }
+      ]
+    },
+    {
+      "id": "skilled_haste",
+      "level": 20,
+      "type": "melee",
+      "skills": [
+        {
+          "skillId": "skill_haste",
+          "downgrade": true,
+          "trigger": "hpBelow",
+          "hpBelow": 50
+        }
+      ]
+    }
+  ]
 }

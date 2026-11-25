@@ -12,7 +12,7 @@ local sessions: {[Player]: any} = {}
 
 function Loadout.Origin(): CFrame
     local t = Balance.Test
-    return CFrame.new(t.x, t.y, t.z) * CFrame.Angles(0, math.rad(t.yaw), 0)
+    return CFrame.new(t.x, t.y + 100, t.z) * CFrame.Angles(0, math.rad(t.yaw), 0)
 end
 function Loadout.Get(player: Player): any?
     return sessions[player]

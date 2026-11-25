@@ -1,0 +1,30 @@
+-- Server Command Bar, Studio Play only. Disposable synthetic actors; no real character changes.
+local Effects = require(game:GetService("ServerScriptService").Game1Server.combat.SkillEffects)
+local function actor(name)
+    local model=Instance.new("Model"); model.Name=name
+    model:SetAttribute("LifeState","Alive"); model:SetAttribute("Damageable",true)
+    model:SetAttribute("HP",100); model:SetAttribute("MaxHP",100); model:SetAttribute("Defense",0)
+    model.Parent=workspace
+    return model
+end
+local source,target=actor("M529SmokeSource"),actor("M529SmokeTarget")
+local ok,err=pcall(function()
+    assert(Effects.Apply(source,target,{effect="slow",power=30,duration=2},10))
+    assert(math.abs(target:GetAttribute("SkillMoveMultiplier")-.7)<.001)
+    assert(not Effects.Apply(source,target,{effect="slow",power=50,duration=2},10))
+    assert(Effects.Apply(source,target,{effect="root",power=100,duration=.5},10))
+    assert(target:GetAttribute("SkillMoveMultiplier")==0)
+    task.wait(.7); assert(math.abs(target:GetAttribute("SkillMoveMultiplier")-.7)<.001)
+    assert(Effects.Apply(source,target,{effect="stun",power=100,duration=.5},10))
+    assert(target:GetAttribute("SkillStunned")==true and target:GetAttribute("SkillStunEpoch")==1)
+    Effects.Clear(target); assert(target:GetAttribute("SkillStunned")==nil)
+    assert(Effects.Apply(source,target,{effect="silence",power=100,duration=.5},10))
+    assert(not Effects.CanCast(target)); task.wait(.7); assert(Effects.CanCast(target))
+    assert(Effects.Apply(source,source,{effect="might",power=25,duration=.5},10))
+    assert(source:GetAttribute("SkillDamageMultiplier")==1.25)
+    task.wait(.7); assert(source:GetAttribute("SkillDamageMultiplier")==nil)
+    assert(Effects.Apply(source,target,{effect="poison",power=15,duration=1,tick=.5},10))
+    task.wait(1.2); assert(target:GetAttribute("HP")==97)
+end)
+Effects.Clear(source); Effects.Clear(target); source:Destroy(); target:Destroy()
+assert(ok,err); print("[M529] skill stacking, expiry, stun epoch, silence, buff and DoT smoke OK")

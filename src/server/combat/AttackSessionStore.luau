@@ -5,6 +5,7 @@ local AttackSessionStore = {}
 export type Session = {
     character: Model,
     serial: number,
+    stunEpoch: number,
     clientAttackId: number,
     untilTime: number,
     damageDealt: boolean,
@@ -40,6 +41,7 @@ function AttackSessionStore.Begin(
     local session: Session = {
         character = character,
         serial = serial,
+        stunEpoch = tonumber(character:GetAttribute("SkillStunEpoch")) or 0,
         clientAttackId = clientAttackId,
         untilTime = untilTime,
         damageDealt = false,

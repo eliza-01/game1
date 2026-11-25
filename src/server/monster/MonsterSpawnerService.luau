@@ -167,7 +167,13 @@ local function spawnOne(state: any): Model?
         local row = assert(Balance.Monster(record.testBalanceId))
         local color = Balance.Grade.Color(row.level)
         TestAppearance.Tint(visual, color)
-        TestAppearance.Label(model, ("Монстр_%s · %s · LVL %d\n%d HP · %d ATK"):format(row.id:sub(-3), row.type, row.level, row.hp, row.damage), color)
+        local title = "Монстр_" .. row.id:sub(-3)
+        if row.skills then
+            local names = {}
+            for _, a in ipairs(row.skills) do table.insert(names, Balance.Skill(a.skillId).name) end
+            title = table.concat(names, " + ")
+        end
+        TestAppearance.Label(model, ("%s · %s · LVL %d\n%d HP · %d ATK"):format(title, row.type, row.level, row.hp, row.damage), color)
         -- Test targets never wander; only ranged approach lanes enable proximity aggro.
     end
     local riseFromGround = not record.testOwner and definition.behavior and definition.behavior.riseFromGround == true

@@ -47,7 +47,7 @@
 <button id="nav-place-registry" class="asset-section" type="button"><b>place registry</b><small>location assets · audit · repair · revisions</small></button>
 <button id="nav-lod-manager" class="asset-section" type="button"><b>LOD Manager</b><small>scan · snapshots · readiness</small></button>
 <button id="nav-database" class="asset-section" type="button"><b>database</b><small>balance · asset history</small></button>
-<div id="database-nav" class="database-subnav" hidden><button id="nav-balance" type="button" class="database-subnav-item">Balance</button><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button><button id="nav-balance-logs" type="button" class="database-subnav-item">Logs</button></div>
+<div id="database-nav" class="database-subnav" hidden><button id="nav-balance" type="button" class="database-subnav-item">Balance</button><button id="nav-skills" type="button" class="database-subnav-item">Skills</button><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button><button id="nav-balance-logs" type="button" class="database-subnav-item">Logs</button></div>
 <button id="nav-atlas" class="asset-section" type="button"><b>atlas</b><small>variants · consumers · retirement</small></button>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-mechanics" class="asset-section" type="button"><b>mechanics</b><small>tech cards · sockets · scripts</small></button>
@@ -440,7 +440,7 @@
 <div class="panel hero">
 <div><span class="eyebrow">common runtime settings · shared gameplay</span><h2>options</h2><p>project-wide settings that are not owned by one character, monster, weapon or animation clip.</p></div>
 </div>
-<details class="game1-option-section" open><summary><span class="game1-option-icon" aria-hidden="true">⚔️</span><span><strong>Combat & AI</strong><small>Состояния, атаки, возврат</small></span></summary>
+<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">⚔️</span><span><strong>Combat & AI</strong><small>Состояния, атаки, возврат</small></span></summary>
 <div class="panel character-card">
 <div class="section-title"><div><span>combat</span><h3>combat state</h3></div><button id="refresh-options" type="button">refresh</button></div>
 <small class="hint">Shared combat timeout; return timer uses monster damage dealt.</small>
@@ -651,6 +651,11 @@
   <small class="hint">Published TestPlace only; authorized developer accounts.</small>
   <label class="game1-published-debug-toggle"><input type="checkbox" id="option-published-debug-buttons">Show debug / test buttons in published TestPlace</label>
   <div class="actions"><button id="option-published-debug-save" class="primary" type="button">Save debug visibility</button></div>
+<hr class="card-separator">
+<details id="skilled-monsters-disclosure"><summary>Skilled Monsters · Studio gameplay test</summary>
+<div class="actions"><button id="skilled-reload" type="button">Refresh</button><button id="skilled-save" class="primary" type="button" disabled>Save test profiles</button></div>
+<div id="skilled-editor"></div><p id="skilled-status" role="status" class="muted"></p>
+</details>
 </div></details>
 </div>
 
@@ -936,6 +941,10 @@
 <div id="weapon-attack-movement-rules" class="weapon-attack-movement-rules"><span class="muted">loading attack movement rules…</span></div>
 </details>
 
+</div>
+<div id="skills-panel" class="panel" hidden>
+<div class="section-title"><div><span>Database · gameplay</span><h3>Skills</h3></div><div class="actions"><button id="skills-reload" type="button">Refresh</button><button id="skills-save" class="primary" type="button" disabled>Save skills</button></div></div>
+<div id="skills-editor" class="table-wrap"></div><p id="skills-status" role="status" class="muted"></p>
 </div>
 <div id="balance-logs-panel" class="panel database-history-panel" hidden>
 <div class="section-title"><div><span>Database</span><h3>Logs</h3></div><button id="balance-logs-refresh" type="button">Refresh</button></div>
@@ -1272,7 +1281,8 @@
 <script src="lod-reuse-picker.js?v=411"></script>
 <script src="location-asset-workflow.js?v=453"></script>
 <script src="asset-audit.js?v=2"></script>
-<script src="game-balance.js?v=527"></script>
+<script src="game-balance.js?v=529"></script>
+<script src="skill-editor.js?v=529"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
 <script src="options.js?v=479"></script>

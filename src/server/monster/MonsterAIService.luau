@@ -7,6 +7,7 @@ local TargetPolicy = require(script.Parent:WaitForChild("MonsterTargetPolicy"))
 local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
 local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor"))
+local Skills = require(script.Parent:WaitForChild("MonsterSkills"))
 local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
 local Lifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
 local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
@@ -114,6 +115,7 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
     end
     agent.returning = false
     agent.retaliating = true
+    if applied > 0 then Skills.UpdateBuffs(agent.model,true) end
     if agent.model:GetAttribute("MonsterSpawning") == true or agent.attacking or Retreat.Waiting(agent) then return end
     local targetRoot = rootOf(attacker)
     if not targetRoot then return end
@@ -161,6 +163,7 @@ local function runAgent(agent: any)
         end
         local target = agent.target
         if target then
+            Skills.UpdateBuffs(agent.model,false)
             if agent.lastDamageAt <= 0 then agent.lastDamageAt = now end
             local targetRoot = rootOf(target)
             if outsideHome(agent, agent.root.Position)

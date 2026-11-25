@@ -9,6 +9,7 @@ local Spawner = require(script.Parent.Parent:WaitForChild("monster"):WaitForChil
 local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
 local Appearance = require(script.Parent:WaitForChild("GameplayTestAppearance"))
 local Layout = require(script.Parent:WaitForChild("GameplayTestLayout"))
+local SkillEffects = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("SkillEffects"))
 local Arena = {}
 local serial = 0
 
@@ -65,8 +66,17 @@ local function deck(parent: Instance, name: string, top: CFrame, width: number, 
 end
 
 function Arena.BuildLinePlatform(parent: Instance, origin: CFrame, spacing: number, size: Vector3): any
-    local layout = Layout.Build(origin, Balance.Monsters, Balance.MaxLevel, spacing, size, Balance.Test.maxGroup)
-    deck(parent, "MonsterPlatform", layout.platformTop, layout.width, layout.depth, Color3.fromRGB(65, 73, 78))
+    local layout = Layout.Build(origin, Balance.Monsters, Balance.MaxLevel, spacing, size, Balance.Test.maxGroup, if Balance.Test.skilledEnabled then Balance.SkilledMonsters else {})
+    for _, platform in ipairs(layout.platforms) do
+        deck(parent, platform.name, platform.top, platform.size.X, platform.size.Z, platform.color)
+    end
+    for _, sign in ipairs(layout.signs) do
+        local anchor = Instance.new("Part")
+        anchor.Name = "Wayfinding"; anchor.Anchored = true; anchor.CanCollide = false; anchor.CanTouch = false; anchor.CanQuery = false
+        anchor.Transparency = 1; anchor.Size = Vector3.one; anchor.CFrame = sign.point + Vector3.yAxis * 12; anchor.Parent = parent
+        local gui = Instance.new("BillboardGui"); gui.Size = UDim2.fromOffset(300,60); gui.MaxDistance = 300; gui.AlwaysOnTop = true; gui.Adornee = anchor; gui.Parent = anchor
+        local label = Instance.new("TextLabel"); label.Size = UDim2.fromScale(1,1); label.BackgroundTransparency = 1; label.Text = sign.name; label.TextColor3 = Color3.fromRGB(235,240,250); label.TextStrokeTransparency = 0.25; label.Font = Enum.Font.GothamBold; label.TextScaled = true; label.Parent = gui
+    end
     for _, track in ipairs(layout.tracks) do
         deck(parent, track.name, track.top, track.size.X, track.size.Z, Color3.fromRGB(45, 115, 98), true)
     end
@@ -91,7 +101,7 @@ function Arena.ShowWeapons(parent: Instance, origin: CFrame, character: Model)
         local model = Weapons.CloneTestDisplay(row.type)
         if model then
             local tier = math.floor(row.level / 5)
-            local point = origin:PointToWorldSpace(Vector3.new(-8 - tier * 6, -CharacterConfig.RootAnchorOffset, -12 - (types[row.type] or 0) * 7))
+            local point = origin:PointToWorldSpace(Vector3.new(-20 - tier * 6, -CharacterConfig.RootAnchorOffset, -14 + (types[row.type] or 0) * 7))
             local surface = Arena.Surface(point, character)
             model:PivotTo(CFrame.new(surface) * origin.Rotation)
             local bounds, size = model:GetBoundingBox()
@@ -123,7 +133,7 @@ function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing
     local state = Spawner.AddTest({
         spawnId = "gameplay-test-" .. owner.UserId .. "-" .. serial,
         monsterSlug = "gremlin", position = {x=surface.X, y=surface.Y, z=surface.Z},
-        spawnRadius = 0, homeRadiusStuds = 150, maxAlive = 1, respawnSeconds = 2,
+        spawnRadius = 0, homeRadiusStuds = if slot and slot.homeRadius then slot.homeRadius else 150, maxAlive = 1, respawnSeconds = 2,
         testOwner = owner.UserId, testKind = kind, testBalanceId = row.id,
         testNoRespawn = kind == "group", testYaw = yaw, testSurface = surface,
         testApproachFrame = slot and slot.approachFrame, testApproachSize = slot and slot.approachSize,
@@ -136,6 +146,7 @@ function Arena.Clear(states: {any})
     table.clear(states)
 end
 function Arena.Warp(character: Model, frame: CFrame)
+    SkillEffects.Clear(character)
     character:PivotTo(frame)
     for _, part in ipairs(character:GetDescendants()) do
         if part:IsA("BasePart") and not part.Anchored then

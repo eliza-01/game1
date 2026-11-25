@@ -5,6 +5,11 @@ Balance.Rules = Registry.rules
 Balance.Test = Registry.test
 Balance.Weapons = Registry.weapons
 Balance.Monsters = Registry.monsters
+Balance.Skills = Registry.skills
+Balance.SkilledMonsters = Registry.resolvedSkilledMonsters
+local skills: {[string]: any} = {}
+for _, skill in ipairs(Registry.skills) do skills[skill.id] = skill end
+function Balance.Skill(id: string): any? return skills[id] end
 Balance.MaxLevel = #Registry.levels
 Balance.Armors = Registry.armor
 Balance.Grade = require(script.Parent:WaitForChild("EquipmentGrade"))
@@ -18,6 +23,7 @@ for _, row in ipairs(Registry.monsters) do
     monsters[row.id] = row
     monstersByType[row.type][row.level] = row
 end
+for _, row in ipairs(Registry.resolvedSkilledMonsters) do monsters[row.id] = row end
 for _, row in ipairs(Registry.armor) do armor[row.id] = row end
 for level = 2, #Registry.levels do
     thresholds[level] = thresholds[level - 1] + Registry.levels[level - 1].xpNext

@@ -19,7 +19,7 @@ class RangedRetreat(unittest.TestCase):
             self.assertEqual(math.floor(hp * 1.1 + .5), expected_hp)
             self.assertEqual(math.floor(damage * 180/139 + .5), expected_damage)
         self.assertEqual(math.floor(100 * 139/180 + .5), 77)
-        self.assertEqual(data['schemaVersion'], 3)
+        self.assertEqual(data['schemaVersion'], 4)
         self.assertEqual(b.OUTPUT.read_text(encoding='utf8'), b.render(data))
         self.assertTrue(any(x['patch'] == 527 for x in logs.load()['entries']))
 

@@ -133,6 +133,7 @@ function Controller.Start()
         local status = label(panel, "Enter test to begin", UDim2.new(1, -20, 0, 26)); status.Position = UDim2.new(0, 10, 1, -27); status.TextColor3 = colors.muted
         local level, monsterLevel, count, upgrade = 1, 1, 1, 0
         local monsterType = "melee"
+        local skilledIndex = 1
         local weapons = {{id="", level=1, type="hands", damage=0}}
         for _, entry in ipairs(Balance.Weapons) do table.insert(weapons, entry) end
         table.sort(weapons, function(a,b) if a.level == b.level then return a.id < b.id end return a.level < b.level end)
@@ -169,16 +170,27 @@ function Controller.Start()
         end, function(d) upgrade=wrap(upgrade+1,d,Balance.Rules.maxUpgrade+1)-1 end)
         local third = row(body, 46); horizontal(third)
         local monsterCell = cell(third, "Monster")
-        local function selectedMonster() return assert(Balance.MonsterAt(monsterLevel, monsterType)) end
+        local function selectedMonster()
+            if monsterType == "skilled" then return Balance.SkilledMonsters[skilledIndex] end
+            return assert(Balance.MonsterAt(monsterLevel, monsterType))
+        end
         local refreshMonster = picker(monsterCell, "Monster", function()
-            local m=selectedMonster(); return ("LVL %d · %d HP\n%d ATK · %g studs"):format(m.level,m.hp,m.damage,m.attackRange)
-        end, function(d) monsterLevel=wrap(monsterLevel,d,Balance.MaxLevel) end)
-        local kindButton = contentButton(monsterCell, "Ranged", 15)
+            local m=selectedMonster()
+            if m.skills then
+                local skill = Balance.Skill(m.skills[1].skillId)
+                return ("%s%s · LVL %d\n%d HP · %d ATK"):format(skill.name,if #m.skills>1 then " +"..(#m.skills-1) else "",m.level,m.hp,m.damage)
+            end
+            return ("LVL %d · %d HP\n%d ATK · %g studs"):format(m.level,m.hp,m.damage,m.attackRange)
+        end, function(d)
+            if monsterType=="skilled" then skilledIndex=wrap(skilledIndex,d,#Balance.SkilledMonsters)
+            else monsterLevel=wrap(monsterLevel,d,Balance.MaxLevel) end
+        end)
+        local kindButton = contentButton(monsterCell, "Skilled", 15)
         kindButton.Text = "Melee"; kindButton.TextSize = 11
         kindButton.AnchorPoint = Vector2.new(1, 0); kindButton.Position = UDim2.new(1, 0, 0, 0); kindButton.ZIndex = 2
         kindButton.Activated:Connect(function()
-            monsterType = if monsterType == "melee" then "ranged" else "melee"
-            kindButton.Text = if monsterType == "melee" then "Melee" else "Ranged"
+            monsterType = if monsterType == "melee" then "ranged" elseif monsterType=="ranged" and Balance.Test.skilledEnabled and #Balance.SkilledMonsters>0 then "skilled" else "melee"
+            kindButton.Text = if monsterType == "melee" then "Melee" elseif monsterType=="ranged" then "Ranged" else "Skilled"
             refreshMonster()
         end)
         local group = cell(third, "Group")

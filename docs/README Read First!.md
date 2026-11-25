@@ -7,6 +7,7 @@
 ## Наиболее актуальная точка входа
 
 - **[Kanban · историческая сверка первых 17 карточек](kanban/STATUS_2026-11-22_M439.md)** — проверка источников и открытая Studio/Android-приёмка; [спецификации карточек](kanban/README.md).
+- **[Skills · M529: каталог и Skilled Monsters](workflows/M529_SKILLS_AND_SKY_TEST_RU.md)** — формулы downgrade, runtime и высотный стенд.
 - **[Balance · M527: ranged](workflows/M527_RANGED_RETREAT_BALANCE_RU.md)** — HP, ATK, AS и отступление.
 - **[Balance · M526: melee/ranged](workflows/M526_MONSTER_TYPES_RU.md)** — типы, дальность, компактный стенд.
 - **[Balance · M525: парные мечи](workflows/M525_DUALSWORDS_RU.md)** — два попадания и рецепт B/B+.

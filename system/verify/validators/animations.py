@@ -22,8 +22,8 @@ def check_character_animation(
         animation_manifest = json.loads(animation_manifest_path.read_text(encoding="utf-8"))
     if animation_manifest.get("schemaVersion") != 2 or animation_manifest.get("project") != "game1":
         err("character animation manifest must be game1 schema 2")
-    if animation_manifest.get("weaponSets") != ["hands", "1hs", "2hs", "bow"]:
-        err("character animation weapon sets must be hands, 1hs, 2hs and bow")
+    if animation_manifest.get("weaponSets") != ["hands", "1hs", "2hs", "bow", "dualswords"]:
+        err("character animation weapon sets must be hands, 1hs, 2hs, bow and dualswords")
     for binding in animation_manifest.get("bindings") or []:
         if "playbackSpeedPercent" in binding or "playback_speed_percent" in binding:
             err(f"character animation binding must not own playback speed: {binding.get('id')}")

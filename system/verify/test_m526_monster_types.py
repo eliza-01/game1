@@ -17,7 +17,7 @@ def read(path):
 class MonsterTypes(unittest.TestCase):
     def test_two_complete_branches(self):
         data = b.load()
-        self.assertEqual(data['schemaVersion'], 3)
+        self.assertEqual(data['schemaVersion'], 4)
         self.assertEqual(len(data['levels']), 35)
         for kind, offset in [('melee', 0), ('ranged', 35)]:
             rows = [r for r in data['monsters'] if r['type'] == kind]

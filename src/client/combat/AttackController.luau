@@ -146,6 +146,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             return
         end
 
+        if character:GetAttribute("SkillStunned") == true then return end
         if not animationController then return end
         local isBow = string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
         -- Bow facing starts with Draw, not with the late target snapshot.

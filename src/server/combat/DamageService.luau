@@ -15,7 +15,7 @@ local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
 local CRITICAL_DAMAGE_MULTIPLIER = Balance.Rules.critMultiplier
 local Critical = require(Shared:WaitForChild("balance"):WaitForChild("CriticalStats"))
 
-function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number, headshot: boolean?): (number, boolean)
+function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number, headshot: boolean?, periodic: boolean?): (number, boolean)
     if not Isolation.Allows(attacker, target) then return 0, false end
     if target:GetAttribute("Damageable") ~= true or target:GetAttribute("LifeState") ~= "Alive" then
         if AttackConfig.DebugLogs then
@@ -28,10 +28,10 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number,
         return 0, false
     end
 
-    local defense = math.max(0, tonumber(target:GetAttribute("Defense")) or 0)
+    local defense = if periodic then 0 else math.max(0, tonumber(target:GetAttribute("Defense")) or 0)
     local normalizedRawDamage = math.max(0, tonumber(rawDamage) or 0)
     local criticalChance = if attacker then Critical.Chance(tonumber(attacker:GetAttribute("CritChance")) or 0) else 0
-    local critical = criticalChance > 0 and criticalRandom:NextNumber(0, 100) < criticalChance
+    local critical = not periodic and criticalChance > 0 and criticalRandom:NextNumber(0, 100) < criticalChance
     local criticalMultiplier = if attacker then Critical.Multiplier(attacker:GetAttribute("CritMultiplier")) else CRITICAL_DAMAGE_MULTIPLIER
     local damageBeforeDefense = normalizedRawDamage * (if critical then criticalMultiplier else 1)
     local finalDamage = math.max(0, math.floor(damageBeforeDefense - defense))
@@ -62,7 +62,7 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number,
     end
 
     -- Only HP actually removed (not overkill) contributes to lifesteal.
-    Healing.OnDamage(attacker, target, hp - newHP)
+    if not periodic then Healing.OnDamage(attacker, target, hp - newHP) end
     ActorDamageSignals.Publish(attacker, target, normalizedRawDamage, finalDamage, killed)
     CombatFeedbackService.PublishDamage(attacker, target, finalDamage, critical, headshot == true)
 

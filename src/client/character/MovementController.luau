@@ -447,6 +447,7 @@ local function applyMovementMode(walkModifierActive: boolean, backwardActive: bo
 				nextMode
 			) * CharacterMovementConfig.TestTrackRunMultiplier(character, nextMode)
 		end
+        controllerManager.BaseMoveSpeed *= math.clamp(tonumber(character:GetAttribute("SkillMoveMultiplier")) or 1,0,1)
 	end
 	if character and movementMode ~= nextMode then
 		movementMode = nextMode
@@ -559,7 +560,7 @@ local function updateMovement(deltaTime: number)
 	local liveAttackAim = aimFacingActive and aimFacingLive
 	local backwardActive = backwardLocomotion(axis)
 	local backwardCameraSteering = backwardActive and (rightMouseDown() or liveAttackAim)
-	local movementLocked = now < movementLockUntil
+	local movementLocked = now < movementLockUntil or character:GetAttribute("SkillMoveMultiplier") == 0
 	local moveDirection = Vector3.zero
 	if not movementLocked then
 		-- Both keyboard and analog movement keep diagonal input while attacking;

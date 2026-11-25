@@ -106,15 +106,17 @@ local function enter(player: Player, selection: any)
     end
     bindCharacter(s, replacement)
     if replacement:GetAttribute("GameplayTestError") then return result(false, "Weapon unavailable; change loadout or Exit") end
-    Arena.ShowWeapons(folder, origin, replacement)
+    Arena.ShowWeapons(folder, s.layout.weaponOrigin, replacement)
     local count = 0
-    for _, row in ipairs(Balance.Monsters) do
+    local rows = table.clone(Balance.Monsters)
+    if Balance.Test.skilledEnabled then for _, row in ipairs(Balance.SkilledMonsters) do table.insert(rows,row) end end
+    for _, row in ipairs(rows) do
         if not active(s) then return result(false, "Test cancelled") end
         local slot = s.layout.slots[row.id]
         local monster = Arena.Add(player, row, "line", slot.point, slot.facing, s.line, s.folder, slot)
         if monster then count += 1 end
     end
-    return result(count == #Balance.Monsters, ("Line: %d/%d · spacing %d studs"):format(count, #Balance.Monsters, s.spacing))
+    return result(count == #rows, ("Line: %d/%d · spacing %d studs"):format(count, #rows, s.spacing))
 end
 local function apply(s: any, selection: any)
     local character = alive(s.player)
@@ -207,6 +209,7 @@ local function dispatch(player: Player, action: any, request: any)
     end
     if action == "stop" then clearGroup(s); return result(true, "Group cleared") end
     local monster = if type(request.monsterId) == "string" then Balance.Monster(request.monsterId) else nil
+    if monster and not s.layout.slots[monster.id] then return result(false,"Monster not enabled on test stand") end
     if action == "apply" or action == "start" then
         local selection, reason = Loadout.Validate(request)
         if not selection then return result(false, tostring(reason)) end

@@ -2,6 +2,8 @@
 JSON is the editable source; the immutable Luau registry is its projection.
 """
 from __future__ import annotations
+from copy import deepcopy
+from services import skill_balance
 import hashlib
 import json
 import math
@@ -36,17 +38,18 @@ def number(v, lo, hi, label, integral=True):
 
 
 def validate(data):
-    if not isinstance(data, dict) or set(data) != {'schemaVersion','rules','levels','weapons','armor','monsters','weaponBindings','monsterBindings','test'} or data['schemaVersion'] != 3:
+    if not isinstance(data, dict) or set(data) != {'schemaVersion','rules','levels','weapons','armor','monsters','weaponBindings','monsterBindings','test','skills','skilledMonsters'} or data['schemaVersion'] != 4:
         raise ValueError('Invalid balance schema')
     if not isinstance(data['rules'], dict) or set(data['rules']) != set(RULES):
         raise ValueError('Invalid rules')
     for field, (lo, hi) in RULES.items():
         number(data['rules'][field], lo, hi, field, field not in ('upgradePercent','headshotMultiplier','critMultiplier','critChance','maxCritChance'))
-    if not isinstance(data['test'], dict) or set(data['test']) != {'x','y','z','yaw','maxGroup'}:
+    if not isinstance(data['test'], dict) or set(data['test']) != {'x','y','z','yaw','maxGroup','skilledEnabled'}:
         raise ValueError('Invalid gameplay test configuration')
     for axis in ('x','y','z'): number(data['test'][axis], -100000, 100000, axis, False)
     number(data['test']['yaw'], -360, 360, 'yaw', False)
     number(data['test']['maxGroup'], 1, 12, 'maxGroup')
+    if type(data['test']['skilledEnabled']) is not bool: raise ValueError('Invalid skilledEnabled')
     counts = {'levels': 35, 'weapons': 34, 'armor': 8, 'monsters': 70}
     for group, fields in FIELDS.items():
         rows = data[group]
@@ -98,6 +101,7 @@ def validate(data):
         for slug, identity in bindings.items():
             if not isinstance(slug,str) or not 1 <= len(slug) <= 64 or not all(c in 'abcdefghijklmnopqrstuvwxyz0123456789_' for c in slug) or not isinstance(identity,str) or identity not in ids:
                 raise ValueError(f'Invalid {key} binding: {slug}')
+    skill_balance.validate(data, number)
     return data
 
 
@@ -113,6 +117,7 @@ def check_bindings(data, models, monsters):
 
 
 def _lua(value, depth=0):
+    if isinstance(value, bool): return str(value).lower()
     if isinstance(value, (int,float)): return str(value)
     if isinstance(value,str): return json.dumps(value, ensure_ascii=False)
     if isinstance(value,(dict,list)):
@@ -123,7 +128,9 @@ def _lua(value, depth=0):
 
 
 def render(data):
-    return '-- Generated from config/balance/gameplay.json. Edit Database, not this file.\nreturn '+_lua(validate(data))+'\n'
+    projection = deepcopy(validate(data))
+    projection['resolvedSkilledMonsters'] = skill_balance.resolve(data)
+    return '-- Generated from config/balance/gameplay.json. Edit Database, not this file.\nreturn '+_lua(projection)+'\n'
 
 
 def digest(data):

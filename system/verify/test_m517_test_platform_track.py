@@ -15,7 +15,7 @@ class TestPlatformTrack(unittest.TestCase):
         self.assertIn('Arena.BuildLinePlatform(folder, origin, s.spacing, size)', service)
         self.assertIn('local floorY = -CharacterConfig.RootAnchorOffset', layout)
         self.assertIn('local surface = point\n    if kind ~= "line" then', arena)
-        self.assertIn('deck(parent, "MonsterPlatform", layout.platformTop', arena)
+        self.assertIn('deck(parent, platform.name, platform.top', arena)
         self.assertIn('deck(parent, track.name, track.top', arena)
         self.assertIn('math.ceil(width / 1024)', arena)
         self.assertIn('Arena.Warp(character, s.layout.slots[monster.id].visit)', service)

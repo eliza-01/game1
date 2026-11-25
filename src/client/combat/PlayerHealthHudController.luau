@@ -15,6 +15,7 @@ local track: Frame? = nil
 local fill: Frame? = nil
 local caption: TextLabel? = nil
 local progressionCaption: TextLabel? = nil
+local effectsCaption: TextLabel? = nil
 local tween: Tween? = nil
 local first = true
 
@@ -91,6 +92,16 @@ local function build(parent: PlayerGui)
     constraint.MaxTextSize = 13
     constraint.Parent = progressionCaption
     progressionCaption.Parent = plate
+    effectsCaption = Instance.new("TextLabel")
+    effectsCaption.Name = "SkillEffects"; effectsCaption.BackgroundTransparency = 1
+    effectsCaption.Position = UDim2.new(0,0,1,22); effectsCaption.Size = UDim2.new(1,0,0,18)
+    effectsCaption.Font = Enum.Font.GothamBold; effectsCaption.TextColor3 = Color3.fromRGB(232,185,255)
+    effectsCaption.TextStrokeTransparency = 0.15; effectsCaption.TextScaled = true; effectsCaption.Parent = plate
+end
+local function updateEffects()
+    if not effectsCaption then return end
+    effectsCaption.Text = if watched then tostring(watched:GetAttribute("ActiveSkillEffects") or "") else ""
+    effectsCaption.Visible = effectsCaption.Text ~= ""
 end
 
 local function update()
@@ -157,8 +168,10 @@ local function bind(character: Model?)
             table.insert(connections, character:GetAttributeChangedSignal(key):Connect(updateProgression))
         end
     end
+    if character then table.insert(connections,character:GetAttributeChangedSignal("ActiveSkillEffects"):Connect(updateEffects)) end
     update()
     updateProgression()
+    updateEffects()
 end
 
 function Controller.Start()

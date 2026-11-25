@@ -72,10 +72,11 @@
   $('balance-logs-refresh').onclick=loadLogs;
   window.game1BalanceOpen=(target=section)=>{
     section=target;
-    for(const [key,panel,nav] of [['balance','balance-panel','nav-balance'],['history','database-history-panel','nav-asset-audit'],['logs','balance-logs-panel','nav-balance-logs']]){
+    for(const [key,panel,nav] of [['balance','balance-panel','nav-balance'],['skills','skills-panel','nav-skills'],['history','database-history-panel','nav-asset-audit'],['logs','balance-logs-panel','nav-balance-logs']]){
       $(panel).hidden=target!==key;$(nav).classList.toggle('active',target===key);
     }
-    if(target==='history')window.game1AssetAuditLoad?.();
+    if(target==='skills')window.game1SkillsOpen?.();
+    else if(target==='history')window.game1AssetAuditLoad?.();
     else if(target==='logs')loadLogs();
     else {load();window.game1WeaponMovementLoad?.()}
   };

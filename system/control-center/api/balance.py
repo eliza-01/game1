@@ -1,12 +1,12 @@
 from services import game_balance as balance
-from services import balance_patch_logs
+from services import balance_patch_logs, skill_balance
 
 
 def snapshot(deps):
     data = balance.load()
     weapons = [{'slug': r['slug'], 'type': r['weapon_type']} for r in deps['weapons'].snapshot()['items']]
     monsters = [{'slug': r['slug']} for r in deps['monsters'].snapshot()['items']]
-    return {'balance': data, 'revision': balance.digest(data), 'weaponModels': weapons, 'monsterModels': monsters}
+    return {'balance': data, 'revision': balance.digest(data), 'weaponModels': weapons, 'monsterModels': monsters, 'resolvedSkilledMonsters': skill_balance.resolve(data)}
 
 
 def read(path, deps):

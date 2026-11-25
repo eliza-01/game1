@@ -33,5 +33,15 @@ function Appearance.Label(model: Model, text: string, color: Color3, adornee: Ba
     label.TextStrokeTransparency = 0.2
     label.Text = text
     label.Parent = gui
+    if string.sub(tostring(model:GetAttribute("MonsterBalanceId") or ""),1,8)=="skilled_" then
+        gui.Size = UDim2.fromOffset(270,64)
+        label.Size = UDim2.new(1,0,0,44)
+        local status = Instance.new("TextLabel")
+        status.BackgroundTransparency = 1; status.Position = UDim2.fromOffset(0,44); status.Size = UDim2.new(1,0,0,20)
+        status.TextColor3 = Color3.fromRGB(232,185,255); status.Font = Enum.Font.GothamBold; status.TextSize = 14; status.TextStrokeTransparency = .2; status.Parent = gui
+        local function update() status.Text = tostring(model:GetAttribute("ActiveSkillEffects") or "") end
+        model:GetAttributeChangedSignal("ActiveSkillEffects"):Connect(update)
+        update()
+    end
 end
 return table.freeze(Appearance)

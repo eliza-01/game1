@@ -132,6 +132,20 @@ class DomainValidatorM167Tests(unittest.TestCase):
             check_character_animation(ROOT, issues.append, schema_text=schema, ui=ui, js=js, character_service_text=character_service)
         self.assertIn('animation resolver missing ResolveLocomotion', issues)
 
+    def test_animation_weapon_sets_include_dualswords(self):
+        _, _, character_service, _, schema, ui, js, _ = self.character_inputs()
+        required = ['hands', '1hs', '2hs', 'bow', 'dualswords']
+        diagnostic = 'character animation weapon sets must be hands, 1hs, 2hs, bow and dualswords'
+        for sets, valid in ((required, True), (required[:-1], False),
+                            (required + ['unknown'], False)):
+            with self.subTest(sets=sets):
+                with self.swap_read('assets/manifests/character-animations.json',
+                                    lambda text: json.dumps({**json.loads(text), 'weaponSets': sets})):
+                    issues = []
+                    check_character_animation(ROOT, issues.append, schema_text=schema, ui=ui,
+                                              js=js, character_service_text=character_service)
+                self.assertEqual(issues, [] if valid else [diagnostic])
+
     def test_animation_scaling_schema_contract(self):
         _, schema, ui, char_js, sources = self.animation_inputs()
         with self.swap_read('assets/manifests/animation-speed-scaling.json',
@@ -154,7 +168,7 @@ class DomainValidatorM167Tests(unittest.TestCase):
                 character_service_text=inputs[2], attack_text=read('src/server/combat/AttackService.luau'),
                 controller_runtime=controller, attack_controller_text=attack_controller, client_init_text=client_init,
             )
-        self.assertIn('weapon manifest must be game1 schema 2', issues)
+        self.assertIn('weapon manifest must be game1 schema 3', issues)
 
     def test_weapon_movement_contract(self):
         with self.swap_read('src/client/character/MovementController.luau',

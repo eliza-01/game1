@@ -24,7 +24,7 @@ function Service.Start(loadPrototype)
                 end
                 if not nextId then break end
                 attempted[nextId] = true
-                local ok, prototype = pcall(loadPrototype, tonumber(nextId), nextId)
+                local ok, prototype = pcall(loadPrototype, tonumber(nextId), nextId, nil, true)
                 if ok and prototype then
                     if wanted[nextId] then prototype.Parent = cache else prototype:Destroy() end
                 else

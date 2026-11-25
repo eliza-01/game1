@@ -11,7 +11,7 @@ local MeshPhysics = require(World:WaitForChild("MeshPhysicsCore"))
 local Service = {}
 local started = false
 
-local function loadPrototype(assetId, name, expectedParts)
+local function loadPrototype(assetId, name, expectedParts, allowAssembly)
 
     -- Prefer owned/shared model assets; fall back to the current API for a
     -- properly permitted third-party asset. No client can submit asset IDs.
@@ -24,29 +24,30 @@ local function loadPrototype(assetId, name, expectedParts)
         return nil
     end
     local visual = nil
+    local visuals = {}
+    local publishedPivot = wrapper:GetPivot()
     local numberVisuals = 0
     for _, part in ipairs(wrapper:GetDescendants()) do
         -- Historical published Model Assets may still contain the retired
         -- col_mesh. M342 removed it from authoring/Studio, not from immutable
         -- Roblox publications. Never include it in a client visual template.
         if part:IsA("MeshPart") and not MeshPhysics.IsLocationCarrier(part)
-            and not MeshPhysics.IsCollider(part.Name) then
+            and not MeshPhysics.IsCollider(part.Name)
+            and part:GetAttribute("Game1DecoPhysicsOnly") ~= true then
             numberVisuals += 1
             visual = part
+            table.insert(visuals, part)
         end
     end
     if expectedParts then
         local found = {}
-        for _, candidate in ipairs(wrapper:GetDescendants()) do
-            if candidate:IsA("MeshPart") and not MeshPhysics.IsLocationCarrier(candidate)
-                and not MeshPhysics.IsCollider(candidate.Name) then
-                if found[candidate.Name] then
-                    warn("[game1][LOD] duplicate composite part: " .. candidate.Name)
-                    wrapper:Destroy()
-                    return nil
-                end
-                found[candidate.Name] = candidate
+        for _, candidate in ipairs(visuals) do
+            if found[candidate.Name] then
+                warn("[game1][LOD] duplicate composite part: " .. candidate.Name)
+                wrapper:Destroy()
+                return nil
             end
+            found[candidate.Name] = candidate
         end
         if numberVisuals ~= #expectedParts then
             warn("[game1][LOD] composite model count mismatched: " .. name)
@@ -89,6 +90,31 @@ local function loadPrototype(assetId, name, expectedParts)
         wrapper:Destroy()
         return template
     end
+    -- Location LODs can be authored as several material/geometry meshes.
+    -- Keep their original relative transforms and names, never include a rig,
+    -- collision mesh, script or effect. Houses/resident effects still use one.
+    if allowAssembly and numberVisuals > 1 and numberVisuals <= 64 then
+        local assembly = Instance.new("Model")
+        assembly.Name = name
+        for _, source in ipairs(visuals) do
+            local copy = source:Clone()
+            for _, descendant in ipairs(copy:GetDescendants()) do
+                if not descendant:IsA("SurfaceAppearance") then descendant:Destroy() end
+            end
+            copy.Anchored = true
+            copy.CanCollide = false
+            copy.CanTouch = false
+            copy.CanQuery = false
+            copy.Parent = assembly
+        end
+        assembly.WorldPivot = publishedPivot
+        -- WorldPivot itself is not replicated; carry the authored frame explicitly.
+        assembly:SetAttribute("Game1LodPublishedPivot", publishedPivot)
+        assembly:SetAttribute("Game1LodVisualCount", numberVisuals)
+        wrapper:Destroy()
+        print(("[game1][LOD] assembly ready %s (%s) · %d visual MeshParts"):format(name, tostring(assetId), numberVisuals))
+        return assembly
+    end
     if numberVisuals ~= 1 then
         warn("[game1][LOD] " .. name .. " has " .. numberVisuals .. " visual MeshParts; expected one")
         wrapper:Destroy()
@@ -101,6 +127,8 @@ local function loadPrototype(assetId, name, expectedParts)
             instance:Destroy()
         end
     end
+    template:SetAttribute("Game1LodSourceName", visual.Name)
+    template:SetAttribute("Game1LodPublishedPivot", publishedPivot)
     template.Name = name
     template.Anchored = true
     template.CanCollide = false
@@ -155,7 +183,7 @@ function Service.Start()
                         end
                     end
                 end
-                local prototype = loadPrototype(id, name, expectedParts)
+                local prototype = loadPrototype(id, name, expectedParts, variant ~= "FULL")
                 if prototype then
                     prototype.Parent = cache
                     count += 1

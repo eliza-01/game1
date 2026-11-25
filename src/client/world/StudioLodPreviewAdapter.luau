@@ -8,6 +8,7 @@ local Contract = require(World:WaitForChild("StudioLodPreviewContract"))
 local Policy = require(World:WaitForChild("LocationLodDistancePolicy"))
 local Physics = require(World:WaitForChild("MeshPhysicsCore"))
 local Registry = require(World:WaitForChild("LocationAssetRegistry"))
+local LodAssembly = require(script.Parent:WaitForChild("LocationLodAssembly"))
 local Adapter = {}
 Adapter.__index = Adapter
 
@@ -44,10 +45,11 @@ local function restore(record)
     record.assetId = nil
 end
 
-function Adapter.new(originalTransparency)
+function Adapter.new(originalTransparency, paint)
     if not RunService:IsStudio() then return nil end
-    local self = setmetatable({inventory={}, records={}, managed={}, dirty=true, digest=nil, failedTemplates={}}, Adapter)
+    local self = setmetatable({inventory={}, records={}, managed={}, dirty=true, digest=nil}, Adapter)
     self.originalTransparency = originalTransparency
+    self.paint = paint
     self.folder = Instance.new("Folder")
     self.folder.Name = "Game1StudioLodVisuals"
     self.folder.Parent = Workspace
@@ -85,7 +87,6 @@ function Adapter:_refresh()
     self.dirty = false
     self.digest = digest
     self.data = data
-    self.failedTemplates = {}
     -- Reconcile ownership by exact live Instance, never by name alone.
     local nextRecords = {}
     local nextManaged = {}
@@ -99,9 +100,9 @@ function Adapter:_refresh()
         local record = nextRecords[key]
         if not record then
             local old = self.records[key]
-            record = {root=entry.root, house=entry.house, parts={}, spec=spec, mode=profile.mode,
+            record = {root=entry.root, slug=entry.slug, house=entry.house, parts={}, spec=spec, mode=profile.mode,
                 actual=old and old.actual, desired=old and old.desired, assetId=old and old.assetId,
-                clone=old and old.clone, distance=math.huge}
+                clone=old and old.clone, assembly=old and old.assembly, visualCost=old and old.visualCost, distance=math.huge}
             nextRecords[key] = record
         end
         local old = self.records[key]
@@ -113,7 +114,10 @@ function Adapter:_refresh()
         local nextRecord = nextRecords[key]
         if not nextRecord then restore(old) else
             for part, original in pairs(old.parts) do
-                if nextRecord.parts[part] == nil and part.Parent then part.LocalTransparencyModifier = original end
+                if nextRecord.parts[part] == nil then
+                    nextRecord.actual = nil
+                    if part.Parent then part.LocalTransparencyModifier = original end
+                end
             end
         end
     end
@@ -128,6 +132,12 @@ function Adapter:Resolve(cameraPosition)
         local part, count = nil, 0
         for mesh in pairs(record.parts) do part = mesh; count += 1 end
         record.source = if count == 1 then part else nil
+        record.sourceParts = {}
+        record.sourceNames = {}
+        for mesh in pairs(record.parts) do
+            table.insert(record.sourceParts, mesh)
+            record.sourceNames[mesh.Name] = mesh
+        end
         if record.mode == "off" then
             record.distance = 0
             record.desired = "FULL"
@@ -139,10 +149,8 @@ function Adapter:Resolve(cameraPosition)
                 mode=mode, lod1=spec.lod1, hide=spec.hide, hysteresis=self.data.hysteresis})
         else
             record.distance = (cameraPosition - record.root:GetPivot().Position).Magnitude
-            -- Composite FULL meshes cannot safely be replaced by an arbitrary
-            -- one-mesh template in the editable Place. Keep FULL until hide.
             local mode = record.mode
-            if not record.source or record.spec.lod1 == "" then mode = "full"
+            if record.spec.lod1 == "" then mode = "full"
             elseif mode == "lod2" and record.spec.lod2 == "" then mode = "lod1" end
             record.desired = Policy.Resolve(record.distance, record.desired, Policy.WithHysteresis(record.spec.distances, self.data.hysteresis), mode)
         end
@@ -183,26 +191,55 @@ function Adapter:Step(budget)
         local desired = record.desired
         local cost = 0
         for _ in pairs(record.parts) do cost += 1 end
-        cost = math.min(budget, math.max(1, cost))
-        if changes + cost > budget then continue end
+        cost = math.min(budget, math.max(1, cost, record.visualCost or 1))
         local id = if desired == "LOD1" then (if record.house then record.spec.assetId else record.spec.lod1)
             elseif desired == "LOD2" then record.spec.lod2 else nil
         if desired == record.actual and id == record.assetId then continue end
         local replacement = nil
+        local assembly = false
         if id then
             local template = cache and cache:FindFirstChild(id)
-            if template and template:IsA("MeshPart") and record.source and not self.failedTemplates[id] then
+            local templateCount = if template then LodAssembly.Count(template) else 0
+            cost = math.min(budget, math.max(cost, templateCount))
+            if changes + cost > budget then continue end
+            if templateCount > 0 and record.failedTemplate ~= template then
                 local ok, reason = pcall(function()
-                    replacement = template:Clone()
-                    replacement.Name = record.source.Name .. "__PreviewLOD"
-                    replacement.CFrame = record.source.CFrame
-                    replacement.Size = record.source.Size
-                    copyAppearance(replacement, record.source)
-                    replacement.Parent = self.folder
+                    local asset = if not record.house then Registry.assets[record.slug] else nil
+                    -- A known FULL set can arrive piecemeal through native streaming.
+                    if asset then
+                        for name in pairs(asset.meshOptions or {}) do
+                            if name ~= "rig_carrier" and not Physics.IsCollider(name)
+                                and not record.sourceNames[name] then return end
+                        end
+                    end
+                    if template:IsA("MeshPart") and record.source then
+                        replacement = template:Clone()
+                        replacement.Name = record.source.Name .. "__PreviewLOD"
+                        replacement.CFrame = record.source.CFrame
+                        replacement.Size = record.source.Size
+                        copyAppearance(replacement, record.source)
+                    elseif not record.house then
+                        -- Only substitute once the complete known FULL set is
+                        -- present (native streaming can deliver children late).
+                        if not asset then return end
+                        local assemblyError
+                        replacement, assemblyError = LodAssembly.Create(template, record.root:GetPivot(), record.sourceParts, function(mesh)
+                            local match = LodAssembly.AppearanceName(mesh, record.sourceNames)
+                            if match then copyAppearance(mesh, record.sourceNames[match])
+                            elseif record.source then copyAppearance(mesh, record.source)
+                            else self.paint(mesh, asset, true) end
+                        end)
+                        if assemblyError then error(assemblyError) end
+                        if replacement then
+                            assembly = true
+                            replacement.Name = record.root.Name .. "__PreviewLOD"
+                        end
+                    end
+                    if replacement then replacement.Parent = self.folder end
                 end)
                 if not ok then
                     if replacement then replacement:Destroy(); replacement = nil end
-                    self.failedTemplates[id] = true
+                    record.failedTemplate = template
                     warn("[game1][LOD preview] could not present " .. id .. ": " .. tostring(reason))
                 end
             end
@@ -213,8 +250,11 @@ function Adapter:Step(budget)
                 if desired == record.actual then continue end
             end
         end
+        if changes + cost > budget then continue end
         if record.clone then record.clone:Destroy() end
         record.clone = replacement
+        record.assembly = assembly
+        record.visualCost = if replacement then (if assembly then #replacement:GetChildren() else 1) else nil
         for part, original in pairs(record.parts) do
             if part:IsDescendantOf(Workspace) then
                 part.LocalTransparencyModifier = if desired == "FULL" then original else 1
@@ -229,7 +269,9 @@ end
 
 function Adapter:FollowMoving()
     for _, record in pairs(self.records) do
-        if record.clone and record.source and record.source:IsDescendantOf(Workspace) then
+        if record.clone and record.assembly and record.root:IsDescendantOf(Workspace) then
+            record.clone:PivotTo(record.root:GetPivot())
+        elseif record.clone and record.source and record.source:IsDescendantOf(Workspace) then
             record.clone.CFrame = record.source.CFrame
             record.clone.Size = record.source.Size
             record.clone.Color = record.source.Color

@@ -10,6 +10,7 @@ local Contract = require(World:WaitForChild("LocationRuntimeManifestContract"))
 local Policy = require(World:WaitForChild("LocationLodDistancePolicy"))
 local HouseVisualAdapter = require(script.Parent:WaitForChild("HouseVisualAdapter"))
 local LocationCompositeVisual = require(script.Parent:WaitForChild("LocationCompositeVisual"))
+local LodAssembly = require(script.Parent:WaitForChild("LocationLodAssembly"))
 local Appearance = require(World:WaitForChild("RuntimeVisualAppearance"))
 local Streamer = {}
 local started = false
@@ -68,9 +69,29 @@ local function transform(values)
     return CFrame.new(table.unpack(values))
 end
 
-local function paint(mesh, asset)
+local missingAppearance = {}
+local function paint(mesh, asset, reduced)
     -- The per-mesh selection is shared with registered Location Assets.
     local override = if typeof(asset.meshOptions) == "table" then asset.meshOptions[mesh.Name] else nil
+    if reduced and not override and typeof(asset.meshOptions) == "table" then
+        local name = LodAssembly.AppearanceName(mesh, asset.meshOptions)
+        override = name and asset.meshOptions[name]
+        if not override then
+            local only, count = nil, 0
+            for _, options in pairs(asset.meshOptions) do only = options; count += 1 end
+            if count == 1 then override = only
+            elseif count > 1 then
+                -- No arbitrary first material on a multi-material LOD. Keep
+                -- the publication appearance and diagnose an unmapped name.
+                local key = asset.slug .. "/" .. mesh.Name
+                if not missingAppearance[key] then
+                    missingAppearance[key] = true
+                    warn("[game1][LOD] no FULL appearance match: " .. key)
+                end
+                return
+            end
+        end
+    end
     local settings = if typeof(override) == "table" and override.appearanceMode then override else asset
     local ok = Appearance.Apply(mesh, {
         mode = settings.appearanceMode, -- includes material_atlas
@@ -79,7 +100,24 @@ local function paint(mesh, asset)
         textureId = settings.texture_asset_id or asset.textureAssetId,
         alpha = settings.alphaEnabled == true,
     })
+    if typeof(settings.doubleSided) == "boolean" then mesh.DoubleSided = settings.doubleSided end
     if not ok then warn("[game1][LOD] invalid runtime visual appearance: " .. mesh.Name) end
+end
+
+local function available(record, candidate, level)
+    if not candidate or (record.failedAssemblies and record.failedAssemblies[level] == candidate) then return false end
+    if level == "FULL" then
+        if record.components then
+            if not candidate:IsA("Model") then return false end
+            for _, component in ipairs(record.components) do
+                local mesh = candidate:FindFirstChild(component.name)
+                if not mesh or not mesh:IsA("MeshPart") then return false end
+            end
+            return true
+        end
+        return candidate:IsA("MeshPart")
+    end
+    return LodAssembly.Count(candidate) > 0
 end
 
 function Streamer.Start()
@@ -117,9 +155,18 @@ function Streamer.Start()
             table.insert(records, {
                 id = row.id, slug = row.slug, pivot = Vector3.new(row.pivot[1], row.pivot[2], row.pivot[3]),
                 cframe = transform(row.cframe), size = Vector3.new(table.unpack(row.size)),
+                pivotFrame = transform(row.pivot),
                 mode = manifest.modes[row.slug], distances = Policy.WithHysteresis(manifest.assetDistances[row.slug], manifest.hysteresis), desired = nil, actual = "UNLOADED", part = nil, distance = math.huge,
                 modelPath = row.modelPath, components = row.components,
             })
+            local record = records[#records]
+            record.fullBounds = {{CFrame=record.cframe, Size=record.size}}
+            if row.components then
+                record.fullBounds = {}
+                for _, component in ipairs(row.components) do
+                    table.insert(record.fullBounds, {CFrame=transform(component.cframe), Size=Vector3.new(table.unpack(component.size))})
+                end
+            end
         end
         cache = ReplicatedStorage:WaitForChild(Contract.TemplateFolder, 30)
         if not cache then
@@ -136,7 +183,7 @@ function Streamer.Start()
         preview = require(script.Parent:WaitForChild("StudioLodPreviewAdapter")).new(function(part)
             local record = visuals[part]
             return if record then record.original else part.LocalTransparencyModifier
-        end)
+        end, paint)
     end
     local elapsed = 0
     local visualElapsed = VISUAL_INTERVAL -- first distance test immediately
@@ -188,36 +235,51 @@ function Streamer.Start()
             local variant = record.desired
             local prototype = if variant ~= "UNLOADED"
                 then cache:FindFirstChild(record.slug .. "__" .. variant) else nil
-            -- During partial template loading we never create a bad fallback geometry.
-            if variant ~= "UNLOADED" and not prototype then
-                -- During partial staging prefer a lower-detail available template,
-                -- never invent a Mesh ID or modify desired distance state.
+            if variant ~= "UNLOADED" and not available(record, prototype, variant) then
+                prototype = nil
+                -- Never instantiate a partially replicated assembly. Preserve
+                -- a valid available detail level while the desired one loads.
                 for _, fallback in ipairs({"LOD1", "FULL"}) do
-                    prototype = cache:FindFirstChild(record.slug .. "__" .. fallback)
-                    if prototype then variant = fallback break end
+                    local candidate = cache:FindFirstChild(record.slug .. "__" .. fallback)
+                    if available(record, candidate, fallback) then prototype = candidate; variant = fallback; break end
                 end
-                if not prototype then variant = "UNLOADED" end
+                if not prototype then
+                    if record.part then continue end
+                    variant = "UNLOADED"
+                end
             end
-            if variant ~= "UNLOADED" and prototype and not prototype:IsA("MeshPart")
-                and not (variant == "FULL" and record.components and prototype:IsA("Model")) then
-                variant = "UNLOADED" -- invalid cache entry is never instantiated
-            end
-            -- Composite clones represent multiple real MeshPart operations;
-            -- charge them against the existing shared per-tick budget.
-            local cost = if record.components then math.min(MAX_CHANGES_PER_TICK,
-                math.max(1,#record.components)) else 1
+            local useAssembly = prototype and variant ~= "FULL"
+                and (record.components ~= nil or prototype:IsA("Model"))
+            local targetCost = if useAssembly then LodAssembly.Count(prototype)
+                elseif variant == "FULL" and record.components then #record.components else 1
+            local cost = math.min(MAX_CHANGES_PER_TICK, math.max(1, targetCost, record.visualCost or 1))
             if variant ~= record.actual and changes + cost <= MAX_CHANGES_PER_TICK then
                 local replacement = nil
-                if prototype and prototype:IsA("MeshPart") then
+                if useAssembly then
+                    local assemblyError
+                    replacement, assemblyError = LodAssembly.Create(prototype, record.pivotFrame, record.fullBounds, function(mesh)
+                        paint(mesh, Registry.assets[record.slug], true)
+                    end)
+                    if assemblyError then
+                        record.failedAssemblies = record.failedAssemblies or {}
+                        record.failedAssemblies[variant] = prototype
+                        warn("[game1][LOD] assembly placement failed: " .. record.slug .. " " .. tostring(assemblyError))
+                    end
+                    if replacement then
+                        replacement.Name = record.slug .. "__" .. record.id
+                        replacement.Parent = folder
+                    end
+                elseif prototype and prototype:IsA("MeshPart") then
                     replacement = prototype:Clone()
-                    replacement.Name = record.slug .. "__" .. record.id
+                    replacement.Name = LodAssembly.SourceName(prototype)
                     replacement.Anchored = true
                     replacement.CanCollide = false
                     replacement.CanTouch = false
                     replacement.CanQuery = false
                     replacement.Size = record.size
                     replacement.CFrame = record.cframe
-                    paint(replacement, Registry.assets[record.slug])
+                    paint(replacement, Registry.assets[record.slug], variant ~= "FULL")
+                    replacement.Name = record.slug .. "__" .. record.id
                     replacement.Parent = folder
                 elseif variant == "FULL" and record.components and prototype and prototype:IsA("Model") then
                     replacement = LocationCompositeVisual.Create(prototype, record, paint,
@@ -228,6 +290,7 @@ function Streamer.Start()
                 if replacement or variant == "UNLOADED" then
                     if record.part then record.part:Destroy() end
                     record.part = replacement
+                    record.visualCost = if replacement then targetCost else nil
                     record.actual = if replacement then variant else "UNLOADED"
                     changes += cost
                 end

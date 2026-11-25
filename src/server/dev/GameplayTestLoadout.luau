@@ -6,6 +6,7 @@ local Stats = require(script.Parent.Parent:WaitForChild("character"):WaitForChil
 local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
 local Appearance = require(script.Parent:WaitForChild("GameplayTestAppearance"))
 local Healing = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterHealing"))
+local Critical = require(Shared:WaitForChild("balance"):WaitForChild("CriticalStats"))
 local Loadout = {}
 local sessions: {[Player]: any} = {}
 
@@ -25,6 +26,11 @@ function Loadout.Validate(request: any): (any?, string?)
     local level, upgrade = request.level, request.upgrade
     local regen = if request.regen == nil then 0 else request.regen
     local vampiric = if request.vampiric == nil then 0 else request.vampiric
+    local critPercent = if request.critPercent == nil then 0 else request.critPercent
+    local critFlat = if request.critFlat == nil then 0 else request.critFlat
+    local critMultiplier = if request.critMultiplier == nil then Balance.Rules.critMultiplier else request.critMultiplier
+    local critValid, critReason = Critical.ValidateTest(critPercent, critFlat, critMultiplier)
+    if not critValid then return nil, critReason end
     local valid, recoveryReason = Healing.ValidateTestRates(regen, vampiric)
     if not valid then return nil, recoveryReason end
     if type(level) ~= "number" or level < 1 or level > #Balance.Monsters or level % 1 ~= 0 then return nil, "Invalid player level" end
@@ -43,7 +49,7 @@ function Loadout.Validate(request: any): (any?, string?)
         slug, placeholder = Weapons.TestModel(weapon.type)
         if not slug then return nil, "No synced model for " .. weapon.type end
     end
-    return {level=level, weapon=weapon, armor=armor, upgrade=upgrade, slug=slug, placeholder=placeholder, regen=regen, vampiric=vampiric}, nil
+    return {level=level, weapon=weapon, armor=armor, upgrade=upgrade, slug=slug, placeholder=placeholder, regen=regen, vampiric=vampiric, critPercent=critPercent, critFlat=critFlat, critMultiplier=critMultiplier}, nil
 end
 local function applyRecovery(character: Model, selection: any)
     character:SetAttribute("GameplayTestRegen", selection.regen)
@@ -81,6 +87,12 @@ function Loadout.Apply(player: Player, character: Model): (boolean, string?)
     else
         Weapons.Unequip(character)
     end
+    -- Named source is replaced (never accumulated) on every Apply / Start / respawn.
+    Stats.SetModifierSource(character, "gameplay-test-critical", {
+        CritChancePercent=selection.critPercent,
+        CritChanceFlat=selection.critFlat,
+        CritMultiplier=selection.critMultiplier - Balance.Rules.critMultiplier,
+    })
     character:SetAttribute("GameplayTestError", if ok then nil else tostring(reason))
     character:SetAttribute("GameplayTestArmorId", selection.armor.id)
     character:SetAttribute("GameplayTestUpgrade", selection.upgrade)

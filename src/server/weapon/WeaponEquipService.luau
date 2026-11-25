@@ -24,7 +24,7 @@ local function gameplayRow(slug: string, testStats: any?, upgrade: number?): any
     row.rarity = stats.rarity
     row.attackRadiusStuds = stats.radius
     row.meleeArcAngleDegrees = stats.arc
-    row.statModifiers = {Damage = Balance.WeaponDamage(stats, upgrade or 0), AttackSpeed = stats.attackSpeedDelta}
+    row.statModifiers = {Damage = Balance.WeaponDamage(stats, upgrade or 0), AttackSpeed = stats.attackSpeedDelta, CritChance = stats.critChance - Balance.Rules.critChance}
     return row
 end
 local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))

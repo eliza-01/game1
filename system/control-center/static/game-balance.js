@@ -4,8 +4,8 @@
   const gradeNames=['Newbie','D','C','B','A','S','SS','SSS'];
   window.game1EquipmentGrade=level=>{const band=Math.max(0,Math.min(7,Math.floor(level/10)));return {name:gradeNames[band]+(level%10>=5?'+':''),required:Math.max(1,band*10)}};
   const groups={rules:'Character',levels:'Levels',weapons:'Weapons',armor:'Armor',monsters:'Monsters',bindings:'Model bindings'};
-  const fields={levels:['level','hp','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','level','hp','damage','xp','gold']};
-  const names={level:'LVL',hp:'HP',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
+  const fields={levels:['level','hp','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','level','hp','damage','critChance','xp','gold']};
+  const names={level:'LVL',hp:'HP',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
   const labels={weapon:'Оружие',armor:'Броня',monster:'Монстр'};
   const label=id=>{const [kind,n]=id.split('_');return `${labels[kind]||kind}_${n}`};
   const node=(tag,text)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el};
@@ -31,7 +31,7 @@
     if(!snapshot)return;
     const d=snapshot.balance;
     if(tab==='rules'){
-      const body=table(['Parameter','Value']);for(const [key,val] of Object.entries(d.rules)){const tr=node('tr');cell(tr,key);cell(tr,number(val,v=>d.rules[key]=v));body.append(tr)}return;
+      const body=table(['Parameter','Value']);for(const [key,val] of Object.entries(d.rules)){const tr=node('tr');cell(tr,({critChance:'Unarmed crit %',maxCritChance:'Max crit %',critMultiplier:'Crit damage ×'}[key]||key));cell(tr,number(val,v=>d.rules[key]=v));body.append(tr)}return;
     }
     if(tab==='bindings'){
       bindingTable('Weapon model',snapshot.weaponModels,d.weaponBindings,d.weapons);

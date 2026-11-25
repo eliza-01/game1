@@ -10,7 +10,7 @@ DOCK = (ROOT / 'src/client/dev/StudioDebugDock.luau').read_text(encoding='utf8')
 
 class CompactGameplay(unittest.TestCase):
     def test_bottom_left_and_order(self):
-        self.assertIn('PANEL_WIDTH, PANEL_HEIGHT = 380, 332', UI)
+        self.assertIn('PANEL_WIDTH, PANEL_HEIGHT = 380, 432', UI)
         self.assertIn('UDim2.new(0.5, -3, 1, 0)', UI)
         self.assertIn('panel.AnchorPoint = Vector2.new(0, 1)', DOCK)
         self.assertIn('panel.Position = UDim2.new(0, 8, 1, -8)', DOCK)

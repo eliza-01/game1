@@ -7,12 +7,13 @@ local TextService = game:GetService("TextService")
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local Shared = RS:WaitForChild("Game1Shared")
 local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
+local Critical = require(Shared:WaitForChild("balance"):WaitForChild("CriticalStats"))
 local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Controller = {}
 local started = false
 local PANEL_ID = "GP"
 local OPEN = "Game1DebugPanelOpen"
-local PANEL_WIDTH, PANEL_HEIGHT = 380, 332
+local PANEL_WIDTH, PANEL_HEIGHT = 380, 432
 local colors = {panel=Color3.fromRGB(24,33,39), control=Color3.fromRGB(44,59,66), text=Color3.fromRGB(240,239,232), muted=Color3.fromRGB(165,180,185), accent=Color3.fromRGB(78,132,110)}
 
 local function rounded(item: GuiObject)
@@ -92,6 +93,16 @@ local function recoveryField(parent: Frame, caption: string, changed: () -> ()):
         return tonumber((input.Text:gsub(",", ".")))
     end
 end
+local function numericField(parent: Frame, caption: string, value: number, changed: () -> ()): () -> number?
+    local title = label(parent, caption, UDim2.new(1, 0, 0, 15)); title.TextColor3 = colors.muted; title.TextSize = 12
+    local input = Instance.new("TextBox")
+    input.Name = "Value"; input.Text = tostring(value); input.ClearTextOnFocus = false
+    input.Size = UDim2.fromOffset(72, 30); input.Position = UDim2.fromOffset(0, 16)
+    input.BackgroundColor3 = colors.control; input.TextColor3 = colors.text; input.BorderSizePixel = 0
+    input.Font = Enum.Font.Gotham; input.TextSize = 14; input.Parent = parent; rounded(input)
+    input:GetPropertyChangedSignal("Text"):Connect(changed)
+    return function() return tonumber((input.Text:gsub(",", "."))) end
+end
 local function wrap(value: number, delta: number, maximum: number): number
     return (value - 1 + delta) % maximum + 1
 end
@@ -139,12 +150,14 @@ function Controller.Start()
             level = math.max(level, minimumLevel()); refreshLevel()
         end
         local refreshUpgrade: (() -> ())? = nil
+        local refreshCrit: (() -> ())? = nil
         picker(cell(first, "Weapon"), "Weapon", function()
             local w = weapon(); local grade, required = Balance.Grade.ForLevel(w.level)
             return if w.id == "" then "Hands" else ("%s %s\n%s · req %d"):format(w.id:sub(-3), w.type, grade, required)
         end, function(d)
             weaponIndex=wrap(weaponIndex,d,#weapons); ensureLevel()
             if refreshUpgrade then refreshUpgrade() end
+            if refreshCrit then refreshCrit() end
         end)
         local second = row(body, 46); horizontal(second)
         picker(cell(second, "Armor"), "Armor", function()
@@ -175,6 +188,22 @@ function Controller.Start()
         end
         local readRegen = recoveryField(cell(recoveryRow, "Regeneration"), "Regen · HP/sec", recoveryChanged)
         local readVampiric = recoveryField(cell(recoveryRow, "Vampiric"), "Vampiric · %", recoveryChanged)
+        local critRow = row(body, 46); horizontal(critRow)
+        local function critChanged() if refreshCrit then refreshCrit() end end
+        local readCritPercent = numericField(cell(critRow, "CritPercent"), "Crit buff · %", 0, critChanged)
+        local readCritFlat = numericField(cell(critRow, "CritFlat"), "Crit bonus · pp", 0, critChanged)
+        local critDamageRow = row(body, 46); horizontal(critDamageRow)
+        local readCritMultiplier = numericField(cell(critDamageRow, "CritMultiplier"), "Crit damage · ×", Balance.Rules.critMultiplier, critChanged)
+        local preview = cell(critDamageRow, "CritPreview")
+        local previewTitle = label(preview, "Effective crit", UDim2.new(1, 0, 0, 15)); previewTitle.TextColor3 = colors.muted; previewTitle.TextSize = 12
+        local previewValue = label(preview, "", UDim2.new(1, 0, 0, 30)); previewValue.Position = UDim2.fromOffset(0, 16)
+        refreshCrit = function()
+            local percent, flat, multiplier = readCritPercent(), readCritFlat(), readCritMultiplier()
+            if not percent or not flat or not multiplier or not Critical.ValidateTest(percent, flat, multiplier) then previewValue.Text = "Invalid"; return end
+            local base = if weapon().id == "" then Balance.Rules.critChance else weapon().critChance
+            previewValue.Text = ("%.1f%% · ×%.2f"):format(Critical.Chance(base, percent, flat), multiplier)
+        end
+        refreshCrit()
         local busy = false
         local queuedAction: string? = nil
         local queuedRecovery = false
@@ -204,8 +233,13 @@ function Controller.Start()
                     return
                 end
             end
+            local critPercent, critFlat, critMultiplier = readCritPercent(), readCritFlat(), readCritMultiplier()
+            if action == "enter" or action == "apply" or action == "start" then
+                local valid, reason = Critical.ValidateTest(critPercent, critFlat, critMultiplier)
+                if not valid then status.Text = tostring(reason); return end
+            end
             busy = true; status.Text = "Working…"
-            local payload = {level=level,weapon=weapon().id,armor=armor().id,upgrade=upgrade,monsterLevel=monsterLevel,count=count,regen=regen,vampiric=vampiric}
+            local payload = {level=level,weapon=weapon().id,armor=armor().id,upgrade=upgrade,monsterLevel=monsterLevel,count=count,regen=regen,vampiric=vampiric,critPercent=critPercent,critFlat=critFlat,critMultiplier=critMultiplier}
             task.spawn(function()
                 -- Respect the server's 0.35 second minimum between requests.
                 local delaySeconds = 0.4 - (os.clock() - lastRequestAt)

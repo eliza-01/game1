@@ -232,6 +232,7 @@ return table.freeze({
     }),
     ["monsters"] = table.freeze({
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 10,
             ["gold"] = 25,
             ["hp"] = 96,
@@ -240,6 +241,7 @@ return table.freeze({
             ["xp"] = 12,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 12,
             ["gold"] = 30,
             ["hp"] = 102,
@@ -248,6 +250,7 @@ return table.freeze({
             ["xp"] = 21,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 15,
             ["gold"] = 32,
             ["hp"] = 108,
@@ -256,6 +259,7 @@ return table.freeze({
             ["xp"] = 32,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 17,
             ["gold"] = 35,
             ["hp"] = 120,
@@ -264,6 +268,7 @@ return table.freeze({
             ["xp"] = 42,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 20,
             ["gold"] = 35,
             ["hp"] = 126,
@@ -272,6 +277,7 @@ return table.freeze({
             ["xp"] = 54,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 23,
             ["gold"] = 40,
             ["hp"] = 138,
@@ -280,6 +286,7 @@ return table.freeze({
             ["xp"] = 65,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 27,
             ["gold"] = 40,
             ["hp"] = 144,
@@ -288,6 +295,7 @@ return table.freeze({
             ["xp"] = 77,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 30,
             ["gold"] = 45,
             ["hp"] = 150,
@@ -296,6 +304,7 @@ return table.freeze({
             ["xp"] = 89,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 34,
             ["gold"] = 45,
             ["hp"] = 162,
@@ -304,6 +313,7 @@ return table.freeze({
             ["xp"] = 110,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 37,
             ["gold"] = 50,
             ["hp"] = 300,
@@ -312,6 +322,7 @@ return table.freeze({
             ["xp"] = 133,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 41,
             ["gold"] = 53,
             ["hp"] = 318,
@@ -320,6 +331,7 @@ return table.freeze({
             ["xp"] = 150,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 46,
             ["gold"] = 56,
             ["hp"] = 342,
@@ -328,6 +340,7 @@ return table.freeze({
             ["xp"] = 168,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 50,
             ["gold"] = 59,
             ["hp"] = 360,
@@ -336,6 +349,7 @@ return table.freeze({
             ["xp"] = 187,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 55,
             ["gold"] = 62,
             ["hp"] = 372,
@@ -344,6 +358,7 @@ return table.freeze({
             ["xp"] = 206,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 59,
             ["gold"] = 65,
             ["hp"] = 384,
@@ -352,6 +367,7 @@ return table.freeze({
             ["xp"] = 225,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 64,
             ["gold"] = 68,
             ["hp"] = 396,
@@ -360,6 +376,7 @@ return table.freeze({
             ["xp"] = 245,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 69,
             ["gold"] = 71,
             ["hp"] = 414,
@@ -368,6 +385,7 @@ return table.freeze({
             ["xp"] = 265,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 73,
             ["gold"] = 74,
             ["hp"] = 426,
@@ -376,6 +394,7 @@ return table.freeze({
             ["xp"] = 285,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 78,
             ["gold"] = 77,
             ["hp"] = 438,
@@ -384,6 +403,7 @@ return table.freeze({
             ["xp"] = 305,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 84,
             ["gold"] = 80,
             ["hp"] = 576,
@@ -392,6 +412,7 @@ return table.freeze({
             ["xp"] = 326,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 89,
             ["gold"] = 83,
             ["hp"] = 600,
@@ -400,6 +421,7 @@ return table.freeze({
             ["xp"] = 346,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 94,
             ["gold"] = 86,
             ["hp"] = 624,
@@ -408,6 +430,7 @@ return table.freeze({
             ["xp"] = 367,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 99,
             ["gold"] = 89,
             ["hp"] = 648,
@@ -416,6 +439,7 @@ return table.freeze({
             ["xp"] = 387,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 105,
             ["gold"] = 92,
             ["hp"] = 672,
@@ -424,6 +448,7 @@ return table.freeze({
             ["xp"] = 408,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 110,
             ["gold"] = 95,
             ["hp"] = 696,
@@ -432,6 +457,7 @@ return table.freeze({
             ["xp"] = 429,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 116,
             ["gold"] = 98,
             ["hp"] = 714,
@@ -440,6 +466,7 @@ return table.freeze({
             ["xp"] = 450,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 121,
             ["gold"] = 101,
             ["hp"] = 738,
@@ -448,6 +475,7 @@ return table.freeze({
             ["xp"] = 471,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 127,
             ["gold"] = 104,
             ["hp"] = 762,
@@ -456,6 +484,7 @@ return table.freeze({
             ["xp"] = 493,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 133,
             ["gold"] = 107,
             ["hp"] = 786,
@@ -464,6 +493,7 @@ return table.freeze({
             ["xp"] = 514,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 139,
             ["gold"] = 110,
             ["hp"] = 900,
@@ -472,6 +502,7 @@ return table.freeze({
             ["xp"] = 535,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 145,
             ["gold"] = 113,
             ["hp"] = 936,
@@ -480,6 +511,7 @@ return table.freeze({
             ["xp"] = 556,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 151,
             ["gold"] = 116,
             ["hp"] = 972,
@@ -488,6 +520,7 @@ return table.freeze({
             ["xp"] = 578,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 157,
             ["gold"] = 119,
             ["hp"] = 1014,
@@ -496,6 +529,7 @@ return table.freeze({
             ["xp"] = 599,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 164,
             ["gold"] = 122,
             ["hp"] = 1050,
@@ -504,6 +538,7 @@ return table.freeze({
             ["xp"] = 621,
         }),
         table.freeze({
+            ["critChance"] = 5,
             ["damage"] = 170,
             ["gold"] = 125,
             ["hp"] = 1086,
@@ -515,9 +550,10 @@ return table.freeze({
     ["rules"] = table.freeze({
         ["baseAttackSpeed"] = 180,
         ["baseDamage"] = 5,
-        ["critChance"] = 8,
+        ["critChance"] = 1,
         ["critMultiplier"] = 2,
         ["headshotMultiplier"] = 1.5,
+        ["maxCritChance"] = 50,
         ["maxUpgrade"] = 10,
         ["upgradePercent"] = 6.67,
     }),
@@ -543,6 +579,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = 0,
+            ["critChance"] = 8,
             ["damage"] = 15,
             ["id"] = "weapon_001",
             ["level"] = 1,
@@ -555,6 +592,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 80,
             ["attackSpeedDelta"] = 26,
+            ["critChance"] = 12,
             ["damage"] = 13,
             ["id"] = "weapon_002",
             ["level"] = 1,
@@ -567,6 +605,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 125,
             ["attackSpeedDelta"] = -26,
+            ["critChance"] = 8,
             ["damage"] = 19,
             ["id"] = "weapon_003",
             ["level"] = 1,
@@ -579,6 +618,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = -41,
+            ["critChance"] = 12,
             ["damage"] = 21,
             ["id"] = "weapon_004",
             ["level"] = 1,
@@ -591,6 +631,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = 0,
+            ["critChance"] = 8,
             ["damage"] = 40,
             ["id"] = "weapon_005",
             ["level"] = 10,
@@ -603,6 +644,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 80,
             ["attackSpeedDelta"] = 26,
+            ["critChance"] = 12,
             ["damage"] = 34,
             ["id"] = "weapon_006",
             ["level"] = 10,
@@ -615,6 +657,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 125,
             ["attackSpeedDelta"] = -26,
+            ["critChance"] = 8,
             ["damage"] = 50,
             ["id"] = "weapon_007",
             ["level"] = 10,
@@ -627,6 +670,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = -41,
+            ["critChance"] = 12,
             ["damage"] = 53,
             ["id"] = "weapon_008",
             ["level"] = 10,
@@ -639,6 +683,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = 0,
+            ["critChance"] = 8,
             ["damage"] = 75,
             ["id"] = "weapon_009",
             ["level"] = 20,
@@ -651,6 +696,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 80,
             ["attackSpeedDelta"] = 26,
+            ["critChance"] = 12,
             ["damage"] = 65,
             ["id"] = "weapon_010",
             ["level"] = 20,
@@ -663,6 +709,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 125,
             ["attackSpeedDelta"] = -26,
+            ["critChance"] = 8,
             ["damage"] = 92,
             ["id"] = "weapon_011",
             ["level"] = 20,
@@ -675,6 +722,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = -41,
+            ["critChance"] = 12,
             ["damage"] = 99,
             ["id"] = "weapon_012",
             ["level"] = 20,
@@ -687,6 +735,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = 0,
+            ["critChance"] = 8,
             ["damage"] = 120,
             ["id"] = "weapon_013",
             ["level"] = 30,
@@ -699,6 +748,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 80,
             ["attackSpeedDelta"] = 26,
+            ["critChance"] = 12,
             ["damage"] = 104,
             ["id"] = "weapon_014",
             ["level"] = 30,
@@ -711,6 +761,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 125,
             ["attackSpeedDelta"] = -26,
+            ["critChance"] = 8,
             ["damage"] = 147,
             ["id"] = "weapon_015",
             ["level"] = 30,
@@ -723,6 +774,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = -41,
+            ["critChance"] = 12,
             ["damage"] = 157,
             ["id"] = "weapon_016",
             ["level"] = 30,
@@ -735,6 +787,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = 0,
+            ["critChance"] = 8,
             ["damage"] = 26,
             ["id"] = "weapon_017",
             ["level"] = 5,
@@ -747,6 +800,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 80,
             ["attackSpeedDelta"] = 26,
+            ["critChance"] = 12,
             ["damage"] = 22,
             ["id"] = "weapon_018",
             ["level"] = 5,
@@ -759,6 +813,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 125,
             ["attackSpeedDelta"] = -26,
+            ["critChance"] = 8,
             ["damage"] = 33,
             ["id"] = "weapon_019",
             ["level"] = 5,
@@ -771,6 +826,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = -41,
+            ["critChance"] = 12,
             ["damage"] = 35,
             ["id"] = "weapon_020",
             ["level"] = 5,
@@ -783,6 +839,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = 0,
+            ["critChance"] = 8,
             ["damage"] = 58,
             ["id"] = "weapon_021",
             ["level"] = 15,
@@ -795,6 +852,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 80,
             ["attackSpeedDelta"] = 26,
+            ["critChance"] = 12,
             ["damage"] = 50,
             ["id"] = "weapon_022",
             ["level"] = 15,
@@ -807,6 +865,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 125,
             ["attackSpeedDelta"] = -26,
+            ["critChance"] = 8,
             ["damage"] = 72,
             ["id"] = "weapon_023",
             ["level"] = 15,
@@ -819,6 +878,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = -41,
+            ["critChance"] = 12,
             ["damage"] = 77,
             ["id"] = "weapon_024",
             ["level"] = 15,
@@ -831,6 +891,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = 0,
+            ["critChance"] = 8,
             ["damage"] = 98,
             ["id"] = "weapon_025",
             ["level"] = 25,
@@ -843,6 +904,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 80,
             ["attackSpeedDelta"] = 26,
+            ["critChance"] = 12,
             ["damage"] = 85,
             ["id"] = "weapon_026",
             ["level"] = 25,
@@ -855,6 +917,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 125,
             ["attackSpeedDelta"] = -26,
+            ["critChance"] = 8,
             ["damage"] = 120,
             ["id"] = "weapon_027",
             ["level"] = 25,
@@ -867,6 +930,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = -41,
+            ["critChance"] = 12,
             ["damage"] = 128,
             ["id"] = "weapon_028",
             ["level"] = 25,
@@ -879,6 +943,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = 0,
+            ["critChance"] = 8,
             ["damage"] = 142,
             ["id"] = "weapon_029",
             ["level"] = 35,
@@ -891,6 +956,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 80,
             ["attackSpeedDelta"] = 26,
+            ["critChance"] = 12,
             ["damage"] = 124,
             ["id"] = "weapon_030",
             ["level"] = 35,
@@ -903,6 +969,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 125,
             ["attackSpeedDelta"] = -26,
+            ["critChance"] = 8,
             ["damage"] = 174,
             ["id"] = "weapon_031",
             ["level"] = 35,
@@ -915,6 +982,7 @@ return table.freeze({
         table.freeze({
             ["arc"] = 108,
             ["attackSpeedDelta"] = -41,
+            ["critChance"] = 12,
             ["damage"] = 185,
             ["id"] = "weapon_032",
             ["level"] = 35,

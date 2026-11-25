@@ -13,6 +13,7 @@ local DamageService = {}
 local criticalRandom = Random.new()
 local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
 local CRITICAL_DAMAGE_MULTIPLIER = Balance.Rules.critMultiplier
+local Critical = require(Shared:WaitForChild("balance"):WaitForChild("CriticalStats"))
 
 function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number, headshot: boolean?): (number, boolean)
     if not Isolation.Allows(attacker, target) then return 0, false end
@@ -29,9 +30,10 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number,
 
     local defense = math.max(0, tonumber(target:GetAttribute("Defense")) or 0)
     local normalizedRawDamage = math.max(0, tonumber(rawDamage) or 0)
-    local criticalChance = if attacker then math.clamp(tonumber(attacker:GetAttribute("CritChance")) or 0, 0, 100) else 0
+    local criticalChance = if attacker then Critical.Chance(tonumber(attacker:GetAttribute("CritChance")) or 0) else 0
     local critical = criticalChance > 0 and criticalRandom:NextNumber(0, 100) < criticalChance
-    local damageBeforeDefense = normalizedRawDamage * (if critical then CRITICAL_DAMAGE_MULTIPLIER else 1)
+    local criticalMultiplier = if attacker then Critical.Multiplier(attacker:GetAttribute("CritMultiplier")) else CRITICAL_DAMAGE_MULTIPLIER
+    local damageBeforeDefense = normalizedRawDamage * (if critical then criticalMultiplier else 1)
     local finalDamage = math.max(0, math.floor(damageBeforeDefense - defense))
     local hp = math.max(0, tonumber(target:GetAttribute("HP")) or 0)
     local newHP = math.max(0, hp - finalDamage)

@@ -9,5 +9,6 @@ CharacterStatsConfig.Default = table.freeze({
     AttackSpeed = Balance.Rules.baseAttackSpeed,
     RunSpeed = 50,
     CritChance = Balance.Rules.critChance,
+    CritMultiplier = Balance.Rules.critMultiplier,
 })
 return table.freeze(CharacterStatsConfig)

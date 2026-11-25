@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local CharacterMovementConfig = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("character"):WaitForChild("CharacterMovementConfig"))
 local Balance = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("balance"):WaitForChild("Balance"))
+local Critical = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("balance"):WaitForChild("CriticalStats"))
 local MonsterInitialAttributes = {}
 local function finite(value: any, fallback: number): number
     local number = tonumber(value)
@@ -44,7 +45,7 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
     local debugLocomotion = tostring(Workspace:GetAttribute("Game1MonsterDebugLocomotionMode") or "Walk")
     model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
-    model:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
+    model:SetAttribute("CritChance", Critical.Chance(if balance then balance.critChance else finite(stats.CritChance, 0)))
     model:SetAttribute("Defense", if balance then 0 else math.max(0, finite(stats.Defense, 0)))
     local aggressive = behavior.aggressive == true
     if record.testOwner then

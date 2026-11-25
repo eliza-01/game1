@@ -3,11 +3,12 @@
   "rules": {
     "baseDamage": 5,
     "baseAttackSpeed": 180,
-    "critChance": 8,
+    "critChance": 1,
     "upgradePercent": 6.67,
     "maxUpgrade": 10,
     "headshotMultiplier": 1.5,
-    "critMultiplier": 2
+    "critMultiplier": 2,
+    "maxCritChance": 50
   },
   "levels": [
     {
@@ -197,7 +198,8 @@
       "attackSpeedDelta": 0,
       "radius": 8,
       "arc": 108,
-      "upgradePrice": 30
+      "upgradePrice": 30,
+      "critChance": 8
     },
     {
       "id": "weapon_002",
@@ -209,7 +211,8 @@
       "attackSpeedDelta": 26,
       "radius": 3,
       "arc": 80,
-      "upgradePrice": 30
+      "upgradePrice": 30,
+      "critChance": 12
     },
     {
       "id": "weapon_003",
@@ -221,7 +224,8 @@
       "attackSpeedDelta": -26,
       "radius": 10,
       "arc": 125,
-      "upgradePrice": 30
+      "upgradePrice": 30,
+      "critChance": 8
     },
     {
       "id": "weapon_004",
@@ -233,7 +237,8 @@
       "attackSpeedDelta": -41,
       "radius": 40,
       "arc": 108,
-      "upgradePrice": 30
+      "upgradePrice": 30,
+      "critChance": 12
     },
     {
       "id": "weapon_005",
@@ -245,7 +250,8 @@
       "attackSpeedDelta": 0,
       "radius": 8,
       "arc": 108,
-      "upgradePrice": 300
+      "upgradePrice": 300,
+      "critChance": 8
     },
     {
       "id": "weapon_006",
@@ -257,7 +263,8 @@
       "attackSpeedDelta": 26,
       "radius": 3,
       "arc": 80,
-      "upgradePrice": 300
+      "upgradePrice": 300,
+      "critChance": 12
     },
     {
       "id": "weapon_007",
@@ -269,7 +276,8 @@
       "attackSpeedDelta": -26,
       "radius": 10,
       "arc": 125,
-      "upgradePrice": 300
+      "upgradePrice": 300,
+      "critChance": 8
     },
     {
       "id": "weapon_008",
@@ -281,7 +289,8 @@
       "attackSpeedDelta": -41,
       "radius": 40,
       "arc": 108,
-      "upgradePrice": 300
+      "upgradePrice": 300,
+      "critChance": 12
     },
     {
       "id": "weapon_009",
@@ -293,7 +302,8 @@
       "attackSpeedDelta": 0,
       "radius": 8,
       "arc": 108,
-      "upgradePrice": 600
+      "upgradePrice": 600,
+      "critChance": 8
     },
     {
       "id": "weapon_010",
@@ -305,7 +315,8 @@
       "attackSpeedDelta": 26,
       "radius": 3,
       "arc": 80,
-      "upgradePrice": 600
+      "upgradePrice": 600,
+      "critChance": 12
     },
     {
       "id": "weapon_011",
@@ -317,7 +328,8 @@
       "attackSpeedDelta": -26,
       "radius": 10,
       "arc": 125,
-      "upgradePrice": 600
+      "upgradePrice": 600,
+      "critChance": 8
     },
     {
       "id": "weapon_012",
@@ -329,7 +341,8 @@
       "attackSpeedDelta": -41,
       "radius": 40,
       "arc": 108,
-      "upgradePrice": 600
+      "upgradePrice": 600,
+      "critChance": 12
     },
     {
       "id": "weapon_013",
@@ -341,7 +354,8 @@
       "attackSpeedDelta": 0,
       "radius": 8,
       "arc": 108,
-      "upgradePrice": 900
+      "upgradePrice": 900,
+      "critChance": 8
     },
     {
       "id": "weapon_014",
@@ -353,7 +367,8 @@
       "attackSpeedDelta": 26,
       "radius": 3,
       "arc": 80,
-      "upgradePrice": 900
+      "upgradePrice": 900,
+      "critChance": 12
     },
     {
       "id": "weapon_015",
@@ -365,7 +380,8 @@
       "attackSpeedDelta": -26,
       "radius": 10,
       "arc": 125,
-      "upgradePrice": 900
+      "upgradePrice": 900,
+      "critChance": 8
     },
     {
       "id": "weapon_016",
@@ -377,7 +393,8 @@
       "attackSpeedDelta": -41,
       "radius": 40,
       "arc": 108,
-      "upgradePrice": 900
+      "upgradePrice": 900,
+      "critChance": 12
     },
     {
       "id": "weapon_017",
@@ -389,7 +406,8 @@
       "attackSpeedDelta": 0,
       "radius": 8,
       "arc": 108,
-      "upgradePrice": 150
+      "upgradePrice": 150,
+      "critChance": 8
     },
     {
       "id": "weapon_018",
@@ -401,7 +419,8 @@
       "attackSpeedDelta": 26,
       "radius": 3,
       "arc": 80,
-      "upgradePrice": 150
+      "upgradePrice": 150,
+      "critChance": 12
     },
     {
       "id": "weapon_019",
@@ -413,7 +432,8 @@
       "attackSpeedDelta": -26,
       "radius": 10,
       "arc": 125,
-      "upgradePrice": 150
+      "upgradePrice": 150,
+      "critChance": 8
     },
     {
       "id": "weapon_020",
@@ -425,7 +445,8 @@
       "attackSpeedDelta": -41,
       "radius": 40,
       "arc": 108,
-      "upgradePrice": 150
+      "upgradePrice": 150,
+      "critChance": 12
     },
     {
       "id": "weapon_021",
@@ -437,7 +458,8 @@
       "attackSpeedDelta": 0,
       "radius": 8,
       "arc": 108,
-      "upgradePrice": 450
+      "upgradePrice": 450,
+      "critChance": 8
     },
     {
       "id": "weapon_022",
@@ -449,7 +471,8 @@
       "attackSpeedDelta": 26,
       "radius": 3,
       "arc": 80,
-      "upgradePrice": 450
+      "upgradePrice": 450,
+      "critChance": 12
     },
     {
       "id": "weapon_023",
@@ -461,7 +484,8 @@
       "attackSpeedDelta": -26,
       "radius": 10,
       "arc": 125,
-      "upgradePrice": 450
+      "upgradePrice": 450,
+      "critChance": 8
     },
     {
       "id": "weapon_024",
@@ -473,7 +497,8 @@
       "attackSpeedDelta": -41,
       "radius": 40,
       "arc": 108,
-      "upgradePrice": 450
+      "upgradePrice": 450,
+      "critChance": 12
     },
     {
       "id": "weapon_025",
@@ -485,7 +510,8 @@
       "attackSpeedDelta": 0,
       "radius": 8,
       "arc": 108,
-      "upgradePrice": 750
+      "upgradePrice": 750,
+      "critChance": 8
     },
     {
       "id": "weapon_026",
@@ -497,7 +523,8 @@
       "attackSpeedDelta": 26,
       "radius": 3,
       "arc": 80,
-      "upgradePrice": 750
+      "upgradePrice": 750,
+      "critChance": 12
     },
     {
       "id": "weapon_027",
@@ -509,7 +536,8 @@
       "attackSpeedDelta": -26,
       "radius": 10,
       "arc": 125,
-      "upgradePrice": 750
+      "upgradePrice": 750,
+      "critChance": 8
     },
     {
       "id": "weapon_028",
@@ -521,7 +549,8 @@
       "attackSpeedDelta": -41,
       "radius": 40,
       "arc": 108,
-      "upgradePrice": 750
+      "upgradePrice": 750,
+      "critChance": 12
     },
     {
       "id": "weapon_029",
@@ -533,7 +562,8 @@
       "attackSpeedDelta": 0,
       "radius": 8,
       "arc": 108,
-      "upgradePrice": 1050
+      "upgradePrice": 1050,
+      "critChance": 8
     },
     {
       "id": "weapon_030",
@@ -545,7 +575,8 @@
       "attackSpeedDelta": 26,
       "radius": 3,
       "arc": 80,
-      "upgradePrice": 1050
+      "upgradePrice": 1050,
+      "critChance": 12
     },
     {
       "id": "weapon_031",
@@ -557,7 +588,8 @@
       "attackSpeedDelta": -26,
       "radius": 10,
       "arc": 125,
-      "upgradePrice": 1050
+      "upgradePrice": 1050,
+      "critChance": 8
     },
     {
       "id": "weapon_032",
@@ -569,7 +601,8 @@
       "attackSpeedDelta": -41,
       "radius": 40,
       "arc": 108,
-      "upgradePrice": 1050
+      "upgradePrice": 1050,
+      "critChance": 12
     }
   ],
   "armor": [
@@ -629,7 +662,8 @@
       "hp": 96,
       "damage": 10,
       "xp": 12,
-      "gold": 25
+      "gold": 25,
+      "critChance": 5
     },
     {
       "id": "monster_002",
@@ -637,7 +671,8 @@
       "hp": 102,
       "damage": 12,
       "xp": 21,
-      "gold": 30
+      "gold": 30,
+      "critChance": 5
     },
     {
       "id": "monster_003",
@@ -645,7 +680,8 @@
       "hp": 108,
       "damage": 15,
       "xp": 32,
-      "gold": 32
+      "gold": 32,
+      "critChance": 5
     },
     {
       "id": "monster_004",
@@ -653,7 +689,8 @@
       "hp": 120,
       "damage": 17,
       "xp": 42,
-      "gold": 35
+      "gold": 35,
+      "critChance": 5
     },
     {
       "id": "monster_005",
@@ -661,7 +698,8 @@
       "hp": 126,
       "damage": 20,
       "xp": 54,
-      "gold": 35
+      "gold": 35,
+      "critChance": 5
     },
     {
       "id": "monster_006",
@@ -669,7 +707,8 @@
       "hp": 138,
       "damage": 23,
       "xp": 65,
-      "gold": 40
+      "gold": 40,
+      "critChance": 5
     },
     {
       "id": "monster_007",
@@ -677,7 +716,8 @@
       "hp": 144,
       "damage": 27,
       "xp": 77,
-      "gold": 40
+      "gold": 40,
+      "critChance": 5
     },
     {
       "id": "monster_008",
@@ -685,7 +725,8 @@
       "hp": 150,
       "damage": 30,
       "xp": 89,
-      "gold": 45
+      "gold": 45,
+      "critChance": 5
     },
     {
       "id": "monster_009",
@@ -693,7 +734,8 @@
       "hp": 162,
       "damage": 34,
       "xp": 110,
-      "gold": 45
+      "gold": 45,
+      "critChance": 5
     },
     {
       "id": "monster_010",
@@ -701,7 +743,8 @@
       "hp": 300,
       "damage": 37,
       "xp": 133,
-      "gold": 50
+      "gold": 50,
+      "critChance": 5
     },
     {
       "id": "monster_011",
@@ -709,7 +752,8 @@
       "hp": 318,
       "damage": 41,
       "xp": 150,
-      "gold": 53
+      "gold": 53,
+      "critChance": 5
     },
     {
       "id": "monster_012",
@@ -717,7 +761,8 @@
       "hp": 342,
       "damage": 46,
       "xp": 168,
-      "gold": 56
+      "gold": 56,
+      "critChance": 5
     },
     {
       "id": "monster_013",
@@ -725,7 +770,8 @@
       "hp": 360,
       "damage": 50,
       "xp": 187,
-      "gold": 59
+      "gold": 59,
+      "critChance": 5
     },
     {
       "id": "monster_014",
@@ -733,7 +779,8 @@
       "hp": 372,
       "damage": 55,
       "xp": 206,
-      "gold": 62
+      "gold": 62,
+      "critChance": 5
     },
     {
       "id": "monster_015",
@@ -741,7 +788,8 @@
       "hp": 384,
       "damage": 59,
       "xp": 225,
-      "gold": 65
+      "gold": 65,
+      "critChance": 5
     },
     {
       "id": "monster_016",
@@ -749,7 +797,8 @@
       "hp": 396,
       "damage": 64,
       "xp": 245,
-      "gold": 68
+      "gold": 68,
+      "critChance": 5
     },
     {
       "id": "monster_017",
@@ -757,7 +806,8 @@
       "hp": 414,
       "damage": 69,
       "xp": 265,
-      "gold": 71
+      "gold": 71,
+      "critChance": 5
     },
     {
       "id": "monster_018",
@@ -765,7 +815,8 @@
       "hp": 426,
       "damage": 73,
       "xp": 285,
-      "gold": 74
+      "gold": 74,
+      "critChance": 5
     },
     {
       "id": "monster_019",
@@ -773,7 +824,8 @@
       "hp": 438,
       "damage": 78,
       "xp": 305,
-      "gold": 77
+      "gold": 77,
+      "critChance": 5
     },
     {
       "id": "monster_020",
@@ -781,7 +833,8 @@
       "hp": 576,
       "damage": 84,
       "xp": 326,
-      "gold": 80
+      "gold": 80,
+      "critChance": 5
     },
     {
       "id": "monster_021",
@@ -789,7 +842,8 @@
       "hp": 600,
       "damage": 89,
       "xp": 346,
-      "gold": 83
+      "gold": 83,
+      "critChance": 5
     },
     {
       "id": "monster_022",
@@ -797,7 +851,8 @@
       "hp": 624,
       "damage": 94,
       "xp": 367,
-      "gold": 86
+      "gold": 86,
+      "critChance": 5
     },
     {
       "id": "monster_023",
@@ -805,7 +860,8 @@
       "hp": 648,
       "damage": 99,
       "xp": 387,
-      "gold": 89
+      "gold": 89,
+      "critChance": 5
     },
     {
       "id": "monster_024",
@@ -813,7 +869,8 @@
       "hp": 672,
       "damage": 105,
       "xp": 408,
-      "gold": 92
+      "gold": 92,
+      "critChance": 5
     },
     {
       "id": "monster_025",
@@ -821,7 +878,8 @@
       "hp": 696,
       "damage": 110,
       "xp": 429,
-      "gold": 95
+      "gold": 95,
+      "critChance": 5
     },
     {
       "id": "monster_026",
@@ -829,7 +887,8 @@
       "hp": 714,
       "damage": 116,
       "xp": 450,
-      "gold": 98
+      "gold": 98,
+      "critChance": 5
     },
     {
       "id": "monster_027",
@@ -837,7 +896,8 @@
       "hp": 738,
       "damage": 121,
       "xp": 471,
-      "gold": 101
+      "gold": 101,
+      "critChance": 5
     },
     {
       "id": "monster_028",
@@ -845,7 +905,8 @@
       "hp": 762,
       "damage": 127,
       "xp": 493,
-      "gold": 104
+      "gold": 104,
+      "critChance": 5
     },
     {
       "id": "monster_029",
@@ -853,7 +914,8 @@
       "hp": 786,
       "damage": 133,
       "xp": 514,
-      "gold": 107
+      "gold": 107,
+      "critChance": 5
     },
     {
       "id": "monster_030",
@@ -861,7 +923,8 @@
       "hp": 900,
       "damage": 139,
       "xp": 535,
-      "gold": 110
+      "gold": 110,
+      "critChance": 5
     },
     {
       "id": "monster_031",
@@ -869,7 +932,8 @@
       "hp": 936,
       "damage": 145,
       "xp": 556,
-      "gold": 113
+      "gold": 113,
+      "critChance": 5
     },
     {
       "id": "monster_032",
@@ -877,7 +941,8 @@
       "hp": 972,
       "damage": 151,
       "xp": 578,
-      "gold": 116
+      "gold": 116,
+      "critChance": 5
     },
     {
       "id": "monster_033",
@@ -885,7 +950,8 @@
       "hp": 1014,
       "damage": 157,
       "xp": 599,
-      "gold": 119
+      "gold": 119,
+      "critChance": 5
     },
     {
       "id": "monster_034",
@@ -893,7 +959,8 @@
       "hp": 1050,
       "damage": 164,
       "xp": 621,
-      "gold": 122
+      "gold": 122,
+      "critChance": 5
     },
     {
       "id": "monster_035",
@@ -901,7 +968,8 @@
       "hp": 1086,
       "damage": 170,
       "xp": 642,
-      "gold": 125
+      "gold": 125,
+      "critChance": 5
     }
   ],
   "weaponBindings": {

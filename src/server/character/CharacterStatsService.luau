@@ -4,6 +4,8 @@ local CharacterShared = Shared:WaitForChild("character")
 local Config = require(CharacterShared:WaitForChild("CharacterStatsConfig"))
 local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
 
+local Critical = require(Shared:WaitForChild("balance"):WaitForChild("CriticalStats"))
+
 local Service = {}
 local BASE_PREFIX = "Base"
 local modifierSources = setmetatable({}, { __mode = "k" })
@@ -34,7 +36,16 @@ local function recompute(character: Model)
             delta += tonumber(modifiers[stat]) or 0
         end
         local resolved = base + delta
-        if stat == "RunSpeed" then
+        if stat == "CritChance" then
+            local percent, flat = 0, 0
+            for _, modifiers in pairs(sources) do
+                percent += tonumber(modifiers.CritChancePercent) or 0
+                flat += tonumber(modifiers.CritChanceFlat) or 0
+            end
+            resolved = Critical.Chance(resolved, percent, flat)
+        elseif stat == "CritMultiplier" then
+            resolved = Critical.Multiplier(resolved)
+        elseif stat == "RunSpeed" then
             local debugOverride = tonumber(character:GetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE))
             if debugOverride ~= nil then
                 resolved = math.max(0, debugOverride)
@@ -66,6 +77,8 @@ function Service.Initialize(character: Model, startingStats: any?, progressionLe
     setBase(character, "AttackSpeed", Balance.Rules.baseAttackSpeed)
     setBase(character, "RunSpeed", value("RunSpeed"))
     setBase(character, "CritChance", Balance.Rules.critChance)
+    character:SetAttribute("CritChance", Critical.Chance(Balance.Rules.critChance))
+    setBase(character, "CritMultiplier", Balance.Rules.critMultiplier)
     character:SetAttribute("MoveSpeed", value("RunSpeed"))
     character:SetAttribute("HP", level.hp)
     character:SetAttribute("Damageable", true)

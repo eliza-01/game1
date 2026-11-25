@@ -273,7 +273,7 @@
     "maxActiveLeaves": 32
   },
   "characterCreation": {
-    "enabled": false,
+    "enabled": true,
     "useStudioAnchors": true,
     "transitionSeconds": 0.9,
     "faceTransitionSeconds": 0.65,

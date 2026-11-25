@@ -242,9 +242,9 @@ return table.freeze({
 			head = table.freeze({"Plastic", "Slate", "Fabric", "SmoothPlastic", "Sandstone", "Grass", "LeafyGrass", "Concrete"}),
 		}),
 		animations = table.freeze({
-			chancePercent = 35,
+			chancePercent = 100,
 			weights = table.freeze({
-				atk = 100,
+				atk = 0,
 				bow = 100,
 				clap = 100,
 				hi = 100,

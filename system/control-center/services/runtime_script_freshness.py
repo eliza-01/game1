@@ -4,6 +4,10 @@ import hashlib
 import json
 
 SCRIPT_CLASSES = {'Script', 'LocalScript', 'ModuleScript'}
+RETIRED_PLACE_INSTANCES = {
+    ('StarterPlayer', 'StarterPlayerScripts', 'Game1LodProbeClient'): SCRIPT_CLASSES,
+    ('Workspace', 'game1TrainingDummy'): {'Model'},
+}
 
 
 def _source(value):
@@ -71,6 +75,8 @@ def verify_scripts(root, tree):
             # Root services may omit Name when it is the class default.
             path = key + (name or item.get('class', ''),)
             cls = item.get('class')
+            if cls in RETIRED_PLACE_INSTANCES.get(path, ()):
+                errors.append('retired Place instance ' + '.'.join(path) + ' (delete in Studio Edit mode)')
             if cls in SCRIPT_CLASSES and any(path[:len(scope)] == scope for scope in scopes):
                 if path in found:
                     errors.append('duplicate ' + '.'.join(path))

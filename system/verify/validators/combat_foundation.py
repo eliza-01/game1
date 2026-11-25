@@ -20,7 +20,6 @@ def check_combat_foundation(ROOT: Path, err: Callable[[str], None]):
             err(f"critical damage contract missing {required}")
 
     attack_text = (ROOT / "src/server/combat/AttackService.luau").read_text(encoding="utf-8")
-    dummy_text = (ROOT / "src/server/dev/TrainingDummyService.luau").read_text(encoding="utf-8")
     damage_resolver_text = (ROOT / "src/server/combat/AttackDamageResolver.luau").read_text(encoding="utf-8")
     if "[game1][melee-arc] hit" not in damage_resolver_text or "[game1][attack] zero_damage" not in attack_text:
         err("attack smoke-test logging contract missing")
@@ -55,7 +54,5 @@ def check_combat_foundation(ROOT: Path, err: Callable[[str], None]):
     ]:
         if required not in attack_text:
             err(f"server attack timeline contract missing {required}")
-    if "BillboardGui" not in dummy_text or "HP %d/%d" not in dummy_text:
-        err("training dummy visible hp contract missing")
 
     return CombatFoundationSources(attack_text, damage_resolver_text, attack_timeline_text, attack_timeline_data_text)

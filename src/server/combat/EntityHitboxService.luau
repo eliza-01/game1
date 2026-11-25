@@ -289,7 +289,7 @@ function EntityHitboxService.QueryDamageablesInBox(
 end
 
 
--- M358: queries exactly the existing authored monster/NPC/training-dummy hitboxes.
+-- M358: queries exactly the existing authored monster/NPC hitboxes.
 -- Broad sphere keeps far entities cheap; the pure geometry module handles actual
 -- sector vs OBB overlap (including large targets whose center is outside reach).
 function EntityHitboxService.QueryDamageablesInArc(

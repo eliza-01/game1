@@ -366,9 +366,9 @@
       ]
     },
     "animations": {
-      "chancePercent": 35,
+      "chancePercent": 100,
       "weights": {
-        "atk": 100,
+        "atk": 0,
         "bow": 100,
         "clap": 100,
         "hi": 100,

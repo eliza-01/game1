@@ -110,9 +110,6 @@ function ServiceCatalog.Build(root: Instance)
         {name = "UiPresentationDebugService", critical = false, start = function()
             require(dev:WaitForChild("UiPresentationDebugService")).Start()
         end},
-        {name = "TrainingDummyService", critical = false, dependsOn = {"EntityHitboxService"}, start = function()
-            require(dev:WaitForChild("TrainingDummyService")).Start()
-        end},
     }
 end
 

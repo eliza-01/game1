@@ -36,7 +36,6 @@ class HeadshotCharacterDeathHotfixTest(unittest.TestCase):
         lifecycle = read("src/server/combat/DeathLifecycleService.luau")
         character = read("src/server/character/CharacterService.luau")
         monster = read("src/server/monster/MonsterDeathLifecycle.luau")
-        dummy = read("src/server/dev/TrainingDummyService.luau")
         self.assertIn("if options and options.sink == false then", lifecycle)
         self.assertIn("task.delay(Config.DeathIdleSeconds", lifecycle)
         self.assertIn("task.delay(Config.DeathIdleSurfaceSeconds", lifecycle)
@@ -44,7 +43,6 @@ class HeadshotCharacterDeathHotfixTest(unittest.TestCase):
         self.assertIn("end, { sink = false })", character)
         self.assertIn('ReturnToTownAvailable", true', character)
         self.assertNotIn("{ sink = false }", monster)
-        self.assertNotIn("{ sink = false }", dummy)
 
 
 if __name__ == "__main__":

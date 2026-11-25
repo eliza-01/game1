@@ -33,5 +33,5 @@ class TestRecovery(unittest.TestCase):
         self.assertIn('Loadout.SetRecovery(player, character, request.regen, request.vampiric)', service)
         self.assertNotIn('SetAttribute("HP"', service.split('if action == "recovery" then', 1)[1].split('if action == "stop"', 1)[0])
         ui = read('src/client/dev/GameplayTestController.luau')
-        for token in ('Regeneration · HP/sec', 'Vampiric · % of damage', 'invoke("recovery")', 'regen=regen,vampiric=vampiric', 'input.Text = "0"'):
+        for token in ('Regen · HP/sec', 'Vampiric · %', 'invoke("recovery")', 'regen=regen,vampiric=vampiric', 'input.Text = "0"'):
             self.assertIn(token, ui)

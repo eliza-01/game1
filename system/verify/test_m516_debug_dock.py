@@ -24,7 +24,7 @@ class DebugDock(unittest.TestCase):
     def test_gameplay_launcher_does_not_wait_for_rpc(self):
         gp = (DEV / 'GameplayTestController.luau').read_text(encoding='utf8')
         self.assertIn('button(gui, "GP", UDim2.fromOffset(44, 44))', gp)
-        self.assertIn('StudioDebugDock.Bind(PANEL_ID, launcher, panel, 440, true)', gp)
+        self.assertIn('StudioDebugDock.Bind(PANEL_ID, launcher, panel, PANEL_WIDTH, true, PANEL_HEIGHT)', gp)
         self.assertNotIn('WaitForChild("GameplayTest"', gp)
         self.assertIn('remotes:FindFirstChild("GameplayTest")', gp)
         self.assertIn('Gameplay server not ready', gp)

@@ -39,7 +39,7 @@ end
 
 -- Each launcher reflects its actual panel, never hover or initial construction.
 -- ScreenGui size includes its inset; all slots reflow together when it changes.
-function StudioDebugDock.Bind(id: string, launcher: TextButton, panel: GuiObject, width: number, adaptive: boolean?)
+function StudioDebugDock.Bind(id: string, launcher: TextButton, panel: GuiObject, width: number, adaptive: boolean?, bottomHeight: number?)
     local screen = launcher:FindFirstAncestorWhichIsA("ScreenGui") :: ScreenGui
     screen.DisplayOrder = 135 -- Above the game HUD, below character creation and language selection.
     launcher.Name = "DebugLauncher" .. id
@@ -49,8 +49,15 @@ function StudioDebugDock.Bind(id: string, launcher: TextButton, panel: GuiObject
         launcher.Position = StudioDebugDock.ButtonPosition(id, viewport)
         local panelWidth = if adaptive then math.min(width, math.max(1, viewport - 16)) else width
         local position = StudioDebugDock.WindowPosition(id, panelWidth, viewport)
-        panel.Position = position
-        if adaptive then
+        if bottomHeight then
+            -- Bottom-left panels keep their bottom edge fixed as the viewport changes.
+            panel.AnchorPoint = Vector2.new(0, 1)
+            panel.Position = UDim2.new(0, 8, 1, -8)
+            panel.Size = UDim2.fromOffset(panelWidth, math.max(1, math.min(bottomHeight, screen.AbsoluteSize.Y - position.Y.Offset - 16)))
+        else
+            panel.Position = position
+        end
+        if adaptive and not bottomHeight then
             panel.Size = UDim2.fromOffset(panelWidth, math.max(1, math.min(585, screen.AbsoluteSize.Y - position.Y.Offset - 8)))
         end
     end

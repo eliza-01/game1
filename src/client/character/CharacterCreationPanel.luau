@@ -337,6 +337,9 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     progressValue.TextXAlignment = Enum.TextXAlignment.Center
     progressValue.ZIndex = 102
     progressValue.Text = ""
+    local recovery = action(overlayCard, "ReturnToSelection", UDim2.new(0.82, 0, 0, 44), UDim2.new(0.09, 0, 0, 125), false)
+    recovery.ZIndex = 105
+    recovery.Visible = false
     -- Safe-area dimensions also handle camera replacement, rotation and resize.
     local function resize()
         local viewport = if parent:IsA("ScreenGui") then parent.AbsoluteSize else Vector2.new(1280, 720)
@@ -348,7 +351,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
         local selection = mode == "selection"
         local requested = tonumber(if mobile then settings.mobilePanelWidthPx else settings.desktopPanelWidthPx) or 460
         local width = math.max(1, math.min(math.max(if mobile then 300 else 410, requested), viewport.X - 20))
-        local availableHeight = if portrait and editing then math.floor(viewport.Y * 0.56) else viewport.Y - 24
+        local availableHeight = if portrait and editing then math.max(math.floor(viewport.Y * 0.70), math.min(420, viewport.Y - 24)) else viewport.Y - 24
         local height = math.max(1, math.min(if editing then 850 elseif selection then 300 else 180, availableHeight))
         root.Size = UDim2.fromOffset(width, height)
         root.AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.new(1, 0.5)
@@ -366,7 +369,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
         genders.Size = UDim2.new(1, -32, 0, if compact then 40 else 46)
         local visibleCount = 0
         for _, button in pairs(tabButtons) do if button.Visible then visibleCount += 1 end end
-        local rows = if mobile and not compact and visibleCount > 2 then 2 else 1
+        local rows = 1 -- Three compact tabs always fit one row.
         local tabY = if compact then 88 else 141
         local tabHeight = if visibleCount == 0 then 0 elseif rows == 2 then 86 else 40
         tabs.Position = UDim2.fromOffset(16, tabY)
@@ -385,7 +388,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
         local contentY = tabY + tabHeight + 12
         local enterHeight = if compact then 38 else 44
         local newActionSpace = if selection then enterHeight + 6 else 0
-        local footerHeight = 84 + newActionSpace
+        local footerHeight = (if compact then 64 else 84) + newActionSpace
         local bottom = if compact then 8 else 16
         separator.Position = UDim2.fromOffset(16, contentY - 7)
         separator.Size = UDim2.new(1, -32, 0, 1)
@@ -415,7 +418,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     resize()
     return {panel = root, title = heading, subtitle = tagline,
         male = male, female = female, enter = enter, newCharacter = newCharacter,
-        overlay = overlay, overlayCard = overlayCard, overlayLabel = overlayLabel,
+        overlay = overlay, overlayCard = overlayCard, overlayLabel = overlayLabel, recovery = recovery,
         overlayRunner = runner, overlayTrack = progressTrack, overlayFill = progressFill, overlayValue = progressValue,
         status = status, tabs = tabButtons, content = content, editor = editor, invalidateCanvas = invalidateCanvas,
         selectionCard = selectionCard, selectionName = selectionName, selectionLevel = selectionLevel, selectionCaption = selectionCaption,
@@ -467,6 +470,10 @@ local function setRunnerPose(runner: Frame, time: number)
 end
 
 local function setOverlay(views: any, busy: boolean, message: string, progress: number?)
+    views.recovery.Visible = false
+    views.overlayTrack.Visible = true
+    views.overlayRunner.Visible = true
+    views.overlayValue.Visible = true
     views.overlayLabel.Text = message
     views.overlay.Visible = busy
     views.overlay.Modal = busy
@@ -504,6 +511,16 @@ end
 
 function Panel.SetSubmitting(views: any, busy: boolean, message: string, progress: number?)
     setOverlay(views, busy, message, progress)
+end
+
+function Panel.SetRecovery(views: any, message: string)
+    setOverlay(views, true, message, nil)
+    if views.runnerConnection then views.runnerConnection:Disconnect(); views.runnerConnection = nil end
+    views.overlayTrack.Visible = false
+    views.overlayRunner.Visible = false
+    views.overlayValue.Visible = false
+    views.recovery.Text = Language.Translate("settings.change_character")
+    views.recovery.Visible = true
 end
 
 function Panel.UpdateTabs(views: any, selected: boolean, active: string?, visible: {[string]: boolean})

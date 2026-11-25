@@ -7,20 +7,21 @@ def src(path: str) -> str:
     return (ROOT / path).read_text(encoding='utf-8')
 
 class CreationMeshPreloadM490(unittest.TestCase):
-    def test_preloader_collects_mesh_and_surface_assets(self):
+    def test_preloader_collects_typed_mesh_and_image_assets(self):
         code = src('src/client/character/CharacterCreationMeshPreloader.luau')
         self.assertIn('local ContentProvider = game:GetService("ContentProvider")', code)
         self.assertIn('object:IsA("MeshPart")', code)
-        self.assertIn('push(bucket, object.MeshId)', code)
-        self.assertIn('push(bucket, object.TextureID)', code)
-        self.assertIn('object:IsA("SurfaceAppearance")', code)
-        self.assertIn('ContentProvider.PreloadAsync', code)
-        self.assertIn('loaded[id] = true', code)
+        self.assertIn('push(bucket, object.MeshId, true, object)', code)
+        self.assertIn('push(bucket, object.TextureID, false, nil)', code)
+        self.assertNotIn('object.ColorMap', code)
+        self.assertIn('ContentProvider:PreloadAsync({request}', code)
+        self.assertIn('loaded[key] = true', code)
 
     def test_preview_waits_for_preload_before_parenting(self):
         code = src('src/client/character/CharacterCreationPreviewController.luau')
         self.assertIn('local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))', code)
-        preload = code.index('if not MeshPreloader.PreloadModel(instance, isCurrent, onPreloadProgress) then')
+        preload = code.index('MeshPreloader.PreloadModel(instance, isCurrent, onPreloadProgress)')
+        self.assertIn('if not geometryReady then', code)
         parent = code.index('instance.Parent = self.folder')
         self.assertLess(preload, parent)
 

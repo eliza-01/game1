@@ -84,7 +84,7 @@ class CharacterCreationM479(unittest.TestCase):
         self.assertIn('CharacterCreationSelect', ui)
         self.assertIn('CameraController.ClearCreationView()', ui)
         self.assertIn('option-character-creation-section', html)
-        self.assertIn('character-creation-options.js?v=482', html)
+        self.assertRegex(html, r'character-creation-options\.js\?v=\d+')
         self.assertLess(html.index('SelectionOverview') if 'SelectionOverview' in html else 0,
                         html.index('option-rotation-save'))
 

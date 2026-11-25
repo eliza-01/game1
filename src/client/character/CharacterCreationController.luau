@@ -17,6 +17,8 @@ local CameraController = require(script.Parent:WaitForChild("CameraController"))
 local Mounts = require(script.Parent:WaitForChild("BoneMountedAttachmentController"))
 local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
 local Preview = require(script.Parent:WaitForChild("CharacterCreationPreviewController"))
+local Request = require(script.Parent:WaitForChild("CharacterCreationRequest"))
+local VariantPrewarm = require(script.Parent:WaitForChild("CharacterCreationVariantPrewarm"))
 local Editor = require(script.Parent:WaitForChild("CharacterCreationAppearanceView"))
 local EyeEdit = require(script.Parent:WaitForChild("CharacterCreationEyeEdit"))
 local FullScreenLayer = require(script.Parent.Parent:WaitForChild("FullScreenLayer"))
@@ -123,6 +125,10 @@ function Controller.Start()
     local bootstrapPending: {[string]: boolean} = {}
     local bootstrapProgress: {[string]: number} = {}
     local worldProgress: number? = nil
+    local warmProgress: number? = 0
+    local warming = false
+    local worldRecovery = false
+    local recoveryBusy = false
     local function remoteFor(name: string): RemoteFunction?
         local remotes = ReplicatedStorage:WaitForChild("Game1Remotes", 15)
         local item = remotes and remotes:WaitForChild(name, 15)
@@ -154,8 +160,12 @@ function Controller.Start()
         end
         local partial = 0
         for id in pairs(bootstrapPending) do partial += bootstrapProgress[id] or 0 end
-        local progress = math.clamp((completed + partial) / total, 0, 1)
-        Panel.SetLoading(controls, true, Language.Translate("creation.loading_appearance_assets"), progress)
+        if warmProgress == nil then
+            Panel.SetSubmitting(controls, true, Language.Translate("creation.loading_appearance_assets"))
+        else
+            local progress = math.clamp(0.75 * warmProgress + 0.25 * (completed + partial) / total, 0, 1)
+            Panel.SetLoading(controls, true, Language.Translate("creation.loading_appearance_assets"), progress)
+        end
     end
 
     local function markBootstrapDone(id: string)
@@ -183,7 +193,9 @@ function Controller.Start()
 
     local refresh: () -> ()
     local function requestPreview(id: string)
-        local current = choices[id]
+        local current = table.clone(choices[id])
+        -- Geometry request is independent of live color/material edits.
+        current.colors = nil; current.materials = nil
         ready[id] = false
         previewError[id] = nil
         refresh()
@@ -202,11 +214,20 @@ function Controller.Start()
             local previewRemote = remoteFor("CharacterCreationPreview")
             if not gui.Enabled or revisions[id] ~= version then previewRequestBusy = false; return end
             local ok, response = false, nil
-            if previewRemote then ok, response = pcall(previewRemote.InvokeServer, previewRemote, id, current) end
+            if previewRemote then
+                for attempt = 1, 3 do
+                    ok, response = Request.Invoke(previewRemote, function()
+                        return gui.Enabled and revisions[id] == version and not leaving
+                    end, 30, id, current)
+                    if not ok or type(response) ~= "table" or response.error ~= "preview_busy" then break end
+                    if not gui.Enabled or revisions[id] ~= version then break end
+                    task.wait(0.4 * attempt)
+                end
+            end
             previewRequestBusy = false
             if not gui.Enabled or revisions[id] ~= version then return end
             if not ok or type(response) ~= "table" or response.ok ~= true then
-                local reason = if ok and type(response) == "table" then response.error else "network"
+                local reason = if ok and type(response) == "table" then response.error else tostring(response or "network")
                 warn("[game1][character-creation] preview failed: " .. tostring(reason))
                 previewError[id] = true
                 markBootstrapDone(id)
@@ -239,6 +260,14 @@ function Controller.Start()
                 end
                 if not isCurrent() then return end
             end
+            -- The server's stream request is a bounded hint, not a guarantee
+            -- that every decorative descendant has reached the client.
+            if workspace.StreamingEnabled and not sceneReady then
+                local deadline = os.clock() + 8
+                while isCurrent() and player:GetAttribute("Game1CharacterSceneStreamReady") ~= stage
+                    and os.clock() < deadline do task.wait(0.1) end
+                if not isCurrent() then return end
+            end
             if bootstrapPending[id] == true then bootstrapProgress[id] = 0; refreshBootstrapOverlay() end
             -- Preserve the shared selection-scene contract: preview.Set(..., stage, isCurrent, selectionAnchors)
             local preloadProgress = if bootstrapPending[id] == true then function(progress: number)
@@ -262,7 +291,7 @@ function Controller.Start()
     end
 
     local function pick(group: string, id: string)
-        if stage ~= "creation" or not selected or pending or leaving then return end
+        if stage ~= "creation" or not selected or pending or leaving or warming then return end
         local values = choices[selected]
         if values[group] == id then return end
         values[group] = id
@@ -274,7 +303,7 @@ function Controller.Start()
         requestPreview(selected)
     end
     local function paint(group: string, value: string, channel: string?)
-        if stage ~= "creation" or not selected or pending or leaving then return end
+        if stage ~= "creation" or not selected or pending or leaving or warming then return end
         local values = choices[selected]
         if group == "eyes" and channel then
             values.colors.eyes = EyeEdit.Paint(values.colors.eyes, channel, value, eyeLocks[selected].locked)
@@ -284,7 +313,7 @@ function Controller.Start()
         if currentPreview then currentPreview:Colors(selected, values.colors) end
     end
     local function material(group: string, value: string)
-        if stage ~= "creation" or not selected or pending or leaving then return end
+        if stage ~= "creation" or not selected or pending or leaving or warming then return end
         local allowed = (settings.materialChoices or {})[group] or {}
         if not table.find(allowed, value) then return end
         choices[selected].materials[group] = value
@@ -292,7 +321,7 @@ function Controller.Start()
         if currentPreview then currentPreview:Materials(selected, choices[selected].materials) end
     end
     local function customColor(group: string, channel: string?, value: string?)
-        if stage ~= "creation" or not selected or pending or leaving then return end
+        if stage ~= "creation" or not selected or pending or leaving or warming then return end
         local id = selected
         local function preview(hex: string)
             if not id or not currentPreview then return end
@@ -340,7 +369,7 @@ function Controller.Start()
         Panel.UpdateTabs(controls, stage == "creation" and selected ~= nil and not pending, activeTab, visible)
         local selectedReady = selected ~= nil and ready[selected] == true
         local retry = (selected ~= nil and previewError[selected] == true) or (stage == "selection" and readFailed)
-        local busy = pending or leaving
+        local busy = pending or leaving or next(bootstrapPending) ~= nil
         male.Active = not busy
         female.Active = not busy
         enter.Active = not busy and (retry or (selectedReady and sceneReady))
@@ -355,7 +384,7 @@ function Controller.Start()
                 if selected then choices[selected] else nil, pick, paint, activeTab,
                 settings, material, customColor, if selected then eyeLocks[selected].locked else true,
                 function(side: string)
-                    if stage ~= "creation" or not selected or pending or leaving then return end
+                    if stage ~= "creation" or not selected or pending or leaving or warming then return end
                     palette:Close()
                     local values = choices[selected]
                     values.colors.eyes = EyeEdit.Toggle(eyeLocks[selected], values.colors.eyes, side)
@@ -365,11 +394,15 @@ function Controller.Start()
             controls.invalidateCanvas()
         end
         Panel.SetMode(controls, stage)
-        if submitting then
+        if worldRecovery then
+            Panel.SetRecovery(controls, Language.Translate("creation.unavailable"))
+        elseif submitting then
             Panel.SetSubmitting(controls, true, Language.Translate(
                 if leaving or (submitting and stage == "selection") then "creation.entering_world" else "creation.working"), worldProgress)
         elseif next(bootstrapPending) then
             refreshBootstrapOverlay()
+        elseif stage == "selection" and not retry and not selectedReady then
+            Panel.SetSubmitting(controls, true, Language.Translate("creation.loading_profile"))
         else
             Panel.SetSubmitting(controls, false, "")
         end
@@ -390,7 +423,7 @@ function Controller.Start()
     end
 
     male.Activated:Connect(function()
-        if pending or leaving or stage ~= "creation" then return end
+        if pending or leaving or next(bootstrapPending) ~= nil or stage ~= "creation" then return end
         palette:Close()
         selected = "human_male"; activeTab = firstCategory("human_male")
         status.Text = ""
@@ -398,7 +431,7 @@ function Controller.Start()
         refresh(); showStage()
     end)
     female.Activated:Connect(function()
-        if pending or leaving or stage ~= "creation" then return end
+        if pending or leaving or next(bootstrapPending) ~= nil or stage ~= "creation" then return end
         palette:Close()
         selected = "human_female"; activeTab = firstCategory("human_female")
         status.Text = ""
@@ -408,7 +441,7 @@ function Controller.Start()
     for _, key in ipairs(Panel.Categories) do
         local category = key
         controls.tabs[category].Activated:Connect(function()
-            if stage ~= "creation" or not selected or pending or leaving then return end
+            if stage ~= "creation" or not selected or pending or leaving or warming then return end
             if not controls.tabs[category].Visible then return end
             palette:Close()
             activeTab = if activeTab == category then nil else category
@@ -427,7 +460,7 @@ function Controller.Start()
             local readRemote = remoteFor("CharacterCreationRead")
             if epoch ~= token or leaving then return end
             if readRemote then
-                ok, response = pcall(readRemote.InvokeServer, readRemote)
+                ok, response = Request.Invoke(readRemote, function() return epoch == token and not leaving end, 25)
             end
             if epoch ~= token or stage ~= "selection" or leaving then return end
             pending = false
@@ -447,6 +480,7 @@ function Controller.Start()
     end
     enter.Activated:Connect(function()
         if pending or leaving or (stage ~= "creation" and stage ~= "selection") then return end
+        if next(bootstrapPending) ~= nil then return end
         if stage == "selection" and readFailed then readSelection(); return end
         if not selected then return end
         if previewError[selected] then requestPreview(selected); return end
@@ -473,9 +507,9 @@ function Controller.Start()
                 local ok, response = false, nil
                 if remote then
                     if requestedStage == "creation" then
-                        ok, response = pcall(remote.InvokeServer, remote, chosen, choices[chosen])
+                        ok, response = Request.Invoke(remote, function() return epoch == token and not leaving end, 35, chosen, choices[chosen])
                     else
-                        ok, response = pcall(remote.InvokeServer, remote)
+                        ok, response = Request.Invoke(remote, function() return epoch == token and not leaving end, 35)
                     end
                 end
                 if epoch ~= token or leaving then return end
@@ -486,7 +520,7 @@ function Controller.Start()
                     if epoch ~= token or leaving then return end
                     reason = "stage_timeout"
                 else
-                    reason = tostring(if ok and type(response) == "table" then response.error else "network")
+                    reason = tostring(if ok and type(response) == "table" then response.error else response or "network")
                 end
                 warn("[game1][character-creation] " .. requestedStage .. " attempt " .. attempt .. ": " .. reason)
                 if requestedStage ~= "creation" or not ({network = true, request_in_progress = true,
@@ -498,6 +532,24 @@ function Controller.Start()
             submitting = false
             status.Text = Language.Translate("creation.unavailable") .. " (" .. reason .. ")"
             pending = false; refresh()
+        end)
+    end)
+    controls.recovery.Activated:Connect(function()
+        if not worldRecovery or recoveryBusy or not leaving then return end
+        recoveryBusy = true
+        local token = epoch
+        task.spawn(function()
+            local remote = remoteFor("CharacterCreationManage")
+            if epoch ~= token or not worldRecovery then return end
+            local ok, response = false, nil
+            if remote then
+                ok, response = Request.Invoke(remote, function() return epoch == token and worldRecovery end, 20)
+            end
+            if epoch ~= token or not worldRecovery then return end
+            recoveryBusy = false
+            if not ok or type(response) ~= "table" or response.ok ~= true then
+                Panel.SetRecovery(controls, Language.Translate("creation.unavailable"))
+            end
         end)
     end)
     local function sync()
@@ -514,6 +566,8 @@ function Controller.Start()
         palette:Close()
         submitting = not active
         worldProgress = nil
+        worldRecovery = false; recoveryBusy = false
+        warming = false; warmProgress = 0
         Panel.SetSubmitting(controls, submitting, Language.Translate("creation.entering_world"))
         cover(true)
         if currentPreview then currentPreview:Destroy(); currentPreview = nil end
@@ -547,8 +601,29 @@ function Controller.Start()
                 bootstrapPending = {human_male = true, human_female = true}
                 bootstrapProgress = {}
                 refresh(); showStage(true); refreshBootstrapOverlay()
-                requestPreview("human_male")
-                requestPreview("human_female")
+                warming = true
+                task.spawn(function()
+                    local function current(): boolean return epoch == token and not leaving end
+                    local remote = remoteFor("CharacterCreationPreview")
+                    if not current() then return end
+                    local complete = false
+                    if remote then
+                        while previewRequestBusy and current() do task.wait(0.05) end
+                        if not current() then return end
+                        previewRequestBusy = true
+                        local ok, problem = pcall(VariantPrewarm.Run, remote, Catalog.archetypes or {}, choices, current, function(value)
+                            if current() then warmProgress = value; refreshBootstrapOverlay() end
+                        end)
+                        previewRequestBusy = false
+                        if not ok then warn("[game1][character-creation] variant prewarm: " .. tostring(problem)) end
+                        complete = ok and problem == true
+                    end
+                    if not current() then return end
+                    warming = false; warmProgress = if complete then 1 else nil
+                    refreshBootstrapOverlay()
+                    requestPreview("human_male")
+                    requestPreview("human_female")
+                end)
             elseif stage == "selection" then
                 refresh()
                 readSelection()
@@ -562,45 +637,51 @@ function Controller.Start()
             task.spawn(function()
                 -- CharacterAdded/RootCollider replication may follow the world
                 -- attribute. Keep the curtain until the gameplay camera owns a root.
-                local warned = false
                 local began = os.clock()
-                while epoch == token and not CameraController.ClearCreationView() do
-                    if not warned and os.clock() - began > 12 then
-                        warned = true
-                        warn("[game1][character-creation] waiting for gameplay camera root")
-                        -- Keep the world-entry overlay until the camera has a root.
+                while epoch == token do
+                    while epoch == token and not CameraController.ClearCreationView() do
+                        if not worldRecovery and os.clock() - began > 20 then
+                            worldRecovery = true
+                            warn("[game1][character-creation] gameplay root timeout; waiting for replication or return to selection")
+                            Panel.SetRecovery(controls, Language.Translate("creation.unavailable"))
+                        end
+                        RunService.RenderStepped:Wait()
                     end
-                    RunService.RenderStepped:Wait()
+                    if epoch ~= token then return end
+                    worldRecovery = false; recoveryBusy = false
+                    Panel.SetSubmitting(controls, true, Language.Translate("creation.entering_world"))
+                    local model = player.Character
+                    if model then
+                        local function current(): boolean
+                            return epoch == token and player.Character == model and leaving
+                        end
+                        local actor = archetype(tostring(model:GetAttribute("CharacterArchetype") or selected or ""))
+                        if actor and actor.visualMode == "assembly" then
+                            local deadline = os.clock() + 12
+                            while current() and not Mounts.HairAssemblyReady(model) and os.clock() < deadline do
+                                RunService.Heartbeat:Wait()
+                            end
+                            if current() and not Mounts.HairAssemblyReady(model) then
+                                warn("[game1][character-creation] world hair replication incomplete; follower will retry")
+                            end
+                        end
+                        if current() then
+                            local ok, loaded = pcall(MeshPreloader.PreloadModel, model, current, function(progress: number)
+                                if not current() then return end
+                                worldProgress = progress
+                                Panel.SetSubmitting(controls, true, Language.Translate("creation.entering_world"), worldProgress)
+                            end)
+                            if current() and CameraController.ClearCreationView() then
+                                if not ok or not loaded then warn("[game1][character-creation] world preload incomplete; continue with engine streaming") end
+                                break
+                            end
+                        end
+                    end
+                    -- Character changed while preloading: retry against the new root.
+                    began = os.clock(); worldProgress = nil
+                    RunService.Heartbeat:Wait()
                 end
                 if epoch ~= token then return end
-                -- Server spawn/replication has no byte-count contract: show an
-                -- indeterminate bar until the actual local character is available.
-                local model = player.Character
-                if model then
-                    local function current(): boolean
-                        return epoch == token and player.Character == model and leaving
-                    end
-                    -- The camera root can replicate before the visual compound.
-                    -- Wait for the assembly's real readiness, not a fixed delay.
-                    local actor = archetype(tostring(model:GetAttribute("CharacterArchetype") or selected or ""))
-                    if actor and actor.visualMode == "assembly" then
-                        local deadline = os.clock() + 12
-                        while current() and not Mounts.HairAssemblyReady(model) and os.clock() < deadline do
-                            RunService.Heartbeat:Wait()
-                        end
-                        if not current() then return end
-                        if not Mounts.HairAssemblyReady(model) then
-                            warn("[game1][character-creation] world hair replication incomplete; follower will retry")
-                        end
-                    end
-                    local ok, loaded = pcall(MeshPreloader.PreloadModel, model, current, function(progress: number)
-                        if not current() then return end
-                        worldProgress = progress
-                        Panel.SetSubmitting(controls, true, Language.Translate("creation.entering_world"), worldProgress)
-                    end)
-                    if epoch ~= token then return end
-                    if not ok or not loaded then warn("[game1][character-creation] world preload incomplete: " .. tostring(loaded)) end
-                end
                 controls.panel.Visible = false
                 submitting = false
                 Panel.SetSubmitting(controls, false, "")

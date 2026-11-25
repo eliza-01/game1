@@ -21,7 +21,10 @@ class PlaytestWeaponMobilePlotsM290(unittest.TestCase):
         self.assertNotIn('CharacterService.Respawn', service)
         self.assertNotIn('ApplyTestLoadout', service)
         self.assertNotIn('GetTestLoadoutCatalog', service)
-        self.assertIn('if started or not RunService:IsStudio() then', test)
+        self.assertIn('if started or not PublishedDebugAccess.ServerEnabled() then', test)
+        self.assertIn('PublishedDebugAccess.ServerAllowed(player)', test)
+        policy = read('src/shared/dev/PublishedDebugAccess.luau')
+        self.assertIn('not compiledRuntime()', policy)
         self.assertIn('Game1PlaytestWeaponChosen', equip)
 
     def test_live_menu_reuses_server_catalog(self):
@@ -57,7 +60,9 @@ class PlaytestWeaponMobilePlotsM290(unittest.TestCase):
     def test_touch_prompt_uses_existing_server_validation(self):
         ui = read('src/client/world/HouseSocketPromptController.luau')
         server = read('src/server/world/HouseSocketService.luau')
-        self.assertIn('local touch = UserInputService.TouchEnabled', ui)
+        self.assertIn('local touch = UiSettings.ActiveDevice() == "mobile"', ui)
+        settings = read('src/client/world/UiPresentationSettings.luau')
+        self.assertIn('UserInputService.TouchEnabled', settings)
         self.assertIn('local action = Instance.new("TextButton")', ui)
         self.assertIn('action.Activated:Connect(function()', ui)
         self.assertIn('requestAction(prompt)', ui)

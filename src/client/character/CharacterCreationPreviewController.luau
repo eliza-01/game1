@@ -142,20 +142,32 @@ local function templateReady(template: Model): boolean
     return type(name) == "string" and BoneModelMount.FindHairBone(template, name) ~= nil
 end
 
-function Controller:Set(archetype: string, templateName: string, choice: any, stage: string?, isCurrent: (() -> boolean)?, anchors: any?, onPreloadProgress: ((number) -> ())?): boolean
-    local available = ReplicatedStorage:WaitForChild("Game1CharacterCreationTemplates", 12)
-    local template = available and available:WaitForChild(templateName, 12)
-    if not self.folder.Parent or not template or not template:IsA("Model") then return false end
-    if isCurrent and not isCurrent() then return false end
-    local replicationDeadline = os.clock() + 12
+function Controller.AwaitTemplate(templateName: string, isCurrent: (() -> boolean)?): Model?
+    local replicationDeadline = os.clock() + 15
+    local template: Instance? = nil
+    repeat
+        if isCurrent and not isCurrent() then return nil end
+        local available = ReplicatedStorage:FindFirstChild("Game1CharacterCreationTemplates")
+        template = available and available:FindFirstChild(templateName)
+        if template then break end
+        task.wait(0.1)
+    until os.clock() >= replicationDeadline
+    if not template or not template:IsA("Model") or (isCurrent and not isCurrent()) then return nil end
     while not templateReady(template) do
-        if not self.folder.Parent or (isCurrent and not isCurrent()) then return false end
+        if not template.Parent or (isCurrent and not isCurrent()) then return nil end
         if os.clock() >= replicationDeadline then
             warn("[game1][character-creation] incomplete preview template: " .. templateName)
-            return false
+            return nil
         end
         RunService.Heartbeat:Wait()
     end
+    return template
+end
+
+function Controller:Set(archetype: string, templateName: string, choice: any, stage: string?, isCurrent: (() -> boolean)?, anchors: any?, onPreloadProgress: ((number) -> ())?): boolean
+    local template = Controller.AwaitTemplate(templateName, isCurrent)
+    if not self.folder.Parent or not template then return false end
+    if isCurrent and not isCurrent() then return false end
     local gender = if archetype == "human_male" then "male" else "female"
     local target = asCFrame(self.settings, gender, stage, anchors)
     local other = asCFrame(self.settings, if gender == "male" then "female" else "male")
@@ -186,10 +198,12 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
         gender, target.Position.X, target.Position.Y, target.Position.Z, math.deg(select(2, target:ToOrientation()))))
     paint(instance, choice.colors or {})
     applyMaterials(instance, choice.materials or {})
-    if not MeshPreloader.PreloadModel(instance, isCurrent, onPreloadProgress) then
+    local complete, geometryReady = MeshPreloader.PreloadModel(instance, isCurrent, onPreloadProgress)
+    if not geometryReady then
         instance:Destroy()
         return false
     end
+    if not complete then warn("[game1][character-creation] texture preload incomplete; renderer will retry") end
     instance.Parent = self.folder
     Mounts.RegisterPreview(instance)
     local track = playIdle(instance, archetype)

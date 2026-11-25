@@ -21,9 +21,6 @@ import uuid
 from xml.etree import ElementTree as etree
 
 
-MAX_XML_BYTES = 150 * 1024 * 1024
-
-
 def _sha(path):
     digest = hashlib.sha256()
     with path.open('rb') as stream:
@@ -32,9 +29,18 @@ def _sha(path):
     return digest.hexdigest()
 
 
+def _source_size(path):
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f'Source XML missing or not a regular file: {path}. Studio: File → Save to File → Roblox XML Place (.rbxlx).')
+    size = path.stat().st_size
+    if size <= 100:
+        raise ValueError(f'Source XML is empty or truncated: {path} ({size} bytes)')
+    # No fixed byte ceiling: authoring Places grow with the world.
+    return size
+
+
 def _parse(path):
-    if not path.is_file() or path.is_symlink() or not 100 < path.stat().st_size <= MAX_XML_BYTES:
-        raise ValueError('Save the current authoring Place as place/game1_runtime_source.rbxlx (XML, max 150 MB)')
+    _source_size(path)
     # Reject external entity definitions; ElementTree itself does not resolve
     # external entities, but fail rather than silently accepting a DTD.
     with path.open('rb') as stream:
@@ -43,6 +49,8 @@ def _parse(path):
         raise ValueError('DOCTYPE and XML entities are not accepted in source Place')
     try:
         tree = etree.parse(str(path))
+    except MemoryError as error:
+        raise ValueError(f'Insufficient memory to parse XML Place: {path}. Close other applications or use a machine with more available memory.') from error
     except (etree.ParseError, OSError) as error:
         raise ValueError('Source Place is not a valid Roblox XML .rbxlx file') from error
     if tree.getroot().tag != 'roblox' or tree.getroot().get('version') not in ('4', '5'):
@@ -585,7 +593,8 @@ def build_rows(overview, registry, settings=None):
 
 
 class RuntimePlaceBuilder:
-    def __init__(self, root):
+    def __init__(self, root, *, require_scripts=False):
+        self.require_scripts = require_scripts
         self.root = Path(root).resolve()
         self.source = self.root / 'place' / 'game1_runtime_source.rbxlx'
         self.destination = self.root / '.control-center' / 'runtime-builds'
@@ -602,13 +611,26 @@ class RuntimePlaceBuilder:
                 raise ValueError('Runtime build is incomplete or redirected')
         return folder
 
+    def _verify_scripts(self, tree):
+        # Geometry-only synthetic fixtures have no project tree. Real projects
+        # always carry the Rojo mapping; fail closed if it disappears.
+        if not self.require_scripts and not (self.root / 'src').exists() and not (self.root / 'default.project.json').exists():
+            return {}
+        from .runtime_script_freshness import verify_scripts
+        return verify_scripts(self.root, tree)
+
     def inspect(self, rows, settings=None, house_inputs=None):
-        source = self.source.resolve(strict=True)
+        source = self.source.resolve()
         if source != self.source or source.suffix.lower() != '.rbxlx':
             raise ValueError('Source must be a regular place/game1_runtime_source.rbxlx, not a symlink')
         from .location_streaming_config import DEFAULT_SETTINGS, validate_settings
         settings = validate_settings(settings or DEFAULT_SETTINGS)
+        # Hash both sides of the parse: a Studio save during Preflight cannot
+        # bless geometry or scripts parsed from a different file revision.
+        _source_size(source)
+        source_digest = _sha(source)
         tree = _parse(source)
+        scripts = self._verify_scripts(tree)
         _, authoring_root, authoring_refs = _authoring_marker_root(tree)
         targets = sorted({row['slug'] for row in rows})
         selected = _verify(tree, rows, targets)
@@ -631,14 +653,16 @@ class RuntimePlaceBuilder:
         if len([node for node in tree.getroot() if node.tag == 'Item'
                 and node.get('class') == 'ReplicatedStorage']) != 1:
             raise ValueError('Saved Place must include exactly one ReplicatedStorage service')
-        return {'source': str(source), 'sourceSha256': _sha(source),
+        if _sha(source) != source_digest:
+            raise ValueError('Source XML changed during Preflight; rerun Preflight after saving')
+        return {'source': str(source), 'sourceSha256': source_digest,
                 'eligible': len(selected), 'houseCount': len(house_rows),
                 'houseMeshParts': sum(len(r['parts']) for r in house_rows),
                 'untouchedHouseCounts': untouched_houses,
                 'untouchedHouseModels': sum(untouched_houses.values()),
                 'counts': {slug: sum(r['slug'] == slug for r in rows) for slug in targets},
                 'sourceBytes': source.stat().st_size,
-                'authoringMarkersToStrip': len(authoring_refs)}
+                'authoringMarkersToStrip': len(authoring_refs), **scripts}
 
     def prepare(self, rows, *, expected_sha, snapshot_id, catalog_digest, settings=None, house_inputs=None):
         if not isinstance(expected_sha, str) or len(expected_sha) != 64:
@@ -649,6 +673,10 @@ class RuntimePlaceBuilder:
         if expected_sha != meta['sourceSha256']:
             raise ValueError('Saved authoring Place changed since Preflight; run it again')
         tree = _parse(self.source)
+        if _sha(self.source) != expected_sha:
+            raise ValueError('Source XML changed during preparation; run Preflight again')
+        if self._verify_scripts(tree) != {k: meta[k] for k in ('scriptCount', 'scriptSha256') if k in meta}:
+            raise ValueError('Runtime scripts changed during preparation; run Preflight again')
         matched = _verify(tree, rows, sorted({r['slug'] for r in rows}))
         from .house_runtime_compilation import inspect as inspect_houses, transform as transform_houses, payload as house_payload
         selected_houses = inspect_houses(tree, house_inputs or {})
@@ -696,6 +724,8 @@ class RuntimePlaceBuilder:
             # Verify that all intended stripped MeshParts are absent and all
             # Collision Parts still exist, from a fresh parse on disk.
             rebuilt = _parse(runtime)
+            if self._verify_scripts(rebuilt) != {k: meta[k] for k in ('scriptCount', 'scriptSha256') if k in meta}:
+                raise RuntimeError('Runtime script integrity mismatch')
             # Reopen the result and ensure every Workspace setting was serialized
             # with the expected Roblox XML type and value.
             workspace_nodes = [n for n in rebuilt.getroot() if n.tag == 'Item' and n.get('class') == 'Workspace']
@@ -769,6 +799,7 @@ class RuntimePlaceBuilder:
                 'schemaVersion': 1, 'kind': 'game1-location-runtime-draft',
                 'snapshotRevision': snapshot_id, 'catalogDigest': catalog_digest,
                 'sourceSha256': expected_sha, 'runtimeSha256': _sha(runtime),
+                **{k: meta[k] for k in ('scriptCount', 'scriptSha256') if k in meta},
                 'targets': runtime_payload['targets'], 'modes': runtime_payload['modes'],
                 'assetDistances': runtime_payload['assetDistances'], 'hysteresis': settings['hysteresis'], 'workspace': settings['workspace'],
                 'removedVisualMeshParts': sum(len(x) if isinstance(x, list) else 1 for _row, _model, x in matched),
@@ -783,6 +814,7 @@ class RuntimePlaceBuilder:
             (build_dir / 'placement_manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
             (build_dir / 'build_report.json').write_text(json.dumps({
                 'snapshotRevision': snapshot_id,
+                **{k: meta[k] for k in ('scriptCount', 'scriptSha256') if k in meta},
                 'backup': str(backup), 'backupSha256': _sha(backup),
                 'runtime': str(runtime), 'runtimeSha256': _sha(runtime),
                 'placements': len(rows), 'housePlacements': len(selected_houses),

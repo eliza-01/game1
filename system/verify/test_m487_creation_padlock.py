@@ -44,7 +44,7 @@ class CreationPadlockM487(unittest.TestCase):
         c = source('src/client/character/CharacterCreationController.luau')
         action = c.split('enter.Activated:Connect(function()')[1].split('local function sync()')[0]
         self.assertIn('submitting = true', action)
-        self.assertLess(action.index('submitting = true'), action.index('remote.InvokeServer'))
+        self.assertLess(action.index('submitting = true'), action.index('Request.Invoke(remote'))
         self.assertIn('submitting = false', action)
         sync = c.split('local function sync()')[1]
         self.assertIn('submitting = not active', sync)

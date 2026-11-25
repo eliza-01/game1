@@ -32,12 +32,13 @@ class CharacterLabelsM500(unittest.TestCase):
         self.assertIn('newCharacter.Selectable = false', panel)
         self.assertNotIn('newCharacter.Activated:Connect', panel)
         self.assertIn('local newActionSpace = if selection then enterHeight + 6 else 0', panel)
-        self.assertIn('local footerHeight = 84 + newActionSpace', panel)
+        self.assertIn('local footerHeight = (if compact then 64 else 84) + newActionSpace', panel)
         self.assertIn('local enterY = 4 + newActionSpace', panel)
         for enter_height in (38, 44):
             # Both mobile and desktop footer layouts leave a six-pixel gap.
             self.assertEqual(4 + enter_height + 6 - (4 + enter_height), 6)
-            self.assertGreaterEqual(84 + enter_height + 6 - (4 + enter_height + 6 + enter_height + 3), 18)
+            footer = 64 if enter_height == 38 else 84
+            self.assertGreaterEqual(footer + enter_height + 6 - (4 + enter_height + 6 + enter_height + 3), 18)
 
 
 if __name__ == '__main__':

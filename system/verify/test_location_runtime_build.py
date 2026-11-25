@@ -309,6 +309,21 @@ class RuntimeBuildRouteTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
         self.source,self.rows=fixture(self.root)
+        # Route-level production preflight also requires verified Rojo scripts.
+        (self.root / 'default.project.json').write_text(json.dumps({'tree': {
+            'ReplicatedStorage': {'Game1Shared': {'$path': 'src/shared'}}}}), encoding='utf-8')
+        folder = self.root / 'src/shared'
+        folder.mkdir(parents=True)
+        (folder / 'Fixture.luau').write_text('return {}\n', encoding='utf-8')
+        tree = ET.parse(self.source)
+        storage = tree.getroot().find('./Item[@class="ReplicatedStorage"]')
+        shared = ET.SubElement(storage, 'Item', {'class': 'Folder', 'referent': 'RBX_SHARED'})
+        ET.SubElement(ET.SubElement(shared, 'Properties'), 'string', name='Name').text = 'Game1Shared'
+        module = ET.SubElement(shared, 'Item', {'class': 'ModuleScript', 'referent': 'RBX_FIXTURE'})
+        props = ET.SubElement(module, 'Properties')
+        ET.SubElement(props, 'string', name='Name').text = 'Fixture'
+        ET.SubElement(props, 'ProtectedString', name='Source').text = 'return {}\n'
+        tree.write(self.source, encoding='utf-8', xml_declaration=True)
         self.revisions=PlaceRevisionStore(self.root)
         report={'schemaVersion':1,'placeId':0,'placements':self.rows,'protected':[], 'warnings':[]}
         self.revisions.add(report,'test-digest')
@@ -335,6 +350,7 @@ class RuntimeBuildRouteTests(unittest.TestCase):
         status,plan=route('/api/lod-manager/preflight',lambda:{},{'lod_manager':self.manager})
         self.assertEqual(status,200,plan)
         self.assertEqual(plan['eligible'],2)
+        self.assertEqual(plan['scriptCount'],1)
         status,result=route('/api/lod-manager/prepare',lambda:{'token':plan['token']},
                             {'lod_manager':self.manager})
         self.assertEqual(status,200,result)

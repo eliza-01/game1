@@ -211,7 +211,7 @@ function Controller.Start()
         local current = settingsTab == "language"
         list.Visible = current
         confirm.Visible = current
-        subtitle.Visible = current
+        subtitle.Visible = current and panel.AbsoluteSize.Y >= 360
         details.Visible = not current
         settingsAction.Visible = settingsTab == "character"
         for tab, item in pairs(settingsTabs) do
@@ -305,12 +305,40 @@ function Controller.Start()
     end)
     State.Changed:Connect(paint)
     paint()
-    gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-        panel.Size = UDim2.fromOffset(math.min(460, math.max(270, gui.AbsoluteSize.X - 24)),
-            math.min(456, math.max(225, gui.AbsoluteSize.Y - 24)))
-    end)
-    panel.Size = UDim2.fromOffset(math.min(460, math.max(270, gui.AbsoluteSize.X - 24)),
-        math.min(456, math.max(225, gui.AbsoluteSize.Y - 24)))
+    local function resize()
+        local width = math.max(1, math.min(460, gui.AbsoluteSize.X - 24))
+        local height = math.max(1, math.min(456, gui.AbsoluteSize.Y - 24))
+        local compact = height < 360
+        panel.Size = UDim2.fromOffset(width, height)
+        title.Position = UDim2.fromOffset(12, if compact then 3 else 14)
+        title.TextSize = if compact then 17 else 22
+        title.Size = UDim2.new(1, -62, 0, 34)
+        close.Position = UDim2.new(1, -43, 0, if compact then 4 else 13)
+        subtitle.Visible = not compact and settingsTab == "language"
+        local tabsY = if compact then 38 else 93
+        for _, item in pairs(settingsTabs) do
+            item.Position = UDim2.new(item.Position.X.Scale, item.Position.X.Offset, 0, tabsY)
+            item.Size = UDim2.new(0.25, -17, 0, if compact then 32 else 40)
+            item.TextWrapped = true
+            item.TextSize = if compact then 11 else 12
+        end
+        local top = tabsY + (if compact then 38 else 52)
+        local footer = 68
+        list.Position = UDim2.fromOffset(13, top)
+        list.Size = UDim2.new(1, -26, 0, math.max(1, height - top - footer))
+        local available = math.max(1, height - top - footer)
+        details.Position = UDim2.fromOffset(18, top)
+        details.Size = UDim2.new(1, -36, 0, if settingsTab == "character" then math.max(1, available - 38) else available)
+        details.TextScaled = compact
+        settingsAction.Position = UDim2.fromOffset(18, top + math.max(0, available - 34))
+        settingsAction.Size = UDim2.new(1, -36, 0, 34)
+        settingsAction.TextWrapped = true
+        settingsAction.TextSize = if compact then 12 else 15
+    end
+    gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize)
+    for _, item in pairs(settingsTabs) do item.Activated:Connect(function() task.defer(resize) end) end
+    shade:GetPropertyChangedSignal("Visible"):Connect(resize)
+    resize()
 
     task.spawn(function()
         -- Load persisted preference before deciding whether first-run modal

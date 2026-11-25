@@ -26,7 +26,7 @@ class LocationLodManager:
         self.house_placements = house_placements
         self._verified = None  # Last scan by THIS process, not a claim about Studio edits.
         root = Path(self.registry.revisions.path).resolve().parents[1]
-        self.builder = RuntimePlaceBuilder(root)
+        self.builder = RuntimePlaceBuilder(root, require_scripts=True)
         self.streaming_config = LocationStreamingConfig(root)
         self._preflight = None
         self._build_lock = RLock()

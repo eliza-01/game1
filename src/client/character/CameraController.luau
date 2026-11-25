@@ -69,7 +69,13 @@ local function setCharacter(newCharacter: Model)
 	character = newCharacter
 	root = nil
 
-	local newRoot = newCharacter:WaitForChild("RootCollider", 10)
+	local newRoot = newCharacter:FindFirstChild("RootCollider")
+    -- A late replicated root can arrive after the original ten-second wait.
+    while character == newCharacter and localPlayer.Character == newCharacter
+        and (not newRoot or not newRoot:IsA("BasePart")) do
+        task.wait(0.15)
+        newRoot = newCharacter:FindFirstChild("RootCollider")
+    end
 	if character ~= newCharacter or localPlayer.Character ~= newCharacter then return end
 	if newRoot and newRoot:IsA("BasePart") then
 		root = newRoot

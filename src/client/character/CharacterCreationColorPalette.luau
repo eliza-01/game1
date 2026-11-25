@@ -183,6 +183,16 @@ function Picker.new(parent: Frame)
     local onCommit: ((string) -> ())? = nil
     local onCancel: (() -> ())? = nil
     local dragging: string? = nil
+    local pointer: InputObject? = nil
+    local function releasePointer()
+        dragging = nil
+        pointer = nil
+        overlay.ScrollingEnabled = true
+    end
+    overlay:GetPropertyChangedSignal("Visible"):Connect(function()
+        if not overlay.Visible then releasePointer() end
+    end)
+    UserInputService.WindowFocusReleased:Connect(releasePointer)
     local function display(emit: boolean)
         local chosen = hex(Color3.fromHSV(h, s, v))
         preview.BackgroundColor3 = Color3.fromHSV(h, s, v)
@@ -214,7 +224,8 @@ function Picker.new(parent: Frame)
     end
     local function attach(buttonObject: TextButton, which: string)
         buttonObject.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if overlay.Visible and not pointer and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                pointer = input
                 dragging = which
                 overlay.ScrollingEnabled = false
                 coordinate(which, Vector2.new(input.Position.X, input.Position.Y))
@@ -224,15 +235,14 @@ function Picker.new(parent: Frame)
     attach(hit, "canvas")
     attach(valueHit, "brightness")
     UserInputService.InputChanged:Connect(function(input)
-        if overlay.Visible and dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        if overlay.Visible and dragging and pointer and (input == pointer
+            or (pointer.UserInputType == Enum.UserInputType.MouseButton1 and input.UserInputType == Enum.UserInputType.MouseMovement)) then
             coordinate(dragging, Vector2.new(input.Position.X, input.Position.Y))
         end
     end)
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = nil
-            overlay.ScrollingEnabled = true
-        end
+        if pointer and (input == pointer or (pointer.UserInputType == Enum.UserInputType.MouseButton1
+            and input.UserInputType == Enum.UserInputType.MouseButton1)) then releasePointer() end
     end)
     field.FocusLost:Connect(function()
         if not setHex(field.Text, true) then display(false) end

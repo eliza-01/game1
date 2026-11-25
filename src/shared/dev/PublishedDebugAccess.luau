@@ -6,13 +6,16 @@ local Shared = script.Parent.Parent
 local Options = require(Shared:WaitForChild("GameOptions"))
 
 local Access = {}
+local function compiledRuntime(): boolean
+    return game:GetService("ReplicatedStorage"):FindFirstChild("Game1LocationRuntimeManifest") ~= nil
+end
 local AUTH_ATTRIBUTE = "Game1PublishedDebugAuthorized"
 local warnedAuthorization = false
 
 function Access.ServerEnabled(): boolean
     return RunService:IsStudio()
-        or Options.ShowPublishedDebugControls("desktop")
-        or Options.ShowPublishedDebugControls("mobile")
+        or (not compiledRuntime() and (Options.ShowPublishedDebugControls("desktop")
+        or Options.ShowPublishedDebugControls("mobile")))
 end
 
 function Access.ServerAllowed(player: Player): boolean
@@ -21,6 +24,7 @@ end
 
 function Access.ClientAllowed(): boolean
     if RunService:IsStudio() then return true end
+    if compiledRuntime() then return false end
     local device = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
         then "mobile" else "desktop"
     if not Options.ShowPublishedDebugControls(device) then return false end

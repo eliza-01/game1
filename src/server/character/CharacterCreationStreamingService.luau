@@ -48,6 +48,8 @@ function Service.Start(settings: any)
     end
     local focused: {[Player]: boolean} = {}
     local selectedFocus: {[Player]: boolean} = {}
+    local streamStages: {[Player]: string} = {}
+    local streamTokens: {[Player]: number} = {}
     local subscriptions: {[Player]: {RBXScriptConnection}} = {}
 
     local function set(player: Player)
@@ -61,33 +63,38 @@ function Service.Start(settings: any)
             end)
             if ok then selectedFocus[player] = if selectionNeeded then true else nil
             else warn("[game1][character-creation] selection focus: " .. tostring(reason)) end
-            if ok and selectionNeeded then
-                task.spawn(function()
-                    local success, message = pcall(function() player:RequestStreamAroundAsync(selection.Position, 6) end)
-                    if not success and selectedFocus[player] then warn("[game1][character-creation] selection streaming: " .. tostring(message)) end
-                end)
-            end
         end
-        if needed == (focused[player] == true) then return end
-        if needed then
+        if needed and not focused[player] then
             local ok, reason = pcall(function() player:AddReplicationFocus(focus) end)
             if not ok then
                 warn("[game1][character-creation] terrain focus unavailable: " .. tostring(reason))
                 return
             end
             focused[player] = true
-            task.spawn(function()
-                local success, message = pcall(function()
-                    player:RequestStreamAroundAsync(midpoint, 6)
-                end)
-                if not success and focused[player] then
-                    warn("[game1][character-creation] initial streaming request: " .. tostring(message))
-                end
-            end)
-        else
+        elseif not needed and focused[player] then
             focused[player] = nil
             local ok, reason = pcall(function() player:RemoveReplicationFocus(focus) end)
             if not ok then warn("[game1][character-creation] focus cleanup: " .. tostring(reason)) end
+        end
+        local stage = if needed then tostring(player:GetAttribute("CharacterCreationStatus") or "loading") else "world"
+        if streamStages[player] == stage then return end
+        streamStages[player] = stage
+        local token = (streamTokens[player] or 0) + 1
+        streamTokens[player] = token
+        player:SetAttribute("Game1CharacterSceneStreamReady", nil)
+        if stage == "creation" or stage == "selection" then
+            task.spawn(function()
+                local success, message = pcall(function()
+                    if stage == "selection" and selection then
+                        player:RequestStreamAroundAsync(selection.Position, 6)
+                    else
+                        player:RequestStreamAroundAsync(midpoint, 6)
+                    end
+                end)
+                if streamTokens[player] ~= token or not player.Parent then return end
+                if success then player:SetAttribute("Game1CharacterSceneStreamReady", stage)
+                else warn("[game1][character-creation] scene streaming: " .. tostring(message)) end
+            end)
         end
     end
     local function join(player: Player)
@@ -100,6 +107,8 @@ function Service.Start(settings: any)
     end
     Players.PlayerAdded:Connect(join)
     Players.PlayerRemoving:Connect(function(player)
+        streamStages[player] = nil
+        streamTokens[player] = nil
         if subscriptions[player] then
             for _, connection in subscriptions[player] do connection:Disconnect() end
             subscriptions[player] = nil

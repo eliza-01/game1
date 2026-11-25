@@ -12,7 +12,8 @@ class LandscapeSwayRootM302(unittest.TestCase):
         camera = (ROOT / 'src/client/character/CameraController.luau').read_text(encoding='utf-8')
         sway = (ROOT / 'src/client/world/LandscapeSwayController.luau').read_text(encoding='utf-8')
         self.assertIn('root.Name = "RootCollider"', character_rig)
-        self.assertIn('newCharacter:WaitForChild("RootCollider", 10)', camera)
+        self.assertIn('newCharacter:FindFirstChild("RootCollider")', camera)
+        self.assertIn('while character == newCharacter and localPlayer.Character == newCharacter', camera)
         self.assertIn('local function viewerPosition(): Vector3?', sway)
         lookup = sway[sway.index('local function viewerPosition()'):sway.index('local function near(')]
         self.assertLess(lookup.index('FindFirstChild("RootCollider")'), lookup.index('FindFirstChild("HumanoidRootPart")'))

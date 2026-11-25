@@ -393,6 +393,7 @@
         ` · защищённых объектов не трогаем: ${plan.protectedNotModified}` +
         ` · Индивидуальные дистанции: ${Object.keys(plan.assetDistances||{}).length} типов` +
         ` · Workspace Target ${plan.workspace.targetRadius} studs · SHA256 исходника: ${plan.sourceSha256}` +
+        (plan.scriptSha256 ? ` · Rojo scripts: ${plan.scriptCount} verified · ${plan.scriptSha256.slice(0,16)}…` : '') +
         (exclusions.length ? `\nНЕ ВКЛЮЧЕНЫ В RUNTIME STREAMING (${omitted} домов, ${unselectedLocations.reduce((n,x)=>n+x.count,0)} Location):\n${exclusions.join('\n')}` : '');
       $('lod-build-preview').hidden = false;
       $('lod-build-execute').hidden = false;

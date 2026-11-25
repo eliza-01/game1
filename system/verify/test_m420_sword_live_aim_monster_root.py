@@ -45,7 +45,8 @@ class SwordLiveAimM420(unittest.TestCase):
         self.assertIn('or session.environmentBlocked or session.hitResolved', server)
         self.assertIn('MeleeMovingFacing.Resolve(root.CFrame.LookVector, session.attackFacingDirection)', server)
         self.assertNotIn('Config.MovingMeleeMinimumSpeed', server)
-        self.assertEqual(server.count('scheduleMeleeArc(player, character, root, serial, clientAttackId, clipId, hitEndEvent)'), 1)
+        self.assertEqual(server.count('scheduleMeleeArc(player, character, root, serial, clientAttackId, clipId, contact,'), 1)
+        self.assertIn('for _, contact in ipairs(meleePlan) do', server)
         self.assertIn('AttackSessionStore.MarkMeleeResolved', server)
 
     def test_yaw_wrap_and_reverse_targets_do_not_require_lower_body_turn(self):

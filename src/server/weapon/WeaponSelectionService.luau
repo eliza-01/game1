@@ -65,6 +65,7 @@ local function selectWeapon(player: Player, request: any)
     if not character or character.Parent == nil or tostring(character:GetAttribute("LifeState") or "Alive") ~= "Alive" then
         return { ok = false, error = "Персонаж ещё не готов" }
     end
+    if character:GetAttribute("AttackEndsAt") ~= nil then return {ok=false,error="Finish current attack first"} end
     local slug = string.lower(request)
     if slug ~= "" then
         local allowed = false

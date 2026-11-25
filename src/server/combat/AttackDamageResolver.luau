@@ -22,6 +22,7 @@ export type DamageQuery = {
     arcAngleDegrees: number,
     verticalPadding: number,
     facingDirection: Vector3?,
+    baseDamage: number?,
 }
 
 function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number)
@@ -61,7 +62,7 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number
             local hitPosition = if isHeadshot then aimedHead.hitPosition else contact.hit.hitPosition
             local hitZone = if isHeadshot then "head" else "body"
             local damageMultiplier = if isHeadshot then Config.HeadshotDamageMultiplier else 1
-            local rawDamage = (tonumber(character:GetAttribute("Damage")) or 0) * damageMultiplier
+            local rawDamage = (query.baseDamage or tonumber(character:GetAttribute("Damage")) or 0) * damageMultiplier
             local finalDamage, killed = DamageService.Apply(character, model, rawDamage, isHeadshot)
             model:SetAttribute("LastHitZone", hitZone)
             model:SetAttribute("LastHeadshot", isHeadshot)

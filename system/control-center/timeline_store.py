@@ -11,20 +11,27 @@ SCHEMA_VERSION = 2
 EVENT_CATALOGS = {
     "characters": [{"name": "HitEnd", "label": "hit end"}],
     "bows": [{"name": "Release", "label": "release arrow"}],
+    "dualswords": [{"name": "HitFirst", "label": "first hit"}, {"name": "HitEnd", "label": "second hit"}],
     "monsters": [
         {"name": "Hit", "label": "hit"},
     ],
 }
-ALL_EVENT_NAMES = ("HitEnd", "Hit", "Release")
+ALL_EVENT_NAMES = ("HitEnd", "Hit", "Release", "HitFirst")
 
 
 def event_catalog_for_subject(subject_type: str) -> list[dict]:
     return list(EVENT_CATALOGS.get(str(subject_type or ""), []))
 
 
+def catalog_subject(subject_type: str, weapon_set: str) -> str:
+    if subject_type == 'characters':
+        if weapon_set == 'bow': return 'bows'
+        if weapon_set == 'dualswords': return 'dualswords'
+    return subject_type
+
+
 def event_names_for_subject(subject_type: str, weapon_set: str = "") -> set[str]:
-    return {str(row["name"]) for row in event_catalog_for_subject(
-        "bows" if subject_type == "characters" and weapon_set == "bow" else subject_type)}
+    return {str(row["name"]) for row in event_catalog_for_subject(catalog_subject(subject_type, weapon_set))}
 
 
 class TimelineStore:
@@ -161,8 +168,8 @@ class TimelineStore:
                     name: event for name, event in saved_events.items() if name in allowed_events
                 }
                 configured = (float(timeline.get("duration") or 0) > 0
-                              and all(name in required_events for name in
-                                      (("Release",) if str(clip.get("weapon_set") or "") == "bow" else ("HitEnd",)))
+                              and all(name in required_events for name in allowed_events)
+                              and (str(clip.get('weapon_set') or '') != 'dualswords' or required_events['HitFirst']['normalizedTime'] < required_events['HitEnd']['normalizedTime'])
                               and not bool(timeline.get("reviewRequired")))
                 rows.append({
                     "subjectType": "characters",
@@ -175,7 +182,7 @@ class TimelineStore:
                     "animationAssetId": str(clip.get("asset_id") or ""),
                     "weaponSet": str(clip.get("weapon_set") or ""),
                     "eventCatalog": event_catalog_for_subject(
-                        "bows" if str(clip.get("weapon_set") or "") == "bow" else "characters"),
+                        catalog_subject("characters", str(clip.get("weapon_set") or ""))),
                     "variant": int(clip.get("variant") or 0),
                     "duration": float(timeline.get("duration") or 0),
                     "events": required_events,
@@ -253,6 +260,8 @@ class TimelineStore:
         elif subject_type == "characters":
             if "HitEnd" not in events:
                 raise ValueError("character attack timeline requires HitEnd")
+            if weapon_set == 'dualswords' and ('HitFirst' not in events or not events['HitFirst']['normalizedTime'] < events['HitEnd']['normalizedTime']):
+                raise ValueError('dualswords requires HitFirst before HitEnd')
         elif subject_type == "monsters":
             if "Hit" not in events:
                 raise ValueError("monster attack timeline requires Hit")
@@ -262,7 +271,7 @@ class TimelineStore:
 
     def event_catalog_for_subject(self, subject_type: str, weapon_set: str = "") -> list[dict]:
         return event_catalog_for_subject(
-            "bows" if subject_type == "characters" and weapon_set == "bow" else subject_type)
+            catalog_subject(subject_type, weapon_set))
 
     def begin_editor_session(self, clip_id: str) -> dict:
         row = self._find_attack(clip_id)

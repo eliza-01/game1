@@ -84,6 +84,8 @@ function Loadout.Apply(player: Player, character: Model): (boolean, string?)
         ok, reason = Weapons.Equip(character, selection.slug, selection.weapon.id, selection.upgrade)
         local model = character:FindFirstChild("EquippedWeapon")
         if ok and model then Appearance.Tint(model, Balance.Grade.Color(selection.weapon.level)) end
+        local left = character:FindFirstChild("EquippedWeaponLeft")
+        if ok and left then Appearance.Tint(left, Balance.Grade.Color(selection.weapon.level)) end
     else
         Weapons.Unequip(character)
     end

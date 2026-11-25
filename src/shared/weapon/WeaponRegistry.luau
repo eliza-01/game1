@@ -24,6 +24,11 @@ return table.freeze({
 			locomotionMode = "Walk",
 			runSpeedMultiplier = 0.75,
 		}),
+		["dualswords"] = table.freeze({
+			animationSet = "dualswords",
+			locomotionMode = "Run",
+			runSpeedMultiplier = 1,
+		}),
 	}),
 	weapons = table.freeze({
 		["newbie_bow"] = table.freeze({

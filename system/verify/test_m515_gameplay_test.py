@@ -7,7 +7,7 @@ class GameplayTest(unittest.TestCase):
     def test_seed_and_grades(self):
         data=json.loads(read('config/balance/gameplay.json'))
         self.assertEqual(sorted({w['level'] for w in data['weapons']}),[1,5,10,15,20,25,30,35])
-        self.assertEqual(len({w['id'] for w in data['weapons']}),32)
+        self.assertEqual(len({w['id'] for w in data['weapons']}),34)
         self.assertEqual(len(data['monsters']),35)
         self.assertEqual(len(data['armor']),8)
         grade=read('src/shared/balance/EquipmentGrade.luau')

@@ -23,13 +23,14 @@ from opencloud_assets import (
 SCHEMA_VERSION = 3
 PROJECT = "game1"
 ACTIVE_KEY = "active_weapon_slug"
-WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow")
+WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow", "dualswords")
 ATTACK_LOCOMOTION_MODES = ("Run", "Walk")
 ATTACK_MOVEMENT_DEFAULTS = {
     "dagger": {"animationSet": "1hs", "locomotionMode": "Run", "runSpeedMultiplier": 1.0},
     "sword": {"animationSet": "1hs", "locomotionMode": "Run", "runSpeedMultiplier": 1.0},
     "bigsword": {"animationSet": "2hs", "locomotionMode": "Walk", "runSpeedMultiplier": 0.75},
     "bow": {"animationSet": "bow", "locomotionMode": "Walk", "runSpeedMultiplier": 0.75},
+    "dualswords": {"animationSet": "dualswords", "locomotionMode": "Run", "runSpeedMultiplier": 1.0},
 }
 RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")
 TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -330,7 +331,7 @@ class WeaponStore:
         parts = source_path.split("/")
         if len(parts) >= 4 and parts[0:3] == ["assets", "source", "weapons"]:
             folder = parts[3].lower()
-            if folder in {"1hs", "2hs", "dagger", "sword", "bigsword", "bow"}:
+            if folder in {"1hs", "2hs", "dagger", "sword", "bigsword", "bow", "dualswords"}:
                 return folder
         return str(row.get("weapon_type") or "").strip().lower()
 
@@ -399,7 +400,7 @@ class WeaponStore:
         weapon_type = str(payload.get("weaponType", old.get("weapon_type") if old else "") or "").strip().lower()
         rarity = str(payload.get("rarity", old.get("rarity") if old else "common") or "").strip().lower()
         if weapon_type not in WEAPON_TYPES:
-            raise ValueError("weapon type must be dagger, sword, bigsword or bow")
+            raise ValueError("weapon type must be dagger, sword, bigsword, bow or dualswords")
         if rarity not in RARITIES:
             raise ValueError("rarity must be common, uncommon, rare, mythical, legendary or immortal")
         return slug, name_en, name_ru, weapon_type, rarity

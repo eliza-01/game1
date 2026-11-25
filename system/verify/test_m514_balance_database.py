@@ -27,7 +27,7 @@ class BalanceDatabase(unittest.TestCase):
         self.assertEqual(len(self.data['levels']),35)
         self.assertEqual(len(self.data['monsters']),35)
         # Individual values are editable; do not pin the user's balance.
-        self.assertEqual(len(self.data['weapons']),32)
+        self.assertEqual(len(self.data['weapons']),34)
         self.assertEqual(len(self.data['armor']),8)
         self.assertEqual(self.data['levels'][-1]['xpNext'],0)
 

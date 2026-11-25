@@ -9,6 +9,10 @@ export type Session = {
     untilTime: number,
     damageDealt: boolean,
     hitResolved: boolean,
+    meleeResolvedCount: number,
+    meleeHitCount: number?,
+    weaponType: string,
+    weaponId: string,
     lastAimOrigin: Vector3?,
     lastAimDirection: Vector3?,
     attackFacingDirection: Vector3?,
@@ -40,6 +44,10 @@ function AttackSessionStore.Begin(
         untilTime = untilTime,
         damageDealt = false,
         hitResolved = false,
+        meleeResolvedCount = 0,
+        meleeHitCount = nil,
+        weaponType = tostring(character:GetAttribute("EquippedWeaponType") or ""),
+        weaponId = tostring(character:GetAttribute("EquippedWeaponBalanceId") or ""),
         lastAimOrigin = nil,
         lastAimDirection = nil,
         attackFacingDirection = nil,
@@ -71,16 +79,21 @@ function AttackSessionStore.SetAim(
     end
 end
 
--- Consume exactly one authoritative damage event per attack session.
+-- Consume ordered authoritative checkpoints, once each, for this attack session.
 -- A delayed callback from another attack or respawn cannot resolve this one.
 function AttackSessionStore.MarkMeleeResolved(
-    player: Player, character: Model, serial: number, clientAttackId: number
+    player: Player, character: Model, serial: number, clientAttackId: number, index: number?, count: number?
 ): boolean
     local session = byPlayer[player]
     if not matches(session, character, serial, clientAttackId) or session.hitResolved then
         return false
     end
-    session.hitResolved = true
+    local i, n = index or 1, count or 1
+    if n < 1 or n > 2 or i ~= session.meleeResolvedCount + 1 or i > n
+        or (session.meleeHitCount ~= nil and session.meleeHitCount ~= n) then return false end
+    session.meleeHitCount = n
+    session.meleeResolvedCount = i
+    if i == n then session.hitResolved = true end
     return true
 end
 

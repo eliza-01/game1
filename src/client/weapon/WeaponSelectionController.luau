@@ -157,7 +157,7 @@ function Controller.Start()
         end
         local categoryLabels = {
             all = "Все", hands = "Руки", dagger = "Кинжалы", sword = "Мечи",
-            bigsword = "Двуручные", bow = "Луки",
+            bigsword = "Двуручные", bow = "Луки", dualswords = "Парные мечи",
         }
         local function drawCategories()
             clear(categories, categoryLayout)

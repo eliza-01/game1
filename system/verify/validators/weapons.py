@@ -23,8 +23,8 @@ def check_weapon_registration(
     if weapon_manifest.get("schemaVersion") != 3 or weapon_manifest.get("project") != "game1":
         err("weapon manifest must be game1 schema 3")
     weapon_options = weapon_manifest.get("options") or {}
-    if weapon_options.get("weaponTypes") != ["dagger", "sword", "bigsword", "bow"]:
-        err("weapon type pool must be dagger, sword, bigsword, bow")
+    if weapon_options.get("weaponTypes") != ["dagger", "sword", "bigsword", "bow", "dualswords"]:
+        err("weapon type pool must be dagger, sword, bigsword, bow, dualswords")
     if weapon_options.get("rarities") != ["common", "uncommon", "rare", "mythical", "legendary", "immortal"]:
         err("weapon rarity pool must be common through immortal")
 
@@ -33,7 +33,7 @@ def check_weapon_registration(
     for required in [
         "class WeaponStore",
         "def slugify_english",
-        'WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow")',
+        'WEAPON_TYPES = ("dagger", "sword", "bigsword", "bow", "dualswords")',
         'RARITIES = ("common", "uncommon", "rare", "mythical", "legendary", "immortal")',
         'STAT_KEYS = ("Damage", "AttackSpeed")',
         "weapon_stat_modifiers",
@@ -176,10 +176,10 @@ def check_weapon_attack_movement(
     weapon_manifest_path = ROOT / "assets/manifests/weapons.json"
     weapon_manifest_m22 = json.loads(weapon_manifest_path.read_text(encoding="utf-8")) if weapon_manifest_path.is_file() else {}
     weapon_types_m22 = ((weapon_manifest_m22.get("options") or {}).get("weaponTypes") or [])
-    if weapon_types_m22 != ["dagger", "sword", "bigsword", "bow"]:
+    if weapon_types_m22 != ["dagger", "sword", "bigsword", "bow", "dualswords"]:
         err(f"canonical weapon types are wrong: {weapon_types_m22}")
     attack_movement_rows = {str(row.get("weaponType") or ""): row for row in weapon_manifest_m22.get("attackMovement") or []}
-    for weapon_type in ["dagger", "sword", "bigsword", "bow"]:
+    for weapon_type in ["dagger", "sword", "bigsword", "bow", "dualswords"]:
         row = attack_movement_rows.get(weapon_type)
         if not row:
             err(f"weapon attack movement rule missing: {weapon_type}")

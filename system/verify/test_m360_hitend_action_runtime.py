@@ -56,7 +56,7 @@ class HitEndActionM360(unittest.TestCase):
         self.assertNotIn('AttackDamageEndsAt', server)
         self.assertIn('or character:GetAttribute("LifeState") ~= "Alive" then return end', server)
         self.assertIn('session.serial ~= serial', server)
-        self.assertIn('AttackSessionStore.MarkMeleeResolved(player, character, serial, clientAttackId)', server)
+        self.assertIn('AttackSessionStore.MarkMeleeResolved(player, character, serial, clientAttackId, hitEndEvent.index, hitEndEvent.count)', server)
         self.assertIn('session.hitResolved = true', store)
         self.assertIn('or session.environmentBlocked or session.hitResolved', server)
         self.assertIn('MeleeTargetQuery.Find', hit)

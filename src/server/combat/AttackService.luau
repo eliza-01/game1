@@ -8,6 +8,7 @@ local CombatShared = Shared:WaitForChild("combat")
 local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 local CharacterAttackHitEnd = require(CombatShared:WaitForChild("CharacterAttackHitEnd"))
+local MeleeHitPlan = require(CombatShared:WaitForChild("MeleeHitPlan"))
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local CharacterAnimationRegistry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local VariantMerge = require(CharacterShared:WaitForChild("CharacterAnimationVariantMerge"))
@@ -45,7 +46,7 @@ local function rowsForEquippedAttack(character: Model): any
         local rows = VariantMerge.Rows(ownWeapon and ownWeapon.attack, commonWeapon and commonWeapon.attack)
         if #rows > 0 then return rows end
         -- In particular, a bow may NEVER fire using the fallback hands clip.
-        if weaponSet == "bow" then return nil end
+        if weaponSet == "bow" or weaponSet == "dualswords" then return nil end
     end
     return VariantMerge.Rows(profile.base and profile.base.attack, shared and shared.base and shared.base.attack)
 end
@@ -62,12 +63,12 @@ local function allowedAttackDescriptor(character: Model, clipId: string): any?
     return nil
 end
 
--- Exactly one server-clock HitEnd checkpoint. No active hit window.
+-- Server-clock checkpoints, one normally and two for dualswords. No active hit window.
 -- Client-authored CFrame/Size of a weapon is never accepted or consulted.
 local triggerWeaponBounce
 
 local function applyMeleeArc(player: Player, character: Model, root: BasePart,
-    serial: number, clientAttackId: number, clipId: string, elapsed: number): boolean
+    serial: number, clientAttackId: number, clipId: string, elapsed: number, baseDamage: number?): boolean
     local session = AttackSessionStore.Get(player)
     if not session or session.serial ~= serial or session.character ~= character
         or session.clientAttackId ~= clientAttackId or session.environmentBlocked
@@ -93,14 +94,14 @@ local function applyMeleeArc(player: Player, character: Model, root: BasePart,
         aimOrigin=session.lastAimOrigin,
         aimDirection=session.lastAimDirection, attackRange=reach,
         arcAngleDegrees=arcAngle, verticalPadding=padding,
-        facingDirection=facing,
+        facingDirection=facing, baseDamage=baseDamage,
     })
     if damaged > 0 then AttackSessionStore.MarkDamage(player, character, serial) end
     return false
 end
 
 local function scheduleMeleeArc(player: Player, character: Model, root: BasePart,
-    serial: number, clientAttackId: number, clipId: string, hitEndEvent: any)
+    serial: number, clientAttackId: number, clipId: string, hitEndEvent: any, baseDamage: number?)
     local started = os.clock()
     task.delay(hitEndEvent.time, function()
         local session = AttackSessionStore.Get(player)
@@ -110,11 +111,13 @@ local function scheduleMeleeArc(player: Player, character: Model, root: BasePart
             or character:GetAttribute("LifeState") ~= "Alive" then return end
         local currentRoot = character:FindFirstChild("RootCollider")
         if not currentRoot or not currentRoot:IsA("BasePart") then return end
-        if not AttackSessionStore.MarkMeleeResolved(player, character, serial, clientAttackId) then return end
-        -- Exactly one snapshot at HitEnd, even with no loaded animation track.
+        if session.weaponType ~= tostring(character:GetAttribute("EquippedWeaponType") or "")
+            or session.weaponId ~= tostring(character:GetAttribute("EquippedWeaponBalanceId") or "") then return end
+        if not AttackSessionStore.MarkMeleeResolved(player, character, serial, clientAttackId, hitEndEvent.index, hitEndEvent.count) then return end
+        -- One geometry sample per checkpoint, never per client message.
         local bounced = applyMeleeArc(player, character, currentRoot, serial, clientAttackId, clipId,
-            math.max(0, os.clock() - started))
-        if not bounced then
+            math.max(0, os.clock() - started), baseDamage)
+        if not bounced and hitEndEvent.index == hitEndEvent.count then
             local completed = AttackSessionStore.Get(player)
             if completed and completed.serial == serial and not completed.damageDealt then
                 local range = math.clamp(tonumber(character:GetAttribute("AttackRadius")) or Config.Range,
@@ -375,7 +378,11 @@ local function attack(player: Player, payload: any)
     local isBow = string.lower(tostring(character:GetAttribute("EquippedWeaponType") or "")) == "bow"
     local releaseEvent = if isBow then timing.events and timing.events[BowProjectileConfig.ReleaseEvent] else nil
     local hitEndEvent = if isBow then nil else CharacterAttackHitEnd.Resolve(timing)
-    if (isBow and not releaseEvent) or (not isBow and not hitEndEvent) then
+    local isDual = character:GetAttribute("EquippedWeaponType") == "dualswords"
+    local testPreview = RunService:IsStudio() and character:GetAttribute("GameplayTestKind") == "player"
+        and character:GetAttribute("AnimationWeaponSet") == "1hs"
+    local meleePlan = if isBow then nil else MeleeHitPlan.Resolve(timing, isDual, testPreview)
+    if (isBow and not releaseEvent) or (not isBow and (not hitEndEvent or not meleePlan)) then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=missing_character_damage_window clip=%s"):format(player.Name, clipId))
         end
@@ -417,9 +424,13 @@ local function attack(player: Player, payload: any)
             return
         end
     end
-    -- Bow's release path is separate; melee resolves once at server-timed HitEnd.
-    if not isBow then
-        scheduleMeleeArc(player, character, root, serial, clientAttackId, clipId, hitEndEvent)
+    -- One attack session and one cooldown for the entire damage budget.
+    if meleePlan then
+        local totalDamage = tonumber(character:GetAttribute("Damage")) or 0
+        for _, contact in ipairs(meleePlan) do
+            scheduleMeleeArc(player, character, root, serial, clientAttackId, clipId, contact,
+                if isDual then MeleeHitPlan.Damage(totalDamage, contact.index, contact.count) else nil)
+        end
     end
     clearAttackStateLater(player, character, serial, clientAttackId, attackDuration)
 end

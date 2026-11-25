@@ -41,7 +41,7 @@ def check_character_animation(
         "def register_selected",
         "def stage_manual_replacement",
         "def classify_animation",
-        'WEAPON_SETS = ("hands", "1hs", "2hs", "bow")',
+        'WEAPON_SETS = ("hands", "1hs", "2hs", "bow", "dualswords")',
         "def assign_file",
         "normalize_manual_binding",
         "_strip_character_prefix",

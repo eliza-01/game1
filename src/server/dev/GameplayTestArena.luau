@@ -85,7 +85,7 @@ function Arena.IsOnTrack(trackTop: CFrame, trackSize: Vector3, rootPosition: Vec
 end
 
 function Arena.ShowWeapons(parent: Instance, origin: CFrame, character: Model)
-    local types = {sword=0, dagger=1, bigsword=2, bow=3}
+    local types = {sword=0, dagger=1, bigsword=2, bow=3, dualswords=4}
     for _, row in ipairs(Balance.Weapons) do
         local model = Weapons.CloneTestDisplay(row.type)
         if model then

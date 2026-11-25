@@ -125,7 +125,7 @@ local function apply(s: any, selection: any)
         if previous then Loadout.Apply(s.player, character) end
         return result(false, tostring(reason))
     end
-    return result(true, if selection.placeholder then "Applied · 2H sword visual placeholder" else "Loadout applied")
+    return result(true, if selection.weapon and selection.weapon.type == "dualswords" and character:GetAttribute("AnimationWeaponSet") == "1hs" then "Applied · dualswords 1hs animation preview" elseif selection.placeholder then "Applied · sword visual placeholder" else "Loadout applied")
 end
 local function startGroup(s: any, level: number, count: number)
     local character = alive(s.player)

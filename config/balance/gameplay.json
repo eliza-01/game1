@@ -603,6 +603,42 @@
       "arc": 108,
       "upgradePrice": 1050,
       "critChance": 12
+    },
+    {
+      "id": "weapon_033",
+      "level": 30,
+      "type": "dualswords",
+      "rarity": "common",
+      "damage": 136,
+      "price": 7500,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 900,
+      "critChance": 8,
+      "recipe": {
+        "swordId": "weapon_013",
+        "quantity": 2,
+        "fee": 1500
+      }
+    },
+    {
+      "id": "weapon_034",
+      "level": 35,
+      "type": "dualswords",
+      "rarity": "common",
+      "damage": 160,
+      "price": 8750,
+      "attackSpeedDelta": 0,
+      "radius": 8,
+      "arc": 108,
+      "upgradePrice": 1050,
+      "critChance": 8,
+      "recipe": {
+        "swordId": "weapon_029",
+        "quantity": 2,
+        "fee": 1750
+      }
     }
   ],
   "armor": [

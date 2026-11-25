@@ -12,6 +12,7 @@ AttackTimelineConfig.SchemaVersion = 2
 AttackTimelineConfig.EndGuardSeconds = 0.03
 AttackTimelineConfig.EventNames = table.freeze({
     HitEnd = true,
+    HitFirst = true,
     Hit = true,
     Release = true,
 })

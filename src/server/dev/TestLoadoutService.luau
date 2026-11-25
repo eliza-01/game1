@@ -137,6 +137,7 @@ local function buildCatalog(player: Player)
             dagger = "Dagger",
             sword = "Sword",
             bigsword = "Bigsword",
+            dualswords = "Dualswords",
             bow = "Bow",
         },
         weapons = weapons,

@@ -7,6 +7,7 @@
 ## Наиболее актуальная точка входа
 
 - **[Kanban · историческая сверка первых 17 карточек](kanban/STATUS_2026-11-22_M439.md)** — проверка источников и открытая Studio/Android-приёмка; [спецификации карточек](kanban/README.md).
+- **[Balance · M525: парные мечи](workflows/M525_DUALSWORDS_RU.md)** — два попадания и рецепт B/B+.
 - **[Balance · M524: критический шанс и урон](workflows/M524_CRITICAL_BALANCE_RU.md)** — индивидуальные значения, предел и тестовые бонусы.
 - **[Balance · M523: скорость и урон оружия](workflows/M523_INTERLUDE_WEAPON_BALANCE_RU.md)** — действующие формулы и адаптация лука без перезарядки.
 - **[Balance · план следующего этапа](kanban/BALANCE_PLAN_RU.md)** — KBN-0018–0024, актуальный melee и 15-минутная прогрессия (PROPOSED).

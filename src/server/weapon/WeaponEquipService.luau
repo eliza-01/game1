@@ -32,6 +32,24 @@ local CharacterStatsService = require(script.Parent.Parent:WaitForChild("charact
 
 local WeaponEquipService = {}
 local EQUIPPED_NAME = "EquippedWeapon"
+local LEFT_EQUIPPED_NAME = "EquippedWeaponLeft"
+local AnimationRegistry = require(Shared:WaitForChild("character"):WaitForChild("CharacterAnimationRegistry"))
+local VariantMerge = require(Shared:WaitForChild("character"):WaitForChild("CharacterAnimationVariantMerge"))
+local Timeline = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+local HitPlan = require(CombatShared:WaitForChild("MeleeHitPlan"))
+local function dualAnimationReady(character: Model): boolean
+    local profile = AnimationRegistry.profiles[tostring(character:GetAttribute("AnimationProfileId") or character:GetAttribute("CharacterArchetype") or "")]
+    if not profile then return false end
+    local shared = AnimationRegistry.shared and AnimationRegistry.shared[profile.family or ""]
+    local own = profile.weapons and profile.weapons.dualswords
+    local common = shared and shared.weapons and shared.weapons.dualswords
+    local rows = VariantMerge.Rows(own and own.attack, common and common.attack)
+    if #rows == 0 then return false end
+    for _, clip in ipairs(rows) do
+        if not HitPlan.Resolve(Timeline.ResolveCharacterRuntime(clip.clipId, 180), true, false) then return false end
+    end
+    return true
+end
 
 local RIGHT_SOCKET_NAMES = { "weapon_grip_r", "Weapon_R_Bone", "weapon_r", "Weapon_R", "WeaponR" }
 local LEFT_SOCKET_NAMES = { "weapon_grip_l", "Weapon_L_Bone", "weapon_l", "Weapon_L", "WeaponL" }
@@ -134,9 +152,9 @@ local function prepareWeapon(model: Model)
 end
 
 local function clearWeapon(character: Model)
-    local old = character:FindFirstChild(EQUIPPED_NAME)
-    if old then
-        old:Destroy()
+    for _, name in ipairs({EQUIPPED_NAME, LEFT_EQUIPPED_NAME}) do
+        local old = character:FindFirstChild(name)
+        if old then old:Destroy() end
     end
 end
 
@@ -179,7 +197,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any, testId: stri
         if character:GetAttribute("GameplayTestKind") ~= "player" then return false, "Test override denied" end
         local stats = Balance.Weapon(testId)
         local model = WeaponRegistry.weapons[slug]
-        if not stats or not model or (model.weaponType ~= stats.type and not (stats.type == "bigsword" and model.weaponType == "sword")) then
+        if not stats or not model or (model.weaponType ~= stats.type and not ((stats.type == "bigsword" or stats.type == "dualswords") and model.weaponType == "sword")) then
             return false, "Incompatible test model"
         end
         row = gameplayRow(slug, stats, upgrade)
@@ -188,6 +206,12 @@ function WeaponEquipService.Equip(character: Model, slugValue: any, testId: stri
         return false, "weapon model has no compatible Database binding: " .. slug
     end
 
+    local isDual = row.weaponType == "dualswords"
+    local dualReady = isDual and dualAnimationReady(character)
+    if isDual and (tonumber(character:GetAttribute("Level")) or 1) < row.requiredLevel then
+        return false, "Dualswords require LVL " .. row.requiredLevel
+    end
+    if isDual and not dualReady and not testId then return false, "Publish dualswords animations and two hit timings first" end
     local template = findByStudioPath(tostring(row.serverStoragePath or ""))
     if not template or not template:IsA("Model") then
         WeaponEquipService.Unequip(character)
@@ -200,6 +224,8 @@ function WeaponEquipService.Equip(character: Model, slugValue: any, testId: stri
         return false, "character has no compatible weapon socket bone"
     end
 
+    local leftBone = if isDual then findCharacterBone(character, LEFT_SOCKET_NAMES) else nil
+    if isDual and not leftBone then return false, "Dualswords require both hand sockets" end
     clearWeapon(character)
     local weapon = template:Clone()
     weapon.Name = EQUIPPED_NAME
@@ -222,6 +248,16 @@ function WeaponEquipService.Equip(character: Model, slugValue: any, testId: stri
     BoneModelMount.Place(weapon, grip, BoneModelMount.SocketFrame(targetBone, "weapon"))
     purgeLegacyWeaponBox(weapon)
     weapon.Parent = character
+    if isDual and leftBone then
+        local left = weapon:Clone()
+        left.Name = LEFT_EQUIPPED_NAME
+        left:SetAttribute("WeaponTargetBoneName", leftBone.Name)
+        left:SetAttribute("WeaponHand", "left")
+        local leftGrip = left:FindFirstChild(WEAPON_GRIP_NAME, true)
+        if not leftGrip or not leftGrip:IsA("Attachment") then left:Destroy(); WeaponEquipService.Unequip(character); return false, "Dualswords left grip missing" end
+        BoneModelMount.Place(left, leftGrip, BoneModelMount.SocketFrame(leftBone, "weapon"))
+        left.Parent = character
+    end
 
     character:SetAttribute("EquippedWeaponBalanceId", row.balanceId)
     character:SetAttribute("EquippedWeaponRequiredLevel", row.requiredLevel)
@@ -232,7 +268,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any, testId: stri
     local attackMovement = WeaponAttackMovement.Resolve(row.weaponType)
     character:SetAttribute("AttackRadius", attackRadiusFor(row))
     character:SetAttribute("MeleeArcAngle", meleeArcFor(row))
-    character:SetAttribute("AnimationWeaponSet", attackMovement.animationSet)
+    character:SetAttribute("AnimationWeaponSet", if isDual then (if dualReady then "dualswords" else "1hs") else attackMovement.animationSet)
     character:SetAttribute("AttackMovementLocomotionMode", attackMovement.locomotionMode)
     character:SetAttribute("AttackMovementRunSpeedMultiplier", attackMovement.runSpeedMultiplier)
     CharacterStatsService.ApplyModifiers(character, row.statModifiers or {})
@@ -324,7 +360,7 @@ function WeaponEquipService.TestModel(weaponType: string): (string?, boolean)
         local model = row and findByStudioPath(tostring(row.serverStoragePath or ""))
         if model and model:IsA("Model") then return slug, false end
     end
-    if weaponType == "bigsword" then
+    if weaponType == "bigsword" or weaponType == "dualswords" then
         local slug = WeaponEquipService.TestModel("sword")
         return slug, true
     end
@@ -339,6 +375,15 @@ function WeaponEquipService.CloneTestDisplay(weaponType: string): Model?
     if not template or not template:IsA("Model") then return nil end
     local model = template:Clone()
     prepareWeapon(model)
+    if weaponType == "dualswords" then
+        local pair = Instance.new("Model")
+        model.Parent = pair
+        local second = model:Clone()
+        local _, bounds = model:GetBoundingBox()
+        second:PivotTo(model:GetPivot() * CFrame.new(math.max(1, bounds.X + 0.5), 0, 0))
+        second.Parent = pair
+        return pair
+    end
     return model
 end
 

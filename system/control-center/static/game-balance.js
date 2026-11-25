@@ -10,7 +10,7 @@
   const label=id=>{const [kind,n]=id.split('_');return `${labels[kind]||kind}_${n}`};
   const node=(tag,text)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el};
   const status=(message)=>{$('balance-status').textContent=message;};
-  const change=()=>{dirty=true;$('balance-save').disabled=busy||!snapshot;status('Unsaved changes');};
+  const change=()=>{for(const row of snapshot?.balance?.weapons||[]){if(!row.recipe)continue;const source=snapshot.balance.weapons.find(w=>w.id===row.recipe.swordId);row.price=source?.price==null||row.recipe.fee==null?null:2*source.price+row.recipe.fee;const cell=document.querySelector(`[data-recipe-cost="${row.id}"]`);if(cell)cell.textContent=row.price??'—'}dirty=true;$('balance-save').disabled=busy||!snapshot;status('Unsaved changes');};
   function select(values,current,onChange){const el=node('select');for(const [value,text] of values){const option=node('option',text);option.value=value;el.append(option)}el.value=current;el.onchange=()=>onChange(el.value);return el}
   function number(value,apply){const el=node('input');el.type='number';el.step='any';el.value=value;el.style.minWidth='64px';el.style.width='88px';el.oninput=()=>{apply(el.value===''?null:Number(el.value));change()};return el}
   function table(headers){const t=node('table'),head=node('thead'),tr=node('tr'),body=node('tbody');for(const h of headers)tr.append(node('th',h));head.append(tr);t.append(head,body);$('balance-content').append(t);return body}
@@ -37,18 +37,19 @@
       bindingTable('Weapon model',snapshot.weaponModels,d.weaponBindings,d.weapons);
       bindingTable('Monster model',snapshot.monsterModels,d.monsterBindings,d.monsters);return;
     }
-    const columns=fields[tab], headers=columns.map(k=>tab==='monsters'&&k==='damage'?'Damage':names[k]);if(tab==='levels')headers.push('Total XP');if(tab==='weapons')headers.push('Grade · required LVL','ATK +0 / max');
+    const columns=fields[tab], headers=columns.map(k=>tab==='monsters'&&k==='damage'?'Damage':names[k]);if(tab==='levels')headers.push('Total XP');if(tab==='weapons')headers.push('Grade · required LVL','ATK +0 / max','Craft recipe · fee');
     const body=table(headers);let total=0;
     const rows=tab==='weapons'?[...d[tab]].sort((a,b)=>a.level-b.level||a.id.localeCompare(b.id)):d[tab];
     for(const row of rows){const tr=node('tr');let derived,gradeCell;
       function updateDerived(){if(gradeCell){const g=window.game1EquipmentGrade(row.level);gradeCell.textContent=`${g.name} · ${g.required}`}if(tab==='weapons'&&derived)derived.textContent=`${d.rules.baseDamage+row.damage} / ${d.rules.baseDamage+Math.round(row.damage*(1+d.rules.maxUpgrade*d.rules.upgradePercent/100))}`}
       for(const key of columns){
         if(key==='id'||key==='type'||(tab==='levels'&&key==='level'))cell(tr,key==='id'?label(row[key]):String(row[key]));
+        else if(key==='price'&&row.recipe){const source=d.weapons.find(w=>w.id===row.recipe.swordId);const cost=node('span',String(2*source.price+row.recipe.fee));cost.dataset.recipeCost=row.id;cell(tr,cost)}
         else if(key==='rarity')cell(tr,select(['common','uncommon','rare','mythical','legendary','immortal'].map(v=>[v,v]),row[key],v=>{row[key]=v;change()}));
         else cell(tr,number(row[key],v=>{row[key]=v;updateDerived();if(tab==='levels'&&key==='xpNext'){let sum=0;for(const [i,r] of d.levels.entries()){body.rows[i].lastElementChild.textContent=String(sum);sum+=r.xpNext||0}}}));
       }
       if(tab==='levels'){cell(tr,String(total));total+=row.xpNext||0}
-      if(tab==='weapons'){gradeCell=node('span');cell(tr,gradeCell);derived=node('span');cell(tr,derived);updateDerived()}
+      if(tab==='weapons'){gradeCell=node('span');cell(tr,gradeCell);derived=node('span');cell(tr,derived);updateDerived();const recipe=node('span');if(row.recipe){recipe.textContent=`2 × ${label(row.recipe.swordId)} + `;recipe.append(number(row.recipe.fee,v=>{row.recipe.fee=v}));}cell(tr,recipe)}
       body.append(tr);
     }
   }

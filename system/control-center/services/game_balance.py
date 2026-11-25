@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SOURCE = ROOT / 'config/balance/gameplay.json'
 OUTPUT = ROOT / 'src/shared/balance/BalanceRegistry.luau'
 LOCK = RLock()
-TYPES = ('dagger', 'sword', 'bigsword', 'bow')
+TYPES = ('dagger', 'sword', 'bigsword', 'bow', 'dualswords')
 RARITIES = ('common', 'uncommon', 'rare', 'mythical', 'legendary', 'immortal')
 FIELDS = {
     'levels': {'hp': (1, 1000000), 'xpNext': (0, 100000000)},
@@ -47,14 +47,16 @@ def validate(data):
     for axis in ('x','y','z'): number(data['test'][axis], -100000, 100000, axis, False)
     number(data['test']['yaw'], -360, 360, 'yaw', False)
     number(data['test']['maxGroup'], 1, 12, 'maxGroup')
-    counts = {'levels': 35, 'weapons': 32, 'armor': 8, 'monsters': 35}
+    counts = {'levels': 35, 'weapons': 34, 'armor': 8, 'monsters': 35}
     for group, fields in FIELDS.items():
         rows = data[group]
         if not isinstance(rows, list) or len(rows) != counts[group]:
             raise ValueError(f'{group}: expected {counts[group]} rows')
         for i, row in enumerate(rows, 1):
             extra = {'level'} if group == 'levels' else {'id'}
-            if group == 'weapons': extra |= {'type','rarity'}
+            if group == 'weapons':
+                extra |= {'type','rarity'}
+                if isinstance(row, dict) and row.get('type') == 'dualswords': extra.add('recipe')
             if not isinstance(row, dict) or set(row) != set(fields) | extra:
                 raise ValueError(f'{group}: invalid row {i}')
             if group == 'levels':
@@ -67,6 +69,18 @@ def validate(data):
                 number(row[field], lo, hi, f'{group}.{i}.{field}', field not in ('radius','arc','critChance'))
             if group == 'weapons' and (row['type'] not in TYPES or row['rarity'] not in RARITIES):
                 raise ValueError('Invalid weapon type / rarity')
+    swords = {r['id']: r for r in data['weapons'] if r['type'] == 'sword'}
+    for row in data['weapons']:
+        if row['type'] != 'dualswords': continue
+        recipe = row['recipe']
+        if row['level'] < 30 or not isinstance(recipe, dict) or set(recipe) != {'swordId','quantity','fee'}:
+            raise ValueError('Dualswords require B grade and a sword recipe')
+        if not isinstance(recipe['swordId'], str) or recipe['swordId'] not in swords or swords[recipe['swordId']]['level'] != row['level']:
+            raise ValueError('Dualswords recipe requires a sword of the same item level')
+        number(recipe['quantity'], 2, 2, 'recipe.quantity')
+        number(recipe['fee'], 0, 100000000, 'recipe.fee')
+        if row['price'] != 2 * swords[recipe['swordId']]['price'] + recipe['fee']:
+            raise ValueError('Dualswords price must match two swords plus recipe fee')
     if any(b['hp'] < a['hp'] for a,b in zip(data['levels'], data['levels'][1:])):
         raise ValueError('Player HP cannot decrease with level')
     for key, group in (('weaponBindings','weapons'), ('monsterBindings','monsters')):

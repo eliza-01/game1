@@ -12,7 +12,7 @@ local GOLD = Color3.fromRGB(215, 179, 115)
 local DARK = Color3.fromRGB(17, 24, 30)
 local NORMAL = Color3.fromRGB(39, 51, 58)
 local ACTIVE = Color3.fromRGB(81, 107, 98)
-local TABS = table.freeze({"hair", "eyebrows", "eyes", "head"})
+local TABS = table.freeze({"hair", "eyebrows", "eyes"})
 Panel.Categories = TABS
 
 local function rounded(parent: Instance, radius: number)
@@ -145,7 +145,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     tabs.Parent = root
     local tabButtons: {[string]: TextButton} = {}
     for i, key in ipairs(TABS) do
-        local button = action(tabs, "Tab" .. key, UDim2.new(0.25, -6, 1, 0), UDim2.new((i - 1) * 0.25, 3, 0, 0), false)
+        local button = action(tabs, "Tab" .. key, UDim2.new(1 / #TABS, -6, 1, 0), UDim2.new((i - 1) / #TABS, 3, 0, 0), false)
         button.Font = Enum.Font.GothamBold
         button.TextSize = 13
         tabButtons[key] = button

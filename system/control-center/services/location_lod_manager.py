@@ -12,7 +12,8 @@ from secrets import token_urlsafe
 from threading import RLock
 
 from .location_runtime_build import RuntimePlaceBuilder, build_rows, placement_shape_problem
-from .location_streaming_config import LocationStreamingConfig, settings_digest, runtime_mode, distance_profile
+from .location_streaming_config import (LocationStreamingConfig, settings_digest, runtime_mode, distance_profile,
+                                        catalog_mode, published_id, resolve_catalog_modes)
 
 from .place_registry.catalog import build_catalog
 
@@ -30,14 +31,17 @@ class LocationLodManager:
         self._preflight = None
         self._build_lock = RLock()
 
-    def read_settings(self):
-        return self.streaming_config.read([row['slug'] for row in self.assets.snapshot()['items']])
+    def read_settings(self, assets=None):
+        if assets is None:
+            assets = self.assets.snapshot()['items']
+        available = {row['slug']: catalog_mode(row) for row in assets}
+        return resolve_catalog_modes(self.streaming_config.read(available), available)
 
     def save_settings(self, payload: dict) -> dict:
         # Persistent runtime mode overrides only. Do not mutate Studio or the saved Place.
         with self._build_lock:
-            known = [row['slug'] for row in self.assets.snapshot()['items']]
-            self.streaming_config.save(payload, known)
+            available = {row['slug']: catalog_mode(row) for row in self.assets.snapshot()['items']}
+            self.streaming_config.save(payload, available, available_modes=available)
             self._preflight = None  # saved Preflight cannot authorize a different selection/profile
             return self.overview()
 
@@ -62,7 +66,7 @@ class LocationLodManager:
             overview = self.overview()
             if not overview['snapshot'] or overview['snapshot']['freshness'] != 'SCANNED_THIS_SESSION':
                 raise ValueError('Scan Place again in this session before Runtime preflight')
-            settings = self.read_settings()
+            settings = overview['settings']
             rows = self.location_rows(overview, settings)
             selected_houses = self.house_selection()
             inspected = self.builder.inspect(rows, settings, selected_houses)
@@ -85,7 +89,7 @@ class LocationLodManager:
                         for item in overview['items']
                         if item['count'] and item['streamingMode'] == 'off'
                     ],
-                    'message': 'All scanned registered Location Asset types stream by default; explicit Off overrides remain author-controlled.'}
+                    'message': 'All scanned registered Location Assets use the highest available published LOD chain; explicit Off remains author-controlled.'}
 
     def prepare(self, payload: dict) -> dict:
         if not isinstance(payload, dict) or set(payload) != {'token'} or not isinstance(payload['token'], str):
@@ -94,7 +98,7 @@ class LocationLodManager:
             if not self._preflight or payload['token'] != self._preflight[0]:
                 raise ValueError('Preflight expired; run Preflight again')
             overview = self.overview()
-            settings = self.read_settings()
+            settings = overview['settings']
             if settings_digest(settings) != self._preflight[3]:
                 raise ValueError('Streaming settings changed since Preflight; run it again')
             rows = self.location_rows(overview, settings)
@@ -127,17 +131,17 @@ class LocationLodManager:
 
     def location_rows(self, overview, settings):
         # Real Estate may be the only Runtime domain. Every registered
-        # placed Location Asset uses automatic FULL unless explicitly Off.
+        # placed Location Asset uses the published LOD chain unless explicitly Off.
         if not any((item['count'] or item['protectedCount']) and
                    runtime_mode(settings, item['slug']) != 'off' for item in overview['items']):
             return []
         return build_rows(overview, self.registry, settings)
 
     def overview(self) -> dict:
-        settings = self.read_settings()
+        assets = self.assets.snapshot()['items']
+        settings = self.read_settings(assets)
         catalog = build_catalog(self.assets)
         published = {row['slug'] for row in catalog['items']}
-        assets = self.assets.snapshot()['items']
         by_slug = {r['slug']: r for r in assets}
         revisions = self.registry.revisions.page(10)
         latest = revisions[0] if revisions else None
@@ -170,8 +174,8 @@ class LocationLodManager:
             external = external_by_slug[slug]
             lod1 = (asset or {}).get('lod1') or {}
             lod2 = (asset or {}).get('lod2') or {}
-            lod1_active = lod1.get('status') == 'PUBLISHED' and bool(lod1.get('modelAssetId'))
-            lod2_active = lod2.get('status') == 'PUBLISHED' and bool(lod2.get('modelAssetId'))
+            lod1_active = bool(published_id(lod1))
+            lod2_active = bool(published_id(lod2))
             red = not lod1_active
             issues = {
                 'missingId': sum(not r.get('placementId') for r in placements),
@@ -204,6 +208,7 @@ class LocationLodManager:
             items.append({
                 'distances': distance_profile(settings, slug) if asset else None,
                 'streamingMode': mode, 'resolvedStreamingMode': runtime_mode(settings, slug),
+                'availableStreamingMode': catalog_mode(asset) if asset else 'full',
                 'streamingEligible': eligible, 'streamingReason': reason,
                 'slug': slug, 'category': (asset or {}).get('category') or '',
                 'count': len(placements), 'runtimePainterCount':sum(r.get('runtimeCandidate') is True for r in external), 'fullStatus': (asset or {}).get('status') or 'NOT_REGISTERED',
@@ -286,5 +291,5 @@ class LocationLodManager:
                       'sourceFile': str(self.builder.source),
                       'reason': 'Save current Studio Place as XML to the sourceFile; run Preflight. Draft is never publish-ready.',
                       'sourcePlaceMutated': False},
-            'scope': 'All scanned registered Location types default to FULL streaming. LandscapePainter author-owned roots require verified runtime evidence; unknown/unpublished Workspace objects are not treated as registered assets.',
+            'scope': 'All scanned registered Location types automatically use their published LOD chain unless explicitly Off. LandscapePainter author-owned roots require verified runtime evidence; unknown/unpublished Workspace objects are not treated as registered assets.',
         }

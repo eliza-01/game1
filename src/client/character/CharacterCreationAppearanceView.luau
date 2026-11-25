@@ -278,7 +278,9 @@ function View.Render(root: Frame, catalog: any?, selected: any?,
         end
         for _, channel in ipairs((active and active.part and active.part.colorChannels) or {}) do
             local current = (selected.colors.hair or {})[channel]
-            colorPicker(root, Language.Translate("creation.hair_color") .. " · " .. channel,
+            local title = Language.Translate("creation.hair_color")
+            if channel ~= "primary" then title ..= " · " .. channel end
+            colorPicker(root, title,
                 current, order, (settings.colorPresets or {}).hair or {},
                 function(hex) onColor("hair", hex, channel) end,
                 function() onCustomColor("hair", channel, current) end, nil, nil)

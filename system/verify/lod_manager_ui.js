@@ -28,7 +28,7 @@ const response = {
     hysteresis:10,
     workspace:{streamingEnabled:true,minRadius:64,targetRadius:1024,modelStreamingBehavior:'Improved',
       streamingIntegrityMode:'PauseOutsideLoadedArea',streamOutBehavior:'Opportunistic'}},
-  items:[{distances:{lod1:120,lod2:260,hide:400},streamingEligible:true,streamingMode:'lod1',streamingReason:'',slug:'stone_fence_02',category:'fence',count:52,fullStatus:'PUBLISHED',
+  items:[{distances:{lod1:120,lod2:260,hide:400},streamingEligible:true,streamingMode:'lod1',availableStreamingMode:'lod1',streamingReason:'',slug:'stone_fence_02',category:'fence',count:52,fullStatus:'PUBLISHED',
     lod1Status:'PUBLISHED',lod1ModelId:'91896785734146',lod2Status:'NOT_SUPPORTED',
     indicator:'yellow',issues:{missingId:0},recognizedByCatalog:true}],
   revisions:[{id:12,recordedUtc:1784160000,placeId:99,total:52}],
@@ -41,7 +41,8 @@ const ctx = {document:{getElementById:get},window:{},navigator:{clipboard},reque
   if (path === '/api/lod-manager/settings') {savedSettings=JSON.parse(opts.body); return {...response,settings:{...response.settings,...savedSettings},items:response.items.map(row=>({...row,distances:savedSettings.assetDistances?.[row.slug]||row.distances}))};}
   if (path === '/api/lod-manager/scan') return {scan:{revisionId:13,unchanged:false,incomplete:false},overview:{...response,
     build:{...response.build,canPreflight:true},
-    snapshot:{...response.snapshot,revisionId:13,freshness:'SCANNED_THIS_SESSION'}}};
+    snapshot:{...response.snapshot,revisionId:13,freshness:'SCANNED_THIS_SESSION'},
+    items:response.items.map(row=>({...row,streamingMode:'lod2',availableStreamingMode:'lod2',lod2Status:'PUBLISHED',lod2ModelId:'987654321'}))}};
   if (path === '/api/lod-manager/preflight') return {token:'token1',snapshotRevision:13,eligible:52,
     counts:{stone_fence_02:52}, protectedNotModified:4, sourceSha256:'a'.repeat(64),
     assetDistances:{},workspace:response.settings.workspace};
@@ -57,6 +58,8 @@ vm.runInNewContext(fs.readFileSync('system/control-center/static/lod-manager.js'
   assert(get('lod-rows').innerHTML.includes('52'));
   assert(get('lod-rows').innerHTML.includes('91896785734146'));
   assert(get('lod-rows').innerHTML.includes('FULL / LOD1'));
+  assert(!get('lod-rows').innerHTML.includes('value="full"'));
+  assert(get('lod-rows').innerHTML.includes('value="lod1" selected'));
   assert.strictEqual(get('lod-workspace-target-radius').value,'1024');
   assert(!html.includes('id="lod-distance-hide"'));
   assert(get('lod-rows').innerHTML.includes('data-asset-distance-save="stone_fence_02"'));
@@ -71,6 +74,8 @@ vm.runInNewContext(fs.readFileSync('system/control-center/static/lod-manager.js'
   assert(get('lod-rows').innerHTML.includes('Сохранено · Studio Play Sync'));
   await get('lod-scan').on_click();
   assert(get('lod-status').textContent.includes('#13'));
+  assert(get('lod-rows').innerHTML.includes('value="lod2" selected'));
+  assert(!get('lod-rows').innerHTML.includes('value="lod1"'));
   assert.strictEqual(get('lod-prepare').disabled, false);
   await get('lod-prepare').on_click();
   assert(get('lod-build-preview').textContent.includes('52'));

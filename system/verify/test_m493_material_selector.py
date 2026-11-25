@@ -66,7 +66,10 @@ class FaceMaterialsM493(unittest.TestCase):
         self.assertEqual(view.count('materialPicker(root,'), 1)
         controller = source('src/client/character/CharacterCreationController.luau')
         self.assertIn('FaceMaterials.Groups', controller)
-        self.assertIn('or #((settings.materialChoices or {})[category] or {}) > 1', controller)
+        self.assertIn('visible[category] = #entries > 0', controller)
+        # M498 hides the head tab only; the four-group material contract remains.
+        self.assertIn('local TABS = table.freeze({"hair", "eyebrows", "eyes"})',
+                      source('src/client/character/CharacterCreationPanel.luau'))
         preview = source('src/client/character/CharacterCreationPreviewController.luau')
         self.assertIn('FaceMaterials.GroupForPart(slot, channel)', preview)
         contract = source('src/shared/character/CharacterCreationMaterials.luau')

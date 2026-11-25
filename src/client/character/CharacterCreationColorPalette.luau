@@ -127,11 +127,27 @@ function Picker.new(parent: Frame)
     local valueGradient = Instance.new("UIGradient")
     valueGradient.Color = ColorSequence.new(Color3.new(0, 0, 0), Color3.new(1, 1, 1))
     valueGradient.Parent = valueBar
+    -- The handle represents HSV value, independently of the hue/saturation cursor.
+    local valueCursor = Instance.new("Frame")
+    valueCursor.Name = "BrightnessCursor"
+    valueCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+    valueCursor.Size = UDim2.fromOffset(18, 34)
+    valueCursor.BackgroundColor3 = Color3.fromRGB(245, 238, 219)
+    valueCursor.BorderSizePixel = 0
+    valueCursor.ZIndex = 36
+    valueCursor.Parent = valueBar
+    round(valueCursor, 5)
+    local valueOutline = Instance.new("UIStroke")
+    valueOutline.Color = Color3.fromRGB(25, 34, 40)
+    valueOutline.Thickness = 2
+    valueOutline.Parent = valueCursor
     local valueHit = button(valueBar, "BrightnessInput")
     valueHit.Text = ""
     valueHit.BackgroundTransparency = 1
-    valueHit.Size = UDim2.fromScale(1, 1)
-    valueHit.ZIndex = 35
+    valueHit.Position = UDim2.fromOffset(-9, -3)
+    valueHit.Size = UDim2.new(1, 18, 1, 6)
+    valueHit.ZIndex = 37
+    valueHit.AutoButtonColor = false
 
     local field = Instance.new("TextBox")
     field.Name = "HexColorInput"
@@ -172,6 +188,7 @@ function Picker.new(parent: Frame)
         preview.BackgroundColor3 = Color3.fromHSV(h, s, v)
         field.Text = chosen
         cursor.Position = UDim2.fromScale(h, 1 - s)
+        valueCursor.Position = UDim2.fromScale(v, 0.5)
         darken.BackgroundTransparency = v
         if emit and onPreview then onPreview(chosen) end
     end

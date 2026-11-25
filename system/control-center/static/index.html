@@ -848,7 +848,7 @@
         <button id="lod-disable-all" type="button">Выключить все</button></div>
       <div class="lm-table"><table><thead><tr><th>Location Asset</th><th>Placed</th><th>LOD models</th><th>Placement diagnostics</th><th>Streaming</th></tr></thead>
         <tbody id="lod-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
-      <p class="lm-note">Auto включает все зарегистрированные Location Assets. FULL → LOD1 → UNLOADED работает только с опубликованным LOD1; без него доступен FULL → UNLOADED.</p>
+      <p class="lm-note">Режим выбирается автоматически по опубликованным LOD при каждом обновлении каталога, включая Scan Place. Без LOD используется FULL → UNLOADED. Off сохраняется вручную.</p>
     </div>
     <div id="lod-house-panel" role="tabpanel" aria-labelledby="lod-tab-house" hidden>
       <div class="lm-house-intro"><div><h4>Real Estate <small id="lod-house-count" class="lm-note"></small></h4>
@@ -1225,7 +1225,7 @@
 <script src="location-collision.js?v=385"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=405"></script>
-<script src="lod-manager.js?v=430"></script>
+<script src="lod-manager.js?v=497"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="lod-reuse-picker.js?v=411"></script>

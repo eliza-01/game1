@@ -316,8 +316,7 @@ function Controller.Start()
         local visible = {}
         for _, category in ipairs(Panel.Categories) do
             local entries = (catalog and catalog[category]) or {}
-            visible[category] = #entries > 1 or (#entries == 1 and (category ~= "head"
-                or #((settings.materialChoices or {})[category] or {}) > 1))
+            visible[category] = #entries > 0
         end
         return visible
     end

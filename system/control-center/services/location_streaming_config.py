@@ -31,8 +31,8 @@ DEFAULT_SETTINGS = {
         'streamOutBehavior': 'Opportunistic',
     },
 }
-# Auto is the default for all registered Location Assets present in a Scan.
-# Explicit modes override the default, not a whitelist for Runtime coverage.
+# Stored modes remain compatible with existing profiles. The catalog projection
+# selects the highest published LOD for every enabled registered type.
 MODES = ('auto', 'off', 'full', 'lod1', 'lod2')
 
 
@@ -40,6 +40,29 @@ def runtime_mode(settings: dict, slug: str) -> str:
     """Resolve published type policy; rig/effects never change selection rules."""
     mode = settings['modes'].get(slug, 'auto')
     return 'full' if mode == 'auto' else mode
+
+
+def published_id(resource):
+    value = str((resource or {}).get('modelAssetId') or '')
+    return value if (resource or {}).get('status') == 'PUBLISHED' and value.isascii() and value.isdecimal() and len(value) <= 16 and 0 < int(value) < 2**53 else ''
+
+
+def catalog_mode(asset):
+    """A contiguous chain is required: LOD2 cannot replace a missing LOD1."""
+    if not published_id(asset.get('lod1')):
+        return 'full'
+    return 'lod2' if published_id(asset.get('lod2')) else 'lod1'
+
+
+def resolve_catalog_modes(settings, available):
+    """Project current publication state without modifying saved distances on GET."""
+    result = copy.deepcopy(settings)
+    for slug, mode in available.items():
+        if runtime_mode(result, slug) != 'off':
+            result['modes'][slug] = mode
+        result['assetDistances'][slug] = distance_profile(result, slug)
+    return validate_settings(result)
+
 WORLD_ENUMS = {
     'modelStreamingBehavior': ('Default', 'Legacy', 'Improved'),
     'streamingIntegrityMode': ('Default', 'Disabled', 'MinimumRadiusPause', 'PauseOutsideLoadedArea'),
@@ -146,11 +169,11 @@ class LocationStreamingConfig:
                 self._write(value)
             return value
 
-    def save(self, patch, known_slugs):
+    def save(self, patch, known_slugs, *, available_modes=None):
         with self._lock:
-            return self._save(patch, set(known_slugs))
+            return self._save(patch, set(known_slugs), available_modes)
 
-    def _save(self, patch, known):
+    def _save(self, patch, known, available_modes=None):
         if not isinstance(patch, dict) or not patch or set(patch) - {'modes', 'assetDistances', 'workspace', 'hysteresis'}:
             raise ValueError('Expected modes / assetDistances / hysteresis / workspace settings')
         current = copy.deepcopy(self.read(known))
@@ -167,7 +190,14 @@ class LocationStreamingConfig:
                     raise ValueError('Unknown registered Location Asset: ' + ', '.join(sorted(set(values) - known)))
             elif set(values) != set(current[section]):
                 raise ValueError('Save all ' + section + ' fields together')
+            if section == 'modes' and any(mode not in MODES for mode in values.values()):
+                raise ValueError('Invalid Location Asset selection')
             current[section].update(values)
+        # Apply publication policy before normalizing distances: a newly published
+        # LOD may need additional transition intervals.
+        for slug, mode in (available_modes or {}).items():
+            if runtime_mode(current, slug) != 'off':
+                current['modes'][slug] = mode
         for slug in set(current['assetDistances']) | set(patch.get('modes', {})):
             current['assetDistances'][slug] = distance_profile(current, slug)
         validate_settings(current)

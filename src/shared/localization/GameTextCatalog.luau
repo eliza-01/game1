@@ -1862,9 +1862,9 @@ return table.freeze({
                 },
             },
             ["creation.hair"] = {
-                ["source"] = "Причёски",
+                ["source"] = "Причёска",
                 ["translations"] = {
-                    ["ru-ru"] = "Причёски",
+                    ["ru-ru"] = "Причёска",
                     ["en-us"] = "Hairstyles",
                     ["de-de"] = "Frisuren",
                     ["zh-cn"] = "发型",
@@ -1892,9 +1892,9 @@ return table.freeze({
                 },
             },
             ["creation.eyes"] = {
-                ["source"] = "Форма глаз",
+                ["source"] = "Глаза",
                 ["translations"] = {
-                    ["ru-ru"] = "Форма глаз",
+                    ["ru-ru"] = "Глаза",
                     ["en-us"] = "Eyes",
                     ["de-de"] = "Augen",
                     ["zh-cn"] = "眼睛",
@@ -1907,9 +1907,9 @@ return table.freeze({
                 },
             },
             ["creation.eyebrows"] = {
-                ["source"] = "Форма бровей",
+                ["source"] = "Брови",
                 ["translations"] = {
-                    ["ru-ru"] = "Форма бровей",
+                    ["ru-ru"] = "Брови",
                     ["en-us"] = "Eyebrows",
                     ["de-de"] = "Augenbrauen",
                     ["zh-cn"] = "眉毛",

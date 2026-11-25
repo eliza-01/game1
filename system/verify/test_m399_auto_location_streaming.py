@@ -14,7 +14,8 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'system'/'control-center'))
 sys.path.insert(0, str(ROOT/'system'/'verify'))
 from services.location_runtime_build import RuntimePlaceBuilder, build_rows
-from services.location_streaming_config import DEFAULT_SETTINGS, runtime_mode, validate_settings
+from services.location_streaming_config import (DEFAULT_SETTINGS, LocationStreamingConfig,
+                                               runtime_mode, validate_settings)
 from test_m398_runtime_painter_physics import PainterRuntime, FakeRegistry
 
 
@@ -84,8 +85,21 @@ class AutomaticLocationCoverage(unittest.TestCase):
         self.assertEqual(runtime_mode(settings,'sconce_99'),'full')
         self.assertEqual(runtime_mode(settings,'other_sconce'),'lod1')
 
-    def test_no_hardcoded_location_slug_in_shipped_profile(self):
+    def test_saved_project_profile_is_valid(self):
+        # This is an editor-owned profile, not a fixed test fixture. Publishing
+        # LODs and saving settings may add arbitrary registered asset slugs.
         config=json.loads((ROOT/'config'/'location_streaming.json').read_text('utf8'))
-        self.assertEqual(set(config['modes']),{'stone_fence_02','stone_pillar_03','stone_ladder_02'})
+        validate_settings(config)
+
+    def test_new_registered_modes_persist_without_a_fixed_slug_list(self):
+        config=LocationStreamingConfig(self.root)
+        self.assertEqual(config.read(), DEFAULT_SETTINGS)
+        known=set(DEFAULT_SETTINGS['modes']) | {'sconce_99','later_torch'}
+        saved=config.save({'modes':{'sconce_99':'auto','later_torch':'off'}}, known,
+                          available_modes={'sconce_99':'lod1','later_torch':'lod1'})
+        self.assertEqual(saved['modes']['sconce_99'],'lod1')
+        self.assertEqual(config.read()['modes']['sconce_99'],'lod1')
+        self.assertEqual(config.read()['modes']['later_torch'],'off')
+        self.assertEqual(runtime_mode(config.read(),'another_new_asset'),'full')
 
 if __name__=='__main__': unittest.main()

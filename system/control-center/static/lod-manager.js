@@ -52,8 +52,9 @@
       $('lod-build-status').textContent='Настройки изменены. Запусти Preflight по новому профилю.';
       $('lod-settings-status').textContent='Сохранено. Studio Play получает визуальные LOD-настройки автоматически; для Runtime нужен новый Preflight.';
       fillSettings(view.settings);
-      for(const [slug, mode] of Object.entries(payload.modes||{})){
-        if(state.assetEdits.has(slug))state.assetEdits.set(slug,{...state.assetEdits.get(slug),mode});
+      for(const slug of Object.keys(payload.modes||{})){
+        const mode=view.items.find(item=>item.slug===slug)?.streamingMode;
+        if(mode&&state.assetEdits.has(slug))state.assetEdits.set(slug,{...state.assetEdits.get(slug),mode});
       }
       if(Object.hasOwn(payload,'hysteresis'))state.partMessages.clear();
       return true;
@@ -222,7 +223,8 @@
       const flags = Object.entries(item.issues || {}).filter(([,count])=>count>0)
         .map(([key,count]) => `${({missingId:'Нет ID',duplicateId:'Повтор ID',ambiguous:'Неоднозначно',noModel:'Нет Model',collisionReview:'Collision',truncated:'Иерархия обрезана'})[key]}: ${count}`);
       const lod1 = item.lod1Status === 'PUBLISHED' ? `LOD1 · ${escape(item.lod1ModelId)}` : `LOD1 · ${escape(item.lod1Status)}`;
-      const draft=state.assetEdits.get(item.slug)||{...item.distances,mode:item.streamingMode};
+      const draft=assetDraft(item.slug);
+      const available=availableMode(item);
       const canEdit=Boolean(item.distances);
       return `<tr><td><strong class="lm-slug">${escape(item.slug)}</strong><small>${escape(item.category||'Location Asset')}${!item.recognizedByCatalog ? ' · нет в актуальном опубликованном каталоге':''}</small></td>
         <td class="lm-count">${compact(item.count)} <small>pcs</small>${item.protectedCount ? `<small class="lm-protected-count">+${compact(item.protectedCount)} Painter/other (${compact(item.runtimePainterCount||0)} ready)</small>` : ''}</td>
@@ -241,10 +243,10 @@
             </details>` : ''}</td>
         <td><select class="lm-stream-mode" data-stream-slug="${escape(item.slug)}"
           aria-label="Streaming mode ${escape(item.slug)}" ${state.busy || !canEdit ? 'disabled' : ''}>
-          ${[['auto','Auto · FULL → Hide'],['off','Off · Workspace'],['full','FULL → Hide'],['lod1','FULL / LOD1'],['lod2','FULL / LOD1 / LOD2']]
-            .map(([mode,label])=>`<option value="${mode}" ${draft.mode===mode?'selected':''}
-              ${(mode!=='off' && mode!=='auto' && !item.streamingEligible) || (mode==='lod1' && item.lod1Status!=='PUBLISHED') || (mode==='lod2' && item.lod2Status!=='PUBLISHED')?'disabled':''}>${label}</option>`).join('')}
-          </select><div class="lm-stream-status">${escape(item.streamingReason || (item.streamingMode==='auto' ? 'По умолчанию FULL; все размещения данного типа' : 'Выбор сохранён'))}</div></td></tr>${canEdit?`<tr class="lm-asset-distance-row"><td colspan="5"><div class="lm-asset-distances" data-asset-distance-slug="${escape(item.slug)}">
+          ${[['off','Off · Workspace'],['full','FULL → Hide'],['lod1','FULL / LOD1'],['lod2','FULL / LOD1 / LOD2']]
+            .filter(([mode])=>mode==='off'||mode===available)
+            .map(([mode,label])=>`<option value="${mode}" ${draft.mode===mode?'selected':''}>${label}</option>`).join('')}
+          </select><div class="lm-stream-status">${escape(item.streamingReason || (draft.mode==='off' ? 'Отключено вручную' : 'Auto · по опубликованным LOD'))}</div></td></tr>${canEdit?`<tr class="lm-asset-distance-row"><td colspan="5"><div class="lm-asset-distances" data-asset-distance-slug="${escape(item.slug)}">
           ${[['lod1','LOD1'],['lod2','LOD2'],['hide','UNLOADED']].map(([key,label])=>`<label>${label} · studs<input type="number" min="1" max="10000" step="1" data-asset-distance="${key}" value="${escape(draft[key])}" ${state.busy?'disabled':''}></label>`).join('')}
           <button type="button" data-asset-distance-save="${escape(item.slug)}" ${state.busy?'disabled':''}>Сохранить</button>
           <small class="lm-asset-feedback" role="status">${escape(state.assetMessages.get(item.slug)||'Индивидуальный профиль')}</small></div></td></tr>`:''}`;
@@ -496,9 +498,13 @@
   $('lod-house-filter').addEventListener('change',event=>{
     state.houseFilter=event.target.value;render();
   });
+  function availableMode(item) {
+    return item?.availableStreamingMode || 'full';
+  }
   function assetDraft(slug) {
     const item=state.overview?.items.find(row=>row.slug===slug);
-    return state.assetEdits.get(slug)||{...item?.distances,mode:item?.streamingMode};
+    const draft=state.assetEdits.get(slug)||{...item?.distances,mode:item?.streamingMode};
+    return {...draft,mode:draft.mode==='off'?'off':availableMode(item)};
   }
   function normalizeAssetDraft(draft) {
     const d={};
@@ -544,7 +550,7 @@
     if(!state.overview || state.busy)return;
     const modes={};
     for(const item of state.overview.items)if(item.streamingEligible)
-      modes[item.slug]=item.lod2Status==='PUBLISHED'?'lod2':item.lod1Status==='PUBLISHED'?'lod1':'full';
+      modes[item.slug]=availableMode(item);
     if(Object.keys(modes).length)saveSettings({modes});
     else $('lod-settings-status').textContent='Нет готовых ассетов; сначала проверь Collision Blueprint и Scan.';
   });

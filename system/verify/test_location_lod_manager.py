@@ -174,6 +174,46 @@ class TestLocationLodManager(unittest.TestCase):
         self.assertNotEqual(first['revisionId'], second['revisionId'])
         self.assertEqual(self.revisions.page(1)[0]['registry_digest'], 'digest-v2')
 
+    def test_catalog_modes_follow_publication_on_refresh_and_scan(self):
+        from services.lod_studio_preview import snapshot
+        slug = 'wooden_fence_01'
+        asset = self.assets.items[1]
+        self.manager.save_settings({'modes': {slug: 'full'}, 'assetDistances': {
+            slug: {'lod1': 120, 'lod2': 260, 'hide': 100}}})
+        before = self.manager.streaming_config.path.read_bytes()
+        self.assertEqual(snapshot(self.manager)['locations'][slug]['mode'], 'full')
+        asset['lod1'] = {'status': 'PUBLISHED', 'modelAssetId': '789'}
+        view = self.manager.scan({})['overview']
+        row = next(item for item in view['items'] if item['slug'] == slug)
+        self.assertEqual(row['streamingMode'], 'lod1')
+        self.assertEqual(row['resolvedStreamingMode'], 'lod1')
+        self.assertEqual(view['settings']['modes'][slug], 'lod1')
+        self.assertEqual(row['distances'], {'lod1': 79, 'lod2': 260, 'hide': 100})
+        self.assertEqual(snapshot(self.manager)['locations'][slug]['distances'], row['distances'])
+        # Automatic projection does not rewrite authored distances on refresh.
+        self.assertEqual(self.manager.streaming_config.path.read_bytes(), before)
+        asset['lod2'] = {'status': 'PUBLISHED', 'modelAssetId': '790'}
+        self.assertEqual(self.manager.overview()['settings']['modes'][slug], 'lod2')
+        self.assertEqual(snapshot(self.manager)['locations'][slug]['mode'], 'lod2')
+        asset['lod1']['status'] = 'UPDATE_AVAILABLE'
+        self.assertEqual(snapshot(self.manager)['locations'][slug]['mode'], 'full')
+        asset['lod1'] = {'status': 'PUBLISHED', 'modelAssetId': 'bad'}
+        self.assertEqual(snapshot(self.manager)['locations'][slug]['mode'], 'full')
+        asset['lod1'] = {'status': 'PUBLISHED', 'modelAssetId': '789'}
+        self.manager.save_settings({'modes': {slug: 'off'}})
+        self.assertEqual(snapshot(self.manager)['locations'][slug]['mode'], 'off')
+        row = next(item for item in self.manager.scan({})['overview']['items'] if item['slug'] == slug)
+        self.assertEqual(row['streamingMode'], 'off')
+        self.assertEqual(row['availableStreamingMode'], 'lod2')
+        self.manager.save_settings({'modes': {slug: 'full'}})
+        self.assertEqual(self.manager.streaming_config.read()['modes'][slug], 'lod2')
+
+    def test_new_unplaced_asset_with_published_lod_is_automatic(self):
+        row = next(item for item in self.manager.overview()['items'] if item['slug'] == 'no_placement')
+        self.assertEqual(row['count'], 0)
+        self.assertEqual(row['streamingMode'], 'lod1')
+        self.assertFalse(row['streamingEligible'])
+
     def test_red_or_yellow_status_requires_active_publication(self):
         self.manager.scan({})
         self.assets.items[0]['lod1']={'status':'UPDATE_AVAILABLE','modelAssetId':'91896785734146'}
@@ -203,10 +243,10 @@ class TestLodManagerSettingsRoutes(unittest.TestCase):
                                          {'lod_manager':manager})
                 self.assertEqual(status,200)
                 self.assertIsNone(manager._preflight)
-                self.assertEqual(view['settings']['modes']['stone_fence_02'],'full')
+                self.assertEqual(view['settings']['modes']['stone_fence_02'],'lod1')
                 self.assertTrue(manager.streaming_config.path.exists())
                 error_status, error=write_world('/api/lod-manager/settings',
                     lambda:{'modes':{'imaginary_slug':'full'}},{'lod_manager':manager})
                 self.assertEqual(error_status,400)
                 self.assertIn('Unknown',error['error'])
-                self.assertEqual(manager.streaming_config.read()['modes']['stone_fence_02'],'full')
+                self.assertEqual(manager.streaming_config.read()['modes']['stone_fence_02'],'lod1')

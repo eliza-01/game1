@@ -94,7 +94,7 @@ class CharacterCreationM482(unittest.TestCase):
         self.assertIn('if #entries > 1 then', view)
         self.assertIn('materialPicker(root', view)
         self.assertIn('colorPicker(root', view)
-        self.assertIn('visible[category] = #entries > 1 or (#entries == 1 and (category ~= "head"', controller)
+        self.assertIn('visible[category] = #entries > 0', controller)
         self.assertIn('button.Visible = visible[key] == true', panel)
         self.assertIn('palette:Open',controller)
         overlay=(ROOT/'src/client/character/CharacterCreationColorPalette.luau').read_text()

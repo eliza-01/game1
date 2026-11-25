@@ -3,21 +3,17 @@
 No placement snapshot, authoring paths, credentials or mutable runtime state.
 The compiler remains the authority for actual Runtime Place preparation.
 """
-from .location_streaming_config import runtime_mode, distance_profile
+from .location_streaming_config import runtime_mode, distance_profile, published_id
 from .house_part_distances import validate
 import hashlib
 import json
 
 
-def published_id(resource):
-    value = str((resource or {}).get('modelAssetId') or '')
-    return value if (resource or {}).get('status') == 'PUBLISHED' and value.isascii() and value.isdecimal() and 0 < int(value) < 2**53 else ''
-
-
 def snapshot(manager):
-    settings = manager.read_settings()
+    assets = manager.assets.snapshot()['items']
+    settings = manager.read_settings(assets)
     locations = {}
-    for asset in manager.assets.snapshot()['items']:
+    for asset in assets:
         slug = asset['slug']
         locations[slug] = {'mode': runtime_mode(settings, slug),
                            'distances': distance_profile(settings, slug),

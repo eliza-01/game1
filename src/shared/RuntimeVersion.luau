@@ -1,1 +1,1 @@
-return table.freeze({ Version = "2026.11.25.522", SourceDigest = "game1-m522-compact-gameplay-test" })
+return table.freeze({ Version = "2026.11.26.523", SourceDigest = "game1-m523-interlude-weapon-balance" })

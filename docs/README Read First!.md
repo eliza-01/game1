@@ -7,6 +7,7 @@
 ## Наиболее актуальная точка входа
 
 - **[Kanban · историческая сверка первых 17 карточек](kanban/STATUS_2026-11-22_M439.md)** — проверка источников и открытая Studio/Android-приёмка; [спецификации карточек](kanban/README.md).
+- **[Balance · M523: скорость и урон оружия](workflows/M523_INTERLUDE_WEAPON_BALANCE_RU.md)** — действующие формулы и адаптация лука без перезарядки.
 - **[Balance · план следующего этапа](kanban/BALANCE_PLAN_RU.md)** — KBN-0018–0024, актуальный melee и 15-минутная прогрессия (PROPOSED).
 - **[Текущее ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md)** и **[Архитектурная карта](architecture/CURRENT_ARCHITECTURE_RU.md)** — текущие приоритеты и реальные границы сервера, клиента, систем авторинга.
 - **[Mechanics · аудит всех четырёх разделов M447](workflows/MECHANICS_RUNTIME_GAPS_M447_RU.md)** — House/NPC/Monster/Character, незавершённые механики, persistence, Runtime/Studio критерии; [как устроен каталог](workflows/MECHANICS_HOUSE_CATALOG_M436_RU.md).

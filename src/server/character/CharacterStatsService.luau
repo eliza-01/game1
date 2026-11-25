@@ -63,7 +63,7 @@ function Service.Initialize(character: Model, startingStats: any?, progressionLe
     setBase(character, "MaxHP", level.hp)
     setBase(character, "Damage", Balance.Rules.baseDamage)
     setBase(character, "Defense", 0)
-    setBase(character, "AttackSpeed", value("AttackSpeed"))
+    setBase(character, "AttackSpeed", Balance.Rules.baseAttackSpeed)
     setBase(character, "RunSpeed", value("RunSpeed"))
     setBase(character, "CritChance", Balance.Rules.critChance)
     character:SetAttribute("MoveSpeed", value("RunSpeed"))

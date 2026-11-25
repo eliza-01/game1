@@ -85,7 +85,7 @@ def check_weapon_registration(
     stats_config_text = (ROOT / "src/shared/character/CharacterStatsConfig.luau").read_text(encoding="utf-8")
     stats_service_text = (ROOT / "src/server/character/CharacterStatsService.luau").read_text(encoding="utf-8")
     movement_config_text = (ROOT / "src/shared/character/CharacterMovementConfig.luau").read_text(encoding="utf-8")
-    for required in ["AttackSpeed = 100", "RunSpeed = 50"]:
+    for required in ["AttackSpeed = Balance.Rules.baseAttackSpeed", "RunSpeed = 50"]:
         if required not in stats_config_text:
             err(f"character baseline stat missing {required}")
     for required in ["SetModifierSource", "modifierSources", 'Service.SetModifierSource(character, "weapon", modifiers)']:

@@ -25,7 +25,7 @@ FIELDS = {
     'monsters': {'level': (1, 35), 'hp': (1, 1000000), 'damage': (0, 1000000),
                  'xp': (0, 100000000), 'gold': (0, 100000000)},
 }
-RULES = {'baseDamage': (0, 100000), 'critChance': (0, 100), 'upgradePercent': (0, 100),
+RULES = {'baseDamage': (0, 100000), 'baseAttackSpeed': (25, 400), 'critChance': (0, 100), 'upgradePercent': (0, 100),
          'maxUpgrade': (0, 20), 'headshotMultiplier': (1, 5), 'critMultiplier': (1, 5)}
 
 

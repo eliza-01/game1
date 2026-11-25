@@ -287,6 +287,6 @@ def check_character_starting_stats(
     for required in ["character_stats", "set_stats", "defaultStats", '"stats": row.get("stats")']:
         if required not in character_store_m13:
             err(f"character starting-stat Asset Manager contract missing {required}")
-    for required in ["row.stats", 'value("RunSpeed")', 'value("AttackSpeed")']:
+    for required in ["row.stats", 'value("RunSpeed")', 'setBase(character, "AttackSpeed", Balance.Rules.baseAttackSpeed)']:
         if required not in (stats_service_text + character_service_text):
             err(f"character runtime starting-stat contract missing {required}")

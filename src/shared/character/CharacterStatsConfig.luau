@@ -6,7 +6,7 @@ CharacterStatsConfig.Default = table.freeze({
     MaxHP = Balance.Level(1).hp,
     Damage = Balance.Rules.baseDamage,
     Defense = 0,
-    AttackSpeed = 100,
+    AttackSpeed = Balance.Rules.baseAttackSpeed,
     RunSpeed = 50,
     CritChance = Balance.Rules.critChance,
 })

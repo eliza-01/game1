@@ -229,7 +229,7 @@ return table.freeze({
 				rotationDegrees = table.freeze({0, -93.433, 0}),
 			}),
 		}),
-		useStudioSpawnMarkers = false,
+		useStudioSpawnMarkers = true,
 		colorPresets = table.freeze({
 			hair = table.freeze({"#161616", "#765034", "#E2BD83"}),
 			eyes = table.freeze({"#3A6483", "#638B5A", "#795333"}),

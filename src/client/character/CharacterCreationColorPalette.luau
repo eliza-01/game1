@@ -260,7 +260,7 @@ function Picker:Open(current: string?, onPreview: (string) -> (), onCommit: (str
     self.root.Visible = true
     self.setHex(if type(current) == "string" then current else "#765034", false)
     self.apply.Text = Language.Translate("creation.palette_apply")
-    self.cancel.Text = Language.Translate("creation.palette_cancel")
+    self.cancel.Text = Language.Translate("feedback.cancel")
 end
 function Picker:Close()
     if self.root.Visible then self.cancelPreview() end

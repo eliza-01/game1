@@ -116,8 +116,8 @@ class CharacterCreationM482(unittest.TestCase):
         from localization.catalog import read_catalog, LOCALES
         data=read_catalog(ROOT)
         for key in ('creation.hair_material','creation.eyes_material','creation.custom_color',
-                    'creation.palette_apply','creation.palette_cancel'):
-            self.assertEqual(set(data['groups']['creation'][key]['translations']),set(LOCALES))
+                    'creation.palette_apply','feedback.cancel'):
+            self.assertEqual(set(data['groups'][key.split('.')[0]][key]['translations']),set(LOCALES))
 
 
 if __name__ == '__main__': unittest.main()

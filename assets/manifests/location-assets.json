@@ -3814,9 +3814,9 @@
       "model_published_sha256": "631568db143cf79d930ab5932f01e92bfb721a4d1cd0f8ec07a381efbcdf746d",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 14,
+      "revision": 15,
       "created_at": 1795447168.342814,
-      "updated_at": 1795456701.6111188,
+      "updated_at": 1795622066.9386873,
       "published_at": 1795449066.3160079,
       "surface_material": "stone",
       "alpha_enabled": 0,
@@ -4176,7 +4176,7 @@
           "collisionFidelity": "Box",
           "doubleSided": false,
           "glass": false,
-          "noCollide": true,
+          "noCollide": false,
           "visualColor": "#91480B",
           "visualMaterial": "Wood"
         },
@@ -4209,11 +4209,227 @@
         }
       },
       "collisionBlueprintNeedsCapture": false,
-      "collisionBlueprintRetainedRevision": 0,
-      "collisionBlueprintRevision": 0,
-      "collisionBlueprintPartCount": 0,
-      "collisionBlueprint": null,
-      "collisionBlueprintSha256": "",
+      "collisionBlueprintRetainedRevision": 1,
+      "collisionBlueprintRevision": 1,
+      "collisionBlueprintPartCount": 7,
+      "collisionBlueprint": {
+        "anchor": {
+          "localCFrame": [
+            -1.52587890625e-05,
+            -6.187431335449219,
+            -3.814056396484375,
+            1.000000238418579,
+            -2.4492937051703357e-16,
+            0.0,
+            0.0,
+            -2.821299744937278e-07,
+            1.0000001192092896,
+            7.105427357601002e-15,
+            -1.0,
+            -2.821300029154372e-07
+          ],
+          "meshId": "105759403436176",
+          "size": [
+            5.367498397827148,
+            7.519876480102539,
+            0.72564697265625
+          ]
+        },
+        "parts": [
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0001",
+            "localCFrame": [
+              0.0018157958984375,
+              -6.308837890625,
+              -12.18865966796875,
+              0.9999229311943054,
+              -0.012265660800039768,
+              0.002039790153503418,
+              -0.00230252742767334,
+              -0.021442875266075134,
+              0.9997674822807312,
+              -0.01221906766295433,
+              -0.9996948838233948,
+              -0.02146945893764496
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              7.004539489746094,
+              8.827666282653809,
+              0.29599958658218384
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0002",
+            "localCFrame": [
+              5.065093994140625,
+              -3.1589813232421875,
+              -7.43780517578125,
+              0.5344560742378235,
+              -2.4492937051703357e-16,
+              -0.8451964259147644,
+              0.8451963663101196,
+              -2.821299744937278e-07,
+              0.5344560742378235,
+              -2.384552146850183e-07,
+              -1.0,
+              -1.507860929450544e-07
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              7.495583534240723,
+              14.844679832458496,
+              0.29599958658218384
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0003",
+            "localCFrame": [
+              -5.12860107421875,
+              -2.995758056640625,
+              -7.43780517578125,
+              -0.5507469177246094,
+              -2.4492937051703357e-16,
+              -0.8346723914146423,
+              0.8346723318099976,
+              -2.821299744937278e-07,
+              -0.5507469177246094,
+              -2.35486098176807e-07,
+              -1.0,
+              1.553822244204639e-07
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              7.766489028930664,
+              14.844679832458496,
+              0.29599958658218384
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0004",
+            "localCFrame": [
+              -0.5517120361328125,
+              0.2378387451171875,
+              -13.63690185546875,
+              -0.5299309492111206,
+              -2.4492937051703357e-16,
+              -0.8480409383773804,
+              0.8480408787727356,
+              -2.821299744937278e-07,
+              -0.5299308896064758,
+              -2.392577584942046e-07,
+              -1.0,
+              1.4950938975744066e-07
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              11.274572372436523,
+              1.0,
+              12.605356216430664
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0005",
+            "localCFrame": [
+              5.283203125,
+              2.85272216796875,
+              -7.43994140625,
+              0.5003427267074585,
+              -0.012265661731362343,
+              0.8657407164573669,
+              -0.8657383918762207,
+              -0.021442873403429985,
+              0.5000375509262085,
+              0.012430678121745586,
+              -0.99969482421875,
+              -0.021347638219594955
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              7.004539489746094,
+              14.844679832458496,
+              0.29599958658218384
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0006",
+            "localCFrame": [
+              -5.252685546875,
+              3.01885986328125,
+              -7.43780517578125,
+              0.4965279996395111,
+              -2.4492937051703357e-16,
+              -0.8680208921432495,
+              0.8680208325386047,
+              -2.821299744937278e-07,
+              0.4965279698371887,
+              -2.448946929689555e-07,
+              -1.0,
+              -1.400854188204903e-07
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              7.004539489746094,
+              14.844679832458496,
+              0.29599958658218384
+            ]
+          },
+          {
+            "canQuery": true,
+            "canTouch": true,
+            "collisionGroup": "Default",
+            "id": "part_0007",
+            "localCFrame": [
+              0.0881500244140625,
+              6.016937255859375,
+              -7.444061279296875,
+              0.9999229311943054,
+              -0.012265660800039768,
+              0.002039790153503418,
+              -0.00230252742767334,
+              -0.021442875266075134,
+              0.9997674822807312,
+              -0.01221906766295433,
+              -0.9996948838233948,
+              -0.02146945893764496
+            ],
+            "name": "Part",
+            "shape": "Block",
+            "size": [
+              7.004539489746094,
+              14.844679832458496,
+              0.29599958658218384
+            ]
+          }
+        ],
+        "pivot": "Model:GetPivot()",
+        "schemaVersion": 2
+      },
+      "collisionBlueprintSha256": "3ed09b812e5003012ad34aab706e46bf973810a25c0ae85cd88e26c7d12b7e38",
       "surfaceMaterial": "stone",
       "appearanceMode": "material",
       "visualMaterial": "Plastic",
@@ -4236,7 +4452,7 @@
       "textureUsesAlpha": null,
       "meshAtlasesCurrent": true,
       "atlasVariantId": 0,
-      "bindingRevision": 14,
+      "bindingRevision": 15,
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Building",

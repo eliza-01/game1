@@ -248,6 +248,17 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     footLine.BorderSizePixel = 0
     footLine.Size = UDim2.new(1, 0, 0, 1)
     footLine.Parent = footer
+    -- The current profile store has one occupied slot. Reserve the action visually
+    -- without allowing a second character to overwrite it. A future multi-slot
+    -- lifecycle can enable this button once it has an authoritative free slot.
+    local newCharacter = action(footer, "NewCharacter", UDim2.new(1, 0, 0, 44), UDim2.fromOffset(0, 4), false)
+    newCharacter.Visible = false
+    newCharacter.Active = false
+    newCharacter.Interactable = false
+    newCharacter.Selectable = false
+    newCharacter.AutoButtonColor = false
+    newCharacter.TextColor3 = MUTED
+    newCharacter.BackgroundColor3 = Color3.fromRGB(45, 55, 60)
     local enter = action(footer, "EnterWorld", UDim2.new(1, 0, 0, 48), UDim2.fromOffset(0, 4), true)
     local status = text(footer, "CreationStatus", 12, Enum.Font.GothamBold, Color3.fromRGB(238, 187, 154))
     status.TextWrapped = true
@@ -338,7 +349,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
         local requested = tonumber(if mobile then settings.mobilePanelWidthPx else settings.desktopPanelWidthPx) or 460
         local width = math.max(1, math.min(math.max(if mobile then 300 else 410, requested), viewport.X - 20))
         local availableHeight = if portrait and editing then math.floor(viewport.Y * 0.56) else viewport.Y - 24
-        local height = math.max(1, math.min(if editing then 850 elseif selection then 250 else 180, availableHeight))
+        local height = math.max(1, math.min(if editing then 850 elseif selection then 300 else 180, availableHeight))
         root.Size = UDim2.fromOffset(width, height)
         root.AnchorPoint = if portrait then Vector2.new(0.5, 1) else Vector2.new(1, 0.5)
         root.Position = if portrait then UDim2.new(0.5, 0, 1, -8)
@@ -372,7 +383,9 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
             button.TextWrapped = true
         end
         local contentY = tabY + tabHeight + 12
-        local footerHeight = 84
+        local enterHeight = if compact then 38 else 44
+        local newActionSpace = if selection then enterHeight + 6 else 0
+        local footerHeight = 84 + newActionSpace
         local bottom = if compact then 8 else 16
         separator.Position = UDim2.fromOffset(16, contentY - 7)
         separator.Size = UDim2.new(1, -32, 0, 1)
@@ -380,8 +393,9 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
         content.Size = UDim2.new(1, -32, 0, math.max(1, height - contentY - footerHeight - bottom))
         footer.Position = UDim2.new(0, 16, 1, -bottom)
         footer.Size = UDim2.new(1, -32, 0, footerHeight)
-        local enterY = 4
-        local enterHeight = if compact then 38 else 44
+        newCharacter.Position = UDim2.fromOffset(0, 4)
+        newCharacter.Size = UDim2.new(1, 0, 0, enterHeight)
+        local enterY = 4 + newActionSpace
         enter.Position = UDim2.fromOffset(0, enterY)
         enter.Size = UDim2.new(1, 0, 0, enterHeight)
         status.Position = UDim2.fromOffset(0, enterY + enterHeight + 3)
@@ -400,7 +414,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     if parent:IsA("ScreenGui") then parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize) end
     resize()
     return {panel = root, title = heading, subtitle = tagline,
-        male = male, female = female, enter = enter,
+        male = male, female = female, enter = enter, newCharacter = newCharacter,
         overlay = overlay, overlayCard = overlayCard, overlayLabel = overlayLabel,
         overlayRunner = runner, overlayTrack = progressTrack, overlayFill = progressFill, overlayValue = progressValue,
         status = status, tabs = tabButtons, content = content, editor = editor, invalidateCanvas = invalidateCanvas,
@@ -425,6 +439,8 @@ function Panel.SetMode(views: any, stage: string)
     views.genders.Visible = editing
     views.tabBar.Visible = editing
     views.separator.Visible = editing
+    views.newCharacter.Visible = ready
+    views.newCharacter.Text = Language.Translate("creation.new_character")
     views.enter.Visible = editing or ready
     views.layout()
 end

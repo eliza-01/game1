@@ -305,7 +305,7 @@
         ]
       }
     },
-    "useStudioSpawnMarkers": false,
+    "useStudioSpawnMarkers": true,
     "colorPresets": {
       "hair": [
         "#161616",

@@ -11,7 +11,8 @@ class M160FloorAndAim(unittest.TestCase):
         service = code('src/server/world/HouseElevatorService.luau')
         self.assertIn('sockets[Policy.DestinationSocket(floor, option.destination)]', service)
         self.assertIn('local spawn = sockets[Policy.DestinationSocket(floor, floor)]', service)
-        self.assertIn('target:IsA("Bone"), 3)', service)
+        self.assertIn('Policy.SpawnClearance = 3', policy)
+        self.assertIn('target:IsA("Bone"), Policy.SpawnClearance)', service)
         self.assertIn('if not target or not target.Parent then return false', service)
 
     def test_two_independent_radii_and_studio_only_debug(self):

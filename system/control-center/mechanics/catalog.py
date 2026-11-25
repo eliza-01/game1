@@ -76,6 +76,7 @@ SOURCES = {
     'socket-occlusion': ('src/client/world/HouseSocketAimOcclusion.luau', 'Проверка видимости'),
     'door-service': ('src/server/world/HouseDoorService.luau', 'Дверь'),
     'padlock-service': ('src/server/world/HousePadlockService.luau', 'Замок'),
+    'padlock-visuals': ('src/server/world/HousePadlockVisuals.luau', 'Замок · две стороны'),
     'elevator-service': ('src/server/world/HouseElevatorService.luau', 'Лифт'),
     'elevator-policy': ('src/shared/world/HouseElevatorPolicy.luau', 'Маршрутизация этажей'),
     'spawn-orientation': ('src/shared/world/HouseSpawnOrientation.luau', 'Направление spawn'),

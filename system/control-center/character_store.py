@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sqlite3
 import time
+
+from sqlite_connection import connect as connect_sqlite
 
 # Re-export legacy module constants and skeleton validator for existing consumers.
 from character_core.archetype_contract import (
@@ -24,9 +25,10 @@ class CharacterStore(CharacterModelWorkflowMixin, CharacterRegistryExportMixin):
         self.export()
 
     def connect(self):
-        connection = sqlite3.connect(self.db)
-        connection.row_factory = sqlite3.Row
-        return connection
+        # This project's connection manager closes the SQLite handle at context exit.
+        # sqlite3.Connection.__exit__ alone only commits or rolls back, which
+        # leaves Windows temporary DB files locked by the owning process.
+        return connect_sqlite(self.db)
 
     @staticmethod
     def _columns(connection, table: str) -> set[str]:

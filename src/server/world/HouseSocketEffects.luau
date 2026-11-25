@@ -19,8 +19,9 @@ function Effects.CreatePlaceholder(house: Model, socket: Attachment, kind: strin
     local owner = parentPart(socket)
     if not owner then return nil end
     local part = Instance.new("Part")
-    part.Name = if kind == "padlock" then "Game1PadlockPlaceholder" else "Game1ChestPlaceholder"
-    part.Size = if kind == "padlock" then Vector3.new(0.35, 0.45, 0.16) else Vector3.new(2.2, 1.4, 1.3)
+    assert(kind == "chest", "unknown house placeholder: " .. kind)
+    part.Name = "Game1ChestPlaceholder"
+    part.Size = Vector3.new(2.2, 1.4, 1.3)
     part.Material = Enum.Material.SmoothPlastic
     part.Color = Color3.fromRGB(93, 99, 105)
     part.Transparency = 0.4

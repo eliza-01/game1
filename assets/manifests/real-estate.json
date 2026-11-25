@@ -19518,6 +19518,39 @@
       ]
     },
     {
+      "atlasKey": "newbie_sword_01",
+      "baseKey": "newbie_sword",
+      "version": "01",
+      "variants": [
+        {
+          "id": 87,
+          "family_id": 62,
+          "width": 64,
+          "height": 256,
+          "filename": "newbie_sword_01_64x256_atlas.png",
+          "original_filename": "newbie_sword_01_64x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/newbie_sword_01/64x256/newbie_sword_01_64x256_atlas.png",
+          "source_sha256": "7ab0ed7b37cb2b4e3ccc9cd024e7b9a2cdc08ea70ff67e70b4fa4a5def0700a1",
+          "uses_alpha": true,
+          "published_id": "107219803101477",
+          "published_sha256": "7ab0ed7b37cb2b4e3ccc9cd024e7b9a2cdc08ea70ff67e70b4fa4a5def0700a1",
+          "moderation_state": "Reviewing",
+          "published_at": 1795564907.0590782,
+          "created_at": 1795564903.1643083,
+          "retired_at": null,
+          "atlas_key": "newbie_sword_01",
+          "replacement_sha256": null,
+          "favorite": false,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "64x256",
+          "baseKey": "newbie_sword",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "npc_guard_02_gradient_512x512atlas",
       "baseKey": "npc_guard_02_gradient_512x512atlas",
       "version": "",
@@ -21259,6 +21292,22 @@
       "atlasName": "main_statue",
       "atlasVersion": "",
       "atlasResolution": "128×128"
+    },
+    {
+      "reference": "atlas:87",
+      "label": "newbie_sword_01",
+      "slug": "",
+      "filename": "newbie_sword_01_64x256_atlas.png",
+      "group": "atlas",
+      "category": "",
+      "categoryLabel": "",
+      "path": "assets/source/texture-atlases/newbie_sword_01/64x256/newbie_sword_01_64x256_atlas.png",
+      "sha256": "7ab0ed7b37cb2b4e3ccc9cd024e7b9a2cdc08ea70ff67e70b4fa4a5def0700a1",
+      "assetId": "107219803101477",
+      "atlasKey": "newbie_sword_01",
+      "atlasName": "newbie_sword",
+      "atlasVersion": "01",
+      "atlasResolution": "64×256"
     },
     {
       "reference": "atlas:81",

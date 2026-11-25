@@ -6,6 +6,7 @@ import time
 import threading
 from services.camera_settings import DEFAULT_CAMERA, normalize_camera
 from services.flora_effect_settings import DEFAULTS as FLORA_DEFAULTS, normalize_flora, validate_residents
+from services.character_creation_settings import DEFAULTS as CREATION_DEFAULTS, normalize_character_creation
 from copy import deepcopy
 from pathlib import Path
 
@@ -299,6 +300,7 @@ DEFAULT_PAYLOAD = {
     "socketRanges": deepcopy(SOCKET_RANGE_DEFAULTS),
     "rotations": deepcopy(ROTATION_DEFAULTS),
     "flora": deepcopy(FLORA_DEFAULTS),
+    "characterCreation": deepcopy(CREATION_DEFAULTS),
     "npcOverhead": deepcopy(NPC_OVERHEAD_DEFAULTS),
     "monsterAi": {"noDamageReturnSeconds": 30},
     "worldStreaming": {"targetRadiusStuds": 150},
@@ -354,6 +356,7 @@ class OptionsStore:
         normalize_socket_ranges(payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))
         normalize_rotations(payload.get('rotations', ROTATION_DEFAULTS))
         validate_residents(self.root, normalize_flora(payload.get('flora', FLORA_DEFAULTS)))
+        normalize_character_creation(payload.get('characterCreation', CREATION_DEFAULTS))
         normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
         normalize_world_streaming(payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
@@ -385,6 +388,7 @@ class OptionsStore:
             "\tsocketRanges = " + lua_literal(normalize_socket_ranges(payload.get('socketRanges', SOCKET_RANGE_DEFAULTS))) + ",",
             "\trotations = " + lua_literal(normalize_rotations(payload.get('rotations', ROTATION_DEFAULTS))) + ",",
             "\tflora = " + lua_literal(normalize_flora(payload.get('flora', FLORA_DEFAULTS))) + ",",
+            "\tcharacterCreation = " + lua_literal(normalize_character_creation(payload.get('characterCreation', CREATION_DEFAULTS))) + ",",
             "\tnpcOverhead = " + lua_literal(normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))) + ",",
             "\tmonsterAi = " + lua_literal(normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))) + ",",
             "\tplayerJump = " + lua_literal(normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))) + ",",
@@ -441,7 +445,7 @@ class OptionsStore:
                     print(f'[options] M449 campfire range migration skipped: {error}')
             payload['socketRanges'] = normalize_socket_ranges(initial)
             changed = True
-        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges', 'rotations', 'flora'):
+        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges', 'rotations', 'flora', 'characterCreation'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
@@ -459,6 +463,11 @@ class OptionsStore:
         upgraded_ui = normalize_ui_presentation(payload['uiPresentation'], UI_PROFILE_DEFAULTS)
         if upgraded_ui != payload['uiPresentation']:
             payload['uiPresentation'] = upgraded_ui
+            changed = True
+        # Extend the existing scene contract without resetting authored camera views.
+        normalized_creation = normalize_character_creation({}, payload['characterCreation'])
+        if normalized_creation != payload['characterCreation']:
+            payload['characterCreation'] = normalized_creation
             changed = True
         normalized_ranges = normalize_socket_ranges({}, payload['socketRanges'])
         if normalized_ranges != payload['socketRanges']:
@@ -540,6 +549,9 @@ class OptionsStore:
             next_flora = normalize_flora(request['flora'], payload.get('flora', FLORA_DEFAULTS))
             validate_residents(self.root, next_flora)
             payload['flora'] = next_flora
+        if 'characterCreation' in request:
+            payload['characterCreation'] = normalize_character_creation(request['characterCreation'],
+                payload.get('characterCreation', CREATION_DEFAULTS))
         if 'rotations' in request:
             payload['rotations'] = normalize_rotations(request['rotations'],
                 payload.get('rotations', ROTATION_DEFAULTS))

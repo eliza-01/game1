@@ -54,7 +54,7 @@ class HouseSocketM155(unittest.TestCase):
         self.assertIn('if Padlock.IsAttached(house, hasPadlock) then return end', runtime)
         self.assertIn('primary.Enabled = not locked', runtime)
         self.assertIn('prompt.Enabled = locked', runtime)
-        self.assertIn('part.Transparency = if locked then 0.4 else 1', runtime)
+        self.assertIn('PadlockVisuals.SetAttached(house, entry.sockets, locked)', runtime)
         self.assertIn('Door.IsMoving(house)', runtime)
         self.assertIn('Game1PadlockAttached', runtime)
 

@@ -61,6 +61,9 @@ local groundSensor: ControllerPartSensor? = nil
 local function clearCharacter()
 	if meleeArcConnection then meleeArcConnection:Disconnect(); meleeArcConnection = nil end
 	meleeMaxResidualYaw = MeleeFacingPolicy.MaxResidualYaw(nil)
+    table.clear(keysDown)
+    touchAxis = Vector2.zero
+    touchMovementActive = false
     if fallForce then fallForce:Destroy(); fallForce = nil end
     if fallAttachment then fallAttachment:Destroy(); fallAttachment = nil end
     jumpInFlight = false
@@ -532,6 +535,15 @@ local function updateMovement(deltaTime: number)
 		return
 	end
 
+    if UiInputGuard.IsWorldSuspended() then
+        table.clear(keysDown)
+        touchAxis = Vector2.zero
+        touchMovementActive = false
+        jumpRequested = false
+        controllerManager.MovingDirection = Vector3.zero
+        updateJumpDescent()
+        return
+    end
 	if UserInputService:GetFocusedTextBox() then
 		controllerManager.MovingDirection = Vector3.zero
 		updateJumpDescent()
@@ -635,7 +647,7 @@ end
 
 function MovementController.RequestJump()
 	-- Same jump path as Space; grounding and attack locks are checked in updateMovement.
-	if not UserInputService:GetFocusedTextBox() then
+	if not UiInputGuard.IsWorldSuspended() and not UserInputService:GetFocusedTextBox() then
 		jumpRequested = true
 	end
 end

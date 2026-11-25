@@ -1,0 +1,348 @@
+{
+  "schemaVersion": 1,
+  "archetypes": {
+    "human_female": {
+      "hair": [
+        {
+          "id": "human_female_m001_hair",
+          "part": {
+            "id": "human_female_m001_hair",
+            "asset_id": "93538100175421",
+            "revision": 1,
+            "mesh_family_id": "human_female_m001",
+            "appearance_id": "",
+            "used_bones": [],
+            "attachment": "hair_mount",
+            "attachment_mode": "pivot",
+            "socket_bone": "",
+            "extras": [],
+            "atlas_image_id": "",
+            "colorChannels": [
+              "primary"
+            ]
+          }
+        },
+        {
+          "id": "human_female_m003_hair",
+          "part": {
+            "id": "human_female_m003_hair",
+            "asset_id": "122803353972225",
+            "revision": 1,
+            "mesh_family_id": "human_female_m003",
+            "appearance_id": "",
+            "used_bones": [],
+            "attachment": "hair_mount",
+            "attachment_mode": "pivot",
+            "socket_bone": "",
+            "extras": [
+              "human_female_m003_hair_extra_01"
+            ],
+            "atlas_image_id": "",
+            "colorChannels": [
+              "primary",
+              "extra_01"
+            ]
+          }
+        },
+        {
+          "id": "human_female_m004_hair",
+          "part": {
+            "id": "human_female_m004_hair",
+            "asset_id": "115395555838720",
+            "revision": 1,
+            "mesh_family_id": "human_female_m004",
+            "appearance_id": "",
+            "used_bones": [],
+            "attachment": "hair_mount",
+            "attachment_mode": "pivot",
+            "socket_bone": "",
+            "extras": [
+              "human_female_m004_hair_extra_01"
+            ],
+            "atlas_image_id": "",
+            "colorChannels": [
+              "primary",
+              "extra_01"
+            ]
+          }
+        }
+      ],
+      "head": [
+        {
+          "id": "human_female_m001_head",
+          "part": {
+            "id": "human_female_m001_head",
+            "asset_id": "111130300110765",
+            "revision": 3,
+            "mesh_family_id": "human_female_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "head",
+              "neck"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          }
+        }
+      ],
+      "eyes": [
+        {
+          "id": "human_common_m001_eye",
+          "left": {
+            "id": "human_common_m001_eye_l",
+            "asset_id": "109477519119435",
+            "revision": 1,
+            "mesh_family_id": "human_common_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_eye_l"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          },
+          "right": {
+            "id": "human_common_m001_eye_r",
+            "asset_id": "77502187653505",
+            "revision": 1,
+            "mesh_family_id": "human_common_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_eye_r"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          }
+        }
+      ],
+      "eyebrows": [
+        {
+          "id": "human_common_m001_eyebrow",
+          "left": {
+            "id": "human_common_m001_eyebrow_l",
+            "asset_id": "96041697638875",
+            "revision": 1,
+            "mesh_family_id": "human_common_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_brow_l"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          },
+          "right": {
+            "id": "human_common_m001_eyebrow_r",
+            "asset_id": "88353012521312",
+            "revision": 1,
+            "mesh_family_id": "human_common_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_brow_r"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          }
+        },
+        {
+          "id": "human_female_m001_eyebrow",
+          "left": {
+            "id": "human_female_m001_eyebrow_l",
+            "asset_id": "78248573293987",
+            "revision": 1,
+            "mesh_family_id": "human_female_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_brow_l"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          },
+          "right": {
+            "id": "human_female_m001_eyebrow_r",
+            "asset_id": "76315575186865",
+            "revision": 1,
+            "mesh_family_id": "human_female_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_brow_r"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          }
+        }
+      ]
+    },
+    "human_male": {
+      "hair": [
+        {
+          "id": "human_male_m001_hair",
+          "part": {
+            "id": "human_male_m001_hair",
+            "asset_id": "111512978035572",
+            "revision": 1,
+            "mesh_family_id": "human_male_m001",
+            "appearance_id": "",
+            "used_bones": [],
+            "attachment": "hair_mount",
+            "attachment_mode": "pivot",
+            "socket_bone": "",
+            "extras": [],
+            "atlas_image_id": "",
+            "colorChannels": [
+              "primary"
+            ]
+          }
+        },
+        {
+          "id": "human_male_m002_hair",
+          "part": {
+            "id": "human_male_m002_hair",
+            "asset_id": "85123345022327",
+            "revision": 1,
+            "mesh_family_id": "human_male_m002",
+            "appearance_id": "",
+            "used_bones": [],
+            "attachment": "hair_mount",
+            "attachment_mode": "pivot",
+            "socket_bone": "",
+            "extras": [],
+            "atlas_image_id": "",
+            "colorChannels": [
+              "primary"
+            ]
+          }
+        },
+        {
+          "id": "human_male_m003_hair",
+          "part": {
+            "id": "human_male_m003_hair",
+            "asset_id": "81549103854113",
+            "revision": 1,
+            "mesh_family_id": "human_male_m003",
+            "appearance_id": "",
+            "used_bones": [],
+            "attachment": "hair_mount",
+            "attachment_mode": "pivot",
+            "socket_bone": "",
+            "extras": [],
+            "atlas_image_id": "",
+            "colorChannels": [
+              "primary"
+            ]
+          }
+        }
+      ],
+      "head": [
+        {
+          "id": "human_male_m001_head",
+          "part": {
+            "id": "human_male_m001_head",
+            "asset_id": "116014875979775",
+            "revision": 1,
+            "mesh_family_id": "human_male_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "head",
+              "neck"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          }
+        }
+      ],
+      "eyes": [
+        {
+          "id": "human_common_m001_eye",
+          "left": {
+            "id": "human_common_m001_eye_l",
+            "asset_id": "109477519119435",
+            "revision": 1,
+            "mesh_family_id": "human_common_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_eye_l"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          },
+          "right": {
+            "id": "human_common_m001_eye_r",
+            "asset_id": "77502187653505",
+            "revision": 1,
+            "mesh_family_id": "human_common_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_eye_r"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          }
+        }
+      ],
+      "eyebrows": [
+        {
+          "id": "human_common_m001_eyebrow",
+          "left": {
+            "id": "human_common_m001_eyebrow_l",
+            "asset_id": "96041697638875",
+            "revision": 1,
+            "mesh_family_id": "human_common_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_brow_l"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          },
+          "right": {
+            "id": "human_common_m001_eyebrow_r",
+            "asset_id": "88353012521312",
+            "revision": 1,
+            "mesh_family_id": "human_common_m001",
+            "appearance_id": "",
+            "used_bones": [
+              "face_brow_r"
+            ],
+            "attachment": "",
+            "attachment_mode": "",
+            "socket_bone": "pelvis",
+            "extras": [],
+            "atlas_image_id": ""
+          }
+        }
+      ]
+    }
+  }
+}

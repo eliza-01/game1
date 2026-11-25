@@ -77,6 +77,10 @@ class CharacterRegistryExportMixin:
             "studioAdminArchetypeId": self.admin_id(),
             "archetypes": rows,
         }
+        # A single published component/rig authority feeds preview choices.
+        from character_core.creation_appearance_export import write_catalog
+        write_catalog(self.root, getattr(self, 'assemblies', None), rows)
+
         manifest = self.root / "assets/manifests/character-archetypes.json"
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

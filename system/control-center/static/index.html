@@ -492,6 +492,43 @@
   </div>
 </div>
 </details>
+<details class="game1-option-section" id="option-character-creation-section"><summary><span class="game1-option-icon" aria-hidden="true">🎭</span><span><strong>Character Creation</strong><small>Сцена · пять камер · выбор персонажа · UI</small></span></summary>
+<div class="panel character-card game1-creation-options">
+  <div class="section-title"><div><span>game runtime · separate presentation scene</span><h3>Создание персонажа</h3></div><span class="muted">human male / female</span></div>
+  <small class="hint">Пять ракурсов уже сохранены в Studio: Workspace → Places → Character Creation → Game1CharacterCreationCameras. Настройки не затрагивают обычную игровую камеру. До проверки в Studio Play режим по умолчанию выключен.</small>
+  <div class="game1-creation-controls">
+    <label><input id="option-creation-enabled" type="checkbox"> Включить выбор персонажа при входе в игру</label>
+    <label><input id="option-creation-use-anchors" type="checkbox"> Использовать Studio Camera Anchors, если они доступны клиенту</label>
+    <label><input id="option-creation-use-markers" type="checkbox"> Использовать сценические MalePreviewPoint / FemalePreviewPoint, если они есть</label>
+    <div class="game1-creation-view"><strong>Палитры · три быстрых цвета (HEX)</strong>
+      <div class="game1-creation-view-fields">
+        <label>Волосы<input id="option-creation-colors-hair" type="text" spellcheck="false" placeholder="#161616, #765034, #E2BD83"></label>
+        <label>Глаза<input id="option-creation-colors-eyes" type="text" spellcheck="false"></label>
+        <label>Брови<input id="option-creation-colors-eyebrows" type="text" spellcheck="false"></label>
+      </div></div>
+    <div class="game1-creation-view"><strong>Материалы · доступные варианты для игрока</strong>
+      <div class="game1-creation-view-fields">
+        <label>Волосы<input id="option-creation-materials-hair" type="text" spellcheck="false" placeholder="Plastic, SmoothPlastic, Fabric"></label>
+        <label>Глаза<input id="option-creation-materials-eyes" type="text" spellcheck="false" placeholder="Plastic, SmoothPlastic, Glass"></label>
+      </div></div>
+    <label>Переход · полный рост / обзор · сек<input id="option-creation-transition" type="number" min="0.1" max="5" step="0.05"></label>
+    <label>Переход · лицо · сек<input id="option-creation-face-transition" type="number" min="0.1" max="5" step="0.05"></label>
+    <label>Ширина панели · desktop · px<input id="option-creation-width-desktop" type="number" min="240" max="540" step="1"></label>
+    <label>Ширина панели · mobile · px<input id="option-creation-width-mobile" type="number" min="240" max="540" step="1"></label>
+  </div>
+  <div class="section-title"><div><span>character presentation · client visual only</span><h3>Два места персонажей · Position / Rotation (XYZ)</h3></div></div>
+  <small class="hint">Координаты и повороты двух персонажей можно задать напрямую. Если в сцене есть Part с именами MalePreviewPoint и FemalePreviewPoint, их CFrame имеет приоритет. Метки невидимы в игре. Не меняют точки спавна в игровом мире.</small>
+  <div class="game1-creation-views">
+    <div class="game1-creation-view"><strong>Male · позиция и поворот</strong><div class="game1-creation-view-fields"><label>Position X, Y, Z<input id="option-creation-spawn-male-pos" type="text" spellcheck="false"></label><label>Rotation X, Y, Z<input id="option-creation-spawn-male-rot" type="text" spellcheck="false"></label></div></div>
+    <div class="game1-creation-view"><strong>Female · позиция и поворот</strong><div class="game1-creation-view-fields"><label>Position X, Y, Z<input id="option-creation-spawn-female-pos" type="text" spellcheck="false"></label><label>Rotation X, Y, Z<input id="option-creation-spawn-female-rot" type="text" spellcheck="false"></label></div></div>
+  </div>
+  <div class="section-title"><div><span>studio anchor → options fallback</span><h3>Пять кадров · строгий порядок</h3></div></div>
+  <small class="hint">Основной источник — созданные Part-анкорa в Studio. Значения ниже сохранены из последнего Output и используются при стриминге или отсутствии анкоров в собранном Place. Для редактирования CFrame введите 12 чисел из Studio Command Bar и FOV.</small>
+  <div id="option-creation-views" class="game1-creation-views"></div>
+  <div class="actions"><button id="option-creation-save" type="button" class="primary">Сохранить Character Creation</button></div>
+  <div id="option-creation-status" class="hint" role="status">После сохранения сделай Rojo Sync и новый Studio Play. Создание внешности (волосы/брови) подключается отдельно, без дублирования Character Assembly.</div>
+</div>
+</details>
 <details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">⚙️</span><span><strong>Rotations</strong><small>Вращение механизмов · окружение</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>location assets · runtime motion</span><h3>Windmill 02</h3></div></div>
@@ -1193,7 +1230,8 @@
 <script src="location-asset-workflow.js?v=453"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=456"></script>
+<script src="options.js?v=479"></script>
+<script src="character-creation-options.js?v=482"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=437"></script>

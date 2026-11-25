@@ -59,7 +59,7 @@ function MobileInputController.Start(movementController: any, cameraController: 
     local function active(): boolean
         return character ~= nil and character.Parent ~= nil
             and character:GetAttribute("LifeState") == "Alive"
-            and not menuOpen and UserInputService:GetFocusedTextBox() == nil
+            and not menuOpen and not UiInputGuard.IsWorldSuspended() and UserInputService:GetFocusedTextBox() == nil
     end
 
     local function refreshVisibility()
@@ -89,6 +89,7 @@ function MobileInputController.Start(movementController: any, cameraController: 
         resetTouch()
         view.Layout()
     end
+    playerGui:GetAttributeChangedSignal("Game1CharacterSceneInputBlocked"):Connect(refreshVisibility)
     gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(relayout)
     gui:GetPropertyChangedSignal("AbsolutePosition"):Connect(relayout)
     player.CharacterAdded:Connect(bindCharacter)

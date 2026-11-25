@@ -24,6 +24,7 @@ local rotating = false
 local targetYaw = 0
 local pendingAlignment: {character: Model, yaw: number}? = nil
 local cameraSettings = GameOptions.CameraSettings()
+local creationView: any? = nil
 local targetPitch = math.rad(cameraSettings.pitchDegrees)
 local distance = cameraSettings.distance
 local discardNextMouseDelta = false
@@ -90,6 +91,7 @@ local function releaseMouse()
 end
 
 local function updateCameraInput(_deltaTime: number)
+	if creationView then return end
 	if not rotating then
 		return
 	end
@@ -140,6 +142,20 @@ local function setCameraOrbit(camera: Camera, currentRoot: BasePart)
 end
 
 local function updateCamera(_deltaTime: number)
+    if creationView then
+        local camera = Workspace.CurrentCamera
+        if not camera then return end
+        local view = creationView
+        view.elapsed = math.min(view.elapsed + _deltaTime, view.duration)
+        local fraction = if view.duration <= 0 then 1 else view.elapsed / view.duration
+        -- smoothstep avoids a visible jolt when switching from body to face.
+        local alpha = fraction * fraction * (3 - 2 * fraction)
+        camera.CameraType = Enum.CameraType.Scriptable
+        camera.CFrame = view.start:Lerp(view.target, alpha)
+        camera.FieldOfView = view.fromFov + (view.toFov - view.fromFov) * alpha
+        camera.Focus = CFrame.new(camera.CFrame.Position + camera.CFrame.LookVector * 12)
+        return
+    end
     local currentRoot = root
     local camera = Workspace.CurrentCamera
     if not currentRoot or not currentRoot.Parent or not camera then return end
@@ -191,6 +207,76 @@ local function updateCamera(_deltaTime: number)
         end
     end
     setCameraOrbit(camera, currentRoot)
+end
+
+-- Exactly one CameraController controls both world and Character Creation cameras.
+-- Stage names/order are stable authoring identifiers; capture points live in Place.
+local CREATION_STAGES = {
+    SelectionOverview = true, MaleFullBody = true, FemaleFullBody = true,
+    MaleFace = true, FemaleFace = true,
+}
+
+function CameraController.ShowCreationView(stage: string, duration: number?): boolean
+    if not CREATION_STAGES[stage] then return false end
+    local options = GameOptions.CharacterCreationSettings()
+    local view = (options.views or {})[stage]
+    if not view or type(view.cframe) ~= "table" or #view.cframe ~= 12 then return false end
+    local target = CFrame.new(table.unpack(view.cframe))
+    if options.useStudioAnchors then
+        local places = Workspace:FindFirstChild("Places")
+        local scene = places and places:FindFirstChild("Character Creation")
+        local folder = scene and scene:FindFirstChild("Game1CharacterCreationCameras")
+        local point = folder and folder:FindFirstChild(stage)
+        if point and point:IsA("BasePart") then target = point.CFrame end
+    end
+    local camera = Workspace.CurrentCamera
+    if not camera then return false end
+    releaseMouse()
+    clearAutoAim()
+    creationView = {
+        start = camera.CFrame, target = target,
+        fromFov = camera.FieldOfView, toFov = math.clamp(tonumber(view.fov) or 70, 25, 100),
+        elapsed = 0, duration = math.clamp(tonumber(duration) or 0.9, 0, 5),
+    }
+    return true
+end
+
+-- Optional independently authored Character Selection scene. Until its anchors
+-- exist, the existing SelectionOverview is used rather than invented coordinates.
+-- CharacterSelectionCamera and CharacterSelectionPreviewPoint are resolved as
+-- one pair by the creation controller (shared CharacterSelectionScene contract).
+function CameraController.ShowCharacterSelectionView(archetype: string?, duration: number?, anchors: any?): boolean
+    if not anchors then
+        local name = if archetype == "human_male" then "MaleFullBody"
+            else if archetype == "human_female" then "FemaleFullBody"
+            else "SelectionOverview"
+        return CameraController.ShowCreationView(name, duration)
+    end
+    local camera = Workspace.CurrentCamera
+    if not camera then return false end
+    releaseMouse()
+    clearAutoAim()
+    creationView = {
+        start = camera.CFrame, target = anchors.camera,
+        fromFov = camera.FieldOfView,
+        toFov = anchors.fov,
+        elapsed = 0, duration = math.clamp(tonumber(duration) or 0.9, 0, 5),
+    }
+    return true
+end
+
+-- Release only when the replicated gameplay root is bound to this camera.
+-- The menu keeps its transition curtain up until this returns true.
+function CameraController.ClearCreationView(): boolean
+    local camera = Workspace.CurrentCamera
+    if not camera or not root or not root:IsDescendantOf(Workspace) or character ~= localPlayer.Character then return false end
+    creationView = nil
+    releaseMouse()
+    clearAutoAim()
+    targetPitch = math.rad(cameraSettings.pitchDegrees)
+    distance = cameraSettings.distance
+    setCameraOrbit(camera, root)
+    return true
 end
 
 local CAMERA_LIMITS = {
@@ -300,7 +386,7 @@ function CameraController.Start()
 	started = true
 
 	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-		if input.UserInputType == CharacterConfig.InputBindings.CameraOrbit[1] then
+		if not creationView and input.UserInputType == CharacterConfig.InputBindings.CameraOrbit[1] then
 			if UiInputGuard.BlocksWorldInput(input, gameProcessed) then
 				return
 			end
@@ -319,7 +405,7 @@ function CameraController.Start()
 	UserInputService.InputChanged:Connect(function(input: InputObject, gameProcessed: boolean)
 		-- Mouse movement is intentionally NOT handled here. Camera orbit input is
 		-- sampled once per render frame in updateCameraInput().
-		if input.UserInputType == Enum.UserInputType.MouseWheel then
+		if not creationView and input.UserInputType == Enum.UserInputType.MouseWheel then
 			if UiInputGuard.BlocksWorldInput(input, gameProcessed) then
 				return
 			end

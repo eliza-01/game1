@@ -1,3 +1,6 @@
+-- CharacterAutoLoads must be disabled before any yielding service/bootstrap dependency.
+-- No gameplay avatar may be created while the player is in creation/selection.
+game:GetService("Players").CharacterAutoLoads = false
 -- This must run before shared-manifest waits and service bootstrap. A published
 -- authoring Place can otherwise replicate neon Location boundaries if startup
 -- later fails or stalls. RuntimePlaceBuilder also strips this folder offline.

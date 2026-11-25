@@ -47,9 +47,9 @@ function Controller.Start()
     launcher.Name = "ChangeLanguage"
     launcher.AnchorPoint = Vector2.new(1, 0)
     launcher.Position = UDim2.new(1, -12, 0, 8)
-    launcher.Size = UDim2.fromOffset(112, 34)
+    launcher.Size = UDim2.fromOffset(44, 44)
     launcher.Font = Enum.Font.GothamSemibold
-    launcher.TextSize = 13
+    launcher.TextSize = 27
     launcher.BackgroundColor3 = Color3.fromRGB(25, 40, 52)
     launcher.TextColor3 = Color3.fromRGB(247, 249, 250)
     launcher.Parent = gui
@@ -88,8 +88,8 @@ function Controller.Start()
 
     local list = Instance.new("ScrollingFrame")
     list.Name = "AvailableLocales"
-    list.Position = UDim2.fromOffset(13, 89)
-    list.Size = UDim2.new(1, -26, 1, -157)
+    list.Position = UDim2.fromOffset(13, 145)
+    list.Size = UDim2.new(1, -26, 1, -213)
     list.BackgroundTransparency = 1
     list.BorderSizePixel = 0
     list.ScrollBarThickness = 3
@@ -104,6 +104,38 @@ function Controller.Start()
     grid.CellPadding = UDim2.fromOffset(8, 8)
     grid.Parent = list
 
+    local settingsTab = "language"
+    local settingsTabs: {[string]: TextButton} = {}
+    for order, tab in ipairs({"language", "character", "graphics", "sound"}) do
+        local item = Instance.new("TextButton")
+        item.Name = "Settings_" .. tab
+        item.Position = UDim2.new((order - 1) / 4, 9, 0, 93)
+        item.Size = UDim2.new(0.25, -17, 0, 40)
+        item.Font = Enum.Font.GothamSemibold
+        item.TextSize = 12
+        item.TextColor3 = Color3.fromRGB(240, 238, 222)
+        item.BackgroundColor3 = Color3.fromRGB(44, 59, 71)
+        item.ZIndex = 2
+        item.Parent = panel
+        corner(item, 7)
+        settingsTabs[tab] = item
+    end
+    local details = label(panel, "SettingsDescription", "", 16, 90)
+    details.Position = UDim2.fromOffset(18, 174)
+    details.Size = UDim2.new(1, -36, 0, 90)
+    details.TextColor3 = Color3.fromRGB(211, 222, 227)
+    details.Visible = false
+    local settingsAction = Instance.new("TextButton")
+    settingsAction.Name = "SettingsAction"
+    settingsAction.Position = UDim2.fromOffset(18, 285)
+    settingsAction.Size = UDim2.new(1, -36, 0, 45)
+    settingsAction.BackgroundColor3 = Color3.fromRGB(70, 114, 100)
+    settingsAction.Font = Enum.Font.GothamBold
+    settingsAction.TextSize = 15
+    settingsAction.TextColor3 = Color3.fromRGB(255, 255, 255)
+    settingsAction.Visible = false
+    settingsAction.Parent = panel
+    corner(settingsAction, 9)
     local buttons: {[string]: TextButton} = {}
     for order, locale in ipairs(ORDER) do
         local button = Instance.new("TextButton")
@@ -155,21 +187,66 @@ function Controller.Start()
         title.Text = State.Translate("language.title")
         subtitle.Text = State.Translate("language.subtitle")
         confirm.Text = State.Translate("language.confirm")
-        launcher.Text = "🌐  " .. State.Translate("language.button")
+        launcher.Text = "⚙"
         for locale, button in pairs(buttons) do
             button.BackgroundColor3 = if locale == chosen
                 then Color3.fromRGB(48, 105, 91) else Color3.fromRGB(41, 57, 73)
+        end
+        local current = settingsTab == "language"
+        list.Visible = current
+        confirm.Visible = current
+        subtitle.Visible = current
+        details.Visible = not current
+        settingsAction.Visible = settingsTab == "character"
+        for tab, item in pairs(settingsTabs) do
+            item.Text = State.Translate("settings." .. tab)
+            item.BackgroundColor3 = if tab == settingsTab
+                then Color3.fromRGB(77, 107, 95) else Color3.fromRGB(44, 59, 71)
+        end
+        if settingsTab == "character" then
+            details.Text = State.Translate("settings.character_hint")
+            settingsAction.Text = State.Translate("settings.change_character")
+        elseif settingsTab == "graphics" or settingsTab == "sound" then
+            details.Text = State.Translate("settings.coming_soon")
         end
     end
     local function open()
         previous = State.Current()
         chosen = previous
+        settingsTab = "language"
         status.Text = ""
         status:SetAttribute("Game1SaveFailed", false)
-        close.Visible = player:GetAttribute("Game1LanguageChoice") ~= nil
+        close.Visible = hasChosen or player:GetAttribute("Game1LanguageChoice") ~= nil
         shade.Visible = true
         paint()
     end
+    for tab, item in pairs(settingsTabs) do
+        item.Activated:Connect(function()
+            if pending then return end
+            settingsTab = tab
+            status.Text = ""
+            paint()
+        end)
+    end
+    settingsAction.Activated:Connect(function()
+        if pending then return end
+        pending = true
+        status.Text = State.Translate("language.loading")
+        task.spawn(function()
+            local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
+            local remote = remotes and remotes:FindFirstChild("CharacterCreationManage")
+            local ok, response = false, nil
+            if remote and remote:IsA("RemoteFunction") then
+                ok, response = pcall(function() return remote:InvokeServer() end)
+            end
+            pending = false
+            if ok and type(response) == "table" and response.ok == true then
+                shade.Visible = false
+            else
+                status.Text = State.Translate("settings.change_unavailable")
+            end
+        end)
+    end)
     for locale, button in pairs(buttons) do
         button.Activated:Connect(function()
             if pending then return end

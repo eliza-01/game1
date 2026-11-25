@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local TextService = game:GetService("TextService")
+local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 
 local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
@@ -17,6 +18,7 @@ local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitF
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Contract = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketContract"))
 local CampfireContract = require(Shared:WaitForChild("world"):WaitForChild("CampfireSocketContract"))
+local ElevatorFloor = require(Shared:WaitForChild("world"):WaitForChild("HouseElevatorFloor"))
 local Aim = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketAimPolicy"))
 local Occlusion = require(script.Parent:WaitForChild("HouseSocketAimOcclusion"))
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
@@ -130,9 +132,12 @@ end
 -- remain individual server-authored ProximityPrompts for native activation.
 local function availableActions(socket: Attachment): {ProximityPrompt}
     local actions: {ProximityPrompt} = {}
+    local root = SpatialRoot.Get(player)
+    if not root then return actions end
     for _, name in {"Game1HouseInteraction", "Game1HouseInteractionAlternate"} do
         local prompt = socket:FindFirstChild(name)
-        if prompt and prompt:IsA("ProximityPrompt") and prompt.Enabled then
+        if prompt and prompt:IsA("ProximityPrompt") and prompt.Enabled
+            and ElevatorFloor.AllowsPrompt(prompt, root) then
             table.insert(actions, prompt)
         end
     end
@@ -168,7 +173,10 @@ end
 -- Both keyboard shortcuts and mobile action buttons use the same server-owned
 -- socket contract. The server checks distance, offered action and cooldown.
 local function requestAction(prompt: ProximityPrompt)
+    if UiInputGuard.IsWorldSuspended() then return end
     if not prompt.Enabled or not prompt:IsDescendantOf(Workspace) then return end
+    local root = SpatialRoot.Get(player)
+    if not root or not ElevatorFloor.AllowsPrompt(prompt, root) then return end
     local socket = prompt.Parent
     if not socket or not socket:IsA("Attachment") then return end
     local key = prompt.KeyboardKeyCode.Name
@@ -200,7 +208,8 @@ local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): Proximit
     local selectedOther: ProximityPrompt? = nil
     local otherDistance = math.huge
     for prompt in prompts do
-        if not prompt.Enabled or not prompt:IsDescendantOf(Workspace) then continue end
+        if not prompt.Enabled or not prompt:IsDescendantOf(Workspace)
+            or not ElevatorFloor.AllowsPrompt(prompt, root) then continue end
         local socket = prompt.Parent
         if not socket or not socket:IsA("Attachment") then continue end
         local definition = definitionFor(prompt)
@@ -325,7 +334,7 @@ local function updateCustomPrompt()
     local custom = SpatialRoot.IsCustom(player)
     local root = SpatialRoot.Get(player)
     local alive = not custom or (player.Character and player.Character:GetAttribute("LifeState") == "Alive")
-    local nextPrompt = if root and alive then nearestCustomPrompt(root, false) else nil
+    local nextPrompt = if root and alive and not UiInputGuard.IsWorldSuspended() then nearestCustomPrompt(root, false) else nil
     local anchor = if nextPrompt then nextPrompt.Parent else nil
     local selectedSocket = if anchor and anchor:IsA("Attachment") then anchor :: Attachment else nil
     for socket in pairs(visible) do
@@ -436,7 +445,7 @@ function Controller.Start()
         updateCustomPrompt()
     end)
     UserInputService.InputBegan:Connect(function(input, processed)
-        if processed or UserInputService:GetFocusedTextBox() then return end
+        if processed or UiInputGuard.IsWorldSuspended() or UserInputService:GetFocusedTextBox() then return end
         local key = input.KeyCode.Name
         if key ~= "E" and key ~= "F" then return end
         local root = SpatialRoot.Get(player)

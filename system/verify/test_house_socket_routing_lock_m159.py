@@ -21,7 +21,8 @@ class HouseSocketM159(unittest.TestCase):
         self.assertIn('if not target or not target.Parent then return false', mover)
         self.assertIn('target.TransformedWorldCFrame', mover)
         self.assertIn('Orientation.Upright(if target:IsA("Bone")', mover)
-        self.assertIn('target:IsA("Bone"), 3)', mover)
+        self.assertIn('Policy.SpawnClearance = 3', policy)
+        self.assertIn('target:IsA("Bone"), Policy.SpawnClearance)', mover)
         self.assertIn('root.AssemblyAngularVelocity = Vector3.zero', mover)
 
     def test_both_handles_offer_e_open_and_f_lock_only_when_closed(self):

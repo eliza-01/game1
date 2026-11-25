@@ -9,12 +9,15 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local World = Shared:WaitForChild("world")
 local Registry = require(World:WaitForChild("LocationAssetRegistry"))
 local SpawnOrientation = require(World:WaitForChild("HouseSpawnOrientation"))
+local AuthoredPropSocketMount = require(Shared:WaitForChild("rig"):WaitForChild("AuthoredPropSocketMount"))
 local BoneModelMount = require(Shared:WaitForChild("rig"):WaitForChild("BoneModelMount"))
+local PivotSocketMount = require(Shared:WaitForChild("rig"):WaitForChild("PivotSocketMount"))
 local Visuals = require(script.Parent:WaitForChild("EnvironmentAssetVisuals"))
 
 local Mount = {}
 local prototypes: {[string]: Model} = {}
-local allowed = table.freeze({firewood_01 = true, embers_01 = true, cooking_pot_01 = true})
+local allowed = table.freeze({firewood_01 = true, embers_01 = true, cooking_pot_01 = true, padlock_02 = true})
+local loading: {[string]: boolean} = {}
 
 local function canonicalModel(loaded: Model): Model
     -- InsertService/AssetService may wrap the FBX model inside an importer Model.
@@ -59,7 +62,7 @@ local function prepare(model: Model, definition: any): boolean
     elseif visualCount == 1 and onlyVisual then
         model.PrimaryPart = onlyVisual
     else
-        warn("[game1][fireplace] no unambiguous authored pivot in " .. model.Name)
+        warn("[game1][house-socket-mount] no unambiguous authored pivot in " .. model.Name)
         return false
     end
     for _, part in ipairs(model:GetDescendants()) do
@@ -80,6 +83,7 @@ local function prepare(model: Model, definition: any): boolean
 end
 
 local function prototype(slug: string): Model?
+    while loading[slug] do task.wait(0.05) end
     local cached = prototypes[slug]
     if cached then return cached end
     if not allowed[slug] then return nil end
@@ -87,18 +91,23 @@ local function prototype(slug: string): Model?
     if type(definition) ~= "table" or definition.status ~= "PUBLISHED" then return nil end
     local assetId = tonumber(definition.modelAssetId)
     if not assetId or assetId <= 0 then return nil end
+    loading[slug] = true
     local ok, loaded = pcall(InsertService.LoadAsset, InsertService, assetId)
     if not ok or not loaded then
         ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, assetId)
     end
     if not ok or not loaded or not loaded:IsA("Model") then
-        warn(("[game1][fireplace] published model %s (%s) unavailable: %s")
+        loading[slug] = nil
+        warn(("[game1][house-socket-mount] published model %s (%s) unavailable: %s")
             :format(slug, tostring(assetId), tostring(loaded)))
         return nil
     end
     local model = canonicalModel(loaded :: Model)
     model.Name = slug
-    if not prepare(model, definition) then
+    local prepared, result = pcall(prepare, model, definition)
+    loading[slug] = nil
+    if not prepared or not result then
+        warn("[game1][house-socket-mount] prepare failed: " .. slug .. " " .. tostring(result))
         model:Destroy()
         return nil
     end
@@ -163,6 +172,37 @@ function Mount.Spawn(slug: string, parent: Instance, socket: Attachment, ownerHe
     end
     model.Parent = parent
     return model, innerSocket
+end
+
+-- Rigid prop with its own authored attachment (e.g. the hole of a lock).
+-- Unlike upright fireplace props, preserve the full authored orientation.
+-- Returns an unparented model so callers can publish a multi-socket set atomically.
+function Mount.CloneAligned(slug: string, sourceSocket: string, target: Attachment): Model?
+    local source = prototype(slug)
+    if not source then return nil end
+    local model = source:Clone()
+    local aligned, reason = AuthoredPropSocketMount.Align(model, sourceSocket, target)
+    if not aligned then
+        warn(('[game1][house-socket-mount] %s/%s: %s'):format(slug, sourceSocket, tostring(reason)))
+        model:Destroy()
+        return nil
+    end
+    return model
+end
+
+-- Pivot-mounted prop. The target Bone HEAD / Attachment position becomes the
+-- exact authored Model pivot, without substituting a grip or geometry bound.
+function Mount.CloneOnPivot(slug: string, target: Attachment): Model?
+    local source = prototype(slug)
+    if not source then return nil end
+    local model = source:Clone()
+    local ok, reason = PivotSocketMount.Align(model, target)
+    if not ok then
+        warn("[game1][house-socket-mount] pivot mount failed: " .. slug .. " (" .. tostring(reason) .. ")")
+        model:Destroy()
+        return nil
+    end
+    return model
 end
 
 return table.freeze(Mount)

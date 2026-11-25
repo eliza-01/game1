@@ -59,6 +59,7 @@ function game1OptionsRender(){
   game1UiDraftStatus(data);
   game1SocketRangesRender();
   game1FloraRender();
+  if(typeof game1CreationOptionsRender === "function")game1CreationOptionsRender(data.characterCreation);
   $('option-rotation-windmill-enabled').checked=data.rotations?.windmill_02?.enabled??true;
   $('option-rotation-windmill-period').value=String(data.rotations?.windmill_02?.secondsPerRevolution??3);
   $('option-world-streaming-radius').value=String(data.worldStreaming?.targetRadiusStuds??150);
@@ -66,7 +67,7 @@ function game1OptionsRender(){
   $('option-npc-overhead-save').disabled=game1OptionsState.saving;
   $('save-character-life-options').disabled=game1OptionsState.saving;
   $('save-player-jump-options').disabled=game1OptionsState.saving;
-  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save','option-rotation-save','option-flora-save']){
+  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save','option-rotation-save','option-flora-save','option-creation-save']){
     $(id).disabled=game1OptionsState.saving;
   }
 }

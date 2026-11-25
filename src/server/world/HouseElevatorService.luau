@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local Orientation = require(Shared:WaitForChild("world"):WaitForChild("HouseSpawnOrientation"))
 local Policy = require(Shared:WaitForChild("world"):WaitForChild("HouseElevatorPolicy"))
+local Floor = require(Shared:WaitForChild("world"):WaitForChild("HouseElevatorFloor"))
 local CameraSync = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterCameraSync"))
 
 local Elevator = {}
@@ -36,10 +37,13 @@ function Elevator.Move(player: Player, sockets: {[string]: Attachment}, name: st
     local character = player.Character
     local root = SpatialRoot.Get(player)
     if not character or not root then return false, "Персонаж не готов" end
+    if Floor.FromSockets(root, sockets) ~= floor then
+        return false, "Это направление лифта недоступно"
+    end
     -- The destination spawn socket owns position and heading on every floor.
     -- The elevator control socket itself is not an orientation frame.
     local targetFrame = Orientation.Upright(if target:IsA("Bone") then target.TransformedWorldCFrame
-        else target.WorldCFrame, target:IsA("Bone"), 3)
+        else target.WorldCFrame, target:IsA("Bone"), Policy.SpawnClearance)
     if not targetFrame then return false, "Не удалось определить направление персонажа" end
     character:PivotTo(targetFrame)
     local controller = character:FindFirstChildOfClass("ControllerManager")

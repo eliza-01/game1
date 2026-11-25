@@ -51,8 +51,13 @@ function UiInputGuard.IsPointerOverUi(input: InputObject?): boolean
     return false
 end
 
+function UiInputGuard.IsWorldSuspended(): boolean
+    local gui = localPlayer:FindFirstChildOfClass("PlayerGui")
+    return gui ~= nil and gui:GetAttribute("Game1CharacterSceneInputBlocked") == true
+end
+
 function UiInputGuard.BlocksWorldInput(input: InputObject?, gameProcessed: boolean?): boolean
-    if gameProcessed == true then
+    if gameProcessed == true or UiInputGuard.IsWorldSuspended() then
         return true
     end
     if UserInputService:GetFocusedTextBox() ~= nil then

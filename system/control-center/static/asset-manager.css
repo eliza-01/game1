@@ -430,3 +430,18 @@ main > .content{padding-top:14px}
   justify-content:center;min-height:39px;margin:0;padding:8px 12px;
   font-size:13px;font-weight:700;text-align:center;white-space:nowrap;
 }
+
+/* M479 · Character Creation, five ordered 3D authoring cameras. */
+.game1-creation-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.game1-creation-controls label{font-size:13px;font-weight:600;display:grid;gap:5px}
+.game1-creation-controls label:has(input[type=checkbox]){display:flex;gap:8px;align-items:center}
+.game1-creation-controls input[type=checkbox]{width:auto}
+.game1-creation-views{display:grid;gap:8px;margin:12px 0}
+.game1-creation-view{padding:12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}
+.game1-creation-view-head{display:flex;gap:10px;justify-content:space-between;align-items:center;cursor:pointer}
+.game1-creation-view-fields{display:grid;grid-template-columns:minmax(0,1fr) 80px;gap:12px;align-items:end;margin-top:12px}
+.game1-creation-view-head strong{font-size:14px;color:var(--text)}
+.game1-creation-view-head code{font-size:11px;color:var(--muted)}
+.game1-creation-view label{min-width:0;font-size:12px;color:var(--text)}
+.game1-creation-view input{width:100%;margin-top:5px;font-family:ui-monospace,monospace;font-size:12px}
+@media(max-width:800px){.game1-creation-controls{grid-template-columns:1fr}.game1-creation-view-fields{grid-template-columns:1fr}.game1-creation-view-head{flex-wrap:wrap}}

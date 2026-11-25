@@ -2017,6 +2017,39 @@
       ]
     },
     {
+      "atlasKey": "newbie_sword_01",
+      "baseKey": "newbie_sword",
+      "version": "01",
+      "variants": [
+        {
+          "id": 87,
+          "family_id": 62,
+          "width": 64,
+          "height": 256,
+          "filename": "newbie_sword_01_64x256_atlas.png",
+          "original_filename": "newbie_sword_01_64x256_atlas.png",
+          "source_path": "assets/source/texture-atlases/newbie_sword_01/64x256/newbie_sword_01_64x256_atlas.png",
+          "source_sha256": "7ab0ed7b37cb2b4e3ccc9cd024e7b9a2cdc08ea70ff67e70b4fa4a5def0700a1",
+          "uses_alpha": true,
+          "published_id": "107219803101477",
+          "published_sha256": "7ab0ed7b37cb2b4e3ccc9cd024e7b9a2cdc08ea70ff67e70b4fa4a5def0700a1",
+          "moderation_state": "Reviewing",
+          "published_at": 1795564907.0590782,
+          "created_at": 1795564903.1643083,
+          "retired_at": null,
+          "atlas_key": "newbie_sword_01",
+          "replacement_sha256": null,
+          "favorite": false,
+          "retired": false,
+          "current": true,
+          "replacementPending": false,
+          "resolution": "64x256",
+          "baseKey": "newbie_sword",
+          "version": "01"
+        }
+      ]
+    },
+    {
       "atlasKey": "npc_guard_02_gradient_512x512atlas",
       "baseKey": "npc_guard_02_gradient_512x512atlas",
       "version": "",
@@ -4542,7 +4575,12 @@
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Decoration",
-      "publishedVisualMeshes": [],
+      "publishedVisualMeshes": [
+        {
+          "meshId": "76164662538545",
+          "name": "barrel_01"
+        }
+      ],
       "aliases": []
     },
     {
@@ -10136,7 +10174,12 @@
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Leaf",
-      "publishedVisualMeshes": [],
+      "publishedVisualMeshes": [
+        {
+          "meshId": "136134072157100",
+          "name": "leaf_01"
+        }
+      ],
       "aliases": []
     },
     {
@@ -13692,7 +13735,12 @@
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Prop",
-      "publishedVisualMeshes": [],
+      "publishedVisualMeshes": [
+        {
+          "meshId": "135508825183012",
+          "name": "embers_01"
+        }
+      ],
       "aliases": []
     },
     {
@@ -14036,7 +14084,12 @@
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Prop",
-      "publishedVisualMeshes": [],
+      "publishedVisualMeshes": [
+        {
+          "meshId": "114039295718485",
+          "name": "padlock_02"
+        }
+      ],
       "aliases": []
     },
     {
@@ -17821,6 +17874,203 @@
       "aliases": []
     },
     {
+      "slug": "blossom_tree_02",
+      "name_en": "Blossom Tree 02",
+      "category": "tree",
+      "model_path": "assets/source/location-assets/tree/blossom_tree_02/model/blossom_tree_02.fbx",
+      "model_sha256": "23f7df9f65701887e7b3169c80a4103a5ec200a537ab04e482ad71b9e46a80c4",
+      "model_asset_id": "78633717590800",
+      "model_published_sha256": "23f7df9f65701887e7b3169c80a4103a5ec200a537ab04e482ad71b9e46a80c4",
+      "model_moderation_state": "Approved",
+      "destructible": false,
+      "revision": 3,
+      "created_at": 1795610409.1966875,
+      "updated_at": 1795610732.6589496,
+      "published_at": 1795610421.8650076,
+      "surface_material": "wood",
+      "alpha_enabled": 0,
+      "appearance_mode": "material",
+      "visual_material": "Plastic",
+      "visual_color": "#FFFFFF",
+      "lod1": {
+        "kind": "lod1",
+        "revision": 1,
+        "status": "PUBLISHED",
+        "sourcePath": "assets/source/location-assets/tree/blossom_tree_02/lod/lod1.fbx",
+        "sourceSha256": "0e21f7b1a774cd66645cd8c47230cc29d934e1473e88014f679c62d2cccd8302",
+        "publishedSha256": "0e21f7b1a774cd66645cd8c47230cc29d934e1473e88014f679c62d2cccd8302",
+        "modelAssetId": "71005212477453",
+        "moderationState": "Approved",
+        "reuse": null
+      },
+      "fbxAnalysis": {
+        "schemaVersion": 1,
+        "meshes": [
+          {
+            "name": "crown",
+            "armature": "",
+            "vertices": 144,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "flower",
+            "armature": "",
+            "vertices": 720,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          },
+          {
+            "name": "trunk",
+            "armature": "",
+            "vertices": 109,
+            "bones": [],
+            "influencedBones": [],
+            "role": "visual",
+            "physics": {
+              "role": "visual",
+              "canCollide": null,
+              "canQuery": null,
+              "canTouch": false,
+              "doubleSided": false,
+              "collisionFidelity": null,
+              "physicsOnly": false
+            }
+          }
+        ],
+        "hasCollider": false,
+        "armatures": [],
+        "unassignedArmatures": []
+      },
+      "rigManifest": {
+        "boneHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "bones": [],
+        "carrierName": null,
+        "inventoryHash": "4ca938f4a2ea71cb15886050b143f265878261b3dab6a0816cd703fd5e027554",
+        "parts": [
+          {
+            "name": "crown",
+            "role": "visual",
+            "vertices": 144
+          },
+          {
+            "name": "flower",
+            "role": "visual",
+            "vertices": 720
+          },
+          {
+            "name": "trunk",
+            "role": "visual",
+            "vertices": 109
+          }
+        ],
+        "rigKind": "static",
+        "schemaVersion": 2,
+        "sourceSha256": "",
+        "structuralHash": "8ba0ff0e3f98f277e3eb5b7c94dea04a83848df70e9045074db06d070e40f35e"
+      },
+      "needsFbxInspection": false,
+      "legacyStaticPublication": false,
+      "meshOptions": {
+        "crown": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#419920",
+          "visualMaterial": "Grass"
+        },
+        "flower": {
+          "appearanceMode": "material_atlas",
+          "atlasVariantId": 71,
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#FFFFFF",
+          "visualMaterial": "Plastic",
+          "texture_asset_id": "82028913618222"
+        },
+        "trunk": {
+          "appearanceMode": "material",
+          "collisionFidelity": "Box",
+          "doubleSided": false,
+          "glass": false,
+          "noCollide": true,
+          "visualColor": "#875731",
+          "visualMaterial": "Slate"
+        }
+      },
+      "collisionBlueprintNeedsCapture": false,
+      "collisionBlueprintRetainedRevision": 0,
+      "collisionBlueprintRevision": 0,
+      "collisionBlueprintPartCount": 0,
+      "collisionBlueprint": null,
+      "collisionBlueprintSha256": "",
+      "surfaceMaterial": "wood",
+      "appearanceMode": "material",
+      "visualMaterial": "Plastic",
+      "visualColor": "#FFFFFF",
+      "alphaEnabled": false,
+      "materialDefinition": {
+        "id": "wood",
+        "label": "Wood",
+        "robloxMaterial": "Wood",
+        "soundFamily": "wood"
+      },
+      "texture_path": "",
+      "texture_filename": "",
+      "texture_sha256": "",
+      "texture_asset_id": null,
+      "texture_published_sha256": "",
+      "texture_moderation_state": "",
+      "texture_reference_slug": "",
+      "atlasVariants": [],
+      "textureUsesAlpha": null,
+      "meshAtlasesCurrent": true,
+      "atlasVariantId": 0,
+      "bindingRevision": 3,
+      "atlasLegacyWarning": false,
+      "status": "PUBLISHED",
+      "category_label": "Tree",
+      "publishedVisualMeshes": [
+        {
+          "meshId": "125906236487400",
+          "name": "crown"
+        },
+        {
+          "meshId": "85071401409762",
+          "name": "trunk"
+        },
+        {
+          "meshId": "93568065178199",
+          "name": "flower"
+        }
+      ],
+      "aliases": []
+    },
+    {
       "slug": "christmas_tree_01",
       "name_en": "Christmas Tree 01",
       "category": "tree",
@@ -18412,7 +18662,12 @@
       "atlasLegacyWarning": false,
       "status": "PUBLISHED",
       "category_label": "Tree",
-      "publishedVisualMeshes": [],
+      "publishedVisualMeshes": [
+        {
+          "meshId": "124281961299450",
+          "name": "dry_tree_02"
+        }
+      ],
       "aliases": []
     },
     {
@@ -18581,8 +18836,8 @@
     }
   ],
   "summary": {
-    "registered": 41,
-    "published": 41,
+    "registered": 42,
+    "published": 42,
     "changed": 0
   }
 }

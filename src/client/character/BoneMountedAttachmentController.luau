@@ -11,6 +11,7 @@ local BoneModelMount = require(ReplicatedStorage:WaitForChild("Game1Shared")
 local BoneMountedAttachmentController = {}
 local started = false
 local cache = setmetatable({}, { __mode = "k" })
+local previews: {[Model]: boolean} = setmetatable({}, {__mode = "k"}) :: any
 
 type MountState = {
     character: Model,
@@ -73,6 +74,10 @@ local function update()
     for _, player in Players:GetPlayers() do
         if player.Character then updateCharacter(player.Character) end
     end
+    for preview in pairs(previews) do
+        if preview.Parent then updateCharacter(preview)
+        else previews[preview] = nil end
+    end
     local npcs = workspace:FindFirstChild("NPCs")
     if npcs then
         for _, npc in npcs:GetChildren() do
@@ -86,6 +91,13 @@ end
 -- The Studio timeline preview shares the exact mount method without starting
 -- a render connection. Scrubbing updates both weapons and pivot hair once.
 BoneMountedAttachmentController.UpdateCharacter = updateCharacter
+function BoneMountedAttachmentController.RegisterPreview(model: Model)
+    previews[model] = true
+    updateCharacter(model)
+end
+function BoneMountedAttachmentController.UnregisterPreview(model: Model)
+    previews[model] = nil
+end
 
 function BoneMountedAttachmentController.GetBowReleaseOrigin(character: Model): Vector3?
     local weapon = character:FindFirstChild("EquippedWeapon")

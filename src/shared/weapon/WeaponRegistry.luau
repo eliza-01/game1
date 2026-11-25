@@ -133,11 +133,11 @@ return table.freeze({
 				["AttackSpeed"] = 0,
 				["Damage"] = 11,
 			}),
-			atlasVariantId = 0,
+			atlasVariantId = 87,
 			textures = table.freeze({
-				["newbie_sword_01"] = table.freeze({
-					assetId = "127316574053686",
-					sha256 = "2ad6323ed05598ff5d88a1ffadb904e867f99eeaf7e2751557e8b349657626f1",
+				["atlas"] = table.freeze({
+					assetId = "107219803101477",
+					sha256 = "7ab0ed7b37cb2b4e3ccc9cd024e7b9a2cdc08ea70ff67e70b4fa4a5def0700a1",
 				}),
 			}),
 		}),

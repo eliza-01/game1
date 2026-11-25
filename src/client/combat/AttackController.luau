@@ -139,7 +139,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         end
     end)
     local function attemptAttack()
-
+        if UiInputGuard.IsWorldSuspended() then return end
         local player = Players.LocalPlayer
         local character = player.Character
         if not character or tostring(character:GetAttribute("LifeState") or "Alive") ~= "Alive" then

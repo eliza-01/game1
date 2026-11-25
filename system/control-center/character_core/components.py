@@ -440,3 +440,5 @@ class CharacterComponents:
         data=self.snapshot();data.pop('atlas_families',None)
         target=self.root/'assets/manifests/character-components.json';target.parent.mkdir(parents=True,exist_ok=True)
         temp=target.with_suffix('.tmp');temp.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf8');temp.replace(target)
+        callback=getattr(self, 'after_export', None)
+        if callback is not None: callback()

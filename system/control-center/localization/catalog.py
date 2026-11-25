@@ -20,6 +20,7 @@ GROUPS = {
     'language': 'Language selection', 'action': 'World interactions',
     'hud': 'HUD and feedback', 'weapon': 'Weapons', 'feedback': 'Common actions',
     'actors': 'NPC and monsters', 'items': 'Equipment names',
+    'creation': 'Character Creation', 'settings': 'Player settings',
 }
 KEY_RE = re.compile(r'^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$')
 

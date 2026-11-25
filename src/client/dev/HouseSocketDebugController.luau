@@ -8,6 +8,8 @@ local PublishedDebugAccess = require(game:GetService("ReplicatedStorage"):WaitFo
 local Workspace = game:GetService("Workspace")
 local StudioDebugDock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local Contract = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world"):WaitForChild("HouseSocketContract"))
+local ElevatorFloor = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world"):WaitForChild("HouseElevatorFloor"))
+local ElevatorPolicy = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world"):WaitForChild("HouseElevatorPolicy"))
 local CampfireContract = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world"):WaitForChild("CampfireSocketContract"))
 local SpatialRoot = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local PromptController = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("HouseSocketPromptController"))
@@ -103,7 +105,7 @@ local function startTracking()
     end)
 end
 
-local function updatePreview()
+local function updatePreview(floorInfo: TextLabel)
     local count = 0
     local active: {[Attachment]: boolean} = {}
     -- Prioritize nearest sockets instead of picking the first 100 hash keys;
@@ -121,6 +123,21 @@ local function updatePreview()
         end
     end
     table.sort(options, function(a, b) return a.distance < b.distance end)
+    floorInfo.Text = "ELEVATOR · no nearby authored route"
+    if root then
+        for _, item in ipairs(options) do
+            local source = ElevatorPolicy.Floor(item.socket.Name)
+            if not source or item.distance > Contract.MaxDebugRadius then continue end
+            local prompt = item.socket:FindFirstChild("Game1HouseInteraction")
+                or item.socket:FindFirstChild("Game1HouseInteractionAlternate")
+            if prompt and prompt:IsA("ProximityPrompt") then
+                local floor = ElevatorFloor.FromPrompt(prompt, root)
+                floorInfo.Text = ("ELEVATOR · current %s / socket %d · %s"):format(
+                    tostring(floor or "?"), source, if floor == source then "OK" else "BLOCKED")
+                break
+            end
+        end
+    end
     for _, item in ipairs(options) do
         if count >= MAX_PREVIEWS then break end
         local socket = item.socket
@@ -238,9 +255,13 @@ local function mountPanel(gui: ScreenGui)
     info.TextColor3 = COLORS.muted
     info.TextTruncate = Enum.TextTruncate.AtEnd
     info.ZIndex = 81
+    local floorInfo = label(panel, "ELEVATOR · enable RANGES", 365, 20)
+    floorInfo.Position = UDim2.fromOffset(12, 94)
+    floorInfo.TextColor3 = COLORS.muted
+    floorInfo.ZIndex = 81
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -24, 1, -114)
-    scroll.Position = UDim2.fromOffset(12, 103)
+    scroll.Size = UDim2.new(1, -24, 1, -134)
+    scroll.Position = UDim2.fromOffset(12, 123)
     scroll.BackgroundTransparency = 1
     scroll.ScrollBarThickness = 4
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -326,7 +347,7 @@ local function mountPanel(gui: ScreenGui)
                 if not response.ok then info.Text = tostring(response.error); return end
                 valueLabel.Text = tostring(response.radius) .. " studs"
                 if not campfire then PromptController.SetRadius(row.name, response.radius) end
-                if visualize then updatePreview() end
+                if visualize then updatePreview(floorInfo) end
             end
             minus.Activated:Connect(function() set(-1) end)
             plus.Activated:Connect(function() set(1) end)
@@ -355,7 +376,7 @@ local function mountPanel(gui: ScreenGui)
                     if not response.ok then info.Text = tostring(response.error); return end
                     aimValue.Text = tostring(response.hoverRadius) .. " studs"
                     previewHoverOverrides[(if campfire then "campfire:" else "house:") .. row.name] = response.hoverRadius
-                    if visualize then updatePreview() end
+                    if visualize then updatePreview(floorInfo) end
                 end
                 aimMinus.Activated:Connect(function() setAim(-1) end)
                 aimPlus.Activated:Connect(function() setAim(1) end)
@@ -385,6 +406,7 @@ local function mountPanel(gui: ScreenGui)
         panel.Visible = false
         visualize = false
         previewButton.Text = "RANGES: OFF"
+        floorInfo.Text = "ELEVATOR · enable RANGES"
         clearPreview()
     end
     togglePanel = function()
@@ -422,13 +444,14 @@ local function mountPanel(gui: ScreenGui)
         visualize = not visualize
         previewButton.Text = if visualize then "RANGES: ON" else "RANGES: OFF"
         clearPreview()
+        floorInfo.Text = "ELEVATOR · enable RANGES"
         if visualize then
             startTracking()
-            updatePreview()
+            updatePreview(floorInfo)
             local elapsed = 0
             updateConnection = RunService.Heartbeat:Connect(function(dt)
                 elapsed += dt
-                if elapsed >= 0.25 then elapsed = 0; updatePreview() end
+                if elapsed >= 0.25 then elapsed = 0; updatePreview(floorInfo) end
             end)
         end
     end)

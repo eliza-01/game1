@@ -13,6 +13,8 @@ local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("Chara
 local SpawnOrientation = require(Shared:WaitForChild("world"):WaitForChild("HouseSpawnOrientation"))
 local Door = require(script.Parent:WaitForChild("HouseDoorService"))
 local Padlock = require(script.Parent:WaitForChild("HousePadlockService"))
+local PadlockVisuals = require(script.Parent:WaitForChild("HousePadlockVisuals"))
+local ElevatorFloor = require(Shared:WaitForChild("world"):WaitForChild("HouseElevatorFloor"))
 local Elevator = require(script.Parent:WaitForChild("HouseElevatorService"))
 local CameraSync = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterCameraSync"))
 local Effects = require(script.Parent:WaitForChild("HouseSocketEffects"))
@@ -20,7 +22,7 @@ local Discovery = require(script.Parent:WaitForChild("HouseSocketDiscovery"))
 local Fireplace = require(script.Parent:WaitForChild("HouseFireplaceService"))
 
 local Service = {}
-type Entry = {sockets: {[string]: Attachment}, connections: {RBXScriptConnection}, generated: {Instance}, padlockPart: BasePart?}
+type Entry = {sockets: {[string]: Attachment}, connections: {RBXScriptConnection}, generated: {Instance}}
 local registered: {[Model]: Entry} = {}
 local started = false
 local cooldown: {[Player]: number} = {}
@@ -99,10 +101,7 @@ local function updateDoorPrompts(entry: Entry, house: Model)
             prompt.Enabled = locked
         end
     end
-    local part = entry.padlockPart
-    if part then
-        part.Transparency = if locked then 0.4 else 1
-    end
+    PadlockVisuals.SetAttached(house, entry.sockets, locked)
 end
 
 local function handleInteraction(house: Model, name: string, player: Player, key: string)
@@ -185,13 +184,14 @@ local function clear(house: Model)
     refreshQueued[house] = nil
     Door.Cleanup(house)
     Fireplace.Unregister(house)
+    PadlockVisuals.Clear(house)
     for _, connection in entry.connections do connection:Disconnect() end
     for _, generated in entry.generated do generated:Destroy() end
 end
 
 local function register(house: Model)
     if registered[house] or not Discovery.IsHouse(house) then return end
-    local entry: Entry = {sockets = {}, connections = {}, generated = {}, padlockPart = nil}
+    local entry: Entry = {sockets = {}, connections = {}, generated = {}}
     local chimneySmoke: ParticleEmitter? = nil
     registered[house] = entry
     local missing = {}
@@ -238,6 +238,7 @@ local function register(house: Model)
         if RunService:IsStudio() then prompt.RequiresLineOfSight = false end
         prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
         prompt.Style = Enum.ProximityPromptStyle.Custom
+        if definition.role == "elevator" then ElevatorFloor.BindPrompt(prompt, entry.sockets) end
         prompt.Parent = socket
         table.insert(entry.generated, prompt)
         table.insert(entry.connections, prompt.Triggered:Connect(function(player)
@@ -266,7 +267,6 @@ local function register(house: Model)
             local part = Effects.CreatePlaceholder(house, socket, definition.placeholder)
             if part then
                 table.insert(entry.generated, part)
-                if definition.role == "padlock" then entry.padlockPart = part end
             end
         elseif definition.role == "chimney" then
             chimneySmoke = Effects.StartSmoke(socket)

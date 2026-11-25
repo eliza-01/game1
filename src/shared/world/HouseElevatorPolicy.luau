@@ -55,4 +55,28 @@ function Policy.Resolve(floor: number, key: string, present: {[number]: boolean}
     return nil
 end
 
+-- Use the authored spawn height, not the height of an aimed control. The
+-- clearance is shared with the actual teleport. A midpoint is ambiguous.
+Policy.SpawnClearance = 3
+
+function Policy.CurrentFloor(rootY: number, heights: {[number]: number}, standingOffset: number): number?
+    local best: number? = nil
+    local distance = math.huge
+    local second = math.huge
+    for floor, height in heights do
+        -- Accept the root while standing or while settling after the +3 teleport.
+        local lower = height + math.min(standingOffset, Policy.SpawnClearance)
+        local upper = height + math.max(standingOffset, Policy.SpawnClearance)
+        local delta = math.max(lower - rootY, rootY - upper, 0)
+        if delta < distance then
+            second = distance
+            best, distance = floor, delta
+        elseif delta < second then
+            second = delta
+        end
+    end
+    if second - distance <= 0.15 then return nil end
+    return best
+end
+
 return table.freeze(Policy)

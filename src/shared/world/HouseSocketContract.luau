@@ -19,7 +19,7 @@ export type SocketDefinition = {
 local definitions: {SocketDefinition} = {
     {name = "door_01_handle_outside_socket", role = "door", action = "Открыть дверь", radius = 8, interact = true},
     {name = "door_01_handle_inside_socket", role = "door", action = "Открыть дверь", radius = 8, interact = true},
-    {name = "door_01_padlock_01_outside_socket", role = "padlock", action = "Снять замок", radius = 6, interact = true, placeholder = "padlock", optional = true},
+    {name = "door_01_padlock_01_outside_socket", role = "padlock", action = "Снять замок", radius = 6, interact = true, optional = true},
     {name = "door_01_padlock_01_inside_socket", role = "padlock", action = "Снять замок", radius = 6, interact = true, optional = true},
     {name = "chest_01_socket", role = "chest", action = "Открыть сундук", radius = 8, hoverRadius = 4, interact = true, placeholder = "chest"},
     {name = "elevator_01_socket", role = "elevator", hoverRadius = 5, action = "Подняться на 2 этаж", radius = 10, interact = true},

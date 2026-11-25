@@ -212,6 +212,56 @@ return table.freeze({
 		cooldownSeconds = 1.5,
 		maxActiveLeaves = 32,
 	}),
+	characterCreation = table.freeze({
+		enabled = true,
+		useStudioAnchors = true,
+		transitionSeconds = 0.9,
+		faceTransitionSeconds = 0.65,
+		desktopPanelWidthPx = 460,
+		mobilePanelWidthPx = 330,
+		spawnPoints = table.freeze({
+			male = table.freeze({
+				position = table.freeze({179.449, -314.025, 176.096}),
+				rotationDegrees = table.freeze({0, -35.501, 0}),
+			}),
+			female = table.freeze({
+				position = table.freeze({177.64, -314.025, 167.78}),
+				rotationDegrees = table.freeze({0, -93.433, 0}),
+			}),
+		}),
+		useStudioSpawnMarkers = false,
+		colorPresets = table.freeze({
+			hair = table.freeze({"#161616", "#765034", "#E2BD83"}),
+			eyes = table.freeze({"#3A6483", "#638B5A", "#795333"}),
+			eyebrows = table.freeze({"#161616", "#765034", "#E2BD83"}),
+		}),
+		materialChoices = table.freeze({
+			hair = table.freeze({"Plastic", "SmoothPlastic", "Fabric", "Neon", "Metal", "Sand"}),
+			eyes = table.freeze({"Plastic", "SmoothPlastic", "Glass", "Neon"}),
+		}),
+		views = table.freeze({
+			SelectionOverview = table.freeze({
+				cframe = table.freeze({194.504593, -304.755432, 170.894653, -0.192445204, -0.290456295, 0.937336683, 3.72528985e-09, 0.955191374, 0.295989007, -0.981307685, 0.0569616668, -0.183822021}),
+				fov = 70,
+			}),
+			MaleFullBody = table.freeze({
+				cframe = table.freeze({182.015625, -308.425964, 170.331039, -0.708430588, -0.162659898, 0.68678087, 7.45057971e-09, 0.973080039, 0.230468094, -0.705780566, 0.163270652, -0.689359605}),
+				fov = 70,
+			}),
+			FemaleFullBody = table.freeze({
+				cframe = table.freeze({185.124832, -309.109985, 166.462067, 0.395562619, -0.160015583, 0.904392183, 3.72529074e-09, 0.984705806, 0.174225584, -0.91843909, -0.0689171255, 0.389512748}),
+				fov = 70,
+			}),
+			MaleFace = table.freeze({
+				cframe = table.freeze({180.331024, -308.415009, 172.346603, -0.723042011, -0.109602585, 0.682053983, 0, 0.987333477, 0.158659428, -0.690804124, 0.114717431, -0.713883519}),
+				fov = 70,
+			}),
+			FemaleFace = table.freeze({
+				cframe = table.freeze({182.726929, -308.539276, 166.062881, 0.310615152, -0.11110054, 0.944020629, 0, 0.993145883, 0.116882019, -0.950535774, -0.036305327, 0.308486134}),
+				fov = 70,
+			}),
+		}),
+	}),
 	npcOverhead = table.freeze({
 		desktop = table.freeze({
 			nameRadiusStuds = 70,

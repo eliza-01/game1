@@ -88,7 +88,8 @@ store = CharacterStore(ROOT)
 character_components = CharacterComponents(ROOT)
 armor = ArmorCatalog(character_components)
 character_assemblies = CharacterAssemblies(ROOT, store, character_components, armor)
-# Export v2-resolved recipes after their resolver has been wired into CharacterStore.
+# Export v2-resolved recipes and preview choices after authoring changes.
+character_components.after_export = store.export
 store.export()
 
 def export_character_publication():

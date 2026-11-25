@@ -37,7 +37,7 @@ class FireplaceSocketHeadOrientationM441(unittest.TestCase):
         debug_spawn = src('src/server/world/HouseSocketService.luau')
         mount = src('src/server/world/HouseSocketAssetMount.luau')
         self.assertIn('Orientation.Upright(', elevator)
-        self.assertIn('target:IsA("Bone"), 3)', elevator)
+        self.assertIn('target:IsA("Bone"), Policy.SpawnClearance)', elevator)
         self.assertIn('SpawnOrientation.Upright(getFrame(socket), socket:IsA("Bone"), 3)', debug_spawn)
         self.assertIn('SpawnOrientation.Upright(socketFrame, fromBone, 0)', mount)
 

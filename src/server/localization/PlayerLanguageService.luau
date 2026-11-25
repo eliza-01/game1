@@ -11,7 +11,15 @@ local Service = {}
 local started = false
 local lastRequest: {[Player]: number} = {}
 local selectedDuringLoad: {[Player]: boolean} = {}
-local store = DataStoreService:GetDataStore("Game1PlayerLanguage_v1")
+-- GetDataStore itself throws in an unpublished Studio Place. Preference is
+-- optional: keep the game/UI usable when cloud persistence is unavailable.
+local storeOk, store = pcall(function()
+    return DataStoreService:GetDataStore("Game1PlayerLanguage_v1")
+end)
+if not storeOk then
+    warn("[game1][language] DataStore unavailable; using per-session language")
+    store = nil
+end
 local ATTRIBUTE = "Game1LanguageChoice"
 local READY = "Game1LanguageReady"
 
@@ -20,6 +28,10 @@ local function keyFor(player: Player): string
 end
 
 local function load(player: Player)
+    if not store then
+        if player.Parent == Players then player:SetAttribute(READY, true) end
+        return
+    end
     local ok, value = pcall(function()
         return store:GetAsync(keyFor(player))
     end)
@@ -46,6 +58,9 @@ local function save(player: Player, value: any)
     -- Per-session preference is applied even if persistence fails.
     player:SetAttribute(ATTRIBUTE, value)
     player:SetAttribute(READY, true)
+    if not store then
+        return {ok = false, error = "save_unavailable", locale = value}
+    end
     local ok, reason = pcall(function()
         store:SetAsync(keyFor(player), value)
     end)

@@ -58,6 +58,11 @@ function GameOptions.UiPresentationSettings(device: string): {[string]: any}
     return profiles[device] or fallback[device] or fallback.desktop
 end
 
+-- One authoring contract for camera composition and character selection UI.
+function GameOptions.CharacterCreationSettings(): {[string]: any}
+    return Registry.characterCreation or {enabled = false}
+end
+
 function GameOptions.PlayerJumpSettings(): {[string]: number}
     local jump = Registry.playerJump or {}
     return {

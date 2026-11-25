@@ -11,6 +11,12 @@ local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterM
 local CharacterRegistry = require(CharacterShared:WaitForChild("CharacterRegistry"))
 
 local CharacterCameraSync = require(script.Parent:WaitForChild("CharacterCameraSync"))
+local CharacterCreationGateway = require(script.Parent:WaitForChild("CharacterCreationGateway"))
+local CharacterCreationProfileStore = require(script.Parent:WaitForChild("CharacterCreationProfileStore"))
+local CharacterCreationAppearanceService = require(script.Parent:WaitForChild("CharacterCreationAppearanceService"))
+local CharacterCreationPreviewService = require(script.Parent:WaitForChild("CharacterCreationPreviewService"))
+local CharacterCreationStreamingService = require(script.Parent:WaitForChild("CharacterCreationStreamingService"))
+local GameOptions = require(Shared:WaitForChild("GameOptions"))
 local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigService"))
 local CharacterAssemblyBuilder = require(script.Parent:WaitForChild("CharacterAssemblyBuilder"))
 local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
@@ -23,6 +29,7 @@ local CharacterService = {}
 local started = false
 local spawning: { [Player]: boolean } = {}
 local deathContexts: { [Player]: any } = {}
+local creationSelections: {[Player]: any} = {}
 local createCharacter
 
 local cache = ServerStorage:FindFirstChild("game1CharacterCache") or Instance.new("Folder")
@@ -159,7 +166,7 @@ local function beginPlayerDeathIdle(player: Player)
     character:SetAttribute("ReturnToTownAvailable", true)
 end
 
-createCharacter = function(player: Player, requestedArchetypeId: string?, reviveOnSpawn: boolean?): Model?
+createCharacter = function(player: Player, requestedArchetypeId: string?, reviveOnSpawn: boolean?, appearance: any?, spawnOverride: CFrame?): Model?
     if spawning[player] then
         return nil
     end
@@ -172,7 +179,25 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
         return nil
     end
 
-    local template, loadError = templateFor(row, assetId)
+    local template: Model?
+    local loadError: string? = nil
+    local temporaryTemplate = false
+    local picked = appearance or creationSelections[player]
+    if picked then
+        local recipe, checked, problem = CharacterCreationAppearanceService.Resolve(archetype, picked)
+        if not recipe then
+            player:SetAttribute("CharacterLoadError", problem or "invalid appearance")
+            spawning[player] = nil
+            return nil
+        end
+        local ok, result = pcall(CharacterAssemblyBuilder.Build, recipe, function(componentAssetId: number)
+            return getAssetTemplate(componentAssetId, "component-" .. tostring(componentAssetId))
+        end)
+        if not ok then loadError = tostring(result)
+        else template = result; temporaryTemplate = true end
+    else
+        template, loadError = templateFor(row, assetId)
+    end
     if not template then
         player:SetAttribute("CharacterLoadError", loadError or ("Cannot load character: " .. archetype))
         warn("[game1] character spawn cancelled; previous character preserved", archetype)
@@ -219,7 +244,8 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
         character:SetAttribute("RevivePending", true)
     end
 
-    local rig = CharacterRigService.Build(character, CharacterRigService.SpawnCFrame(player), template, row == nil)
+    local rig = CharacterRigService.Build(character, spawnOverride or CharacterRigService.SpawnCFrame(player), template, row == nil)
+    if temporaryTemplate then template:Destroy() end
     if not rig then
         character:Destroy()
         spawning[player] = nil
@@ -229,6 +255,7 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
     character.Parent = Workspace
     CharacterRigService.Finish(rig)
     player.Character = character
+    if appearance then creationSelections[player] = appearance end
     require(script.Parent:WaitForChild("FaceEmotionService")).Bind(character)
     WeaponEquipService.EquipStartup(character)
 
@@ -299,6 +326,12 @@ end
 
 function CharacterService.Respawn(player: Player, archetypeId: string?): Model?
     if player.Parent ~= Players then
+        return nil
+    end
+    -- Legacy Test Loadout and other spawn callers must not bypass the
+    -- create -> select -> enter-world lifecycle when Character Creation is on.
+    if GameOptions.CharacterCreationSettings().enabled == true
+        and player:GetAttribute("CharacterCreationStatus") ~= "world" then
         return nil
     end
     local requested = tostring(archetypeId or "")
@@ -372,16 +405,57 @@ function CharacterService.Start()
     reviveAnimationFinished.Parent = remotes
     reviveAnimationFinished.OnServerEvent:Connect(finishRevive)
 
+    local preview = CharacterCreationPreviewService.new(function(asset: number): Model?
+        return getAssetTemplate(asset, "component-" .. tostring(asset))
+    end)
+    local creation = CharacterCreationGateway.new(
+        GameOptions.CharacterCreationSettings().enabled == true,
+        CharacterService.IsAvailable,
+        function(player: Player, archetype: string, selected: any?, location: CFrame?): Model?
+            return createCharacter(player, archetype, nil, selected, location)
+        end,
+        function(archetype: string, selection: any): (any?, string?)
+            local recipe, checked, reason = CharacterCreationAppearanceService.Resolve(archetype, selection)
+            if not recipe then return nil, reason end
+            return checked, nil
+        end,
+        CharacterCreationProfileStore,
+        function(player: Player)
+            destroyPreviousCharacter(player)
+        end
+    )
+    CharacterCreationStreamingService.Start(GameOptions.CharacterCreationSettings())
+    creation:Bind(remotes)
+    if GameOptions.CharacterCreationSettings().enabled == true then
+        preview:Bind(remotes)
+        task.spawn(function()
+            for _, id in ipairs({"human_male", "human_female"}) do
+                local ready, failure = preview:Prepare(id, nil)
+                if not ready then warn("[game1][character-creation] " .. id .. " preview: " .. tostring(failure)) end
+            end
+        end)
+    end
     Players.PlayerAdded:Connect(function(player)
-        task.defer(createCharacter, player)
+        creation:Join(player)
     end)
     Players.PlayerRemoving:Connect(function(player)
+        CharacterCreationProfileStore.RememberPosition(player, player.Character)
+        creation:Leave(player)
+        CharacterCreationProfileStore.ForgetSession(player)
         spawning[player] = nil
         deathContexts[player] = nil
+        creationSelections[player] = nil
     end)
     for _, player in Players:GetPlayers() do
-        task.defer(createCharacter, player)
+        creation:Join(player)
     end
+    -- Studio and production server shutdowns can skip normal leave ordering.
+    -- This is a bounded server-owned checkpoint, not a client-supplied position.
+    game:BindToClose(function()
+        for _, player in ipairs(Players:GetPlayers()) do
+            CharacterCreationProfileStore.RememberPosition(player, player.Character)
+        end
+    end)
 end
 
 return table.freeze(CharacterService)

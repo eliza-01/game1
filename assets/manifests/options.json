@@ -365,6 +365,22 @@
         "Concrete"
       ]
     },
+    "animations": {
+      "chancePercent": 35,
+      "weights": {
+        "atk": 100,
+        "bow": 100,
+        "clap": 100,
+        "hi": 100,
+        "laugh": 100,
+        "sad": 100,
+        "sp_wait": 100,
+        "unaware": 100,
+        "victory": 100,
+        "waiting": 100,
+        "yes": 100
+      }
+    },
     "views": {
       "SelectionOverview": {
         "cframe": [

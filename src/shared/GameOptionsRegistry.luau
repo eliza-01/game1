@@ -241,6 +241,22 @@ return table.freeze({
 			eyebrows = table.freeze({"Plastic", "Slate", "Fabric", "SmoothPlastic", "Sandstone", "Grass", "LeafyGrass", "Concrete"}),
 			head = table.freeze({"Plastic", "Slate", "Fabric", "SmoothPlastic", "Sandstone", "Grass", "LeafyGrass", "Concrete"}),
 		}),
+		animations = table.freeze({
+			chancePercent = 35,
+			weights = table.freeze({
+				atk = 100,
+				bow = 100,
+				clap = 100,
+				hi = 100,
+				laugh = 100,
+				sad = 100,
+				sp_wait = 100,
+				unaware = 100,
+				victory = 100,
+				waiting = 100,
+				yes = 100,
+			}),
+		}),
 		views = table.freeze({
 			SelectionOverview = table.freeze({
 				cframe = table.freeze({194.504593, -304.755432, 170.894653, -0.192445204, -0.290456295, 0.937336683, 3.72528985e-09, 0.955191374, 0.295989007, -0.981307685, 0.0569616668, -0.183822021}),

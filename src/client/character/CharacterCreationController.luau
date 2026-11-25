@@ -124,6 +124,7 @@ function Controller.Start()
     local selectionAnchors: SelectionScene.Anchors? = nil
     local bootstrapPending: {[string]: boolean} = {}
     local bootstrapProgress: {[string]: number} = {}
+    local reactionPending: {[string]: boolean} = {}
     local worldProgress: number? = nil
     local warmProgress: number? = 0
     local warming = false
@@ -286,10 +287,18 @@ function Controller.Start()
                 sceneReady = showStage(true) == true
                 if sceneReady then cover(false) else ready[id] = false; previewError[id] = true end
             end
+            if ready[id] and reactionPending[id] then
+                reactionPending[id] = nil
+                if stage == "creation" and selected == id then preview:React(id) end
+            end
             refresh()
         end)
     end
 
+    local function react(id: string)
+        if ready[id] and currentPreview then currentPreview:React(id)
+        else reactionPending[id] = true end
+    end
     local function pick(group: string, id: string)
         if stage ~= "creation" or not selected or pending or leaving or warming then return end
         local values = choices[selected]
@@ -299,26 +308,33 @@ function Controller.Start()
             -- Reset channels on hairstyle changes; extras may differ across styles.
             values.colors.hair = {}
         end
+        reactionPending[selected] = true
         refresh()
         requestPreview(selected)
     end
     local function paint(group: string, value: string, channel: string?)
         if stage ~= "creation" or not selected or pending or leaving or warming then return end
         local values = choices[selected]
+        local previous = if channel then values.colors[group][channel] else values.colors[group]
         if group == "eyes" and channel then
-            values.colors.eyes = EyeEdit.Paint(values.colors.eyes, channel, value, eyeLocks[selected].locked)
+            local pair = EyeEdit.Paint(values.colors.eyes, channel, value, eyeLocks[selected].locked)
+            if pair.l == values.colors.eyes.l and pair.r == values.colors.eyes.r then return end
+            values.colors.eyes = pair
+        elseif previous == value then return
         elseif channel then values.colors[group][channel] = value
         else values.colors[group] = value end
         refresh()
         if currentPreview then currentPreview:Colors(selected, values.colors) end
+        react(selected)
     end
     local function material(group: string, value: string)
         if stage ~= "creation" or not selected or pending or leaving or warming then return end
         local allowed = (settings.materialChoices or {})[group] or {}
-        if not table.find(allowed, value) then return end
+        if not table.find(allowed, value) or choices[selected].materials[group] == value then return end
         choices[selected].materials[group] = value
         refresh()
         if currentPreview then currentPreview:Materials(selected, choices[selected].materials) end
+        react(selected)
     end
     local function customColor(group: string, channel: string?, value: string?)
         if stage ~= "creation" or not selected or pending or leaving or warming then return end
@@ -390,6 +406,7 @@ function Controller.Start()
                     values.colors.eyes = EyeEdit.Toggle(eyeLocks[selected], values.colors.eyes, side)
                     refresh()
                     if currentPreview then currentPreview:Colors(selected, values.colors) end
+                    react(selected)
                 end)
             controls.invalidateCanvas()
         end
@@ -425,6 +442,7 @@ function Controller.Start()
     male.Activated:Connect(function()
         if pending or leaving or next(bootstrapPending) ~= nil or stage ~= "creation" then return end
         palette:Close()
+        if selected and selected ~= "human_male" then reactionPending[selected] = nil end
         selected = "human_male"; activeTab = firstCategory("human_male")
         status.Text = ""
         controls.content.CanvasPosition = Vector2.zero
@@ -433,6 +451,7 @@ function Controller.Start()
     female.Activated:Connect(function()
         if pending or leaving or next(bootstrapPending) ~= nil or stage ~= "creation" then return end
         palette:Close()
+        if selected and selected ~= "human_female" then reactionPending[selected] = nil end
         selected = "human_female"; activeTab = firstCategory("human_female")
         status.Text = ""
         controls.content.CanvasPosition = Vector2.zero
@@ -584,13 +603,14 @@ function Controller.Start()
             status.Text = ""
             bootstrapPending = {}
             bootstrapProgress = {}
+            reactionPending = {}
             Panel.SetLoading(controls, false, "", 1)
             if stage == "creation" or stage == "selection" then
                 currentPreview = Preview.new(settings, function()
                     return gui.Enabled and sceneReady and not pending and not leaving and not submitting
                         and not controls.overlay.Visible and not palette.root.Visible
                         and next(bootstrapPending) == nil
-                end)
+                end, function() return selected, stage == "creation" end)
             end
             if stage == "creation" then
                 choices.human_male = defaults("human_male")

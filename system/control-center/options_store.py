@@ -4,6 +4,7 @@ import json
 import re
 import time
 import threading
+from datetime import datetime, timezone
 from services.camera_settings import DEFAULT_CAMERA, normalize_camera
 from services.flora_effect_settings import DEFAULTS as FLORA_DEFAULTS, normalize_flora, validate_residents
 from services.character_creation_settings import DEFAULTS as CREATION_DEFAULTS, normalize_character_creation
@@ -471,6 +472,10 @@ class OptionsStore:
             creation['materialChoices'] = deepcopy(CREATION_DEFAULTS['materialChoices'])
             changed = True
         normalized_creation = normalize_character_creation({}, creation)
+        if 'animations' not in creation:
+            backup = self.manifest_path.with_name('options.json.pre-m505-'
+                + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.bak')
+            backup.write_bytes(self.manifest_path.read_bytes())
         if normalized_creation != payload['characterCreation']:
             payload['characterCreation'] = normalized_creation
             changed = True

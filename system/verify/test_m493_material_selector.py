@@ -38,6 +38,7 @@ class FaceMaterialsM493(unittest.TestCase):
         creation['materialChoices'] = {'hair':['Plastic','Sand'], 'eyes':['Plastic','Metal']}
         expected = deepcopy(data)
         expected['characterCreation']['materialChoices'] = deepcopy(DEFAULTS['materialChoices'])
+        expected['characterCreation'].setdefault('animations', deepcopy(DEFAULTS['animations']))
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             path = root/'assets/manifests/options.json'

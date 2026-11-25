@@ -16,6 +16,8 @@ CAMERA_VIEWS = {'SelectionOverview': {'cframe': [194.504593, -304.755432, 170.89
 FACE_MATERIALS = ('Plastic', 'Slate', 'Fabric', 'SmoothPlastic', 'Sandstone', 'Grass', 'LeafyGrass', 'Concrete')
 MATERIAL_GROUPS = ('hair', 'eyes', 'eyebrows', 'head')
 
+REACTION_GROUPS = ('atk', 'bow', 'clap', 'hi', 'laugh', 'sad', 'sp_wait', 'unaware', 'victory', 'waiting', 'yes')
+
 DEFAULTS = {
     'enabled': False,  # opt-in until Studio Play composition is verified
     'useStudioAnchors': True,
@@ -34,6 +36,7 @@ DEFAULTS = {
         'eyebrows': ['#161616', '#765034', '#E2BD83'],
     },
     'materialChoices': {group: list(FACE_MATERIALS) for group in MATERIAL_GROUPS},
+    'animations': {'chancePercent': 35, 'weights': {group: 100 for group in REACTION_GROUPS}},
     'views': CAMERA_VIEWS,
 }
 
@@ -53,6 +56,16 @@ def normalize_character_creation(value, base=None):
         elif key in ('desktopPanelWidthPx', 'mobilePanelWidthPx'):
             if type(item) is not int or not 240 <= item <= 540:
                 raise ValueError(f'characterCreation.{key}: expected integer 240..540')
+        elif key == 'animations':
+            if not isinstance(item, dict) or set(item) != {'chancePercent', 'weights'}:
+                raise ValueError('characterCreation.animations: chancePercent/weights required')
+            chance, weights = item['chancePercent'], item['weights']
+            if type(chance) is not int or not 0 <= chance <= 100:
+                raise ValueError('characterCreation.animations.chancePercent: integer 0..100 required')
+            if not isinstance(weights, dict) or set(weights) != set(REACTION_GROUPS) or any(
+                    type(weight) is not int or not 0 <= weight <= 100 for weight in weights.values()):
+                raise ValueError('characterCreation.animations.weights: integer 0..100 for each reaction required')
+            item = {'chancePercent': chance, 'weights': {group: weights[group] for group in REACTION_GROUPS}}
         elif key == 'colorPresets':
             if not isinstance(item, dict) or set(item) != {'hair', 'eyes', 'eyebrows'}:
                 raise ValueError('characterCreation.colorPresets: hair/eyes/eyebrows required')

@@ -46,4 +46,11 @@ for(const group of ['hair','eyes','eyebrows','head']){
   assert.equal(node('option-creation-materials-'+group).value,faceMaterials.join(', '));
   assert.equal(JSON.stringify(saved.characterCreation.materialChoices[group]),JSON.stringify(faceMaterials));
 }
+assert.equal(saved.characterCreation.animations.chancePercent,settings.animations?.chancePercent??35);
+assert.equal(saved.characterCreation.animations.weights.bow,settings.animations?.weights?.bow??100);
+node('option-creation-animation-chance').value='75';
+node('option-creation-animation-unaware').value='0';
+node('option-creation-save').onclick();
+assert.equal(saved.characterCreation.animations.chancePercent,75);
+assert.equal(saved.characterCreation.animations.weights.unaware,0);
 console.log('m479 character creation options ui passed');

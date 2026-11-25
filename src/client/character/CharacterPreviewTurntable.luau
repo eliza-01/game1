@@ -1,5 +1,5 @@
 --!strict
--- Local presentation only: horizontal drag on a visible preview, not the camera.
+-- Local presentation only: horizontal drag in the free scene, not the camera.
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -66,7 +66,31 @@ local function pick(models: {[string]: Model}, position: Vector2): string?
     return result
 end
 
-function Turntable.new(models: {[string]: Model}, enabled: () -> boolean)
+-- In the overview, a drag outside both models controls the closest visible
+-- podium by screen position. A selected avatar always takes precedence.
+function Turntable.Target(models: {[string]: Model}, position: Vector2, selected: string?, freeScene: boolean): string?
+    if freeScene and selected then
+        local model = models[selected]
+        return if model and model.Parent then selected else nil
+    end
+    local id = pick(models, position)
+    if id or not freeScene then return id end
+    local camera = Workspace.CurrentCamera
+    if not camera then return nil end
+    local best = math.huge
+    for key, model in pairs(models) do
+        if model.Parent then
+            local point = camera:WorldToViewportPoint(model:GetPivot().Position)
+            if point.Z > 0 then
+                local distance = (Vector2.new(point.X, point.Y) - position).Magnitude
+                if distance < best then best, id = distance, key end
+            end
+        end
+    end
+    return id
+end
+
+function Turntable.new(models: {[string]: Model}, enabled: () -> boolean, freeTarget: (() -> (string?, boolean))?)
     local self = setmetatable({models = models, enabled = enabled, rotations = {} :: {[string]: Rotation},
         connections = {} :: {RBXScriptConnection}, drag = nil :: InputObject?, dragId = nil :: string?, lastX = 0}, Turntable)
     local function connect(signal: RBXScriptSignal, callback: any)
@@ -78,7 +102,10 @@ function Turntable.new(models: {[string]: Model}, enabled: () -> boolean)
         if kind ~= Enum.UserInputType.MouseButton1 and kind ~= Enum.UserInputType.Touch then return end
         if UserInputService:GetFocusedTextBox() or UiInputGuard.IsPointerOverUi(input) then return end
         local position = Vector2.new(input.Position.X, input.Position.Y)
-        local id = pick(models, position)
+        local selected: string? = nil
+        local freeScene = false
+        if freeTarget then selected, freeScene = freeTarget() end
+        local id = Turntable.Target(models, position, selected, freeScene)
         if not id or not self.rotations[id] then return end
         self.drag, self.dragId, self.lastX = input, id, position.X
     end)

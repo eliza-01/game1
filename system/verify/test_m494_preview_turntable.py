@@ -10,12 +10,13 @@ def source(name):
 
 
 class PreviewTurntableM494(unittest.TestCase):
-    def test_input_capture_only_on_preview_and_not_ui(self):
+    def test_input_capture_free_scene_and_not_ui(self):
         code = source('CharacterPreviewTurntable')
         self.assertIn('Enum.UserInputType.MouseButton1 and kind ~= Enum.UserInputType.Touch', code)
         self.assertIn('if input ~= drag then return end', code)
         self.assertIn('UiInputGuard.IsPointerOverUi(input)', code)
-        self.assertIn('local id = pick(models, position)', code)
+        self.assertIn('Turntable.Target(models, position, selected, freeScene)', code)
+        self.assertIn('if freeScene and selected then', code)
         self.assertIn('part.LocalTransparencyModifier < 0.99', code)
         self.assertIn('Turntable.HitDistance(part, ray)', code)
         self.assertNotIn('CanQuery = true', code)

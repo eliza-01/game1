@@ -7,6 +7,7 @@ const game1CreationViews = [
   ['FemaleFace','05','Female · лицо']
 ];
 const creationId = id => document.getElementById(id);
+const creationReactions = ['atk','bow','clap','hi','laugh','sad','sp_wait','unaware','victory','waiting','yes'];
 function game1CreationOptionsRender(settings){
   const value=settings||{};
   creationId('option-creation-enabled').checked=value.enabled===true;
@@ -27,6 +28,8 @@ function game1CreationOptionsRender(settings){
   creationId('option-creation-face-transition').value=String(value.faceTransitionSeconds??0.65);
   creationId('option-creation-width-desktop').value=String(value.desktopPanelWidthPx??460);
   creationId('option-creation-width-mobile').value=String(value.mobilePanelWidthPx??330);
+  creationId('option-creation-animation-chance').value=String(value.animations?.chancePercent??35);
+  for(const key of creationReactions) creationId('option-creation-animation-'+key).value=String(value.animations?.weights?.[key]??100);
   creationId('option-creation-views').innerHTML=game1CreationViews.map(([key,number,name])=>{
     const row=value.views?.[key]||{};
     return `<details class="game1-creation-view"><summary class="game1-creation-view-head"><strong>${number} · ${name}</strong><code>${key} · FOV ${row.fov??70}°</code></summary>`+
@@ -72,7 +75,9 @@ function game1CreationOptionsRead(){
       throw Error('materials '+channel+': unique valid materials with Plastic required');
     materialChoices[channel]=materials;
   }
-  return {colorPresets,materialChoices,spawnPoints,useStudioSpawnMarkers:creationId('option-creation-use-markers').checked,
+  const animations={chancePercent:number('option-creation-animation-chance',0,100,true),
+    weights:Object.fromEntries(creationReactions.map(key=>[key,number('option-creation-animation-'+key,0,100,true)]))};
+  return {animations,colorPresets,materialChoices,spawnPoints,useStudioSpawnMarkers:creationId('option-creation-use-markers').checked,
     enabled:creationId('option-creation-enabled').checked,
     useStudioAnchors:creationId('option-creation-use-anchors').checked,
     transitionSeconds:number('option-creation-transition',0.1,5),

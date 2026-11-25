@@ -12,6 +12,7 @@ local BoneModelMount = require(Shared:WaitForChild("rig"):WaitForChild("BoneMode
 local Mounts = require(script.Parent:WaitForChild("BoneMountedAttachmentController"))
 local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
 local Turntable = require(script.Parent:WaitForChild("CharacterPreviewTurntable"))
+local Reactions = require(script.Parent:WaitForChild("CharacterCreationReactions"))
 local Controller = {}
 Controller.__index = Controller
 
@@ -115,7 +116,7 @@ local function playIdle(model: Model, archetype: string): AnimationTrack?
     return nil
 end
 
-function Controller.new(settings: any, canRotate: () -> boolean)
+function Controller.new(settings: any, canRotate: () -> boolean, freeTarget: (() -> (string?, boolean))?)
     local localFolder = Instance.new("Folder")
     localFolder.Name = "Game1CharacterCreationLocalPreviews"
     localFolder.Parent = Workspace
@@ -123,7 +124,8 @@ function Controller.new(settings: any, canRotate: () -> boolean)
     local models: {[string]: Model} = {}
     return setmetatable({settings = settings, folder = localFolder, models = models,
         hidden = hidden, tracks = {} :: {[string]: AnimationTrack},
-        turntable = Turntable.new(models, canRotate)}, Controller)
+        reactions = Reactions.new(settings.animations),
+        turntable = Turntable.new(models, canRotate, freeTarget)}, Controller)
 end
 
 local function templateReady(template: Model): boolean
@@ -250,7 +252,7 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
     local previous = self.models[archetype]
     self.models[archetype] = instance
     self.tracks[archetype] = track
-    if previous then Mounts.UnregisterPreview(previous); previous:Destroy() end
+    if previous then self.reactions:Remove(previous); Mounts.UnregisterPreview(previous); previous:Destroy() end
     for part, transparency in pairs(visibility) do part.LocalTransparencyModifier = transparency end
     return true
 end
@@ -258,6 +260,7 @@ end
 function Controller:KeepOnly(archetype: string)
     for id, model in pairs(self.models) do
         if id ~= archetype then
+            self.reactions:Remove(model)
             Mounts.UnregisterPreview(model)
             model:Destroy()
             self.models[id] = nil
@@ -277,7 +280,13 @@ function Controller:Materials(archetype: string, materials: any)
     if model then applyMaterials(model, materials) end
 end
 
+function Controller:React(archetype: string)
+    local model = self.models[archetype]
+    if model then self.reactions:Play(model, archetype) end
+end
+
 function Controller:Destroy()
+    self.reactions:Destroy()
     self.turntable:Destroy()
     for _, model in pairs(self.models) do Mounts.UnregisterPreview(model) end
     self.folder:Destroy()

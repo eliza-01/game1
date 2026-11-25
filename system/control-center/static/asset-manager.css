@@ -445,3 +445,16 @@ main > .content{padding-top:14px}
 .game1-creation-view label{min-width:0;font-size:12px;color:var(--text)}
 .game1-creation-view input{width:100%;margin-top:5px;font-family:ui-monospace,monospace;font-size:12px}
 @media(max-width:800px){.game1-creation-controls{grid-template-columns:1fr}.game1-creation-view-fields{grid-template-columns:1fr}.game1-creation-view-head{flex-wrap:wrap}}
+
+/* M505 · compact, collapsed creation sections */
+.game1-creation-options .game1-creation-subsection{padding:8px 10px;margin:0 0 6px}
+.game1-creation-subsection>summary{cursor:pointer;font-size:13px}
+.game1-creation-subsection .game1-creation-controls{gap:8px;margin:8px 0 0}
+.game1-creation-subsection .game1-creation-views{gap:6px;margin:8px 0 0}
+.game1-creation-subsection .game1-creation-view{padding:8px}
+.game1-creation-subsection .game1-creation-view-fields{margin-top:6px;gap:8px}
+.game1-creation-animation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:8px}
+.game1-creation-animation-grid label{font-size:12px}
+.game1-creation-animation-grid input{margin-top:3px}
+
+.game1-creation-points .game1-creation-view-fields{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}

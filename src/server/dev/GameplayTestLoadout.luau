@@ -6,6 +6,8 @@ local Stats = require(script.Parent.Parent:WaitForChild("character"):WaitForChil
 local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
 local Appearance = require(script.Parent:WaitForChild("GameplayTestAppearance"))
 local Healing = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterHealing"))
+local RunService = game:GetService("RunService")
+local ProgressionView = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterProgressionView"))
 local Critical = require(Shared:WaitForChild("balance"):WaitForChild("CriticalStats"))
 local Loadout = {}
 local sessions: {[Player]: any} = {}
@@ -18,6 +20,10 @@ function Loadout.Get(player: Player): any?
     return sessions[player]
 end
 function Loadout.Set(player: Player, selection: any?)
+    if selection and selection.xp == nil then
+        selection.xp = Balance.Threshold(selection.level)
+        selection.gold = 0
+    end
     sessions[player] = selection
     player:SetAttribute("Game1GameplayTestActive", selection ~= nil)
 end
@@ -95,7 +101,7 @@ function Loadout.Apply(player: Player, character: Model): (boolean, string?)
     local selection = sessions[player]
     if not selection or character:GetAttribute("GameplayTestKind") ~= "player" then return false, "Not in Gameplay Test" end
     applyRecovery(character, selection)
-    Stats.SetProgressionLevel(character, selection.level)
+    Stats.SetProgressionLevel(character, Balance.LevelForXP(selection.xp))
     Stats.SetModifierSource(character, "gameplay-test-armor", {MaxHP=selection.armor.hp})
     Appearance.Tint(character, Balance.Grade.Color(selection.armor.level), true)
     local ok, reason = true, nil
@@ -125,11 +131,23 @@ function Loadout.Apply(player: Player, character: Model): (boolean, string?)
     character:SetAttribute("GameplayTestUpgrade", selection.upgrade)
     character:SetAttribute("WeaponLoadoutSource", "gameplay-test")
     character:SetAttribute("HP", character:GetAttribute("MaxHP"))
-    -- HUD reflects the selected level, not the persisted XP of another level.
-    character:SetAttribute("XP", Balance.Threshold(selection.level))
-    character:SetAttribute("XPIntoLevel", 0)
-    character:SetAttribute("XPNext", Balance.Level(selection.level).xpNext)
-    character:SetAttribute("Gold", 0)
+    ProgressionView.Publish(character, selection.xp, selection.gold)
     return ok, reason
+end
+-- Only normal map kills earn rewards; no group/Guided or Skilled farming.
+function Loadout.Reward(player: Player, character: Model, target: Model)
+    local selection = sessions[player]
+    if not RunService:IsStudio() or not selection or player.Character ~= character
+        or character:GetAttribute("GameplayTestKind") ~= "player"
+        or character:GetAttribute("Game1GameplayTestOwner") ~= player.UserId
+        or target:GetAttribute("Game1GameplayTestOwner") ~= player.UserId
+        or target:GetAttribute("GameplayTestKind") ~= "zone"
+        or character:GetAttribute("GameplayGuideTrial") == true then return end
+    local row = Balance.Monster(tostring(target:GetAttribute("MonsterBalanceId") or ""))
+    if not row or row.skills then return end
+    selection.xp = Balance.NormalizeXP(selection.xp + Balance.NormalizeXP(target:GetAttribute("RewardXP")))
+    selection.gold = Balance.NormalizeGold(selection.gold + Balance.NormalizeGold(target:GetAttribute("RewardGold")))
+    selection.level = Balance.LevelForXP(selection.xp)
+    ProgressionView.Publish(character, selection.xp, selection.gold)
 end
 return table.freeze(Loadout)

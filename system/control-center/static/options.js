@@ -283,6 +283,9 @@ function game1HealthRender(){
   $('health-ui-desktop').classList.toggle('primary',dev==='desktop');
   $('health-ui-mobile').classList.toggle('primary',dev==='mobile');
   $('option-published-debug-buttons').checked=data.debugUi?.[dev]?.showPublishedControls===true;
+  $('option-start-in-hub').checked=data.debugUi?.startInHub===true;
+  $('option-started-language').checked=data.debugUi?.startedLanguage===true;
+  $('option-start-locale').value=data.debugUi?.startLocale||'auto';
   if(!values)return;
   const el=$('health-ui-fields');
   el.innerHTML=Object.entries(GAME1_HP_FIELDS).map(([section,fields])=>{
@@ -342,7 +345,7 @@ $('health-ui-import').onclick=()=>{
 };
 $('option-published-debug-save').onclick=()=>{
   const device=game1OptionsState.hpDevice;
-  game1OptionsSave({debugUi:{[device]:{showPublishedControls:$('option-published-debug-buttons').checked}}},`${device} published TestPlace debug visibility saved`);
+  game1OptionsSave({debugUi:{[device]:{showPublishedControls:$('option-published-debug-buttons').checked},startInHub:$('option-start-in-hub').checked,startedLanguage:$('option-started-language').checked,startLocale:$('option-start-locale').value}},'Debug settings saved');
 };
 
 // M443 · editable device buffers; saving one does not overwrite the other.

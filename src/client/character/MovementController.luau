@@ -447,6 +447,9 @@ local function applyMovementMode(walkModifierActive: boolean, backwardActive: bo
 				nextMode
 			)
 		end
+        if not attackActive and nextMode == "Run" and character:GetAttribute("GameplayTestHubRunMultiplier") == 3 then
+            controllerManager.BaseMoveSpeed *= 3
+        end
         controllerManager.BaseMoveSpeed *= math.clamp(tonumber(character:GetAttribute("SkillMoveMultiplier")) or 1,0,1)
 	end
 	if character and movementMode ~= nextMode then

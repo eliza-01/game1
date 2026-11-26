@@ -184,6 +184,8 @@ local function updateVisibility()
     -- not lose its HP just because the collider briefly misses a ray sample.
     local lockedMonster = CameraController.AutoAimTarget()
     local currentGui = player:FindFirstChildOfClass("PlayerGui")
+    local playerZone = if character then character:GetAttribute("GameplayTestZone") else nil
+    local playerLevel = if character then tonumber(character:GetAttribute("Level")) or 1 else 1
     for model, view in pairs(monsterViews) do
         -- Some spawn/reset paths remove BillboardGui while the monster Model
         -- stays in Workspace. Recover from missing adornee or destroyed GUI.
@@ -200,8 +202,17 @@ local function updateVisibility()
         local root = anchorFor(model)
         local delta = if playerRoot and root then root.Position - playerRoot.Position else nil
         local inRange = delta ~= nil and delta:Dot(delta) <= radiusSquared
-        view.SetVisible(alive and inRange
-            and (HealthUiSettings.ShowAllMonsters() or focused or attackingUs))
+        local zone = model:GetAttribute("GameplayTestZone")
+        local release = typeof(zone) == "number" and zone <= 6
+        local sameZone = release and playerZone == zone and model:GetAttribute("Game1GameplayTestOwner") == player.UserId
+        view.SetIcon(alive and sameZone, playerLevel)
+        if release then
+            -- Portraits across the current zone; titles only nearby; HP when engaged.
+            view.SetSegments(alive and sameZone and inRange, alive and sameZone and inRange
+                and (HealthUiSettings.ShowAllMonsters() or focused or attackingUs))
+        else
+            view.SetVisible(alive and inRange and (HealthUiSettings.ShowAllMonsters() or focused or attackingUs))
+        end
     end
     -- Rebind after the iteration: never mutate the live hash while visiting it.
     for _, model in ipairs(detachedMonsters) do

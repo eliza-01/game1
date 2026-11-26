@@ -121,7 +121,10 @@
     },
     "mobile": {
       "showPublishedControls": true
-    }
+    },
+    "startInHub": true,
+    "startedLanguage": false,
+    "startLocale": "auto"
   },
   "worldStreaming": {
     "targetRadiusStuds": 150

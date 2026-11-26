@@ -48,6 +48,7 @@
 <button id="nav-lod-manager" class="asset-section" type="button"><b>LOD Manager</b><small>scan · snapshots · readiness</small></button>
 <button id="nav-database" class="asset-section" type="button"><b>database</b><small>balance · asset history</small></button>
 <div id="database-nav" class="database-subnav" hidden><button id="nav-balance" type="button" class="database-subnav-item">Balance</button><button id="nav-skills" type="button" class="database-subnav-item">Skills</button><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button><button id="nav-balance-logs" type="button" class="database-subnav-item">Logs</button></div>
+<button id="nav-interface" class="asset-section" type="button"><b>interface</b><small>icons · monsters</small></button>
 <button id="nav-atlas" class="asset-section" type="button"><b>atlas</b><small>variants · consumers · retirement</small></button>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-mechanics" class="asset-section" type="button"><b>mechanics</b><small>tech cards · sockets · scripts</small></button>
@@ -436,6 +437,12 @@
 </div>
 </div>
 
+<div id="interface-view" hidden>
+<section class="panel" style="padding:20px"><span class="eyebrow">Interface / Icons</span><h3>Monsters</h3>
+<p class="muted">Pixel atlas · 16 × 16 px per tile · local source · gameplay preview</p>
+<div id="monster-icon-atlas-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:10px"></div>
+<p><a href="monster-icons/atlas.png" download="monster-icons.png">Download PNG atlas</a> · <a href="monster-icons/catalog.json" download>Tile index</a></p>
+</section></div>
 <div id="options-view" hidden>
 <div class="panel hero">
 <div><span class="eyebrow">common runtime settings · shared gameplay</span><h2>options</h2><p>project-wide settings that are not owned by one character, monster, weapon or animation clip.</p></div>
@@ -650,7 +657,10 @@
   <div class="section-title"><div><span>published TestPlace</span><h3>Debug and test controls</h3></div></div>
   <small class="hint">Published TestPlace only; authorized developer accounts.</small>
   <label class="game1-published-debug-toggle"><input type="checkbox" id="option-published-debug-buttons">Show debug / test buttons in published TestPlace</label>
-  <div class="actions"><button id="option-published-debug-save" class="primary" type="button">Save debug visibility</button></div>
+  <label class="game1-published-debug-toggle"><input type="checkbox" id="option-start-in-hub">Start in Hub <small>· Studio Gameplay Test</small></label>
+  <label class="game1-published-debug-toggle"><input type="checkbox" id="option-started-language">Started language</label>
+  <label>Start language <select id="option-start-locale"><option value="auto">Saved / device</option><option value="ru-ru">Русский</option><option value="en-us">English</option><option value="de-de">Deutsch</option><option value="zh-cn">简体中文</option><option value="it-it">Italiano</option><option value="es-es">Español</option><option value="fr-fr">Français</option><option value="pt-br">Português (Brasil)</option><option value="ja-jp">日本語</option><option value="ko-kr">한국어</option></select></label>
+  <div class="actions"><button id="option-published-debug-save" class="primary" type="button">Save debug settings</button></div>
 <hr class="card-separator">
 <details id="skilled-monsters-disclosure"><summary>Skilled Monsters · Studio gameplay test</summary>
 <div class="actions"><button id="skilled-reload" type="button">Refresh</button><button id="skilled-save" class="primary" type="button" disabled>Save test profiles</button></div>
@@ -1244,7 +1254,8 @@
 <div id="app-busy-overlay" class="app-busy-overlay" hidden><div class="app-busy-card"><div class="app-busy-spinner" aria-hidden="true"></div><div id="app-busy-text">Processing…</div></div></div>
 <script src="publication-descriptions.js?v=1"></script>
 <script src="asset-name-defaults.js?v=437"></script>
-<script src="character-assets.js?v=521"></script>
+<script src="character-assets.js?v=543"></script>
+<script src="interface-icons.js?v=543"></script>
 <script src="asset-section-order.js?v=1"></script>
 <script src="character-animation-ui.js?v=474"></script>
 <script src="animation-publish-queue-core.js?v=474"></script>
@@ -1285,7 +1296,7 @@
 <script src="skill-editor.js?v=531"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=479"></script>
+<script src="options.js?v=543"></script>
 <script src="character-creation-options.js?v=505"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>

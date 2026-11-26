@@ -304,6 +304,9 @@ return table.freeze({
 		mobile = table.freeze({
 			showPublishedControls = true,
 		}),
+		startInHub = true,
+		startedLanguage = false,
+		startLocale = "auto",
 	}),
 	characterAnimations = table.freeze({
 		deathPlaybackPercent = 50,

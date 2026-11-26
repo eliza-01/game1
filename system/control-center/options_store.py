@@ -263,10 +263,22 @@ def normalize_monster_ai(change, base=None):
 
 
 def normalize_debug_ui(change, base=None):
-    if not isinstance(change, dict) or set(change) - {'desktop', 'mobile'}:
+    if not isinstance(change, dict) or set(change) - {'desktop', 'mobile', 'startInHub', 'startedLanguage', 'startLocale'}:
         raise ValueError('debugUi expects desktop/mobile profiles')
-    result = deepcopy(base or DEFAULT_PAYLOAD['debugUi'])
+    result = deepcopy(DEFAULT_PAYLOAD['debugUi'])
+    if base:
+        result.update(deepcopy(base))
     for device, settings in change.items():
+        if device in ('startInHub', 'startedLanguage'):
+            if type(settings) is not bool:
+                raise ValueError(f'debugUi.{device} must be boolean')
+            result[device] = settings
+            continue
+        if device == 'startLocale':
+            if settings not in ('auto','ru-ru','en-us','de-de','zh-cn','it-it','es-es','fr-fr','pt-br','ja-jp','ko-kr'):
+                raise ValueError('debugUi.startLocale unsupported')
+            result[device] = settings
+            continue
         if not isinstance(settings, dict) or set(settings) != {'showPublishedControls'} or type(settings['showPublishedControls']) is not bool:
             raise ValueError('debugUi.showPublishedControls must be boolean')
         result[device] = deepcopy(settings)
@@ -306,7 +318,7 @@ DEFAULT_PAYLOAD = {
     "monsterAi": {"noDamageReturnSeconds": 30},
     "worldStreaming": {"targetRadiusStuds": 150},
     "playerJump": {"heightMultiplier": 2.0, "descentTimeMultiplier": 2.0},
-    "debugUi": {"desktop": {"showPublishedControls": False}, "mobile": {"showPublishedControls": False}},
+    "debugUi": {"desktop": {"showPublishedControls": False}, "mobile": {"showPublishedControls": False}, "startInHub": False, "startedLanguage": False, "startLocale": "auto"},
     "cameraPresets": [],
     "activeCameraPreset": "",
     "characterAnimations": {
@@ -450,6 +462,10 @@ class OptionsStore:
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
+        normalized_debug = normalize_debug_ui(payload['debugUi'])
+        if normalized_debug != payload['debugUi']:
+            payload['debugUi'] = normalized_debug
+            changed = True
         for field in ('cameraPresets', 'activeCameraPreset'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])

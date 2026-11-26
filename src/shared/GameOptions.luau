@@ -71,6 +71,15 @@ function GameOptions.PlayerJumpSettings(): {[string]: number}
     }
 end
 
+function GameOptions.StartedLanguage(): string?
+    local debugUi = Registry.debugUi or {}
+    return if debugUi.startedLanguage == true then debugUi.startLocale or "auto" else nil
+end
+
+function GameOptions.StartInGameplayHub(): boolean
+    return (Registry.debugUi or {}).startInHub == true
+end
+
 function GameOptions.ShowPublishedDebugControls(device: string): boolean
     local settings = (Registry.debugUi or {})[device] or {}
     return settings.showPublishedControls == true

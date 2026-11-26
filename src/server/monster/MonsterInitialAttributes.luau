@@ -53,10 +53,16 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     if record.testOwner then
         model:SetAttribute("Game1GameplayTestOwner", record.testOwner)
         model:SetAttribute("GameplayTestKind", record.testKind)
+        model:SetAttribute("GameplayTestZone", record.testZone)
         aggressive = record.testKind == "zone" -- guided groups are armed atomically after readiness
+        if record.testKind == "zone" and type(record.testAggressive) == "boolean" then
+            aggressive = record.testAggressive
+        end
     end
     local aggroRadius = math.max(0, finite(behavior.aggroRadiusStuds, 16))
-    if record.testOwner then aggroRadius = if record.testKind == "zone" then 30 else 120 end
+    if record.testOwner then
+        aggroRadius = if record.testKind == "zone" then (record.testAggroRadius or 30) else 120
+    end
     local attackRadius = if balance then balance.attackRange else math.max(0, finite(behavior.attackRadiusStuds, 3))
     model:SetAttribute("MonsterCombatType", if balance then balance.type else "melee")
     -- Leash belongs to this spawn record, never to the monster species.

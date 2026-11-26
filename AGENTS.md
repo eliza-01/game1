@@ -25,7 +25,10 @@
 6. Verify `git apply --check` against the actual supplied project version. Deliver changes as a patch from the game1 project root with one single PowerShell block; restart **only** services affected. Do not restart Rojo or open new consoles by default.
 7. In every handoff describe boundaries changed, migrations, observed tests, untested runtime scenarios and any regressions/risks. Never claim full Studio validation from static tests.
 
-## Current documentation and remaining decomposition (M189 baseline; M439 review 2026-11-22)
+## Current documentation and remaining decomposition (M189 baseline; M541 gameplay review 2026-11-26)
+
+- Current gameplay source baseline: M541 (`game1_diag_2026-11-26_19-42-21.zip` + M541 patch); documentation-only M542 does not bump RuntimeVersion. See [`M541 Hub / World GP`](docs/workflows/M541_HUB_WORLD_PROGRESSION_RU.md) and [Design KBN-0031](docs/kanban/specs/KBN-0031.md).
+- GP rewards are transient and restricted to owned ordinary zone kills in Studio. Never route them to account persistence; Guided/Group/Skilled must remain reward-free. Keep `CharacterProgressionView` shared rather than duplicate progression formulae. Hub ×3 is a temporary location policy, not a permanent stat. No class lock; release goals in Design are proposals, not published content.
 
 M189 separates Character and Monster/NPC Animation Python store responsibilities without changing public contracts; see `docs/workflows/CHARACTER_ANIMATION_STORES_R3_M189_RU.md`. R3 is not finished. The M83 audit is **historical**. M85–M105 implemented the bootstrap, Host Agent, Monster AI/Spawner, Hitbox/Combat and Studio Bridge extraction steps. Do **not** repeat their original "not yet implemented" work. The live documents are:
 

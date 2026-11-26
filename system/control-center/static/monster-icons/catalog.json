@@ -1,0 +1,163 @@
+{
+  "width": 96,
+  "height": 80,
+  "tileSize": 16,
+  "tiles": [
+    {
+      "name": "Toad",
+      "x": 0,
+      "y": 0,
+      "size": 16
+    },
+    {
+      "name": "Mandragora",
+      "x": 16,
+      "y": 0,
+      "size": 16
+    },
+    {
+      "name": "Wooden Guardian",
+      "x": 32,
+      "y": 0,
+      "size": 16
+    },
+    {
+      "name": "Living Scarecrow",
+      "x": 48,
+      "y": 0,
+      "size": 16
+    },
+    {
+      "name": "Wolf",
+      "x": 64,
+      "y": 0,
+      "size": 16
+    },
+    {
+      "name": "Zombie",
+      "x": 80,
+      "y": 0,
+      "size": 16
+    },
+    {
+      "name": "Giant Spider",
+      "x": 0,
+      "y": 16,
+      "size": 16
+    },
+    {
+      "name": "Skeleton Archer",
+      "x": 16,
+      "y": 16,
+      "size": 16
+    },
+    {
+      "name": "Ice Vale Master",
+      "x": 32,
+      "y": 16,
+      "size": 16
+    },
+    {
+      "name": "Grizzly",
+      "x": 48,
+      "y": 16,
+      "size": 16
+    },
+    {
+      "name": "Scarab",
+      "x": 64,
+      "y": 16,
+      "size": 16
+    },
+    {
+      "name": "Gremlin",
+      "x": 80,
+      "y": 16,
+      "size": 16
+    },
+    {
+      "name": "Stone Golem",
+      "x": 0,
+      "y": 32,
+      "size": 16
+    },
+    {
+      "name": "Greater Golem",
+      "x": 16,
+      "y": 32,
+      "size": 16
+    },
+    {
+      "name": "Tiger",
+      "x": 32,
+      "y": 32,
+      "size": 16
+    },
+    {
+      "name": "Ancient Treant",
+      "x": 48,
+      "y": 32,
+      "size": 16
+    },
+    {
+      "name": "Spore Spitter",
+      "x": 64,
+      "y": 32,
+      "size": 16
+    },
+    {
+      "name": "Orc Warrior",
+      "x": 80,
+      "y": 32,
+      "size": 16
+    },
+    {
+      "name": "Orc Archer",
+      "x": 0,
+      "y": 48,
+      "size": 16
+    },
+    {
+      "name": "Orc Shaman",
+      "x": 16,
+      "y": 48,
+      "size": 16
+    },
+    {
+      "name": "Succubus",
+      "x": 32,
+      "y": 48,
+      "size": 16
+    },
+    {
+      "name": "Magical Weaver",
+      "x": 48,
+      "y": 48,
+      "size": 16
+    },
+    {
+      "name": "Fire Vale Master",
+      "x": 64,
+      "y": 48,
+      "size": 16
+    },
+    {
+      "name": "Drake",
+      "x": 80,
+      "y": 48,
+      "size": 16
+    },
+    {
+      "name": "Wyrm",
+      "x": 0,
+      "y": 64,
+      "size": 16
+    },
+    {
+      "name": "Unknown",
+      "x": 16,
+      "y": 64,
+      "size": 16
+    }
+  ]
+}

@@ -1,10 +1,11 @@
 --!strict
--- One controlled Studio arena per server. Never grants persistent items, XP or gold.
+-- One controlled Studio arena per server. XP/gold are transient; no persistent grants.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local RS = game:GetService("ReplicatedStorage")
 local Shared = RS:WaitForChild("Game1Shared")
 local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
+local Options = require(Shared:WaitForChild("GameOptions"))
 local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local CharacterService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterService"))
 local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild("WeaponEquipService"))
@@ -20,6 +21,7 @@ local session: any = nil
 local started = false
 local busy: {[Player]: boolean} = {}
 local last: {[Player]: number} = {}
+local autoAttempted: {[Player]: boolean} = {}
 local function result(ok: boolean, message: string)
     return {ok=ok, message=message}
 end
@@ -52,6 +54,7 @@ end
 local function clearGroup(s: any)
     if s.guide and s.guide.running then finishTrial(s, Report.Outcome() or "interrupted") end
     s.generation += 1
+    s.groupStarting = false
     Arena.Clear(s.group)
     s.groupSupports:ClearAllChildren()
 end
@@ -66,7 +69,34 @@ local function clearSession(s: any)
     s.player:SetAttribute("GameplayGuideStatus", nil)
     s.player:SetAttribute("GameplayTestStock",nil)
 end
--- Single sampling loop for the isolated guided fight.
+-- Hub speed is a location policy, not a permanent character stat.
+local function updateHubSpeed(s: any)
+    local character = alive(s.player)
+    if not character or character:GetAttribute("Game1GameplayTestOwner") ~= s.player.UserId then return end
+    local root = character:FindFirstChild("RootCollider")
+    local inHub = false
+    if root and root:IsA("BasePart") and not s.guide and #s.group == 0 and not s.groupStarting then
+        local point = s.layout.hub:PointToObjectSpace(root.Position)
+        local half = s.layout.hubWidth/2
+        inHub = math.abs(point.X) <= half and math.abs(point.Z) <= half and math.abs(point.Y) < 12
+    end
+    local zone = nil
+    if root and root:IsA("BasePart") and not s.guide and #s.group == 0 and not s.groupStarting then
+        for index, box in pairs(s.layout.boxes) do
+            local p = box.top:PointToObjectSpace(root.Position)
+            if math.abs(p.X) <= box.size.X/2 and math.abs(p.Z) <= box.size.Z/2 and math.abs(p.Y) < 32 then
+                zone = index
+                break
+            end
+        end
+    end
+    if character:GetAttribute("GameplayTestZone") ~= zone then character:SetAttribute("GameplayTestZone", zone) end
+    local multiplier = if inHub then 3 else nil
+    if character:GetAttribute("GameplayTestHubRunMultiplier") ~= multiplier then
+        character:SetAttribute("GameplayTestHubRunMultiplier", multiplier)
+    end
+end
+-- Single sampling loop for the isolated guided fight and hub membership.
 local function bindReport(s: any)
     local elapsed = 0
     s.sampleConnection = RunService.Heartbeat:Connect(function(dt)
@@ -75,6 +105,7 @@ local function bindReport(s: any)
         local sample=elapsed
         elapsed = 0
         if not active(s) then return end
+        updateHubSpeed(s)
         if s.guide and s.guide.running then
             Report.Sample(sample)
             local outcome=Report.Outcome()
@@ -109,6 +140,7 @@ local function enter(player: Player, selection: any)
     local origin = Loadout.Origin()
     s.layout = Arena.BuildZonePlatform(folder, origin, s.spacing, size)
     session = s
+    autoAttempted[player] = true
     bindReport(s)
     Loadout.Set(player, selection)
     local replacement = CharacterService.Respawn(player, s.archetype)
@@ -128,6 +160,12 @@ local function enter(player: Player, selection: any)
         local monster = Arena.Add(player, row, "zone", slot.point, slot.facing, s.population, s.folder, slot)
         if monster then count += 1 end
     end
+    for _,item in ipairs(s.layout.extraSlots) do
+        if not active(s) then return result(false, "Test cancelled") end
+        local slot = item.slot
+        if Arena.Add(player,item.row,"zone",slot.point,slot.facing,s.population,s.folder,slot) then count += 1 end
+    end
+    local expectedCount = #rows + #s.layout.extraSlots
     if not active(s) then return result(false,"Test cancelled") end
     local function panelAction(actor: Player, part: BasePart, callback: (Model)->())
         if actor~=s.player or not allowed(actor) or not active(s) or s.guide or busy[actor] then return end
@@ -143,6 +181,7 @@ local function enter(player: Player, selection: any)
         panelAction(actor,part,function(character)
             clearGroup(s)
             Arena.Warp(character,if index then s.layout.boxes[index].entry else s.layout.hub)
+            updateHubSpeed(s)
         end)
     end,function(actor,part,level)
         panelAction(actor,part,function(_character)
@@ -153,7 +192,7 @@ local function enter(player: Player, selection: any)
             actor:SetAttribute("GameplayTestStock",string.format("%s|%s|%d|%d",selection.weapon.id,selection.armor.id,selection.level,s.generation))
         end)
     end)
-    return result(count == #rows, ("Zone map: %d/%d spawns · %d studs per zone"):format(count, #rows, s.layout.zoneSize))
+    return result(count == expectedCount, ("Zone map: %d/%d spawns · %d studs per zone"):format(count, expectedCount, s.layout.zoneSize))
 end
 apply = function(s: any, selection: any)
     local character = alive(s.player)
@@ -175,8 +214,10 @@ local function startGroup(s: any, row: any, count: number, stage: any?)
     if not character then return result(false, "Respawn first") end
     clearGroup(s)
     local generation = s.generation
+    s.groupStarting = true
     local origin = Loadout.Origin()
     Arena.Warp(character, origin)
+    updateHubSpeed(s)
     character:SetAttribute("HP", character:GetAttribute("MaxHP"))
     local models = {}
     local function current(): boolean
@@ -211,6 +252,7 @@ local function startGroup(s: any, row: any, count: number, stage: any?)
                 model:SetAttribute("GameplayTestArmed", true)
                 model:SetAttribute("MonsterAggressive", true)
             end
+            s.groupStarting = false
             return result(true, ("Group started: %d × %s LVL %d"):format(count, row.type, row.level))
         end
         if os.clock() >= deadline then clearGroup(s); return result(false, "Group readiness timeout") end
@@ -333,6 +375,7 @@ local function dispatch(player: Player, action: any, request: any)
         if character:GetAttribute("AttackEndsAt") ~= nil then return result(false, "Finish current attack first") end
         clearGroup(s)
         Arena.Warp(character, s.layout.slots[monster.id].visit)
+        updateHubSpeed(s)
         return result(true, "At selected monster")
     end
     return result(false, "Unknown action")
@@ -360,6 +403,30 @@ function Service.Start()
     end
     remote.Parent = RS:WaitForChild("Game1Remotes")
     local function bindPlayer(player: Player)
+        local function autoStart(character: Model)
+            if autoAttempted[player] or not Options.StartInGameplayHub() or not allowed(player)
+                or character:GetAttribute("CharacterArchetype") ~= "human_male"
+                or character:GetAttribute("GameplayTestKind") == "player" then return end
+            task.spawn(function()
+                local deadline = os.clock() + 20
+                while player.Parent == Players and player.Character == character and os.clock() < deadline do
+                    if character:GetAttribute("CombatHitboxCount") ~= nil
+                        and (not Options.CharacterCreationSettings().enabled or player:GetAttribute("CharacterCreationStatus") == "world") then break end
+                    task.wait(0.1)
+                end
+                if player.Parent ~= Players or player.Character ~= character or os.clock() >= deadline or session or busy[player] or autoAttempted[player] then return end
+                autoAttempted[player] = true
+                local selection, reason = Loadout.Stock(player, 1)
+                if not selection then warn("[game1][gameplay-test] Start in Hub: " .. tostring(reason)); return end
+                busy[player] = true
+                local ok, response = pcall(enter, player, selection)
+                busy[player] = nil
+                if not ok or not response.ok then
+                    if session and session.player == player and not Loadout.Get(player) then clearSession(session) end
+                    warn("[game1][gameplay-test] Start in Hub: " .. tostring(if ok then response.message else response))
+                end
+            end)
+        end
         player.CharacterRemoving:Connect(function(character)
             local s = session
             if s and s.player == player and character:GetAttribute("GameplayTestKind") == "player" then
@@ -369,13 +436,15 @@ function Service.Start()
         player.CharacterAdded:Connect(function(character)
             local s = session
             if s and s.player == player and character:GetAttribute("GameplayTestKind") == "player" then bindCharacter(s, character) end
+            autoStart(character)
         end)
+        if player.Character then autoStart(player.Character) end
     end
     Players.PlayerAdded:Connect(bindPlayer)
     for _, player in ipairs(Players:GetPlayers()) do bindPlayer(player) end
     Players.PlayerRemoving:Connect(function(player)
         if session and session.player == player then clearSession(session) end
-        last[player] = nil; busy[player] = nil
+        last[player] = nil; busy[player] = nil; autoAttempted[player] = nil
     end)
     print("[game1][gameplay-test] ready · Studio only")
 end

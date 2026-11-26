@@ -10,6 +10,9 @@ local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild
 local Appearance = require(script.Parent:WaitForChild("GameplayTestAppearance"))
 local Layout = require(script.Parent:WaitForChild("GameplayTestLayout"))
 local SkillEffects = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("SkillEffects"))
+local Players = game:GetService("Players")
+local CameraSync = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterCameraSync"))
+local Decorations = require(script.Parent:WaitForChild("GameplayWorldDecorations"))
 local Arena = {}
 local serial = 0
 
@@ -80,10 +83,13 @@ function Arena.BuildZonePlatform(parent: Instance, origin: CFrame, spacing: numb
         local gui=Instance.new("BillboardGui"); gui.Size=UDim2.fromOffset(330,75); gui.MaxDistance=450; gui.Adornee=anchor; gui.Parent=anchor
         local label=Instance.new("TextLabel"); label.Size=UDim2.fromScale(1,1); label.BackgroundTransparency=1; label.Text=box.name.." · LVL "..box.low.."–"..box.high; label.TextColor3=box.color; label.TextStrokeTransparency=0.15; label.Font=Enum.Font.GothamBold; label.TextScaled=true; label.Parent=gui
     end
-    for id,slot in pairs(layout.slots) do
+    Decorations.Build(parent, layout)
+    local function markerFor(id: string, slot: any)
         local marker=Instance.new("Part"); marker.Name="Spawn_"..id; marker.Size=Vector3.new(8,0.1,8); marker.Position=slot.point+Vector3.yAxis*0.05
         marker.Anchored=true; marker.CanCollide=false; marker.CanTouch=false; marker.CanQuery=false; marker.Transparency=0.45; marker.Color=layout.boxes[slot.zone].color; marker.Parent=parent
     end
+    for id,slot in pairs(layout.slots) do markerFor(id,slot) end
+    for index,item in ipairs(layout.extraSlots) do markerFor(item.row.id.."_extra_"..index,item.slot) end
     return layout
 end
 
@@ -128,6 +134,9 @@ function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing
         spawnRadius = 0, homeRadiusStuds = if slot and slot.homeRadius then slot.homeRadius else 150, maxAlive = 1, respawnSeconds = 2,
         testOwner = owner.UserId, testKind = kind, testBalanceId = row.id,
         testNoRespawn = kind == "group", testYaw = yaw, testSurface = surface,
+        testZone = if slot then slot.zone else nil,
+        testAggressive = if slot then slot.aggressive else nil,
+        testAggroRadius = if slot then slot.aggroRadius else nil,
     })
     table.insert(states, state) -- Registered BEFORE any yielding construction.
     return Spawner.FillTest(state)
@@ -139,6 +148,10 @@ end
 function Arena.Warp(character: Model, frame: CFrame)
     SkillEffects.Clear(character)
     character:PivotTo(frame)
+    local manager = character:FindFirstChildWhichIsA("ControllerManager", true)
+    if manager then manager.FacingDirection = frame.LookVector end
+    local player = Players:GetPlayerFromCharacter(character)
+    if player then CameraSync.Align(player, character, frame) end
     for _, part in ipairs(character:GetDescendants()) do
         if part:IsA("BasePart") and not part.Anchored then
             part.AssemblyLinearVelocity = Vector3.zero

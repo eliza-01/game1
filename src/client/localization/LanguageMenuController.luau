@@ -7,6 +7,9 @@ local State = require(script.Parent:WaitForChild("LanguageState"))
 local FullScreenLayer = require(script.Parent.Parent:WaitForChild("FullScreenLayer"))
 local Catalog = require(ReplicatedStorage:WaitForChild("Game1Shared")
     :WaitForChild("localization"):WaitForChild("GameTextCatalog"))
+local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local Options = require(Shared:WaitForChild("GameOptions"))
+local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Controller = {}
 local started = false
 
@@ -343,12 +346,33 @@ function Controller.Start()
     task.spawn(function()
         -- Load persisted preference before deciding whether first-run modal
         -- is necessary. Never stall the rest of client boot for DataStore.
+        local configured = Options.StartedLanguage()
+        local debugStart = configured ~= nil and Access.ClientAllowed()
+        if hasChosen or not gui.Parent then return end
+        if debugStart and configured and Catalog.locales[configured] then
+            chosen = configured
+            hasChosen = true
+            State.SetLocale(chosen)
+            shade.Visible = false
+            paint()
+            return -- configured debug locale, no DataStore wait or writes
+        end
         local elapsed = 0
         while player:GetAttribute("Game1LanguageReady") ~= true and elapsed < 6 do
             elapsed += task.wait(0.1)
         end
         if hasChosen or not gui.Parent then return end
         local saved = player:GetAttribute("Game1LanguageChoice")
+        if configured and debugStart then
+            if hasChosen or not gui.Parent then return end
+            chosen = if Catalog.locales[configured] then configured
+                elseif typeof(saved) == "string" and Catalog.locales[saved] then saved else State.Current()
+            hasChosen = true
+            State.SetLocale(chosen)
+            shade.Visible = false
+            paint()
+            return -- debug preference is session-only; do not overwrite saved locale
+        end
         if typeof(saved) == "string" and Catalog.locales[saved] then
             chosen = saved
             State.SetLocale(saved)

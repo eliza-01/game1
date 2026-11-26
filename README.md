@@ -49,6 +49,6 @@ python system/studio-plugin/validate_luau.py
 
 Runtime behaviour Roblox Studio, публикация через Open Cloud и источники Blender проверяются **отдельно**. Успех Python-тестов не означает проверенный Play session.
 
-**Документальный срез:** 30 октября 2026, `game1_diag_2026-10-30_13-52-46.zip` (после M162); реальные Studio состояния за пределами этого дампа не удостоверены.
+**Актуальный срез gameplay:** M541, 26 ноября 2026 (`game1_diag_2026-11-26_19-42-21.zip` M540 + патч M541); документационная редакция M542. [Hub и тестовая прогрессия](docs/workflows/M541_HUB_WORLD_PROGRESSION_RU.md) · [Design релиза](docs/kanban/specs/KBN-0031.md). Studio-приёмка M541 открыта. Перечень исторических workflow ниже сохраняется; он не заменяет текущие контракты.
 
 - [M236: Location Assets — Model/Mesh ID history and Find → Replace](docs/workflows/LOCATION_ASSETS_ID_HISTORY_TWO_PHASE_SYNC_M236_RU.md)

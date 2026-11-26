@@ -1,6 +1,7 @@
 -- Overhead HP view: no combat state or damage calculation; style is client-only.
 local TweenService = game:GetService("TweenService")
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
+local IconView = require(script.Parent:WaitForChild("MonsterIconView"))
 local HealthBarView = {}
 local TWEEN = TweenInfo.new(0.23, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
@@ -113,6 +114,16 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     title.TextStrokeTransparency = 0
     title.Parent = titleLine
 
+    local debugLine = Instance.new("TextLabel")
+    debugLine.Name = "TestStats"
+    debugLine.BackgroundTransparency = 1
+    debugLine.TextColor3 = Color3.fromRGB(205, 213, 225)
+    debugLine.TextStrokeTransparency = 0.25
+    debugLine.Font = Enum.Font.Gotham
+    debugLine.TextSize = 12
+    debugLine.Visible = false
+    debugLine.Parent = gui
+
     local plate = Instance.new("Frame")
     plate.Name = "Plate"
     plate.AnchorPoint = Vector2.new(0.5, 0)
@@ -150,6 +161,12 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     local currentStyle = style
     local showNameRequested = false
     local showHpRequested = false
+    local portrait: Frame? = nil
+    local portraitStroke: UIStroke? = nil
+    local showPortrait = false
+    local releaseZone = tonumber(model:GetAttribute("GameplayTestZone"))
+    local hasPortrait = model:GetAttribute("Game1MonsterRuntime") == true and releaseZone ~= nil and releaseZone <= 6
+    local portraitHeight = if hasPortrait then 46 else 0
     local baseOffset = visualTopOffset(model, anchor)
 
     local function update()
@@ -172,10 +189,11 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     local function applySegments()
         local visibleName = showNameRequested
         local visibleHP = showHpRequested and currentStyle[layout].enabled == true
-        local enabled = visibleName or visibleHP
+        local enabled = visibleName or visibleHP or showPortrait
         if gui.Enabled ~= enabled then gui.Enabled = enabled end
         if titleLine.Visible ~= visibleName then titleLine.Visible = visibleName end
         if plate.Visible ~= visibleHP then plate.Visible = visibleHP end
+        debugLine.Visible = hasPortrait and visibleName
     end
 
     local view = {}
@@ -184,7 +202,7 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     -- The expensive bounds walk runs once at spawn completion, not at 10 Hz.
     function view.RefreshVisualOffset()
         baseOffset = visualTopOffset(model, anchor)
-        gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + currentStyle[layout].offsetStuds, 0)
+        gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + currentStyle[layout].offsetStuds + (if hasPortrait then 1 else 0), 0)
     end
     function view.IsAttached(expectedParent: PlayerGui?): boolean
         return expectedParent ~= nil and gui.Parent == expectedParent
@@ -201,21 +219,30 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         local lineHeight = math.max(titleSize, levelSize) + 5
         local lineWidth = math.max(width + 28, math.min(580,
             #nameText * titleSize * 0.68 + (number.Visible and levelSize * 2.5 or 0) + 20))
-        gui.Size = UDim2.fromOffset(lineWidth, lineHeight + height + 13)
+        local statsHeight = if hasPortrait then 17 else 0
+        if hasPortrait then
+            debugLine.Text = string.format("%s · %d HP · %d ATK%s",
+                tostring(model:GetAttribute("MonsterCombatType") or ""),
+                tonumber(model:GetAttribute("MaxHP")) or 0, tonumber(model:GetAttribute("Damage")) or 0,
+                if model:GetAttribute("GameplayTestVisualPlaceholder") then " · proxy" else "")
+        end
+        gui.Size = UDim2.fromOffset(lineWidth, lineHeight + height + 13 + portraitHeight + statsHeight)
         -- A generous camera-distance cap avoids clipping a monster whose root
         -- is within the actual player-centered radius in third-person view.
         if monster then
-            gui.MaxDistance = math.max(260, (tonumber(spec.maxDistanceStuds) or 100) + 80)
+            gui.MaxDistance = if hasPortrait then 800 else math.max(260, (tonumber(spec.maxDistanceStuds) or 100) + 80)
         end
-        gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + spec.offsetStuds, 0)
-        titleLine.Position = UDim2.fromOffset(0, 0)
+        gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + spec.offsetStuds + (if hasPortrait then 1 else 0), 0)
+        titleLine.Position = UDim2.fromOffset(0, portraitHeight)
         titleLine.Size = UDim2.fromOffset(lineWidth, lineHeight)
         title.TextSize = titleSize
         title.Size = UDim2.fromOffset(math.min(lineWidth - 20, #nameText * titleSize * 0.68 + 12), lineHeight)
         number.TextSize = levelSize
         number.Size = UDim2.fromOffset(levelSize * 1.7, lineHeight)
         plate.Size = UDim2.fromOffset(width, height)
-        plate.Position = UDim2.new(0.5, 0, 0, lineHeight + 2)
+        debugLine.Position = UDim2.fromOffset(0, portraitHeight + lineHeight)
+        debugLine.Size = UDim2.fromOffset(lineWidth, statsHeight)
+        plate.Position = UDim2.new(0.5, 0, 0, portraitHeight + lineHeight + statsHeight + 2)
         border.Thickness = spec.border
         local pad = math.min(3, math.max(1, math.floor(height / 7)))
         track.Position = UDim2.fromOffset(pad, pad)
@@ -231,9 +258,19 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     function view.SetSegments(showName: boolean, showHP: boolean)
         -- Compare actual GUI properties even if the policy did not change:
         -- a Studio reset or another presentation controller may have hidden it.
-        showNameRequested = showName and model:GetAttribute("Game1GameplayTestOwner") == nil
+        showNameRequested = showName and (hasPortrait or model:GetAttribute("Game1GameplayTestOwner") == nil)
         showHpRequested = showHP
         applySegments()
+    end
+    function view.SetIcon(visible: boolean, playerLevel: number)
+        if not hasPortrait then return end
+        if visible and not portrait then portrait, portraitStroke = IconView.Create(gui, model) end
+        if not visible and portrait then portrait:Destroy(); portrait = nil; portraitStroke = nil end
+        if portraitStroke then
+            local delta = (tonumber(model:GetAttribute("Level")) or playerLevel) - playerLevel
+            portraitStroke.Color = IconView.DangerColor(delta)
+        end
+        if showPortrait ~= visible then showPortrait = visible; applySegments() end
     end
     function view.SetVisible(value: boolean)
         view.SetSegments(value and currentStyle[layout].enabled == true,
@@ -249,6 +286,22 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     table.insert(connections, Language.Changed:Connect(function()
         view.ApplyStyle(currentStyle)
     end))
+    if model:GetAttribute("Game1MonsterRuntime") == true then
+        table.insert(connections, model:GetAttributeChangedSignal("GameplayTestZone"):Connect(function()
+            local zone = tonumber(model:GetAttribute("GameplayTestZone"))
+            hasPortrait = zone ~= nil and zone <= 6
+            portraitHeight = if hasPortrait then 46 else 0
+            if not hasPortrait then
+                if portrait then portrait:Destroy(); portrait = nil; portraitStroke = nil end
+                showPortrait = false
+            end
+            view.ApplyStyle(currentStyle)
+        end))
+        table.insert(connections, model:GetAttributeChangedSignal("MonsterDisplayName"):Connect(function()
+            if portrait then portrait:Destroy(); portrait = nil; portraitStroke = nil end
+            view.ApplyStyle(currentStyle)
+        end))
+    end
     table.insert(connections, model:GetAttributeChangedSignal("HP"):Connect(update))
     table.insert(connections, model:GetAttributeChangedSignal("MaxHP"):Connect(update))
     if model:GetAttribute("Game1MonsterRuntime") == true then

@@ -1,3 +1,4 @@
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -142,7 +143,15 @@ local function spawnOne(state: any): Model?
     if record.testOwner then state.testConstructing = model end
     local instanceId = tostring(record.spawnId or "spawn") .. "-" .. tostring(math.floor(os.clock() * 1000)) .. "-" .. tostring(spawnRandom:NextInteger(1000, 9999))
     model.Name = slug .. "_" .. instanceId:sub(-4)
+    -- The GP inspection mode must show all portraits within the 384-stud zone,
+    -- even if the normal streaming target radius is shorter. Only the test
+    -- owner receives persistent release-map proxies; production streaming stays intact.
+    local persistentOwner = if RunService:IsStudio() and Workspace.StreamingEnabled
+        and record.testOwner and record.testZone and record.testZone <= 6
+        then Players:GetPlayerByUserId(record.testOwner) else nil
+    if persistentOwner then model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer end
     model.Parent = ensureMonstersFolder()
+    if persistentOwner then model:AddPersistentPlayer(persistentOwner) end
     local visual, visualRoot = MonsterRigBuilder.PrepareVisual(model)
     if not visualRoot then
         model:Destroy()
@@ -174,7 +183,9 @@ local function spawnOne(state: any): Model?
             title = table.concat(names, " + ")
         end
         local proxy = row.name ~= "Гремлин (Gremlin)" or row.skills ~= nil
-        TestAppearance.Label(model, ("%s · %s · LVL %d\n%d HP · %d ATK"):format(title .. (if proxy then " [proxy]" else ""), row.type, row.level, row.hp, row.damage), color)
+        if not record.testZone or record.testZone > 6 then
+            TestAppearance.Label(model, ("%s · %s · LVL %d\n%d HP · %d ATK"):format(title .. (if proxy then " [proxy]" else ""), row.type, row.level, row.hp, row.damage), color)
+        end
         model:SetAttribute("MonsterDisplayName", title)
         model:SetAttribute("GameplayTestVisualPlaceholder", proxy)
     end

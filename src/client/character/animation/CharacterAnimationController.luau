@@ -128,7 +128,11 @@ local function animationPlaybackPercent(channel: string, animationId: any?): num
 		)
 		return AnimationSpeedScaling.ResolveForAnimation(character, normalizedChannel, animationId, equivalentRunSpeed)
 	end
-	return AnimationSpeedScaling.ResolveForAnimation(character, normalizedChannel, animationId)
+	local percent = AnimationSpeedScaling.ResolveForAnimation(character, normalizedChannel, animationId)
+	if normalizedChannel == "run" and not attackLowerBodyActive and character:GetAttribute("GameplayTestHubRunMultiplier") == 3 then
+		percent *= 3
+	end
+	return percent
 end
 
 local function animationPlaybackScale(channel: string, animationId: any?): number
@@ -574,7 +578,7 @@ local function bindCharacter(newCharacter: Model)
         warn("[game1][animation] Animator missing; visual unavailable, gameplay continues")
     end
     lastLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
-	local refreshAttributes = { "SkillStunned", "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "AnimationAirborne", "AnimationJumpSequence" }
+	local refreshAttributes = { "SkillStunned", "GameplayTestHubRunMultiplier", "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "AnimationAirborne", "AnimationJumpSequence" }
 	for _, channel in ipairs({ "run", "walk" }) do
 		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
 	end

@@ -1,6 +1,6 @@
 local Balance = require(script.Parent.Parent:WaitForChild("balance"):WaitForChild("Balance"))
 local CharacterStatsConfig = {}
-CharacterStatsConfig.RegenerationHPPerSecond = 0
+CharacterStatsConfig.RegenerationHPPerSecond = 1
 CharacterStatsConfig.Default = table.freeze({
     Level = 1,
     MaxHP = Balance.Level(1).hp,

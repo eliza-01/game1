@@ -123,8 +123,8 @@
       "showPublishedControls": true
     },
     "startInHub": true,
-    "startedLanguage": false,
-    "startLocale": "auto"
+    "startedLanguage": true,
+    "startLocale": "en-us"
   },
   "worldStreaming": {
     "targetRadiusStuds": 150

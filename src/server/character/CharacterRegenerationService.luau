@@ -24,7 +24,11 @@ function CharacterRegenerationService.Start()
         for _, player in ipairs(Players:GetPlayers()) do
             local character = player.Character
             if character then
-                local rate = Config.RegenerationHPPerSecond + Healing.TestRate(character, "GameplayTestRegen")
+                -- Guided reports remain comparable to the pre-M545 zero-regen baseline.
+                local guided = player:GetAttribute("GameplayGuideActive") == true
+                local rate = if guided then 0 else Config.RegenerationHPPerSecond
+                    + Healing.TestRate(character, "GameplayTestRegen")
+                    + math.max(0, tonumber(character:GetAttribute("BuffGain_life")) or 0)
                 if rate > 0 then Healing.Restore(character, rate * elapsed) end
             end
         end

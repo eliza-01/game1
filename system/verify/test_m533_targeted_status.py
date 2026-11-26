@@ -11,12 +11,12 @@ class TargetedStatus(unittest.TestCase):
     def test_durations_and_generated_downgrade(self):
         data=b.load(); rows={x['effect']:x for x in data['skills']}
         self.assertEqual({k:rows[k]['duration'] for k in ('poison','bleed','slow','root','silence','stun')},dict(poison=10,bleed=10,slow=10,root=5,silence=5,stun=3))
-        self.assertEqual(rows['slow']['power'],30)
+        self.assertEqual(rows['slow']['power'],40)
         for effect in ('poison','bleed'):
             self.assertEqual(rows[effect]['duration']/rows[effect]['tick'],10)
         for r in s.resolve(data):
             base=next(x for x in data['monsters'] if x['id']==r['baseId'])
-            expected={'skilled_poison':72,'skilled_bleed':74,'skilled_slow':80,'skilled_root':70,'skilled_stun':69,'skilled_silence':84,'skilled_might':81,'skilled_haste':81}
+            expected={'skilled_poison':72,'skilled_bleed':74,'skilled_slow':77,'skilled_root':70,'skilled_stun':69,'skilled_silence':84,'skilled_might':81,'skilled_haste':81}
             if r['id'] in expected: self.assertEqual(r['damage'],expected[r['id']])
             self.assertEqual((r['hp'],r['xp'],r['gold'],r['runSpeed']),(base['hp'],base['xp'],base['gold'],base['runSpeed']))
         self.assertEqual(b.render(data),b.OUTPUT.read_text(encoding='utf8'))

@@ -1,0 +1,30 @@
+-- Server command bar, Studio only, on a disposable character outside Guided.
+-- Manual smoke; do not run against a production player.
+local players=game:GetService("Players")
+local server=game:GetService("ServerScriptService"):WaitForChild("Game1Server")
+local shared=game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+local effects=require(server.combat.SkillEffects)
+local definitions=require(shared.combat.BuffDefinitions)
+local player=assert(players:GetPlayers()[1])
+local character=assert(player.Character)
+assert(game:GetService("RunService"):IsStudio() and player:GetAttribute("GameplayGuideActive")~=true)
+assert(character:GetAttribute("LifeState")=="Alive")
+effects.Clear(character)
+local damage=character:GetAttribute("Damage")
+local hp=character:GetAttribute("MaxHP")
+local speed=character:GetAttribute("RunSpeed")
+for _, row in ipairs(definitions.Rows) do
+    local skill=table.clone(row); skill.duration=5
+    assert(effects.Apply(character,character,skill,0))
+    assert(not effects.Apply(character,character,skill,0),"repeat must not stack")
+end
+assert(math.abs(character:GetAttribute("Damage")-damage*1.2)<.001)
+assert(character:GetAttribute("MaxHP")==math.floor(hp*1.3+.5))
+assert(character:GetAttribute("RunSpeed")==speed+20)
+assert(character:GetAttribute("BuffGain_life")==2)
+effects.Clear(character,true)
+assert(effects.IsActive(character,"might"))
+task.wait(5.2)
+assert(character:GetAttribute("Damage")==damage and character:GetAttribute("MaxHP")==hp and character:GetAttribute("RunSpeed")==speed)
+assert(character:GetAttribute("BuffGain_life")==nil)
+print("M545 BUFF SMOKE PASS")

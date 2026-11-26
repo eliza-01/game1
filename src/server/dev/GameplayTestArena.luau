@@ -145,8 +145,8 @@ function Arena.Clear(states: {any})
     for _, state in ipairs(states) do Spawner.RemoveTest(state) end
     table.clear(states)
 end
-function Arena.Warp(character: Model, frame: CFrame)
-    SkillEffects.Clear(character)
+function Arena.Warp(character: Model, frame: CFrame, preserveBuffs: boolean?)
+    SkillEffects.Clear(character,preserveBuffs)
     character:PivotTo(frame)
     local manager = character:FindFirstChildWhichIsA("ControllerManager", true)
     if manager then manager.FacingDirection = frame.LookVector end

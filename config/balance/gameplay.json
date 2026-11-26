@@ -198,7 +198,7 @@
       "damage": 15,
       "price": 0,
       "attackSpeedDelta": 0,
-      "radius": 8,
+      "radius": 9,
       "arc": 108,
       "upgradePrice": 30,
       "critChance": 8
@@ -211,7 +211,7 @@
       "damage": 13,
       "price": 0,
       "attackSpeedDelta": 26,
-      "radius": 3,
+      "radius": 9,
       "arc": 80,
       "upgradePrice": 30,
       "critChance": 12
@@ -250,7 +250,7 @@
       "damage": 40,
       "price": 1000,
       "attackSpeedDelta": 0,
-      "radius": 8,
+      "radius": 9,
       "arc": 108,
       "upgradePrice": 300,
       "critChance": 8
@@ -263,7 +263,7 @@
       "damage": 34,
       "price": 1000,
       "attackSpeedDelta": 26,
-      "radius": 3,
+      "radius": 9,
       "arc": 80,
       "upgradePrice": 300,
       "critChance": 12
@@ -302,7 +302,7 @@
       "damage": 75,
       "price": 2000,
       "attackSpeedDelta": 0,
-      "radius": 8,
+      "radius": 9,
       "arc": 108,
       "upgradePrice": 600,
       "critChance": 8
@@ -315,7 +315,7 @@
       "damage": 65,
       "price": 2000,
       "attackSpeedDelta": 26,
-      "radius": 3,
+      "radius": 9,
       "arc": 80,
       "upgradePrice": 600,
       "critChance": 12
@@ -354,7 +354,7 @@
       "damage": 120,
       "price": 3000,
       "attackSpeedDelta": 0,
-      "radius": 8,
+      "radius": 9,
       "arc": 108,
       "upgradePrice": 900,
       "critChance": 8
@@ -367,7 +367,7 @@
       "damage": 104,
       "price": 3000,
       "attackSpeedDelta": 26,
-      "radius": 3,
+      "radius": 9,
       "arc": 80,
       "upgradePrice": 900,
       "critChance": 12
@@ -406,7 +406,7 @@
       "damage": 26,
       "price": 500,
       "attackSpeedDelta": 0,
-      "radius": 8,
+      "radius": 9,
       "arc": 108,
       "upgradePrice": 150,
       "critChance": 8
@@ -419,7 +419,7 @@
       "damage": 22,
       "price": 500,
       "attackSpeedDelta": 26,
-      "radius": 3,
+      "radius": 9,
       "arc": 80,
       "upgradePrice": 150,
       "critChance": 12
@@ -458,7 +458,7 @@
       "damage": 58,
       "price": 1500,
       "attackSpeedDelta": 0,
-      "radius": 8,
+      "radius": 9,
       "arc": 108,
       "upgradePrice": 450,
       "critChance": 8
@@ -471,7 +471,7 @@
       "damage": 50,
       "price": 1500,
       "attackSpeedDelta": 26,
-      "radius": 3,
+      "radius": 9,
       "arc": 80,
       "upgradePrice": 450,
       "critChance": 12
@@ -510,7 +510,7 @@
       "damage": 98,
       "price": 2500,
       "attackSpeedDelta": 0,
-      "radius": 8,
+      "radius": 9,
       "arc": 108,
       "upgradePrice": 750,
       "critChance": 8
@@ -523,7 +523,7 @@
       "damage": 85,
       "price": 2500,
       "attackSpeedDelta": 26,
-      "radius": 3,
+      "radius": 9,
       "arc": 80,
       "upgradePrice": 750,
       "critChance": 12
@@ -562,7 +562,7 @@
       "damage": 142,
       "price": 3500,
       "attackSpeedDelta": 0,
-      "radius": 8,
+      "radius": 9,
       "arc": 108,
       "upgradePrice": 1050,
       "critChance": 8
@@ -575,7 +575,7 @@
       "damage": 124,
       "price": 3500,
       "attackSpeedDelta": 26,
-      "radius": 3,
+      "radius": 9,
       "arc": 80,
       "upgradePrice": 1050,
       "critChance": 12
@@ -703,7 +703,7 @@
       "gold": 25,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Жаба (Toad)"
@@ -717,7 +717,7 @@
       "gold": 30,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Жаба (Toad)"
@@ -731,7 +731,7 @@
       "gold": 32,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Деревянный страж (Wooden Guardian)"
@@ -745,7 +745,7 @@
       "gold": 35,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Живое пугало (Living Scarecrow)"
@@ -759,7 +759,7 @@
       "gold": 35,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Волк (Wolf)"
@@ -773,7 +773,7 @@
       "gold": 40,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Зомби (Zombie)"
@@ -787,7 +787,7 @@
       "gold": 40,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Гигантский паук (Giant Spider)"
@@ -801,7 +801,7 @@
       "gold": 45,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Зомби (Zombie)"
@@ -815,7 +815,7 @@
       "gold": 45,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Медведь гризли (Grizzly)"
@@ -829,7 +829,7 @@
       "gold": 50,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Скарабей (Scarab)"
@@ -843,7 +843,7 @@
       "gold": 53,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Гремлин (Gremlin)"
@@ -857,7 +857,7 @@
       "gold": 56,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Каменный голем (Stone Golem)"
@@ -871,7 +871,7 @@
       "gold": 59,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Каменный голем (Stone Golem)"
@@ -885,7 +885,7 @@
       "gold": 62,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Большой голем (Greater Golem)"
@@ -899,7 +899,7 @@
       "gold": 65,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Тигр (Tiger)"
@@ -913,7 +913,7 @@
       "gold": 68,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Тигр (Tiger)"
@@ -927,7 +927,7 @@
       "gold": 71,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Тигр (Tiger)"
@@ -941,7 +941,7 @@
       "gold": 74,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Тигр (Tiger)"
@@ -955,7 +955,7 @@
       "gold": 77,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Древень (Ancient Treant)"
@@ -969,7 +969,7 @@
       "gold": 80,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Орк-воин (Orc Warrior)"
@@ -983,7 +983,7 @@
       "gold": 83,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Орк-воин (Orc Warrior)"
@@ -997,7 +997,7 @@
       "gold": 86,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Орк-воин (Orc Warrior)"
@@ -1011,7 +1011,7 @@
       "gold": 89,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Орк-воин (Orc Warrior)"
@@ -1025,7 +1025,7 @@
       "gold": 92,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Орк-воин (Orc Warrior)"
@@ -1039,7 +1039,7 @@
       "gold": 95,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Малый дракон (Drake)"
@@ -1053,7 +1053,7 @@
       "gold": 98,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Малый дракон (Drake)"
@@ -1067,7 +1067,7 @@
       "gold": 101,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Малый дракон (Drake)"
@@ -1081,7 +1081,7 @@
       "gold": 104,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Малый дракон (Drake)"
@@ -1095,7 +1095,7 @@
       "gold": 107,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Малый дракон (Drake)"
@@ -1109,7 +1109,7 @@
       "gold": 110,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": "Древний дракон (Wyrm)"
@@ -1123,7 +1123,7 @@
       "gold": 113,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": ""
@@ -1137,7 +1137,7 @@
       "gold": 116,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": ""
@@ -1151,7 +1151,7 @@
       "gold": 119,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": ""
@@ -1165,7 +1165,7 @@
       "gold": 122,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": ""
@@ -1179,7 +1179,7 @@
       "gold": 125,
       "critChance": 5,
       "type": "melee",
-      "attackRange": 5,
+      "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
       "name": ""
@@ -1392,7 +1392,7 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Мандрагора (Mandragora)"
+      "name": "Споровик (Spore Spitter)"
     },
     {
       "id": "monster_051",
@@ -1406,7 +1406,7 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Мандрагора (Mandragora)"
+      "name": "Споровик (Spore Spitter)"
     },
     {
       "id": "monster_052",
@@ -1724,7 +1724,7 @@
       "effect": "slow",
       "duration": 10,
       "cooldown": 15,
-      "power": 30,
+      "power": 40,
       "tick": 0
     },
     {

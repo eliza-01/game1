@@ -112,7 +112,13 @@ local function updateEquipment()
 end
 local function updateEffects()
     if not effectsCaption then return end
-    effectsCaption.Text = if watched then tostring(watched:GetAttribute("ActiveSkillEffects") or "") else ""
+    local names={}
+    if watched then
+        for _, name in ipairs(string.split(tostring(watched:GetAttribute("ActiveSkillEffects") or "")," · ")) do
+            if name~="Might" and name~="Earth" and name~="Life" and name~="Wind" then table.insert(names,name) end
+        end
+    end
+    effectsCaption.Text = table.concat(names," · ")
     effectsCaption.Visible = effectsCaption.Text ~= ""
 end
 
@@ -195,6 +201,7 @@ function Controller.Start()
     started = true
     build(player:WaitForChild("PlayerGui"))
     require(script.Parent:WaitForChild("StatusEffectVisuals")).Start()
+    require(script.Parent:WaitForChild("BuffHud")).Start(assert(gui),assert(plate))
     Settings.Changed(applyStyle)
     applyStyle()
     player.CharacterAdded:Connect(bind)

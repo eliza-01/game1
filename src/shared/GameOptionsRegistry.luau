@@ -305,8 +305,8 @@ return table.freeze({
 			showPublishedControls = true,
 		}),
 		startInHub = true,
-		startedLanguage = false,
-		startLocale = "auto",
+		startedLanguage = true,
+		startLocale = "en-us",
 	}),
 	characterAnimations = table.freeze({
 		deathPlaybackPercent = 50,

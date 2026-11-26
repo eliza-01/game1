@@ -36,6 +36,21 @@ local function recompute(character: Model)
             delta += tonumber(modifiers[stat]) or 0
         end
         local resolved = base + delta
+        -- Percent modifiers are resolved after flat gear modifiers so buffs
+        -- follow weapon swaps and progression without snapshotting old stats.
+        if stat == "Damage" or stat == "MaxHP" then
+            local percent = 0
+            for _, modifiers in pairs(sources) do
+                percent += tonumber(modifiers[stat .. "Percent"]) or 0
+            end
+            local buff = sources["skill-buffs"] or {}
+            local buffPercent = tonumber(buff[stat .. "Percent"]) or 0
+            local beforeBuff = resolved * (1 + (percent - buffPercent) / 100)
+            resolved *= 1 + percent / 100
+            if stat == "MaxHP" and percent ~= 0 then resolved = math.floor(resolved + 0.5) end
+            if stat == "MaxHP" and percent ~= buffPercent then beforeBuff = math.floor(beforeBuff + 0.5) end
+            character:SetAttribute(if stat == "Damage" then "BuffGain_might" else "BuffGain_earth", if buffPercent > 0 then resolved - beforeBuff else nil)
+        end
         if stat == "CritChance" then
             local percent, flat = 0, 0
             for _, modifiers in pairs(sources) do
@@ -48,8 +63,12 @@ local function recompute(character: Model)
         elseif stat == "RunSpeed" then
             local debugOverride = tonumber(character:GetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE))
             if debugOverride ~= nil then
-                resolved = math.max(0, debugOverride)
+                resolved = math.max(0, debugOverride + (tonumber((sources["skill-buffs"] or {}).RunSpeed) or 0))
             end
+        end
+        if stat == "RunSpeed" then
+            local gain = tonumber((sources["skill-buffs"] or {}).RunSpeed) or 0
+            character:SetAttribute("BuffGain_wind", if gain > 0 then gain else nil)
         end
         character:SetAttribute(stat, resolved)
     end

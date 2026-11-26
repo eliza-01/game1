@@ -13,6 +13,8 @@ local Spawner = require(script.Parent.Parent:WaitForChild("monster"):WaitForChil
 local Loadout = require(script.Parent:WaitForChild("GameplayTestLoadout"))
 local Arena = require(script.Parent:WaitForChild("GameplayTestArena"))
 local Panels = require(script.Parent:WaitForChild("GameplayTestPanels"))
+local Buffer = require(script.Parent:WaitForChild("GameplayBufferDummy"))
+local Effects = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("SkillEffects"))
 local Report = require(script.Parent:WaitForChild("GameplayCombatReport"))
 local Plan = require(script.Parent:WaitForChild("GameplayGuidedPlan"))
 local RuntimeVersion = require(Shared:WaitForChild("RuntimeVersion"))
@@ -67,6 +69,7 @@ local function clearSession(s: any)
     if s.deathConnection then s.deathConnection:Disconnect() end
     Loadout.Set(s.player, nil)
     s.player:SetAttribute("GameplayGuideStatus", nil)
+    s.player:SetAttribute("GameplayGuideActive", nil)
     s.player:SetAttribute("GameplayTestStock",nil)
 end
 -- Hub speed is a location policy, not a permanent character stat.
@@ -180,7 +183,7 @@ local function enter(player: Player, selection: any)
     Panels.Build(folder,s.layout,function(actor,part,index)
         panelAction(actor,part,function(character)
             clearGroup(s)
-            Arena.Warp(character,if index then s.layout.boxes[index].entry else s.layout.hub)
+            Arena.Warp(character,if index then s.layout.boxes[index].entry else s.layout.hub,true)
             updateHubSpeed(s)
         end)
     end,function(actor,part,level)
@@ -192,6 +195,12 @@ local function enter(player: Player, selection: any)
             actor:SetAttribute("GameplayTestStock",string.format("%s|%s|%d|%d",selection.weapon.id,selection.armor.id,selection.level,s.generation))
         end)
     end)
+    Buffer.Build(folder,s.layout,function(actor,part,definition,lift)
+        panelAction(actor,part,function(character)
+            if not Effects.CanCast(character) then return end
+            if Effects.Apply(character,character,definition,0) then lift() end
+        end)
+    end)
     return result(count == expectedCount, ("Zone map: %d/%d spawns · %d studs per zone"):format(count, expectedCount, s.layout.zoneSize))
 end
 apply = function(s: any, selection: any)
@@ -199,6 +208,7 @@ apply = function(s: any, selection: any)
     if not character then return result(false, "Respawn first") end
     if character:GetAttribute("AttackEndsAt") ~= nil then return result(false, "Finish current attack first") end
     clearGroup(s)
+    Effects.Clear(character)
     local previous = Loadout.Get(s.player)
     Loadout.Set(s.player, selection)
     local ok, reason = Loadout.Apply(s.player, character)
@@ -289,12 +299,15 @@ local function dispatch(player: Player, action: any, request: any)
     if not s or s.player ~= player then return result(false, "Enter Gameplay Test first") end
     if action == "exit" then return exit(s) end
     if action == "guideAbort" then
-        clearGroup(s); s.guide=nil; publishGuide(s,"Guided test cancelled"); return result(true,"Guided test cancelled")
+        clearGroup(s); s.guide=nil; player:SetAttribute("GameplayGuideActive",nil); publishGuide(s,"Guided test cancelled"); return result(true,"Guided test cancelled")
     end
     if action == "guideBegin" then
         if s.guide then return result(false,"Guided test already exists") end
         clearGroup(s)
+        local character=alive(player)
+        if character then Effects.Clear(character) end
         s.guide={stages=Plan.Build(),results={},running=false,pending=false}
+        player:SetAttribute("GameplayGuideActive",true)
         publishGuide(s,("0/%d · Next to start"):format(#s.guide.stages))
         return result(true,"Guided test ready")
     end
@@ -348,7 +361,7 @@ local function dispatch(player: Player, action: any, request: any)
         local g=s.guide
         if not g or g.running or #g.results~=#g.stages then return result(false,"Complete all trials first") end
         Report.Emit(g.results,RuntimeVersion.Version)
-        s.guide=nil; publishGuide(s,"Report exported · copy GP_REPORT from Output")
+        s.guide=nil; player:SetAttribute("GameplayGuideActive",nil); publishGuide(s,"Report exported · copy GP_REPORT from Output")
         return result(true,"Report exported to server Output")
     end
     if s.guide then return result(false,"Guided test active · use guide controls") end
@@ -374,7 +387,7 @@ local function dispatch(player: Player, action: any, request: any)
         if not character then return result(false, "Respawn first") end
         if character:GetAttribute("AttackEndsAt") ~= nil then return result(false, "Finish current attack first") end
         clearGroup(s)
-        Arena.Warp(character, s.layout.slots[monster.id].visit)
+        Arena.Warp(character, s.layout.slots[monster.id].visit,true)
         updateHubSpeed(s)
         return result(true, "At selected monster")
     end

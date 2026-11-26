@@ -70,7 +70,7 @@ class TestHealth(unittest.TestCase):
         self.assertIn('character:GetAttribute("Damageable") ~= true', healing)
         self.assertIn('Healing.Restore(character, rate * elapsed)', regen_service)
         self.assertIn('CharacterRegenerationService', code('src/server/bootstrap/ServiceCatalog.luau'))
-        self.assertIn('RegenerationHPPerSecond = 0', code('src/shared/character/CharacterStatsConfig.luau'))
+        self.assertIn('RegenerationHPPerSecond = 1', code('src/shared/character/CharacterStatsConfig.luau'))
 
     def test_no_top_hud_and_overhead_visibility_and_tweens(self):
         self.assertFalse((ROOT / 'src/client/character/PlayerStatusController.luau').exists())

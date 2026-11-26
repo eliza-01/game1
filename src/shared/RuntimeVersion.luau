@@ -1,1 +1,1 @@
-return table.freeze({ Version = "2026.11.26.543", SourceDigest = "game1-m543-world-readability" })
+return table.freeze({ Version = "2026.11.26.547", SourceDigest = "game1-m547-interface-buff-icons" })

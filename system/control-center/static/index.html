@@ -48,7 +48,7 @@
 <button id="nav-lod-manager" class="asset-section" type="button"><b>LOD Manager</b><small>scan · snapshots · readiness</small></button>
 <button id="nav-database" class="asset-section" type="button"><b>database</b><small>balance · asset history</small></button>
 <div id="database-nav" class="database-subnav" hidden><button id="nav-balance" type="button" class="database-subnav-item">Balance</button><button id="nav-skills" type="button" class="database-subnav-item">Skills</button><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button><button id="nav-balance-logs" type="button" class="database-subnav-item">Logs</button></div>
-<button id="nav-interface" class="asset-section" type="button"><b>interface</b><small>icons · monsters</small></button>
+<button id="nav-interface" class="asset-section" type="button"><b>interface</b><small>icons · monsters · skills</small></button>
 <button id="nav-atlas" class="asset-section" type="button"><b>atlas</b><small>variants · consumers · retirement</small></button>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
 <button id="nav-mechanics" class="asset-section" type="button"><b>mechanics</b><small>tech cards · sockets · scripts</small></button>
@@ -438,10 +438,19 @@
 </div>
 
 <div id="interface-view" hidden>
-<section class="panel" style="padding:20px"><span class="eyebrow">Interface / Icons</span><h3>Monsters</h3>
+<div class="actions" aria-label="Interface sections">
+<button id="interface-nav-monsters" type="button" class="primary" aria-pressed="true">Icons / Monsters</button>
+<button id="interface-nav-buffs" type="button" aria-pressed="false">Skills / Buffs</button>
+</div>
+<section id="interface-monsters-panel" class="panel" style="padding:20px"><span class="eyebrow">Interface / Icons</span><h3>Monsters</h3>
 <p class="muted">Pixel atlas · 16 × 16 px per tile · local source · gameplay preview</p>
 <div id="monster-icon-atlas-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:10px"></div>
 <p><a href="monster-icons/atlas.png" download="monster-icons.png">Download PNG atlas</a> · <a href="monster-icons/catalog.json" download>Tile index</a></p>
+</section>
+<section id="interface-buffs-panel" class="panel" style="padding:20px" hidden>
+<span class="eyebrow">Interface / Skills</span><h3>Buffs</h3>
+<p class="muted">Player buff icons · runtime HUD preview</p>
+<div id="buff-icon-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:10px"></div>
 </section></div>
 <div id="options-view" hidden>
 <div class="panel hero">
@@ -1255,7 +1264,7 @@
 <script src="publication-descriptions.js?v=1"></script>
 <script src="asset-name-defaults.js?v=437"></script>
 <script src="character-assets.js?v=543"></script>
-<script src="interface-icons.js?v=543"></script>
+<script src="interface-icons.js?v=547"></script>
 <script src="asset-section-order.js?v=1"></script>
 <script src="character-animation-ui.js?v=474"></script>
 <script src="animation-publish-queue-core.js?v=474"></script>

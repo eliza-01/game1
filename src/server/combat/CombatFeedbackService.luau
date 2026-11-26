@@ -105,6 +105,15 @@ function CombatFeedbackService.PublishAttackOutcome(character: Model, aimedState
     if kind then publishLabel(character, kind) end
 end
 
+-- Only the server reward path publishes this after resolved stats are updated.
+function CombatFeedbackService.PublishLevelUp(character: Model, level: number, hpGain: number, attackGain: number)
+    if not started or not remote then return end
+    local player = Players:GetPlayerFromCharacter(character)
+    if not player or player.Character ~= character or character:GetAttribute("LifeState") ~= "Alive" then return end
+    remote:FireClient(player, {kind = "level-up", target = character, level = level,
+        hpGain = hpGain, attackGain = attackGain})
+end
+
 function CombatFeedbackService.Start()
     if started then return end
     started = true

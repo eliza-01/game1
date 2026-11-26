@@ -7,7 +7,7 @@
 <title>Characters</title>
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
 <link rel="stylesheet" href="asset-manager.css?v=505">
-<link rel="stylesheet" href="m337-options.css?v=449">
+<link rel="stylesheet" href="m337-options.css?v=548">
 <link rel="stylesheet" href="database-history.css?v=3">
 <link rel="stylesheet" href="atlas-library.css?v=435">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
@@ -456,7 +456,7 @@
 <div class="panel hero">
 <div><span class="eyebrow">common runtime settings · shared gameplay</span><h2>options</h2><p>project-wide settings that are not owned by one character, monster, weapon or animation clip.</p></div>
 </div>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">⚔️</span><span><strong>Combat & AI</strong><small>Состояния, атаки, возврат</small></span></summary>
+<details class="game1-option-section" data-option-section="combat"><summary><span class="game1-option-icon" aria-hidden="true">⚔️</span><span><strong>Combat & AI</strong><small>Состояния, атаки, возврат</small></span></summary>
 <div class="panel character-card">
 <div class="section-title"><div><span>combat</span><h3>combat state</h3></div><button id="refresh-options" type="button">refresh</button></div>
 <small class="hint">Shared combat timeout; return timer uses monster damage dealt.</small>
@@ -475,7 +475,7 @@
 <div class="actions"><button id="save-character-life-options" class="primary" type="button">save character animation options</button></div>
 </div>
 </details>
-<details class="game1-option-section" ><summary><span class="game1-option-icon" aria-hidden="true">🦘</span><span><strong>Movement</strong><small>Прыжок и приземление</small></span></summary>
+<details class="game1-option-section" data-option-section="movement" ><summary><span class="game1-option-icon" aria-hidden="true">🦘</span><span><strong>Movement</strong><small>Прыжок и приземление</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>character movement · shared gameplay</span><h3>Jump &amp; landing</h3></div></div>
   <small class="hint">Shared PC / Mobile; world gravity unchanged.</small>
@@ -486,7 +486,7 @@
   <div class="actions"><button id="save-player-jump-options" type="button" class="primary">Save jump options</button></div>
 </div>
 </details>
-<details class="game1-option-section" ><summary><span class="game1-option-icon" aria-hidden="true">🎥</span><span><strong>Camera</strong><small>Угол, скорость, пресеты</small></span></summary>
+<details class="game1-option-section" data-option-section="camera" ><summary><span class="game1-option-icon" aria-hidden="true">🎥</span><span><strong>Camera</strong><small>Угол, скорость, пресеты</small></span></summary>
 <div class="panel character-card game1-camera-options">
   <div class="section-title"><div><span>camera · saved runtime defaults</span><h3>Camera</h3></div><span class="muted">Studio Debug → draft → Save</span></div>
   <small class="hint">Studio preview → Save to publish.</small>
@@ -509,7 +509,7 @@
   </div>
 </div>
 </details>
-<details class="game1-option-section" id="option-character-creation-section"><summary><span class="game1-option-icon" aria-hidden="true">🎭</span><span><strong>Character Creation</strong><small>Сцена · внешность · анимации</small></span></summary>
+<details class="game1-option-section" data-option-section="character-creation" id="option-character-creation-section"><summary><span class="game1-option-icon" aria-hidden="true">🎭</span><span><strong>Character Creation</strong><small>Сцена · внешность · анимации</small></span></summary>
 <div class="panel character-card game1-creation-options">
   <details class="game1-creation-view game1-creation-subsection"><summary><strong>⚙ Общие</strong></summary>
     <div class="game1-creation-controls">
@@ -566,7 +566,7 @@
   <div class="actions"><button id="option-creation-save" type="button" class="primary">Сохранить Character Creation</button></div>
 </div>
 </details>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">⚙️</span><span><strong>Rotations</strong><small>Вращение механизмов · окружение</small></span></summary>
+<details class="game1-option-section" data-option-section="rotations"><summary><span class="game1-option-icon" aria-hidden="true">⚙️</span><span><strong>Rotations</strong><small>Вращение механизмов · окружение</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>location assets · runtime motion</span><h3>Windmill 02</h3></div></div>
   <div class="character-grid">
@@ -576,7 +576,7 @@
   <small class="hint">Лопасти и ткань вращаются синхронно вокруг общего центра. После Save — Rojo Sync / новый Play.</small>
   <div class="actions"><button id="option-rotation-save" class="primary" type="button">Save rotations</button></div>
 </div></details>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🍃</span><span><strong>Flora</strong><small>Контакт с деревьями/кустами · листья · resident assets</small></span></summary>
+<details class="game1-option-section" data-option-section="flora"><summary><span class="game1-option-icon" aria-hidden="true">🍃</span><span><strong>Flora</strong><small>Контакт с деревьями/кустами · листья · resident assets</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>Game Runtime · client-only VFX</span><h3>Foliage contact</h3></div></div>
   <small class="hint">Работает без CanCollide/Touched, по близости игрока к геометрии и его движению. Эффект локален для игрока. Resident assets — исключения из выгрузки ресурсов эффекта, не глобальное отключение LOD размещённых растений.</small>
@@ -595,14 +595,14 @@
   <small class="hint">В resident list разрешены только опубликованные Location Asset с одним MeshPart (до 8). Загружаются один раз сервером и прогреваются клиентом. Применение — Save → Rojo Sync → Studio Play.</small>
   <div class="actions"><button id="option-flora-save" class="primary" type="button">Save Flora</button></div>
 </div></details>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🎯</span><span><strong>Sockets · USE / AIM</strong><small>House, Campfire &amp; Windmill · интерактивные зоны</small></span></summary>
+<details class="game1-option-section" data-option-section="sockets"><summary><span class="game1-option-icon" aria-hidden="true">🎯</span><span><strong>Sockets · USE / AIM</strong><small>House, Campfire &amp; Windmill · интерактивные зоны</small></span></summary>
 <div class="panel character-card game1-socket-range-options">
   <div class="section-title"><div><span>authoritative socket reach · studs</span><h3>House, Campfire &amp; Windmill</h3></div></div>
   <small class="hint">USE — дистанция персонажа до сокета; AIM — радиус сферы наведения центральным прицелом. «—» означает, что AIM не используется. Точки HEAD / spawn / дым не интерактивны и не имеют редактируемых зон. Studio HS Debug меняет зоны временно; Save здесь сохраняет значения для опубликованной игры после Rojo Sync и нового Play.</small>
   <div id="option-sockets-fields" class="game1-socket-range-fields" aria-label="Socket interaction radius settings"></div>
   <div class="actions"><button id="option-sockets-save" class="primary" type="button">Save Socket Ranges</button></div>
 </div></details>
-<details class="game1-option-section" id="game1-language-options">
+<details class="game1-option-section" data-option-section="languages" id="game1-language-options">
   <summary><span class="game1-option-icon" aria-hidden="true">🌐</span><span><strong>Languages</strong><small>Игровой интерфейс · каталог · переводы всех языков</small></span></summary>
   <div class="panel character-card game1-languages-options">
     <div class="section-title"><div><span>Game Runtime only · Localization v1</span><h3>UI translations</h3></div><span id="game1-languages-status" class="muted" role="status">Открой раздел для загрузки каталога.</span></div>
@@ -615,7 +615,7 @@
     <div id="game1-language-items" class="game1-language-items"></div>
   </div>
 </details>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🪟</span><span><strong>UI</strong><small>Взаимодействия · прогресс · уведомления</small></span></summary>
+<details class="game1-option-section" data-option-section="ui"><summary><span class="game1-option-icon" aria-hidden="true">🪟</span><span><strong>UI</strong><small>Взаимодействия · прогресс · уведомления</small></span></summary>
 <div class="panel character-card game1-ui-layout-options">
   <div class="section-title"><div><span>ПК / мобильные устройства · pixels</span><h3>Presentation UI</h3></div></div>
   <small class="hint">Смещения от исходной позиции окна, в px. Отрицательные значения разрешены. Изменения в Studio Play → Import → Save; сохранённые настройки вступают в силу после Rojo Sync / нового Play.</small>
@@ -630,7 +630,7 @@
   </div>
   <div id="option-ui-draft-status" class="muted" role="status">No Studio UI draft yet.</div>
 </div></details>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">❤️</span><span><strong>Health UI</strong><small>Игрок, монстры, NPC · PC/Mobile</small></span></summary>
+<details class="game1-option-section" data-option-section="health"><summary><span class="game1-option-icon" aria-hidden="true">❤️</span><span><strong>Health UI</strong><small>Игрок, монстры, NPC · PC/Mobile</small></span></summary>
 <div class="panel character-card game1-health-ui-options">
   <div class="section-title"><div><span>combat appearance · separate PC / Mobile profiles</span><h3>Health bars</h3></div><span class="muted">Studio HP Debug → Import → Save</span></div>
   <small class="hint">PC / Mobile profiles. Colors: 30% red · 65% yellow · green.</small>
@@ -654,14 +654,14 @@
   <div class="actions"><button class="primary" id="option-npc-overhead-save" type="button">Save NPC display</button></div>
 </div>
 </details>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🌍</span><span><strong>World</strong><small>Terrain / MeshPart streaming</small></span></summary>
+<details class="game1-option-section" data-option-section="world"><summary><span class="game1-option-icon" aria-hidden="true">🌍</span><span><strong>World</strong><small>Terrain / MeshPart streaming</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>Workspace · both devices</span><h3>World streaming target</h3></div></div>
   <small class="hint">Только для авторского Studio Place. Runtime Build использует настройки из LOD Manager; радиус не является жёсткой границей видимости.</small>
   <div class="game1-hp-grid"><label>Shared target radius · studs <input type="number" id="option-world-streaming-radius" min="96" max="4096" step="1" value="150"></label></div>
   <div class="actions"><button type="button" id="option-world-streaming-save" class="primary">Save world streaming target</button><button type="button" id="option-world-streaming-copy">Copy Studio Command Bar code</button></div>
 </div></details>
-<details class="game1-option-section"><summary><span class="game1-option-icon" aria-hidden="true">🛠️</span><span><strong>Debug / TestPlace</strong><small>Права и видимость кнопок</small></span></summary>
+<details class="game1-option-section" data-option-section="debug"><summary><span class="game1-option-icon" aria-hidden="true">🛠️</span><span><strong>Debug / TestPlace</strong><small>Права и видимость кнопок</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>published TestPlace</span><h3>Debug and test controls</h3></div></div>
   <small class="hint">Published TestPlace only; authorized developer accounts.</small>
@@ -1305,7 +1305,7 @@
 <script src="skill-editor.js?v=531"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=543"></script>
+<script src="options.js?v=548"></script>
 <script src="character-creation-options.js?v=505"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>

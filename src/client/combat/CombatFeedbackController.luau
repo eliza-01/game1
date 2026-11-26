@@ -2,6 +2,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CombatFloatingText = require(script.Parent:WaitForChild("CombatFloatingText"))
 
+local LevelUpPresentation = require(script.Parent:WaitForChild("LevelUpPresentation"))
+
 local CombatFeedbackController = {}
 local started = false
 
@@ -18,6 +20,10 @@ function CombatFeedbackController.Start()
 
     remote.OnClientEvent:Connect(function(payload: any)
         if type(payload) ~= "table" then return end
+        if payload.kind == "level-up" then
+            LevelUpPresentation.Show(payload)
+            return
+        end
         if payload.kind == "miss" or payload.kind == "far" then
             if typeof(payload.position) == "Vector3" then
                 if payload.kind == "far" then

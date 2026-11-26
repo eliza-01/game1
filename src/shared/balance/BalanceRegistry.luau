@@ -243,7 +243,7 @@ return table.freeze({
             ["name"] = "Жаба (Toad)",
             ["runSpeed"] = 130,
             ["type"] = "melee",
-            ["xp"] = 12,
+            ["xp"] = 30,
         }),
         table.freeze({
             ["attackRange"] = 10,
@@ -257,7 +257,7 @@ return table.freeze({
             ["name"] = "Жаба (Toad)",
             ["runSpeed"] = 130,
             ["type"] = "melee",
-            ["xp"] = 21,
+            ["xp"] = 36,
         }),
         table.freeze({
             ["attackRange"] = 10,
@@ -271,7 +271,7 @@ return table.freeze({
             ["name"] = "Деревянный страж (Wooden Guardian)",
             ["runSpeed"] = 130,
             ["type"] = "melee",
-            ["xp"] = 32,
+            ["xp"] = 42,
         }),
         table.freeze({
             ["attackRange"] = 10,
@@ -285,7 +285,7 @@ return table.freeze({
             ["name"] = "Живое пугало (Living Scarecrow)",
             ["runSpeed"] = 130,
             ["type"] = "melee",
-            ["xp"] = 42,
+            ["xp"] = 48,
         }),
         table.freeze({
             ["attackRange"] = 10,
@@ -733,7 +733,7 @@ return table.freeze({
             ["name"] = "Мандрагора (Mandragora)",
             ["runSpeed"] = 120,
             ["type"] = "ranged",
-            ["xp"] = 12,
+            ["xp"] = 30,
         }),
         table.freeze({
             ["attackRange"] = 40,
@@ -747,7 +747,7 @@ return table.freeze({
             ["name"] = "Мандрагора (Mandragora)",
             ["runSpeed"] = 120,
             ["type"] = "ranged",
-            ["xp"] = 21,
+            ["xp"] = 36,
         }),
         table.freeze({
             ["attackRange"] = 40,
@@ -761,7 +761,7 @@ return table.freeze({
             ["name"] = "Мандрагора (Mandragora)",
             ["runSpeed"] = 120,
             ["type"] = "ranged",
-            ["xp"] = 32,
+            ["xp"] = 42,
         }),
         table.freeze({
             ["attackRange"] = 40,
@@ -775,7 +775,7 @@ return table.freeze({
             ["name"] = "Мандрагора (Mandragora)",
             ["runSpeed"] = 120,
             ["type"] = "ranged",
-            ["xp"] = 42,
+            ["xp"] = 48,
         }),
         table.freeze({
             ["attackRange"] = 40,

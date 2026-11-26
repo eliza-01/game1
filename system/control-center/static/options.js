@@ -441,3 +441,38 @@ $('option-flora-save').onclick=()=>{
     game1OptionsSave({flora},'Flora settings saved · Rojo Sync and restart Play');
   }catch(error){toast(error.message,true)}
 };
+
+// M548 · browser-local presentation only; moving existing nodes retains drafts.
+function game1InitOptionOrder(){
+  const key='game1.options.sectionOrder.v1';
+  const sections=Array.from(document.querySelectorAll('#options-view > .game1-option-section[data-option-section]'));
+  if(!sections.length)return;
+  const parent=sections[0].parentElement;
+  const getOrder=()=>Array.from(parent.querySelectorAll(':scope > .game1-option-section[data-option-section]'));
+  const byKey=new Map(sections.map(node=>[node.dataset.optionSection,node]));
+  let saved=[];
+  try{const value=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(value))saved=value}catch{}
+  const ordered=[...new Set([...saved,...byKey.keys()])].filter(id=>byKey.has(id));
+  for(const id of ordered)parent.appendChild(byKey.get(id));
+  const controls=new Map();
+  function refresh(){const nodes=getOrder();nodes.forEach((node,index)=>{const [up,down]=controls.get(node);up.disabled=index===0;down.disabled=index===nodes.length-1})}
+  function move(node,delta){
+    const nodes=getOrder(),index=nodes.indexOf(node),other=nodes[index+delta];if(!other)return;
+    if(delta<0)parent.insertBefore(node,other);else parent.insertBefore(other,node);
+    try{localStorage.setItem(key,JSON.stringify(getOrder().map(item=>item.dataset.optionSection)))}catch{}
+    refresh();
+  }
+  for(const node of sections){
+    const bar=document.createElement('span');bar.className='game1-option-order';
+    const name=node.querySelector('summary strong')?.textContent||node.dataset.optionSection;
+    const buttons=[-1,1].map(delta=>{
+      const button=document.createElement('button');button.type='button';button.textContent=delta<0?'↑':'↓';
+      button.title=button.ariaLabel=`Move ${name} ${delta<0?'up':'down'}`;
+      button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();move(node,delta)});
+      bar.appendChild(button);return button;
+    });
+    controls.set(node,buttons);node.querySelector('summary').appendChild(bar);
+  }
+  refresh();
+}
+game1InitOptionOrder();

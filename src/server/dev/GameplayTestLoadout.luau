@@ -148,6 +148,6 @@ function Loadout.Reward(player: Player, character: Model, target: Model)
     selection.xp = Balance.NormalizeXP(selection.xp + Balance.NormalizeXP(target:GetAttribute("RewardXP")))
     selection.gold = Balance.NormalizeGold(selection.gold + Balance.NormalizeGold(target:GetAttribute("RewardGold")))
     selection.level = Balance.LevelForXP(selection.xp)
-    ProgressionView.Publish(character, selection.xp, selection.gold)
+    ProgressionView.Publish(character, selection.xp, selection.gold, true)
 end
 return table.freeze(Loadout)

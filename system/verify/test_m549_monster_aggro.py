@@ -84,7 +84,7 @@ class MonsterAggro(unittest.TestCase):
             self.assertIn(token,runtime)
         self.assertNotIn('HuntingPlan.Aggro',read('src/server/dev/GameplayTestLayout.luau'))
         self.assertNotIn('testAggroRadius',read('src/server/dev/GameplayTestArena.luau'))
-        self.assertEqual(len(re.findall(r'duration=600',read('src/shared/combat/BuffDefinitions.luau'))),4)
+        self.assertEqual(sum(s['duration']==600 and s['id'].endswith('_d') for s in b.load()['skills']),4)
         self.assertIn('string.format("%d:%02d"',read('src/client/combat/BuffHud.luau'))
         self.assertIn("input.type='checkbox';input.checked=row.aggressive",read('system/control-center/static/game-balance.js'))
         self.assertIn('monster-spawn-aggro-radius',read('system/control-center/static/monster-spawns.js'))

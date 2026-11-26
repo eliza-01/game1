@@ -1,9 +1,9 @@
 /* Database authoring: stable item IDs, explicit model bindings, revision guarded save. */
 (() => {
-  let snapshot=null, tab='levels', busy=false, dirty=false, section='balance';
+  let snapshot=null, tab='levels', busy=false, dirty=false;
   const gradeNames=['Newbie','D','C','B','A','S','SS','SSS'];
   window.game1EquipmentGrade=level=>{const band=Math.max(0,Math.min(7,Math.floor(level/10)));return {name:gradeNames[band]+(level%10>=5?'+':''),required:Math.max(1,band*10)}};
-  const groups={rules:'Character',levels:'Levels',weapons:'Weapons',armor:'Armor',monsters:'Monsters',bindings:'Model bindings'};
+  const groups={rules:'Character',levels:'Levels',weapons:'Weapons',armor:'Armor',monsters:'Monsters',skills:'Skills',bindings:'Model bindings'};
   const fields={levels:['level','hp','attackBonus','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','nameEn','nameRu','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed','aggroRadiusStuds','aggressive']};
   const names={nameEn:'EN',nameRu:'RU',aggroRadiusStuds:'Aggro · studs',aggressive:'Aggressive',runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',attackBonus:'Level ATK bonus',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
   const labels={weapon:'Оружие',armor:'Броня',monster:'Монстр'};
@@ -30,9 +30,11 @@
   function speciesEdit(row,key,value,body){const group=row.nameEn? snapshot.balance.monsters.filter(r=>r.nameEn===row.nameEn):[row];for(const r of group){r[key]=value;const input=body.querySelector(`[data-row="${r.id}"][data-field="${key}"]`);if(input){if(key==='aggressive')input.checked=value;else if(document.activeElement!==input)input.value=value??''}}change()}
   function render(){
     $('balance-tabs').replaceChildren();$('balance-content').replaceChildren();$('balance-save').disabled=busy||!snapshot||!dirty;
-    for(const [key,title] of Object.entries(groups)){const b=node('button',title);b.type='button';b.className=key===tab?'primary':'';b.onclick=()=>{tab=key;render()};$('balance-tabs').append(b)}
+    for(const [key,title] of Object.entries(groups)){const b=node('button',title);b.type='button';b.className=key===tab?'primary':'';b.onclick=()=>{tab=key;$('balance-search').value='';render()};$('balance-tabs').append(b)}
+    $('balance-movement-disclosure').hidden=tab!=='weapons';
     if(!snapshot)return;
     queueMicrotask(applySearch);
+    if(tab==='skills'){window.game1RenderSkills($('balance-content'),snapshot,change,applySearch);return;}
     const d=snapshot.balance;
     if(tab==='rules'){
       const body=table(['Parameter','Value']);for(const [key,val] of Object.entries(d.rules)){const tr=node('tr');cell(tr,({baseRunSpeed:'RunSpeed · /10 studs/s',monsterCastSeconds:'Special cast · s',critChance:'Unarmed crit %',maxCritChance:'Max crit %',critMultiplier:'Crit damage ×'}[key]||key));cell(tr,number(val,v=>d.rules[key]=v));body.append(tr)}return;
@@ -77,13 +79,11 @@
     finally{logsLoading=false;refresh.disabled=false}
   }
   $('balance-logs-refresh').onclick=loadLogs;
-  window.game1BalanceOpen=(target=section)=>{
-    section=target;
-    for(const [key,panel,nav] of [['balance','balance-panel','nav-balance'],['skills','skills-panel','nav-skills'],['history','database-history-panel','nav-asset-audit'],['logs','balance-logs-panel','nav-balance-logs']]){
+  window.game1BalanceOpen=(target='main')=>{
+    for(const [key,panel,nav] of [['main','balance-panel','nav-balance'],['history','database-history-panel','nav-asset-audit'],['logs','balance-logs-panel','nav-balance-logs']]){
       $(panel).hidden=target!==key;$(nav).classList.toggle('active',target===key);
     }
-    if(target==='skills')window.game1SkillsOpen?.();
-    else if(target==='history')window.game1AssetAuditLoad?.();
+    if(target==='history')window.game1AssetAuditLoad?.();
     else if(target==='logs')loadLogs();
     else {load();window.game1WeaponMovementLoad?.()}
   };

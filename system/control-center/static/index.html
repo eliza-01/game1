@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="shared-asset-retirement.css?v=2">
 <link rel="stylesheet" href="asset-manager.css?v=505">
 <link rel="stylesheet" href="m337-options.css?v=548">
-<link rel="stylesheet" href="database-history.css?v=3">
+<link rel="stylesheet" href="database-history.css?v=555">
 <link rel="stylesheet" href="atlas-library.css?v=435">
 <link rel="stylesheet" href="asset-section-order.css?v=1">
 <link rel="stylesheet" href="character-animations.css?v=469">
@@ -46,8 +46,8 @@
 <button id="nav-location-assets" class="asset-section" type="button"><b>location assets</b><small>flora · structure · prop</small></button>
 <button id="nav-place-registry" class="asset-section" type="button"><b>place registry</b><small>location assets · audit · repair · revisions</small></button>
 <button id="nav-lod-manager" class="asset-section" type="button"><b>LOD Manager</b><small>scan · snapshots · readiness</small></button>
-<button id="nav-database" class="asset-section" type="button"><b>database</b><small>balance · asset history</small></button>
-<div id="database-nav" class="database-subnav" hidden><button id="nav-balance" type="button" class="database-subnav-item">Balance</button><button id="nav-skills" type="button" class="database-subnav-item">Skills</button><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button><button id="nav-balance-logs" type="button" class="database-subnav-item">Logs</button></div>
+<button id="nav-database" class="asset-section" type="button"><b>database</b><small>main · asset history · logs</small></button>
+<div id="database-nav" class="database-subnav" hidden><button id="nav-balance" type="button" class="database-subnav-item">Main</button><button id="nav-asset-audit" type="button" class="database-subnav-item">Asset History</button><button id="nav-balance-logs" type="button" class="database-subnav-item">Logs</button></div>
 <button id="nav-interface" class="asset-section" type="button"><b>interface</b><small>icons · monsters · skills</small></button>
 <button id="nav-atlas" class="asset-section" type="button"><b>atlas</b><small>variants · consumers · retirement</small></button>
 <button id="nav-real-estate" class="asset-section" type="button"><b>real estate</b><small>houses · any mesh rigs · textures</small></button>
@@ -152,7 +152,7 @@
 <div id="ca-parts" class="ca-parts-grid"></div>
 <div id="ca-mix" class="character-flow-note ca-outfit-state" aria-live="polite"></div>
 <div id="ca-readiness" class="character-flow-note ca-readiness-state" aria-live="polite"></div>
-<details class="ca-stats" open><summary>Starting stats</summary><p class="muted">Combat AttackSpeed and RunSpeed are owned by Database → Balance → Character. The recipe value is retained for authoring compatibility only.</p><div id="ca-stats" class="ca-grid"></div></details>
+<details class="ca-stats" open><summary>Starting stats</summary><p class="muted">Combat AttackSpeed and RunSpeed are owned by Database → Main → Character. The recipe value is retained for authoring compatibility only.</p><div id="ca-stats" class="ca-grid"></div></details>
 <div class="actions ca-editor-actions"><button id="ca-save" type="button" disabled>Save recipe &amp; starting stats</button><button id="ca-reset" class="character-reset" type="button">Reset edits</button><button type="button" class="character-help" aria-label="О сохранении и Startup" data-character-tip="Save сохраняет рецепт и стартовые характеристики в проект. Studio получает реестр через Rojo. Для Startup нужны опубликованные части; изменения проверяются при новом Play.">?</button></div>
 <div id="ca-status" role="status" aria-live="polite"></div>
 </section>
@@ -670,17 +670,13 @@
   <label class="game1-published-debug-toggle"><input type="checkbox" id="option-started-language">Started language</label>
   <label>Start language <select id="option-start-locale"><option value="auto">Saved / device</option><option value="ru-ru">Русский</option><option value="en-us">English</option><option value="de-de">Deutsch</option><option value="zh-cn">简体中文</option><option value="it-it">Italiano</option><option value="es-es">Español</option><option value="fr-fr">Français</option><option value="pt-br">Português (Brasil)</option><option value="ja-jp">日本語</option><option value="ko-kr">한국어</option></select></label>
   <div class="actions"><button id="option-published-debug-save" class="primary" type="button">Save debug settings</button></div>
-<hr class="card-separator">
-<details id="skilled-monsters-disclosure"><summary>Skilled Monsters · Studio gameplay test</summary>
-<div class="actions"><button id="skilled-reload" type="button">Refresh</button><button id="skilled-save" class="primary" type="button" disabled>Save test profiles</button></div>
-<div id="skilled-editor"></div><p id="skilled-status" role="status" class="muted"></p>
-</details>
+
 </div></details>
 </div>
 
 <div id="weapons-view" hidden>
 <div class="panel hero">
-<div><span class="eyebrow">weapon assets · canonical game1 registry</span><h2>weapons</h2><p>FBX, textures, weapon type and Roblox Asset IDs. Gameplay records and model bindings live in Database → Balance.</p></div>
+<div><span class="eyebrow">weapon assets · canonical game1 registry</span><h2>weapons</h2><p>FBX, textures, weapon type and Roblox Asset IDs. Gameplay records and model bindings live in Database → Main.</p></div>
 <div class="metrics"><div><b id="weapon-metric-total">0</b><span>registered</span></div><div><b id="weapon-metric-published">0</b><span>published</span></div><div><b id="weapon-metric-active">0</b><span>startup</span></div></div>
 </div>
 <div class="panel runtime-card"><div id="weapon-runtime-state" class="runtime-state bootstrap"><strong>unarmed</strong><span>no startup weapon selected.</span></div><div id="weapon-publication-state" class="publication-missing">open cloud: checking…</div></div>
@@ -696,7 +692,7 @@
 <div class="character-grid"><label>name en<input id="weapon-name-en" autocomplete="off"></label><label>name ru<input id="weapon-name-ru" autocomplete="off"></label></div>
 <label>slug<input id="weapon-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="character-grid"><label>type<select id="weapon-type"></select></label></div>
-<small class="muted">Игровые характеристики и привязки — Database → Balance.</small>
+<small class="muted">Игровые характеристики и привязки — Database → Main.</small>
 
 <hr class="card-separator">
 <span class="eyebrow">02 · source assets</span>
@@ -950,20 +946,16 @@
 <div><span class="eyebrow">game1 · gameplay & asset database</span><h2>Database</h2></div>
 </div>
 <div id="balance-panel" class="panel">
-<div class="section-title"><div><span>01 · Gameplay</span><h3>Balance · LVL 1–35</h3></div><div class="actions"><button id="balance-reload" type="button">Refresh</button><button id="balance-save" class="primary" type="button" disabled>Save balance</button></div></div>
+<div class="section-title"><div><span>Database</span><h3>Main</h3></div><div class="actions"><button id="balance-reload" type="button">Refresh</button><button id="balance-save" class="primary" type="button" disabled>Save changes</button></div></div>
 <div id="balance-tabs" class="actions"></div><input id="balance-search" type="search" placeholder="Search Database · EN / RU / ID / level" aria-label="Search Database">
 <div id="balance-content" class="table-wrap"></div>
 <p id="balance-status" role="status" aria-live="polite" class="muted"></p>
-<details class="panel character-card"><summary>Attack movement · animation context</summary>
+<details id="balance-movement-disclosure" class="panel character-card" hidden><summary>Attack movement · animation context</summary>
 <div class="section-title"><div><span>attack movement by weapon type</span><h3>live lower-body locomotion policy</h3></div></div>
 <small class="hint">all values are authored data, not controller constants. movement % is a fraction of RunSpeed used for the complete attack. legs select which locomotion clip stays live under the upper-body attack. animation set maps the gameplay type to its animation context.</small>
 <div id="weapon-attack-movement-rules" class="weapon-attack-movement-rules"><span class="muted">loading attack movement rules…</span></div>
 </details>
 
-</div>
-<div id="skills-panel" class="panel" hidden>
-<div class="section-title"><div><span>Database · gameplay</span><h3>Skills</h3></div><div class="actions"><button id="skills-reload" type="button">Refresh</button><button id="skills-save" class="primary" type="button" disabled>Save skills</button></div></div>
-<div id="skills-editor" class="table-wrap"></div><p id="skills-status" role="status" class="muted"></p>
 </div>
 <div id="balance-logs-panel" class="panel database-history-panel" hidden>
 <div class="section-title"><div><span>Database</span><h3>Logs</h3></div><button id="balance-logs-refresh" type="button">Refresh</button></div>
@@ -1263,7 +1255,7 @@
 <div id="app-busy-overlay" class="app-busy-overlay" hidden><div class="app-busy-card"><div class="app-busy-spinner" aria-hidden="true"></div><div id="app-busy-text">Processing…</div></div></div>
 <script src="publication-descriptions.js?v=1"></script>
 <script src="asset-name-defaults.js?v=437"></script>
-<script src="character-assets.js?v=543"></script>
+<script src="character-assets.js?v=555"></script>
 <script src="interface-icons.js?v=547"></script>
 <script src="asset-section-order.js?v=1"></script>
 <script src="character-animation-ui.js?v=474"></script>
@@ -1301,8 +1293,8 @@
 <script src="lod-reuse-picker.js?v=411"></script>
 <script src="location-asset-workflow.js?v=453"></script>
 <script src="asset-audit.js?v=2"></script>
-<script src="game-balance.js?v=552"></script>
-<script src="skill-editor.js?v=531"></script>
+<script src="game-balance.js?v=555"></script>
+<script src="skill-editor.js?v=555"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
 <script src="options.js?v=548"></script>
@@ -1310,7 +1302,7 @@
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>
 <script src="weapon-assets.js?v=514"></script>
-<script src="weapon-workflow.js?v=514"></script>
+<script src="weapon-workflow.js?v=555"></script>
 <script src="arrow-assets.js?v=437"></script>
 <script src="monster-assets.js?v=437"></script>
 <script src="npc-assets.js?v=437"></script>

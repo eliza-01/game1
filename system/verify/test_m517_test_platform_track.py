@@ -16,7 +16,7 @@ class TestZonePlatform(unittest.TestCase):
         self.assertIn('deck(parent,platform.name,platform.top',arena)
         self.assertIn('math.ceil(width/1024)',arena)
         self.assertIn('math.ceil(depth/1024)',arena)
-        self.assertIn('Arena.Warp(character, s.layout.slots[monster.id].visit,true)',service)
+        self.assertIn('Arena.Warp(character, s.layout.hub,true)',service)
         self.assertIn('wall.CanCollide=false; wall.CanTouch=false; wall.CanQuery=false',arena)
         self.assertIn('wall.Transparency=0.82',arena)
         for width in (64,216,1536,2048,3000):

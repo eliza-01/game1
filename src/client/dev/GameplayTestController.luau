@@ -144,6 +144,8 @@ function Controller.Start()
             local _, required = Balance.Grade.ForLevel(weapon().level)
             return math.max(required, armor().level)
         end
+        local navigation = row(body, 30)
+        local hub = contentButton(navigation, "Hub", 30); hub.BackgroundColor3=colors.accent
         local first = row(body, 46); horizontal(first)
         local refreshUpgrade: (() -> ())? = nil
         local refreshLevel = picker(cell(first, "Level"), "Level", function()
@@ -194,7 +196,7 @@ function Controller.Start()
             refreshMonster()
         end)
         local group = cell(third, "Group")
-        local start = contentButton(group, "Start", 30); start.BackgroundColor3=colors.accent
+        local start = contentButton(group, "Spawn", 30); start.BackgroundColor3=colors.accent
         start.AnchorPoint = Vector2.new(1, 0); start.Position = UDim2.new(1, 0, 0, 16)
         picker(group, "Group size", function() return tostring(count) end, function(d) count=wrap(count,d,Balance.Test.maxGroup) end, start.Size.X.Offset + 4)
         local recoveryRow = row(body, 46); horizontal(recoveryRow)
@@ -246,7 +248,7 @@ function Controller.Start()
             if refreshCrit then refreshCrit() end
             status.Text="Stock loadout applied · +0"
         end)
-        local closeOnSuccess = {enter=true, apply=true, start=true, visit=true, exit=true, guideNext=true}
+        local closeOnSuccess = {enter=true, apply=true, start=true, hub=true, exit=true, guideNext=true}
         invoke = function(action: string)
             if action == "enter" or action == "apply" or action == "start" or action == "exit" then
                 recoveryRevision += 1
@@ -303,8 +305,7 @@ function Controller.Start()
         enterButton.Activated:Connect(function() invoke(if player:GetAttribute("Game1GameplayTestActive") then "apply" else "enter") end)
         local stop = contentButton(actions, "Stop group", 30); stop.Activated:Connect(function() invoke("stop") end)
         local exitButton = contentButton(actions, "Exit", 30); exitButton.Activated:Connect(function() invoke("exit") end)
-        local navigation = row(body, 30)
-        local visit = contentButton(navigation, "Go", 30); visit.Activated:Connect(function() invoke("visit") end)
+        hub.Activated:Connect(function() invoke("hub") end)
         start.Activated:Connect(function() invoke("start") end)
         local guideRow=row(body,30); horizontal(guideRow)
         for _,action in ipairs({{"Guided","guideBegin"},{"Next","guideNext"},{"Export","guideExport"},{"Done","guideDone"},{"Cancel","guideAbort"}}) do

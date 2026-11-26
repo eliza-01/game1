@@ -10,7 +10,7 @@ local Healing = require(script.Parent:WaitForChild("CharacterHealing"))
 local CharacterRegenerationService = {}
 local started = false
 local accumulator = 0
-local STEP = 0.2
+local STEP = 1
 
 function CharacterRegenerationService.Start()
     if started then return end
@@ -19,8 +19,8 @@ function CharacterRegenerationService.Start()
     RunService.Heartbeat:Connect(function(dt)
         accumulator += math.clamp(dt, 0, 0.5)
         if accumulator < STEP then return end
-        local elapsed = accumulator
-        accumulator = 0
+        local elapsed = math.floor(accumulator / STEP) * STEP
+        accumulator -= elapsed
         for _, player in ipairs(Players:GetPlayers()) do
             local character = player.Character
             if character then

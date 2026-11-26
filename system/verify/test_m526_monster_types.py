@@ -45,7 +45,7 @@ class MonsterTypes(unittest.TestCase):
         service = read('src/server/dev/GameplayTestService.luau')
         self.assertIn('Balance.Monster(request.monsterId)', service)
         self.assertIn('startGroup(s, monster, request.count)', service)
-        self.assertIn('s.layout.slots[monster.id].visit', service)
+        self.assertIn('Arena.Warp(character, s.layout.hub,true)', service)
 
     def test_isolation_gates_all_target_transitions(self):
         policy = read('src/server/monster/MonsterTargetPolicy.luau')

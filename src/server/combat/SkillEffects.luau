@@ -8,6 +8,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
 local Buffs = require(Shared:WaitForChild("combat"):WaitForChild("BuffDefinitions"))
 local Stats = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
+local Healing = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterHealing"))
 local Effects = {}
 local connections = setmetatable({}, {__mode="k"})
 local active = setmetatable({}, {__mode="k"})
@@ -18,7 +19,7 @@ end
 local function publish(model: Model, state: any)
     local effects = {}
     for effect in pairs(state) do
-        table.insert(effects, names[effect])
+        table.insert(effects, state[effect].name or names[effect])
     end
     table.sort(effects)
     model:SetAttribute("ActiveSkillEffects", if #effects>0 then table.concat(effects," · ") else nil)
@@ -31,11 +32,12 @@ local function publish(model: Model, state: any)
     -- is resolved by the existing stat service, never multiplied twice.
     model:SetAttribute("SkillDamageMultiplier", if state.might and not player then 1+state.might.power/100 else nil)
     if player then
-        if state.might or state.earth or state.wind then
+        if state.might or state.earth or state.wind or state.haste then
             Stats.SetModifierSource(model, "skill-buffs", {
                 DamagePercent=if state.might then state.might.power else 0,
                 MaxHPPercent=if state.earth then state.earth.power else 0,
                 RunSpeed=if state.wind then state.wind.power else 0,
+                AttackSpeedPercent=if state.haste then state.haste.power else 0,
             })
         else
             Stats.ClearModifierSource(model,"skill-buffs")
@@ -46,8 +48,17 @@ local function publish(model: Model, state: any)
             local entry = state[row.effect]
             model:SetAttribute("BuffUntil_"..row.effect, if entry then entry.expiresAt else nil)
         end
+    elseif model:GetAttribute("Game1MonsterRuntime") == true then
+        local baseHP = tonumber(model:GetAttribute("BaseMaxHP"))
+        if baseHP then
+            local maxHP = if state.earth then math.floor(baseHP*(1+state.earth.power/100)+.5) else baseHP
+            model:SetAttribute("MaxHP",maxHP)
+            local hp=tonumber(model:GetAttribute("HP")) or 0
+            if hp>maxHP then model:SetAttribute("HP",maxHP) end
+        end
+        model:SetAttribute("SkillRunSpeedBonus",if state.wind then state.wind.power else nil)
     end
-    model:SetAttribute("SkillAttackSpeedMultiplier", if state.haste then 1+state.haste.power/100 else nil)
+    model:SetAttribute("SkillAttackSpeedMultiplier", if state.haste and not player then 1+state.haste.power/100 else nil)
 end
 local function release(target: Model)
     active[target] = nil
@@ -68,12 +79,13 @@ function Effects.Clear(target: Model, preserveBuffs: boolean?)
     if target.Parent then publish(target,state) end
     if next(state)==nil then release(target) end
 end
-function Effects.Apply(source: Model, target: Model, skill: any, baseDamage: number): boolean
+function Effects.Apply(source: Model, target: Model, skill: any, baseDamage: number, refreshPurchasedBuff: boolean?): boolean
     if not alive(source) or not alive(target) then return false end
     if source ~= target and not Isolation.Allows(source,target) then return false end
     local effect = skill.effect
     if not names[effect] then return false end
-    if (effect=="earth" or effect=="life" or effect=="wind") and not Players:GetPlayerFromCharacter(target) then return false end
+    if (effect=="earth" or effect=="life" or effect=="wind") and not Players:GetPlayerFromCharacter(target)
+        and target:GetAttribute("Game1MonsterRuntime") ~= true then return false end
     local state = active[target]
     if not state then
         state = {}; active[target]=state
@@ -84,8 +96,13 @@ function Effects.Apply(source: Model, target: Model, skill: any, baseDamage: num
             target.Destroying:Connect(function() release(target) end),
         }
     end
-    if state[effect] then return false end -- same effect never stacks or refreshes
-    local entry = {power=skill.power,expiresAt=Workspace:GetServerTimeNow()+skill.duration}; state[effect]=entry
+    -- Only the server-validated shop may replace a live D-buff. Other casts
+    -- retain their existing non-refresh policy. Replacing the entry cancels
+    -- its old expiry callback by identity, rather than adding durations.
+    local canRefresh = refreshPurchasedBuff == true and source == target
+        and Players:GetPlayerFromCharacter(target) ~= nil and Buffs.ByEffect[effect] == skill
+    if state[effect] and not canRefresh then return false end
+    local entry = {power=skill.power,name=skill.name,expiresAt=Workspace:GetServerTimeNow()+skill.duration}; state[effect]=entry
     if effect == "stun" then
         target:SetAttribute("SkillStunEpoch", (tonumber(target:GetAttribute("SkillStunEpoch")) or 0)+1)
     end
@@ -100,6 +117,18 @@ function Effects.Apply(source: Model, target: Model, skill: any, baseDamage: num
                 if amount>0 then Damage.Apply(source,target,amount,false,true) end
             end)
         end
+    end
+    -- Players already receive Life through CharacterRegenerationService.
+    -- Monsters use the same healing authority and one cancellable tick loop.
+    if effect == "life" and not Players:GetPlayerFromCharacter(target) then
+        task.spawn(function()
+            while active[target] == state and state[effect] == entry and alive(target) do
+                task.wait(1)
+                if active[target] ~= state or state[effect] ~= entry or not alive(target)
+                    or Workspace:GetServerTimeNow() > entry.expiresAt then break end
+                Healing.Restore(target,entry.power)
+            end
+        end)
     end
     task.delay(skill.duration+0.01,function()
         if active[target] ~= state or state[effect] ~= entry then return end

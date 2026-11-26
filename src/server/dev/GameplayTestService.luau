@@ -384,11 +384,10 @@ local function dispatch(player: Player, action: any, request: any)
         if character:GetAttribute("AttackEndsAt")~=nil or not Effects.CanCast(character) then return result(false,"Cannot receive buffs now") end
         local definition=if type(request.effect)=="string" then Buffs.ByEffect[request.effect] else nil
         if not definition then return result(false,"Unknown buff") end
-        if Effects.IsActive(character,definition.effect) then return result(false,"Already active") end
         local selection=Loadout.Get(player)
         if not selection or selection.gold<BufferConfig.Price then return result(false,"Not enough gold") end
         if not Loadout.PurchaseBuff(player,character,function()
-            return Effects.Apply(character,character,definition,0)
+            return Effects.Apply(character,character,definition,0,true)
         end) then return result(false,"Buff not applied") end
         fixture.lift()
         return result(true,"Buff received")
@@ -400,6 +399,15 @@ local function dispatch(player: Player, action: any, request: any)
         return result(ok, if ok then "Recovery settings applied" else tostring(reason))
     end
     if action == "stop" then clearGroup(s); return result(true, "Group cleared") end
+    if action == "hub" then
+        local character = alive(player)
+        if not character then return result(false, "Respawn first") end
+        if character:GetAttribute("AttackEndsAt") ~= nil then return result(false, "Finish current attack first") end
+        clearGroup(s)
+        Arena.Warp(character, s.layout.hub,true)
+        updateHubSpeed(s)
+        return result(true, "Returned to Hub")
+    end
     local monster = if type(request.monsterId) == "string" then Balance.Monster(request.monsterId) else nil
     if monster and not s.layout.slots[monster.id] then return result(false,"Monster not enabled on test stand") end
     if action == "apply" or action == "start" then
@@ -409,15 +417,6 @@ local function dispatch(player: Player, action: any, request: any)
         local applied = apply(s, selection)
         if not applied.ok or action == "apply" then return applied end
         return startGroup(s, monster, request.count)
-    end
-    if action == "visit" and monster then
-        local character = alive(player)
-        if not character then return result(false, "Respawn first") end
-        if character:GetAttribute("AttackEndsAt") ~= nil then return result(false, "Finish current attack first") end
-        clearGroup(s)
-        Arena.Warp(character, s.layout.slots[monster.id].visit,true)
-        updateHubSpeed(s)
-        return result(true, "At selected monster")
     end
     return result(false, "Unknown action")
 end

@@ -25,11 +25,11 @@ class BufferShop(unittest.TestCase):
         for token in ('actor~=s.player','not allowed(actor)','not active(s)','s.guide','s.groupStarting','#s.group>0','Game1GameplayTestOwner','part:IsDescendantOf(s.folder)','BufferConfig.InteractionDistance'):
             self.assertIn(token,guard)
         buy = service.split('if action == "buyBuff"',1)[1].split('if action == "recovery"',1)[0]
-        for token in ('bufferCharacter(s,player,fixture.root)','Effects.CanCast(character)','Buffs.ByEffect[request.effect]','Effects.IsActive(character,definition.effect)','selection.gold<BufferConfig.Price','Loadout.PurchaseBuff','Effects.Apply(character,character,definition,0)','fixture.lift()'):
+        for token in ('bufferCharacter(s,player,fixture.root)','Effects.CanCast(character)','Buffs.ByEffect[request.effect]','selection.gold<BufferConfig.Price','Loadout.PurchaseBuff','Effects.Apply(character,character,definition,0,true)','fixture.lift()'):
             self.assertIn(token,buy)
         self.assertNotIn('request.price',buy)
         self.assertNotIn('request.gold',buy)
-        self.assertLess(buy.index('Effects.IsActive'),buy.index('Loadout.PurchaseBuff'))
+        self.assertNotIn('Effects.IsActive(character,definition.effect)',buy)
         self.assertLess(buy.index('Loadout.PurchaseBuff'),buy.index('fixture.lift()'))
         self.assertIn('if busy[player] then',service)
         dummy = read('src/server/dev/GameplayBufferDummy.luau')

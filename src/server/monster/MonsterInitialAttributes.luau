@@ -41,6 +41,7 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("InCombat", false)
     model:SetAttribute("CombatState", "Peace")
     model:SetAttribute("CombatUntilServerTime", 0)
+    model:SetAttribute("BaseMaxHP", maxHP)
     model:SetAttribute("MaxHP", maxHP)
     model:SetAttribute("HP", maxHP)
     model:SetAttribute("Damage", if balance then balance.damage else math.max(0, finite(stats.Damage, 10)))

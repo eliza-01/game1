@@ -205,8 +205,13 @@ local function updateVisibility()
         local zone = model:GetAttribute("GameplayTestZone")
         local release = typeof(zone) == "number" and zone <= 6
         local sameZone = release and playerZone == zone and model:GetAttribute("Game1GameplayTestOwner") == player.UserId
-        view.SetIcon(alive and sameZone, playerLevel)
-        if release then
+        local group = model:GetAttribute("GameplayTestKind") == "group"
+            and model:GetAttribute("Game1GameplayTestOwner") == player.UserId
+        view.SetIcon(alive and (sameZone or (group and inRange)), playerLevel)
+        if group then
+            view.SetSegments(alive and inRange, alive and inRange
+                and (HealthUiSettings.ShowAllMonsters() or focused or attackingUs))
+        elseif release then
             -- Portraits across the current zone; titles only nearby; HP when engaged.
             view.SetSegments(alive and sameZone and inRange, alive and sameZone and inRange
                 and (HealthUiSettings.ShowAllMonsters() or focused or attackingUs))

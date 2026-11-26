@@ -34,3 +34,12 @@
 
 /* Independent vertical spacing: hero and history panel are sibling panels. */
 #database-view > .panel + .panel{margin-top:14px}
+
+/* Main: one navigation hierarchy and compact skill tables. */
+#balance-tabs{margin-bottom:12px;flex-wrap:wrap}
+#balance-search{width:min(100%,420px);margin-bottom:12px}
+.database-skill-tabs{border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:12px;flex-wrap:wrap}
+.database-skill-actions{margin:8px 0 12px}
+#balance-content .character-card{margin:8px 0}
+#balance-content tr[hidden]{display:none}
+#balance-movement-disclosure[hidden]{display:none}

@@ -17,8 +17,15 @@ function Hud.Start(gui: ScreenGui,plate: Frame)
     -- including the fullscreen receipt canvas even when no buffs are active.
     local strip=Instance.new("Frame"); strip.Name="BuffStrip"; strip.BackgroundTransparency=1; strip.Size=UDim2.fromOffset(132,42)
     strip.Active=false; strip:SetAttribute("WorldInputPassthrough", true); strip.Parent=gui
+    -- Receipts must render ABOVE the shop (DisplayOrder 60), not behind its backdrop.
+    local receiptGui=Instance.new("ScreenGui")
+    receiptGui.Name="Game1BuffReceipts"; receiptGui.DisplayOrder=61
+    receiptGui.IgnoreGuiInset=gui.IgnoreGuiInset; receiptGui.ResetOnSpawn=false
+    receiptGui.Enabled=gui.Enabled; receiptGui.Parent=gui.Parent
+    gui:GetPropertyChangedSignal("Enabled"):Connect(function() receiptGui.Enabled=gui.Enabled end)
+    gui.Destroying:Connect(function() receiptGui:Destroy() end)
     local receipts=Instance.new("Frame"); receipts.Name="BuffReceipts"; receipts.BackgroundTransparency=1; receipts.Size=UDim2.fromScale(1,1)
-    receipts.Active=false; receipts:SetAttribute("WorldInputPassthrough", true); receipts.Parent=gui
+    receipts.Active=false; receipts:SetAttribute("WorldInputPassthrough", true); receipts.Parent=receiptGui
     local player=Players.LocalPlayer
     local watched: Model?=nil; local slots: {[string]: any}={}; local elapsed=0
     local function reset()
@@ -26,22 +33,24 @@ function Hud.Start(gui: ScreenGui,plate: Frame)
     end
     local function receive(character: Model,row: any,slot: any,ordinal: number)
         Visuals.Play(character,row.color)
-        local toast=icon(receipts,row,48); toast.ZIndex=5
+        if slot.toast then slot.toast:Destroy() end
+        slot.icon.Visible=false; slot.timer.Visible=false
+        local toast=icon(receipts,row,48,5)
         toast.Position=UDim2.new(.5,-100,.34,math.min(ordinal-1,3)*52)
-        local text=label(toast,17); text.Position=UDim2.fromOffset(58,0); text.Size=UDim2.fromOffset(220,48); text.TextXAlignment=Enum.TextXAlignment.Left; text.TextColor3=row.color; text.ZIndex=6
+        local text=label(toast,17); text.Position=UDim2.fromOffset(58,0); text.Size=UDim2.fromOffset(220,48); text.TextXAlignment=Enum.TextXAlignment.Left; text.TextColor3=row.color; text.ZIndex=7
         local gain=tonumber(character:GetAttribute("BuffGain_"..row.effect)) or 0
         text.Text=string.format("%s  +%g %s",row.name,math.round(gain*100)/100,row.unit)
         slot.toast=toast
         task.delay(1.1,function()
-            if slots[row.effect]~=slot or not toast.Parent then return end
+            if slots[row.effect]~=slot or slot.toast~=toast or not toast.Parent then return end
             local fade=TweenService:Create(text,TweenInfo.new(.18),{TextTransparency=1,TextStrokeTransparency=1}); fade:Play()
             fade.Completed:Wait()
-            if slots[row.effect]~=slot or not toast.Parent then return end
+            if slots[row.effect]~=slot or slot.toast~=toast or not toast.Parent then return end
             text:Destroy()
             local destination=slot.icon.AbsolutePosition-receipts.AbsolutePosition
             local flight=TweenService:Create(toast,TweenInfo.new(.4,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Position=UDim2.fromOffset(destination.X,destination.Y),Size=slot.icon.Size})
             flight:Play(); flight.Completed:Wait()
-            if slots[row.effect]==slot and slot.icon.Parent then slot.icon.Visible=true; slot.timer.Visible=true; slot.toast=nil end
+            if slots[row.effect]==slot and slot.toast==toast and slot.icon.Parent then slot.icon.Visible=true; slot.timer.Visible=true; slot.toast=nil end
             toast:Destroy()
         end)
     end
@@ -69,6 +78,9 @@ function Hud.Start(gui: ScreenGui,plate: Frame)
                     local tile=icon(strip,row,28); tile.Visible=false
                     local timer=label(strip,10); timer.Size=UDim2.fromOffset(28,12); timer.Visible=false
                     slot={icon=tile,timer=timer}; slots[row.effect]=slot
+                end
+                if slot.untilTime~=untilTime then
+                    slot.untilTime=untilTime
                     receive(character,row,slot,index)
                 end
                 slot.icon.Position=UDim2.fromOffset((index-1)*33,0)

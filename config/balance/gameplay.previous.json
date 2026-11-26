@@ -742,7 +742,7 @@
       "attackSpeed": 100,
       "runSpeed": 130,
       "aggressive": true,
-      "aggroRadiusStuds": 20,
+      "aggroRadiusStuds": 52,
       "nameRu": "Жаба",
       "nameEn": "Toad"
     },
@@ -759,7 +759,7 @@
       "attackSpeed": 100,
       "runSpeed": 130,
       "aggressive": true,
-      "aggroRadiusStuds": 20,
+      "aggroRadiusStuds": 52,
       "nameRu": "Жаба",
       "nameEn": "Toad"
     },
@@ -1945,7 +1945,7 @@
     {
       "id": "skill_poison",
       "name": "Poison",
-      "owner": "monster",
+      "owner": "shared",
       "effect": "poison",
       "duration": 10,
       "cooldown": 12,
@@ -1955,7 +1955,7 @@
     {
       "id": "skill_bleed",
       "name": "Bleed",
-      "owner": "monster",
+      "owner": "shared",
       "effect": "bleed",
       "duration": 10,
       "cooldown": 15,
@@ -1965,7 +1965,7 @@
     {
       "id": "skill_slow",
       "name": "Slow",
-      "owner": "monster",
+      "owner": "shared",
       "effect": "slow",
       "duration": 10,
       "cooldown": 15,
@@ -1975,7 +1975,7 @@
     {
       "id": "skill_root",
       "name": "Root",
-      "owner": "monster",
+      "owner": "shared",
       "effect": "root",
       "duration": 5,
       "cooldown": 15,
@@ -1985,7 +1985,7 @@
     {
       "id": "skill_stun",
       "name": "Stun",
-      "owner": "monster",
+      "owner": "shared",
       "effect": "stun",
       "duration": 3,
       "cooldown": 18,
@@ -1995,7 +1995,7 @@
     {
       "id": "skill_silence",
       "name": "Global Silence",
-      "owner": "monster",
+      "owner": "shared",
       "effect": "silence",
       "duration": 5,
       "cooldown": 20,
@@ -2005,7 +2005,7 @@
     {
       "id": "skill_might",
       "name": "Might",
-      "owner": "monster",
+      "owner": "shared",
       "effect": "might",
       "duration": 6,
       "cooldown": 24,
@@ -2015,11 +2015,51 @@
     {
       "id": "skill_haste",
       "name": "Haste",
-      "owner": "monster",
+      "owner": "shared",
       "effect": "haste",
       "duration": 6,
       "cooldown": 24,
       "power": 25,
+      "tick": 0
+    },
+    {
+      "id": "skill_might_d",
+      "name": "Might",
+      "owner": "shared",
+      "effect": "might",
+      "duration": 600,
+      "cooldown": 601,
+      "power": 20,
+      "tick": 0
+    },
+    {
+      "id": "skill_earth_d",
+      "name": "Earth",
+      "owner": "shared",
+      "effect": "earth",
+      "duration": 600,
+      "cooldown": 601,
+      "power": 30,
+      "tick": 0
+    },
+    {
+      "id": "skill_life_d",
+      "name": "Life",
+      "owner": "shared",
+      "effect": "life",
+      "duration": 600,
+      "cooldown": 601,
+      "power": 2,
+      "tick": 0
+    },
+    {
+      "id": "skill_wind_d",
+      "name": "Wind",
+      "owner": "shared",
+      "effect": "wind",
+      "duration": 600,
+      "cooldown": 601,
+      "power": 20,
       "tick": 0
     }
   ],

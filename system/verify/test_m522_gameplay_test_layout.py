@@ -15,10 +15,10 @@ class CompactGameplay(unittest.TestCase):
         self.assertIn('panel.AnchorPoint = Vector2.new(0, 1)', DOCK)
         self.assertIn('panel.Position = UDim2.new(0, 8, 1, -8)', DOCK)
         self.assertIn('if adaptive and not bottomHeight then', DOCK)
-        items = ['cell(first, "Level")', 'cell(first, "Weapon")', 'cell(second, "Armor")',
+        items = ['contentButton(navigation, "Hub"', 'cell(first, "Level")', 'cell(first, "Weapon")', 'cell(second, "Armor")',
                  'cell(second, "Upgrade")', 'cell(third, "Monster")', 'cell(third, "Group")',
                  'cell(recoveryRow, "Regeneration")', 'cell(recoveryRow, "Vampiric")',
-                 'local actions = row', 'contentButton(navigation, "Go"']
+                 'local actions = row']
         self.assertEqual(sorted(UI.index(x) for x in items), [UI.index(x) for x in items])
         self.assertIn('start.Size.X.Offset + 4', UI)
         self.assertIn('TextService:GetTextSize', UI)
@@ -47,7 +47,7 @@ class CompactGameplay(unittest.TestCase):
         self.assertIn('if not enabled then return 0 end', UI)
         self.assertIn('input.FocusLost:Connect', UI)
         self.assertIn('invoke("recovery")', UI)
-        self.assertIn('local closeOnSuccess = {enter=true, apply=true, start=true, visit=true, exit=true, guideNext=true}', UI)
+        self.assertIn('local closeOnSuccess = {enter=true, apply=true, start=true, hub=true, exit=true, guideNext=true}', UI)
         self.assertIn('response.ok and closeOnSuccess[action]', UI)
         self.assertIn('if action == "recovery" then queuedRecovery = true else queuedAction = action end', UI)
         self.assertIn('local delaySeconds = 0.4 - (os.clock() - lastRequestAt)', UI)

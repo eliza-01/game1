@@ -51,6 +51,11 @@ local function recompute(character: Model)
             if stat == "MaxHP" and percent ~= buffPercent then beforeBuff = math.floor(beforeBuff + 0.5) end
             character:SetAttribute(if stat == "Damage" then "BuffGain_might" else "BuffGain_earth", if buffPercent > 0 then resolved - beforeBuff else nil)
         end
+        if stat == "AttackSpeed" then
+            local percent=0
+            for _, modifiers in pairs(sources) do percent += tonumber(modifiers.AttackSpeedPercent) or 0 end
+            resolved *= 1+percent/100
+        end
         if stat == "CritChance" then
             local percent, flat = 0, 0
             for _, modifiers in pairs(sources) do

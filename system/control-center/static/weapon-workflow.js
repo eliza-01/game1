@@ -51,7 +51,7 @@ window.game1WeaponWorkflow = (() => {
       `<label>Name EN<input data-ww-name value="${e(item.name_en)}"></label>`+
       `<label>Name RU<input data-ww-name-ru value="${e(item.name_ru)}"></label>`+
       `<label>Type<select data-ww-type>${(weaponState.data?.options?.weaponTypes||[]).map(v=>`<option value="${e(v)}" ${v===item.weapon_type?'selected':''}>${e(v)}</option>`).join('')}</select></label>`+
-      `<small class="muted">Gameplay attributes: Database → Balance</small>`+
+      `<small class="muted">Gameplay attributes: Database → Main</small>`+
       `<label>Stable slug<input value="${e(item.slug)}" readonly></label></div>`+
       (warning?`<p class="weapon-edit-warning">This weapon is registered as <b>${e(item.weapon_type)}</b> although its name suggests a bow. The <b>bow</b> animation set will not be selected until you explicitly change Type and save. Sync Rojo afterward.</p>`:'')+
       `<div class="actions">${button('save','Apply Changes',busy)}${button('startup','Set startup',busy)}${button('unarmed','Unarmed startup',busy)}${button('delete','Delete registration',busy)}</div>`,'Revision '+Number(item.revision||1));

@@ -42,7 +42,7 @@ local function stopNavigation(agent: any)
 end
 
 local function runSpeedStuds(agent: any): number
-    local runSpeed = math.max(0, finite(agent.model:GetAttribute("RunSpeed"), CharacterMovementConfig.DefaultRunSpeed))
+    local runSpeed = math.max(0, finite(agent.model:GetAttribute("RunSpeed"), CharacterMovementConfig.DefaultRunSpeed) + finite(agent.model:GetAttribute("SkillRunSpeedBonus"), 0))
     return CharacterMovementConfig.RobloxSpeed(nil, runSpeed, "Run")
 end
 

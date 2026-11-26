@@ -86,6 +86,12 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     gui.MaxDistance = 260
     gui.Adornee = anchor
     gui.Enabled = false
+    -- Monster overheads are presentation only. Do not intercept melee clicks
+    -- or camera drags when the pointer crosses a name, portrait or health bar.
+    if model:GetAttribute("Game1MonsterRuntime") == true then
+        gui.Active = false
+        gui:SetAttribute("WorldInputPassthrough", true)
+    end
     gui.Parent = parent
 
     local titleLine = Instance.new("Frame")
@@ -179,8 +185,12 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     local portrait: Frame? = nil
     local portraitStroke: UIStroke? = nil
     local showPortrait = false
-    local releaseZone = tonumber(model:GetAttribute("GameplayTestZone"))
-    local hasPortrait = model:GetAttribute("Game1MonsterRuntime") == true and releaseZone ~= nil and releaseZone <= 6
+    local function usesPortrait(): boolean
+        local zone = tonumber(model:GetAttribute("GameplayTestZone"))
+        return model:GetAttribute("Game1MonsterRuntime") == true
+            and (model:GetAttribute("GameplayTestKind") == "group" or (zone ~= nil and zone <= 6))
+    end
+    local hasPortrait = usesPortrait()
     local portraitHeight = if hasPortrait then 46 else 0
     local baseOffset = visualTopOffset(model, anchor)
 
@@ -314,8 +324,7 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     end))
     if model:GetAttribute("Game1MonsterRuntime") == true then
         table.insert(connections, model:GetAttributeChangedSignal("GameplayTestZone"):Connect(function()
-            local zone = tonumber(model:GetAttribute("GameplayTestZone"))
-            hasPortrait = zone ~= nil and zone <= 6
+            hasPortrait = usesPortrait()
             portraitHeight = if hasPortrait then 46 else 0
             if not hasPortrait then
                 if portrait then portrait:Destroy(); portrait = nil; portraitStroke = nil end

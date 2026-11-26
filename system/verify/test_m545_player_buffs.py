@@ -7,16 +7,17 @@ def read(p): return (ROOT/p).read_text(encoding='utf8')
 class PlayerBuffs(unittest.TestCase):
     def test_definitions_and_slow(self):
         definitions=read('src/shared/combat/BuffDefinitions.luau')
-        rows=dict(re.findall(r'effect="(\w+)".*?power=(\d+), duration=600',definitions))
-        self.assertEqual(rows,dict(might='20',earth='30',life='2',wind='20'))
         data=json.loads(read('config/balance/gameplay.json'))
+        rows={s['effect']:s['power'] for s in data['skills'] if s['id'].endswith('_d') and s['duration']==600}
+        self.assertEqual(rows,dict(might=20,earth=30,life=2,wind=20))
+        self.assertIn('Balance.Skill("skill_"..icon.effect.."_d")',definitions)
         self.assertEqual(next(s for s in data['skills'] if s['effect']=='slow')['power'],40)
         self.assertIn('1-slow.power/100',read('src/server/combat/SkillEffects.luau'))
         self.assertAlmostEqual(1-.4,.6)
 
     def test_one_server_effect_owner_and_live_stats(self):
         effects=read('src/server/combat/SkillEffects.luau')
-        for token in ['state[effect] then return false','Stats.SetModifierSource(model, "skill-buffs"','Stats.ClearModifierSource(model,"skill-buffs")','state.might and not player','state[effect] ~= entry','target:GetAttributeChangedSignal("LifeState")','target.Destroying:Connect','BuffUntil_','BuffGain_life']:
+        for token in ['state[effect] and not canRefresh then return false','Stats.SetModifierSource(model, "skill-buffs"','Stats.ClearModifierSource(model,"skill-buffs")','state.might and not player','state[effect] ~= entry','target:GetAttributeChangedSignal("LifeState")','target.Destroying:Connect','BuffUntil_','BuffGain_life']:
             self.assertIn(token,effects)
         stats=read('src/server/character/CharacterStatsService.luau')
         for token in ['resolved *= 1 + percent / 100','resolved - beforeBuff','BuffGain_might','BuffGain_earth','BuffGain_wind','math.clamp(previousHP, 0, math.max(0, newMaxHP))']:
@@ -34,7 +35,7 @@ class PlayerBuffs(unittest.TestCase):
         for token in ['GameplayGuideActive','if guided then 0 else','Healing.TestRate(character, "GameplayTestRegen")','BuffGain_life','Healing.Restore(character, rate * elapsed)']:
             self.assertIn(token,regen)
         service=read('src/server/dev/GameplayTestService.luau')
-        for token in ['RunService:IsStudio() and Access.ServerAllowed(player)','actor~=s.player','(root.Position-part.Position).Magnitude>12','Buffer.Build(folder,s.layout','panelAction(actor,part,function(character)','Effects.Apply(character,character,definition,0)','Effects.Clear(character)','SetAttribute("GameplayGuideActive",true)','SetAttribute("GameplayGuideActive",nil)','else s.layout.hub,true)']:
+        for token in ['RunService:IsStudio() and Access.ServerAllowed(player)','actor~=s.player','(root.Position-part.Position).Magnitude>12','Buffer.Build(folder,s.layout','panelAction(actor,part,function(character)','Effects.Apply(character,character,definition,0,true)','Effects.Clear(character)','SetAttribute("GameplayGuideActive",true)','SetAttribute("GameplayGuideActive",nil)','else s.layout.hub,true)']:
             self.assertIn(token,service)
         self.assertIn('if not Buffs.ByEffect[effect] then state[effect]=nil end',read('src/server/combat/SkillEffects.luau'))
         self.assertIn('SkillEffects.Clear(character,preserveBuffs)',read('src/server/dev/GameplayTestArena.luau'))

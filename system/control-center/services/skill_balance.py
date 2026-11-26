@@ -3,7 +3,9 @@ from math import floor, prod
 import re
 
 DEBUFFS = {'poison','bleed','slow','root','stun','silence'}
-BUFFS = {'might','haste'}
+BUFFS = {'might','haste','earth','life','wind'}
+# Stable shop references, not actor ownership. Other casters may use them too.
+SHOP_BUFFS = {f'skill_{e}_d': e for e in ('might','earth','life','wind')}
 CONTROL_WEIGHTS = {'slow': .5, 'root': .75, 'stun': 1.5, 'silence': 0}
 MAX_PROFILES = 24
 
@@ -16,14 +18,17 @@ def validate(data, number):
         if not isinstance(s,dict) or set(s) != {'id','name','owner','effect','duration','cooldown','power','tick'}: raise ValueError('Invalid skill row')
         if not isinstance(s['id'],str) or not re.fullmatch(r'skill_[a-z0-9_]{1,40}',s['id']) or s['id'] in ids: raise ValueError('Invalid / duplicate skill ID')
         if not isinstance(s['name'],str) or not 1<=len(s['name'])<=60 or any(ord(c)<32 for c in s['name']): raise ValueError('Invalid skill name')
-        if s['owner']!='monster' or s['effect'] not in DEBUFFS|BUFFS: raise ValueError('Unsupported skill owner/effect')
-        number(s['duration'], .5, 20, 'duration', False)
-        number(s['cooldown'], s['duration']+1, 120, 'cooldown', False)
+        if s['owner']!='shared' or s['effect'] not in DEBUFFS|BUFFS: raise ValueError('Unsupported shared effect')
+        if s['id'] in SHOP_BUFFS and s['effect'] != SHOP_BUFFS[s['id']]: raise ValueError('Shop buff effect is immutable')
+        is_buff = s['effect'] in BUFFS
+        number(s['duration'], .5, 3600 if is_buff else 20, 'duration', False)
+        number(s['cooldown'], s['duration']+1, 7200 if is_buff else 120, 'cooldown', False)
         number(s['power'], 1, 100, 'power', False)
         if s['effect'] in {'root','stun','silence'} and s['power']!=100: raise ValueError('Binary control power must be 100')
         if s['effect'] in {'poison','bleed'}: number(s['tick'], .5, s['duration'], 'tick', False)
         else: number(s['tick'],0,0,'tick')
         ids[s['id']]=s
+    if not SHOP_BUFFS.keys() <= ids.keys(): raise ValueError('Missing required D buff')
     profiles=data['skilledMonsters']
     if not isinstance(profiles,list) or len(profiles)>MAX_PROFILES: raise ValueError('At most 24 skilled test monsters')
     seen=set()
@@ -50,6 +55,8 @@ def budget(skill, base, crit_multiplier=2):
         cycle=1.8*100/base['attackSpeed']+.03
         return power*floor(skill['duration']/skill['tick']+1e-8)*min(1,cycle/skill['cooldown'])/(1+base['critChance']/100*(crit_multiplier-1))
     if e in CONTROL_WEIGHTS: return uptime*power*CONTROL_WEIGHTS[e]
+    if e == 'life': return skill['power'] * skill['duration'] / max(1, base['hp']) * uptime
+    if e == 'wind': return uptime * skill['power'] / max(1, base['runSpeed'])
     return uptime*power
 
 

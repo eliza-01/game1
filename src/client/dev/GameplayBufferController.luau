@@ -56,14 +56,14 @@ function Controller.Start()
     local function refresh()
         local character=player.Character
         local gold=tonumber(character and character:GetAttribute("Gold")) or 0
-        balance.Text=string.format("Gold: %d  ·  %d / buff  ·  %d min",gold,Config.Price,math.floor(Buffs.Rows[1].duration/60))
+        balance.Text=string.format("Gold: %d  ·  %d / buff",gold,Config.Price)
         for effect,item in pairs(buttons) do
             local expires=tonumber(character and character:GetAttribute("BuffUntil_"..effect)) or 0
             local active=expires>workspace:GetServerTimeNow()
-            item.button.Active=not busy and not active and gold>=Config.Price
+            item.button.Active=not busy and gold>=Config.Price
             item.button.AutoButtonColor=item.button.Active
-            item.state.Text=if active then "Active" elseif gold<Config.Price then "Not enough gold" else string.format("%d gold",Config.Price)
-            item.button.BackgroundTransparency=if active then .55 else .05
+            item.state.Text=if gold<Config.Price then "Not enough gold" elseif active then string.format("%d gold · Renew",Config.Price) else string.format("%d gold · %d:%02d",Config.Price,math.floor(item.duration/60),math.floor(item.duration%60))
+            item.button.BackgroundTransparency=if item.button.Active then .05 else .55
         end
     end
     for i,row in ipairs(Buffs.Rows) do
@@ -72,7 +72,7 @@ function Controller.Start()
         local tile=Icons.Create(button,row,42); tile.Position=UDim2.fromOffset(9,15)
         local name=label(button,row.name,15,UDim2.fromOffset(59,10),UDim2.new(1,-64,0,24)); name.TextXAlignment=Enum.TextXAlignment.Left; name.TextColor3=row.color
         local state=label(button,"",12,UDim2.fromOffset(59,36),UDim2.new(1,-64,0,22)); state.TextXAlignment=Enum.TextXAlignment.Left; state.TextScaled=true; local size=Instance.new("UITextSizeConstraint"); size.MaxTextSize=12; size.Parent=state
-        buttons[row.effect]={button=button,state=state}
+        buttons[row.effect]={button=button,state=state,duration=row.duration}
         button.Activated:Connect(function()
             local npc=model; local character=player.Character
             if busy or not button.Active or not npc or not character or not near(npc) then return end

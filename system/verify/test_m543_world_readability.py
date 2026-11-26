@@ -69,9 +69,9 @@ class WorldReadability(unittest.TestCase):
         self.assertIn('portrait:Destroy()',view)
         ctl=read('src/client/combat/OverheadHealthController.luau')
         self.assertIn('playerZone == zone',ctl)
-        self.assertIn('view.SetIcon(alive and sameZone, playerLevel)',ctl)
+        self.assertIn('view.SetIcon(alive and (sameZone or (group and inRange)), playerLevel)',ctl)
         spawner=read('src/server/monster/MonsterSpawnerService.luau')
-        self.assertIn('if not record.testZone or record.testZone > 6 then',spawner)
+        self.assertIn('if record.testKind ~= "group" and (not record.testZone or record.testZone > 6) then',spawner)
         self.assertIn('RunService:IsStudio() and Workspace.StreamingEnabled',spawner)
         self.assertIn('model:AddPersistentPlayer(persistentOwner)',spawner)
 

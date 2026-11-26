@@ -55,7 +55,7 @@ class SkillCatalogue(unittest.TestCase):
         self.assertIn('session.stunEpoch',attack)
     def test_runtime_and_ui_contracts(self):
         effects=read('src/server/combat/SkillEffects.luau');self.assertIn('Damage.Apply(source,target,amount,false,true)',effects)
-        self.assertIn('state[effect] then return false',effects)
+        self.assertIn('state[effect] and not canRefresh then return false',effects)
         self.assertIn('active[target] ~= state',effects)
         self.assertIn('Effects.CanCast(model)',read('src/server/monster/MonsterSkills.luau'))
         self.assertNotIn('Skills.OnHit',read('src/server/monster/MonsterAttackExecutor.luau'))
@@ -64,7 +64,7 @@ class SkillCatalogue(unittest.TestCase):
         self.assertIn('SkillMoveMultiplier',read('src/client/character/MovementController.luau'))
         self.assertIn('t.y + 1024',read('src/server/dev/GameplayTestLoadout.luau'))
         self.assertIn('Skilled · GP',read('src/server/dev/GameplayTestLayout.luau'))
-        self.assertIn('skilled-monsters-disclosure',read('system/control-center/static/index.html'))
+        self.assertIn('skilled-monsters-editor',read('system/control-center/static/skill-editor.js'))
         self.assertIn('resolvedSkilledMonsters',read('system/control-center/api/balance.py'))
 
 if __name__=='__main__':unittest.main()

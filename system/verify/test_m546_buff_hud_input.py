@@ -13,9 +13,9 @@ class BuffHudInput(unittest.TestCase):
     def test_both_decorative_roots_opt_out_before_parenting(self):
         hud = read("src/client/combat/BuffHud.luau")
         for name in ("strip", "receipts"):
-            self.assertIn(f'{name}.Active=false; {name}:SetAttribute("WorldInputPassthrough", true); {name}.Parent=gui', hud)
+            self.assertIn(f'{name}.Active=false; {name}:SetAttribute("WorldInputPassthrough", true); {name}.Parent={"gui" if name=="strip" else "receiptGui"}', hud)
         self.assertIn('receipts.Size=UDim2.fromScale(1,1)', hud)
-        self.assertIn('icon(receipts,row,48)', hud)
+        self.assertIn('icon(receipts,row,48,5)', hud)
         self.assertIn('icon(strip,row,28)', hud)
         self.assertIn('label(toast,17)', hud)
         self.assertNotIn('gui:SetAttribute("WorldInputPassthrough"', hud)

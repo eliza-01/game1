@@ -32,7 +32,7 @@ function MonsterWanderController.new(spawnRandom: Random, spawnGeometry: any, pr
     end
 
     local function locomotionSpeedFor(model: Model): number
-        return CharacterMovementConfig.RobloxSpeed(nil, model:GetAttribute("RunSpeed"), monsterLocomotionMode(model))
+        return CharacterMovementConfig.RobloxSpeed(nil, finite(model:GetAttribute("RunSpeed"), CharacterMovementConfig.DefaultRunSpeed) + finite(model:GetAttribute("SkillRunSpeedBonus"), 0), monsterLocomotionMode(model))
     end
 
     local function locomotionTrackFor(entry: any, mode: string): AnimationTrack?

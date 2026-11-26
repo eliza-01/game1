@@ -183,7 +183,7 @@ local function spawnOne(state: any): Model?
             title = table.concat(names, " + ")
         end
         local proxy = row.nameEn ~= "Gremlin" or row.skills ~= nil
-        if not record.testZone or record.testZone > 6 then
+        if record.testKind ~= "group" and (not record.testZone or record.testZone > 6) then
             TestAppearance.Label(model, ("%s · %s · LVL %d\n%d HP · %d ATK"):format(title .. (if proxy then " [proxy]" else ""), row.type, row.level, row.hp, row.damage), color)
         end
         model:SetAttribute("MonsterDisplayName", title)

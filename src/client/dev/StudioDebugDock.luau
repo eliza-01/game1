@@ -2,14 +2,15 @@
 local Workspace = game:GetService("Workspace")
 
 local StudioDebugDock = {}
+local Icons = require(script.Parent:WaitForChild("StudioDebugIcons"))
 
 local BUTTON_SIZE = 44
 local BUTTON_GAP = 8
 local LEFT = 16
 local TOP = 8
 local WINDOW_TOP = TOP + BUTTON_SIZE + BUTTON_GAP
-local slots = { TL = 0, MV = 1, MO = 2, CS = 3, HS = 4, CD = 5, HP = 6, UI = 7, GP = 8, AG = 9 }
-local SLOT_COUNT = 10
+local slots = { TL = 0, CS = 1, HS = 2, CD = 3, HP = 4, UI = 5, GP = 6, AG = 7 }
+local SLOT_COUNT = 8
 local STEP = BUTTON_SIZE + BUTTON_GAP
 local CLOSED = Color3.fromRGB(28, 37, 48)
 local SELECTED = Color3.fromRGB(31, 76, 70)
@@ -44,6 +45,7 @@ function StudioDebugDock.Bind(id: string, launcher: TextButton, panel: GuiObject
     screen.DisplayOrder = 135 -- Above the game HUD, below character creation and language selection.
     launcher.Name = "DebugLauncher" .. id
     launcher.AutoButtonColor = false
+    local paintIcon = Icons.Mount(id, launcher)
     local function layout()
         local viewport = screen.AbsoluteSize.X
         launcher.Position = StudioDebugDock.ButtonPosition(id, viewport)
@@ -64,7 +66,7 @@ function StudioDebugDock.Bind(id: string, launcher: TextButton, panel: GuiObject
     local function paint()
         local open = panel.Visible and screen.Enabled
         launcher.BackgroundColor3 = if open then SELECTED else CLOSED
-        launcher.TextColor3 = if open then ACCENT else TEXT
+        paintIcon(if open then ACCENT else TEXT)
     end
     screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
     screen:GetPropertyChangedSignal("Enabled"):Connect(paint)

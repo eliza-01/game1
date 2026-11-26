@@ -13,7 +13,7 @@ class AnimationScalingM96(unittest.TestCase):
     def test_public_api_remains_stable(self):
         facade = (SCALE / "AnimationSpeedScaling.luau").read_text(encoding="utf-8")
         for method in (
-            "DebugUnitsPerPercentAttribute", "TargetForModel", "Rule", "ResolvePercent",
+            "TargetForModel", "Rule", "ResolvePercent",
             "AssetId", "Catalog", "RuleForAnimation", "ResolveDetailsForModel",
             "ResolveForModel", "ResolveForModelWithStatValue", "ResolveScaleForModel",
             "ResolveForAnimation", "ResolveScaleForAnimation", "RefreshPlaying",
@@ -22,7 +22,7 @@ class AnimationScalingM96(unittest.TestCase):
                 self.assertIn(f"function AnimationSpeedScaling.{method}(", facade)
         for constant in (
             "MinPercent", "MaxPercent", "MinUnitsPerPercent", "MaxUnitsPerPercent",
-            "CustomDebugPrefix", "DebugUnitsPerPercentPrefix",
+            "CustomDebugPrefix",
         ):
             self.assertIn(f"AnimationSpeedScaling.{constant} =", facade)
         for name in ("AnimationScalingFormula", "AnimationScalingPolicy", "AnimationScalingDebugOverrides"):
@@ -46,10 +46,9 @@ class AnimationScalingM96(unittest.TestCase):
         # Workspace debug rule must override published custom clip, then profile fallback.
         self.assertLess(facade.index("if debugRule then"), facade.index("if authored then"))
         self.assertLess(facade.index("if authored then"), facade.index("return AnimationSpeedScaling.Rule(targetType"))
-        # A published custom clip keeps its own stat, while Studio Run/Walk
-        # ratio overrides its units even for that clip. Attack remains authored.
+        # Published custom clips retain their authored stat and units.
         self.assertIn("statValueOverride ~= nil and not isCustom", facade)
-        self.assertIn('debugUnitsPerPercent ~= nil and (normalizedChannel == "run" or normalizedChannel == "walk")', facade)
+        self.assertNotIn("DebugUnitsPerPercent", facade)
 
     def test_pure_formula_runtime_if_lua_is_available(self):
         # Formula intentionally uses the Lua 5.3 subset of Luau. This optional
@@ -72,8 +71,6 @@ eq(f.RulePercent(1, 0), 400)
 eq(f.RulePercent(1000, math.huge), 400)
 eq(f.RulePercent("NaN", 2), 1)
 eq(f.DetailsPercent(300, f.AuthoredUnits(2)), 150)
-eq(f.DetailsPercent(300, f.DebugUnits(6, 2)), 50)
-eq(f.DebugUnits("invalid", 4), 4)
 eq(f.AuthoredUnits(1e9), 1000)
 eq(f.AuthoredUnits(-20), 0.001)
 eq(f.Finite(0/0, 12), 12)

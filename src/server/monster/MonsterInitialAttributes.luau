@@ -5,6 +5,7 @@ local Workspace = game:GetService("Workspace")
 local CharacterMovementConfig = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("character"):WaitForChild("CharacterMovementConfig"))
 local Balance = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("balance"):WaitForChild("Balance"))
 local Critical = require(ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("balance"):WaitForChild("CriticalStats"))
+local DeathChase = require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
 local MonsterInitialAttributes = {}
 local function finite(value: any, fallback: number): number
     local number = tonumber(value)
@@ -48,8 +49,7 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("AttackSpeed", if balance then balance.attackSpeed else math.max(1, finite(stats.AttackSpeed, 100)))
     model:SetAttribute("RunSpeed", if balance then balance.runSpeed else math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
     model:SetAttribute("BaseRunSpeed", model:GetAttribute("RunSpeed"))
-    local debugLocomotion = tostring(Workspace:GetAttribute("Game1MonsterDebugLocomotionMode") or "Walk")
-    model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
+    model:SetAttribute("MonsterLocomotionMode", "Walk")
     model:SetAttribute("CritChance", Critical.Chance(if balance then balance.critChance else finite(stats.CritChance, 0)))
     model:SetAttribute("Defense", if balance then 0 else math.max(0, finite(stats.Defense, 0)))
     local aggressive = if balance then balance.aggressive == true else behavior.aggressive == true
@@ -86,6 +86,7 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("MonsterAggressive", aggressive)
     model:SetAttribute("MonsterAggroRadius", aggroRadius)
     model:SetAttribute("MonsterHomeRadiusStuds", homeRadius)
+    DeathChase.Configure(model, record, balance ~= nil and balance.deathChase == true)
     model:SetAttribute("MonsterAttackRadius", attackRadius)
     model:SetAttribute("MonsterCombatActive", false)
     model:SetAttribute("MonsterAttackPursuitActive", false)

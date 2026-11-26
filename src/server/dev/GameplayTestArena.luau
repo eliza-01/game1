@@ -135,6 +135,8 @@ function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing
         testOwner = owner.UserId, testKind = kind, testBalanceId = row.id,
         testNoRespawn = kind == "group", testYaw = yaw, testSurface = surface,
         testZone = if slot then slot.zone else nil,
+        testZoneFrame = if slot then slot.zoneFrame else nil,
+        testZoneSize = if slot then slot.zoneSize else nil,
     })
     table.insert(states, state) -- Registered BEFORE any yielding construction.
     return Spawner.FillTest(state)

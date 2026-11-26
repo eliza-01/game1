@@ -2,8 +2,6 @@
 #options-view .game1-option-section { border: 1px solid var(--line, #33404b); border-radius: 14px; margin: 10px 0; overflow: hidden; background: rgba(20,26,33,.72); }
 #options-view .game1-option-section > summary { display:flex; align-items:center; gap:12px; cursor:pointer; padding:12px 16px; list-style:none; }
 #options-view .game1-option-section > summary::-webkit-details-marker {display:none}
-#options-view .game1-option-section > summary::after {content:'⌄'; margin-left:auto; font-size:20px; opacity:.65; transition:transform .18s ease}
-#options-view .game1-option-section[open] > summary::after {transform:rotate(180deg)}
 #options-view .game1-option-section > summary strong {display:block; font-size:15px}
 #options-view .game1-option-section > summary small {display:block; font-size:11px; opacity:.65; margin-top:2px}
 #options-view .game1-option-icon {display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:rgba(130,150,175,.12);font-size:21px}
@@ -44,8 +42,10 @@
 #options-view .game1-language-translation {display:flex;flex-direction:column;gap:4px;padding:8px;background:rgba(90,110,130,.09);border-radius:6px;font-size:12px;overflow-wrap:anywhere}
 @media(max-width:700px){#options-view .game1-language-filters{grid-template-columns:1fr}#options-view .game1-language-item summary code{min-width:0;flex:0 1 100%}}
 
-/* M548 · Move a section without opening it or rebuilding any controls. */
-#options-view .game1-option-order{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
-#options-view .game1-option-order button{padding:4px 8px;min-width:28px;line-height:1.2;font-size:14px}
-#options-view .game1-option-order button:disabled{opacity:.3;cursor:default}
-#options-view .game1-option-section > summary::after{margin-left:0}
+/* M557 · Drag handle only; summary opens by icon/name. */
+#options-view .game1-option-drag{margin-left:auto;flex-shrink:0;padding:4px 9px;font-size:22px;line-height:1;cursor:grab;touch-action:none;user-select:none;background:transparent;border:0;color:inherit;opacity:.65}
+#options-view .game1-option-drag:hover,#options-view .game1-option-drag:focus-visible{opacity:1}
+#options-view .game1-option-dragging{opacity:.7;outline:1px solid var(--line,#8195a8)}
+#options-view .game1-option-dragging .game1-option-drag{cursor:grabbing}
+#options-view .game1-option-drop-before{box-shadow:0 -3px 0 #79b6ad}
+#options-view .game1-option-drop-after{box-shadow:0 3px 0 #79b6ad}

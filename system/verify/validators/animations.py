@@ -225,13 +225,13 @@ def check_animation_scaling(
     animation_scaling_js = animation_scaling_js_path.read_text(encoding="utf-8") if animation_scaling_js_path.is_file() else ""
     monster_assets_js_early = (ROOT / "system/control-center/static/monster-assets.js").read_text(encoding="utf-8")
     monster_animation_registry_early = (ROOT / "src/shared/monster/MonsterAnimationRegistry.luau").read_text(encoding="utf-8")
-    for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", "unitsPerPercent", "Formula.DetailsPercent", "DebugUnitsPerPercentAttribute", "authoredUnitsPerPercent", "debugUnitsPerPercent"]:
+    for required in ["ResolveForModel", "ResolveDetailsForModel", "TargetForModel", "unitsPerPercent", "Formula.DetailsPercent", "authoredUnitsPerPercent"]:
         if required not in animation_scaling_runtime:
             err(f"animation speed scaling runtime missing {required}")
     for owner, required in {
         "AnimationScalingFormula.luau": ["value / unitsPerPercent", "Formula.RulePercent", "Formula.DetailsPercent"],
         "AnimationScalingPolicy.luau": ["Registry.custom", 'return "monster"', 'return "humanoid", "all"'],
-        "AnimationScalingDebugOverrides.luau": ["Workspace:GetAttribute", "Overrides.ModelUnits", "Overrides.ClipRule"],
+        "AnimationScalingDebugOverrides.luau": ["Workspace:GetAttribute", "Overrides.ClipRule"],
     }.items():
         owner_path = ROOT / "src/shared/animation" / owner
         owner_source = owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""

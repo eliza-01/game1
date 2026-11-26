@@ -11,12 +11,6 @@ AnimationSpeedScaling.MaxPercent = Formula.MaxPercent
 AnimationSpeedScaling.MinUnitsPerPercent = Formula.MinUnitsPerPercent
 AnimationSpeedScaling.MaxUnitsPerPercent = Formula.MaxUnitsPerPercent
 AnimationSpeedScaling.CustomDebugPrefix = "Game1CustomScaling_"
-AnimationSpeedScaling.DebugUnitsPerPercentPrefix = "MovementDebugAnimationUnitsPerPercent_"
-
-function AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel: any): string
-    local normalized = string.lower(tostring(channel or ""))
-    return AnimationSpeedScaling.DebugUnitsPerPercentPrefix .. normalized
-end
 
 -- All Characters and NPCs share "humanoid/all"; monsters retain their own profile.
 function AnimationSpeedScaling.TargetForModel(model: Model): (string, string)
@@ -82,12 +76,7 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
     local rawStatValue = if statValueOverride ~= nil and not isCustom then statValueOverride else model:GetAttribute(stat)
     local statValue = Formula.StatValue(rawStatValue)
     local authoredUnitsPerPercent = Formula.AuthoredUnits(rule.unitsPerPercent)
-    local overrideAttribute = AnimationSpeedScaling.DebugUnitsPerPercentAttribute(normalizedChannel)
-    local debugUnitsPerPercent = DebugOverrides.ModelUnits(model, overrideAttribute)
     local unitsPerPercent = authoredUnitsPerPercent
-    if debugUnitsPerPercent ~= nil and (normalizedChannel == "run" or normalizedChannel == "walk") then
-        unitsPerPercent = Formula.DebugUnits(debugUnitsPerPercent, authoredUnitsPerPercent)
-    end
     local percent = Formula.DetailsPercent(statValue, unitsPerPercent)
     return {
         targetType = targetType,
@@ -96,7 +85,6 @@ function AnimationSpeedScaling.ResolveDetailsForModel(model: Model, channel: any
         stat = stat,
         statValue = statValue,
         authoredUnitsPerPercent = authoredUnitsPerPercent,
-        debugUnitsPerPercent = debugUnitsPerPercent,
         unitsPerPercent = unitsPerPercent,
         percent = percent,
         hasRule = true,

@@ -88,11 +88,11 @@ class NewValidatorsM168Tests(unittest.TestCase):
         self.assertEqual(issues, [])
         self.assertIn('TestLoadoutService.Start()', boot)
 
-    def test_studio_debug_rejects_missing_movement_api(self):
-        with self.intercept('src/server/dev/MovementDebugService.luau',
-                            lambda s: s.replace('GetMovementDebugCatalog', 'RemovedMovementCatalog')):
+    def test_studio_debug_rejects_retired_movement_startup(self):
+        with self.intercept('src/client/init.client.luau',
+                            lambda s: s + '\nMovementDebugController.Start()'):
             issues, _ = self.debug()
-        self.assertIn('Studio movement debugger server missing GetMovementDebugCatalog', issues)
+        self.assertIn('retired debug startup: MovementDebug', issues)
 
     def test_studio_debug_rejects_removed_loadout_preview(self):
         with self.intercept('src/client/dev/TestLoadoutController.luau',

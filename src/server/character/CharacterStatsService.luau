@@ -9,7 +9,6 @@ local Critical = require(Shared:WaitForChild("balance"):WaitForChild("CriticalSt
 local Service = {}
 local BASE_PREFIX = "Base"
 local modifierSources = setmetatable({}, { __mode = "k" })
-local RUN_SPEED_OVERRIDE_ATTRIBUTE = "MovementDebugRunSpeedOverride"
 
 local function baseName(stat: string): string
     return BASE_PREFIX .. stat
@@ -65,11 +64,6 @@ local function recompute(character: Model)
             resolved = Critical.Chance(resolved, percent, flat)
         elseif stat == "CritMultiplier" then
             resolved = Critical.Multiplier(resolved)
-        elseif stat == "RunSpeed" then
-            local debugOverride = tonumber(character:GetAttribute(RUN_SPEED_OVERRIDE_ATTRIBUTE))
-            if debugOverride ~= nil then
-                resolved = math.max(0, debugOverride + (tonumber((sources["skill-buffs"] or {}).RunSpeed) or 0))
-            end
         end
         if stat == "RunSpeed" then
             local gain = tonumber((sources["skill-buffs"] or {}).RunSpeed) or 0

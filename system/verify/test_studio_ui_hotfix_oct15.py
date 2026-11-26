@@ -13,12 +13,10 @@ STATIC = ROOT / "system/control-center/static"
 class StudioDebugDockTests(unittest.TestCase):
     def test_dock_is_shared_and_windows_are_below_single_button_row(self):
         dock = (CLIENT / "StudioDebugDock.luau").read_text(encoding="utf-8")
-        for token in ('TL = 0', 'MV = 1', 'MO = 2', 'CS = 3', 'local TOP = 8', 'local BUTTON_GAP = 8', 'local WINDOW_TOP = TOP + BUTTON_SIZE + BUTTON_GAP'):
+        for token in ('TL = 0', 'CS = 1', 'HS = 2', 'local TOP = 8', 'local BUTTON_GAP = 8', 'local WINDOW_TOP = TOP + BUTTON_SIZE + BUTTON_GAP'):
             self.assertIn(token, dock)
         for file, slot in (
             ("TestLoadoutController.luau", 'DEBUG_PANEL_ID'),
-            ("MovementDebugController.luau", 'DEBUG_PANEL_ID'),
-            ("MonsterDebugController.luau", 'PANEL_ID'),
             ("CustomScalingDebugController.luau", '"CS"'),
         ):
             content = (CLIENT / file).read_text(encoding="utf-8")

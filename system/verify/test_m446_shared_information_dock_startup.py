@@ -51,7 +51,7 @@ class SharedInformativeDockM446(unittest.TestCase):
         after = client.index('if not fireplaceOk then')
         for name in ('HouseSocketDebugController.Start()',
                      'UiPresentationDebugController', 'TestLoadoutController.Start()',
-                     'MovementDebugController.Start()', 'MonsterDebugController.Start()'):
+                     'CustomScalingDebugController', 'GameplayAggroController'):
             self.assertIn(name, client[after:])
         self.assertLess(client.index('if not fireplaceOk then'), client.index('HouseSocketDebugController.Start()'))
 

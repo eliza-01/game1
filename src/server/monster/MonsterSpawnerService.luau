@@ -6,8 +6,6 @@ local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local MonsterShared = Shared:WaitForChild("monster")
-local AnimationShared = Shared:WaitForChild("animation")
-local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local MonsterRegistry = require(MonsterShared:WaitForChild("MonsterRegistry"))
 local MonsterAnimationRegistry = require(MonsterShared:WaitForChild("MonsterAnimationRegistry"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
@@ -263,13 +261,6 @@ local function spawnOne(state: any): Model?
             wanderController:Refresh(model, entry)
         end
     end)
-    for _, channel in ipairs({ "run", "walk" }) do
-        watch(entry, model:GetAttributeChangedSignal(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel)), function()
-            if state.instances[model] == entry then
-                wanderController:Refresh(model, entry)
-            end
-        end)
-    end
     watch(entry, model:GetAttributeChangedSignal("LifeState"), function()
         if state.instances[model] ~= entry then
             return

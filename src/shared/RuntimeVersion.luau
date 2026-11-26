@@ -1,1 +1,1 @@
-return table.freeze({ Version = "2026.11.26.556", SourceDigest = "game1-m556-buffer-refresh-gp-ui" })
+return table.freeze({ Version = "2026.11.26.559", SourceDigest = "game1-m559-monster-table-rebased" })

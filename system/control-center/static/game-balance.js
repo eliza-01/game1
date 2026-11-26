@@ -1,11 +1,11 @@
 /* Database authoring: stable item IDs, explicit model bindings, revision guarded save. */
 (() => {
-  let snapshot=null, tab='levels', busy=false, dirty=false;
+  let snapshot=null, tab='monsters', busy=false, dirty=false;
   const gradeNames=['Newbie','D','C','B','A','S','SS','SSS'];
   window.game1EquipmentGrade=level=>{const band=Math.max(0,Math.min(7,Math.floor(level/10)));return {name:gradeNames[band]+(level%10>=5?'+':''),required:Math.max(1,band*10)}};
-  const groups={rules:'Character',levels:'Levels',weapons:'Weapons',armor:'Armor',monsters:'Monsters',skills:'Skills',bindings:'Model bindings'};
-  const fields={levels:['level','hp','attackBonus','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','nameEn','nameRu','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed','aggroRadiusStuds','aggressive']};
-  const names={nameEn:'EN',nameRu:'RU',aggroRadiusStuds:'Aggro · studs',aggressive:'Aggressive',runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',attackBonus:'Level ATK bonus',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
+  const groups={monsters:'Monsters',skills:'Skills',weapons:'Weapons',levels:'Levels',rules:'Character',armor:'Armor',bindings:'Model bindings'};
+  const fields={levels:['level','hp','attackBonus','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','nameEn','nameRu','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed','aggroRadiusStuds','aggressive','deathChase']};
+  const names={nameEn:'EN',nameRu:'RU',aggroRadiusStuds:'Aggro · studs',aggressive:'Aggressive',deathChase:'Death Chase',runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',attackBonus:'Level ATK bonus',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
   const labels={weapon:'Оружие',armor:'Броня',monster:'Монстр'};
   const label=id=>{const [kind,n]=id.split('_');return `${labels[kind]||kind}_${n}`};
   const node=(tag,text)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el};
@@ -27,7 +27,7 @@
   }
   function applySearch(){const q=$('balance-search').value.trim().toLocaleLowerCase();for(const tr of $('balance-content').querySelectorAll('tbody tr')){const values=[tr.textContent,...Array.from(tr.querySelectorAll('input,select'),el=>el.value),tr.dataset.identity||''];tr.hidden=!!q&&!values.join(' ').toLocaleLowerCase().includes(q)}}
   $('balance-search').oninput=applySearch;
-  function speciesEdit(row,key,value,body){const group=row.nameEn? snapshot.balance.monsters.filter(r=>r.nameEn===row.nameEn):[row];for(const r of group){r[key]=value;const input=body.querySelector(`[data-row="${r.id}"][data-field="${key}"]`);if(input){if(key==='aggressive')input.checked=value;else if(document.activeElement!==input)input.value=value??''}}change()}
+  function speciesEdit(row,key,value,body){const group=row.nameEn? snapshot.balance.monsters.filter(r=>r.nameEn===row.nameEn):[row];for(const r of group){r[key]=value;const input=body.querySelector(`[data-row="${r.id}"][data-field="${key}"]`);if(input){if(key==='aggressive'||key==='deathChase')input.checked=value;else if(document.activeElement!==input)input.value=value??''}}change()}
   function render(){
     $('balance-tabs').replaceChildren();$('balance-content').replaceChildren();$('balance-save').disabled=busy||!snapshot||!dirty;
     for(const [key,title] of Object.entries(groups)){const b=node('button',title);b.type='button';b.className=key===tab?'primary':'';b.onclick=()=>{tab=key;$('balance-search').value='';render()};$('balance-tabs').append(b)}
@@ -43,14 +43,15 @@
       bindingTable('Weapon model',snapshot.weaponModels,d.weaponBindings,d.weapons);
       bindingTable('Monster model',snapshot.monsterModels,d.monsterBindings,d.monsters);return;
     }
-    const columns=fields[tab], headers=columns.map(k=>tab==='monsters'&&k==='damage'?'Damage':names[k]);if(tab==='levels')headers.push('Total XP');if(tab==='weapons')headers.push('Grade · required LVL','ATK +0 / max','Craft recipe · fee');
+    const columns=tab==='monsters'?window.game1MonsterTable.columns(fields[tab]):fields[tab], headers=columns.map(k=>tab==='monsters'&&k==='damage'?'Damage':names[k]);if(tab==='levels')headers.push('Total XP');if(tab==='weapons')headers.push('Grade · required LVL','ATK +0 / max','Craft recipe · fee');
     const body=table(headers);let total=0;
-    const rows=tab==='weapons'?[...d[tab]].sort((a,b)=>a.level-b.level||a.id.localeCompare(b.id)):d[tab];
+    if(tab==='monsters')window.game1MonsterTable.decorate(body.parentElement.tHead.rows[0],columns,render);
+    const rows=tab==='monsters'?window.game1MonsterTable.rows(d.monsters):tab==='weapons'?[...d[tab]].sort((a,b)=>a.level-b.level||a.id.localeCompare(b.id)):d[tab];
     for(const row of rows){const tr=node('tr');tr.dataset.identity=row.id||'';let derived,gradeCell;
       function updateDerived(){if(gradeCell){const g=window.game1EquipmentGrade(row.level);gradeCell.textContent=`${g.name} · ${g.required}`}if(tab==='weapons'&&derived)derived.textContent=`${d.rules.baseDamage+d.levels[row.level-1].attackBonus+row.damage} / ${d.rules.baseDamage+d.levels[row.level-1].attackBonus+Math.round(row.damage*(1+d.rules.maxUpgrade*d.rules.upgradePercent/100))}`}
       for(const key of columns){
         if(key==='id'||key==='type'||(tab==='levels'&&key==='level'))cell(tr,key==='id'?label(row[key]):String(row[key]));
-        else if(key==='aggressive'){const input=node('input');input.type='checkbox';input.checked=row.aggressive;input.dataset.row=row.id;input.dataset.field=key;input.onchange=()=>speciesEdit(row,key,input.checked,body);input.setAttribute('aria-label',`${row.nameEn||row.id} aggressive`);cell(tr,input)}
+        else if(key==='aggressive'||key==='deathChase'){const input=node('input');input.type='checkbox';input.checked=row[key];input.dataset.row=row.id;input.dataset.field=key;input.onchange=()=>speciesEdit(row,key,input.checked,body);input.setAttribute('aria-label',`${row.nameEn||row.id} ${names[key]}`);cell(tr,input)}
         else if(key==='nameEn'||key==='nameRu'){const input=node('input');input.type='text';input.maxLength=100;input.value=row[key];input.dataset.row=row.id;input.dataset.field=key;input.placeholder='—';input.style.minWidth='180px';input.onchange=()=>{const value=input.value.trim();speciesEdit(row,key,value,body)};cell(tr,input)}
         else if(key==='price'&&row.recipe){const source=d.weapons.find(w=>w.id===row.recipe.swordId);const cost=node('span',String(2*source.price+row.recipe.fee));cost.dataset.recipeCost=row.id;cell(tr,cost)}
         else if(key==='rarity')cell(tr,select(['common','uncommon','rare','mythical','legendary','immortal'].map(v=>[v,v]),row[key],v=>{row[key]=v;change()}));

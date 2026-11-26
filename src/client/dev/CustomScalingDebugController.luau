@@ -95,7 +95,6 @@ function Controller.Start()
     local function refreshPanelVisibility()
         local open = playerGui:GetAttribute(OPEN_ATTRIBUTE) == PANEL_ID
         panel.Visible = open
-        toggle.Text = "CS"
     end
     toggle.Activated:Connect(function()
         playerGui:SetAttribute(OPEN_ATTRIBUTE, if panel.Visible then "" else PANEL_ID)

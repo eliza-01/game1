@@ -66,7 +66,7 @@ local function maintainAttackPursuit(agent: any, target: Model, serial: number, 
             and agent.target == target
             and tostring(agent.model:GetAttribute("LifeState") or "") == "Alive" do
             local liveRoot = rootOf(target)
-            if not targetIsValid(target) or not liveRoot then
+            if not targetIsValid(target) or not liveRoot or not TargetPolicy.AllowsTarget(agent, target) then
                 clearAttackPursuit(agent)
                 return
             end

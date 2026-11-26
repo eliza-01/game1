@@ -57,7 +57,7 @@ def validate(data):
             raise ValueError(f'{group}: expected {counts[group]} rows')
         for i, row in enumerate(rows, 1):
             extra = {'level'} if group == 'levels' else {'id'}
-            if group == 'monsters': extra |= {'type','nameEn','nameRu','aggressive'}
+            if group == 'monsters': extra |= {'type','nameEn','nameRu','aggressive','deathChase'}
             if group == 'weapons':
                 extra |= {'type','rarity'}
                 if isinstance(row, dict) and row.get('type') == 'dualswords': extra.add('recipe')
@@ -73,6 +73,7 @@ def validate(data):
                 number(row[field], lo, hi, f'{group}.{i}.{field}', field not in ('radius','arc','critChance','aggroRadiusStuds','attackBonus'))
             if group == 'monsters':
                 if type(row['aggressive']) is not bool: raise ValueError('Invalid monster aggressive flag')
+                if type(row['deathChase']) is not bool: raise ValueError('Invalid monster Death Chase flag')
                 for field in ('nameEn','nameRu'):
                     name = row[field]
                     if not isinstance(name,str) or len(name)>100 or name != name.strip() or any(ord(c)<32 for c in name):
@@ -88,7 +89,7 @@ def validate(data):
     for row in data['monsters']:
         if not row['nameEn']: continue
         key = row['nameEn'].lower()
-        value = (row['nameEn'], row['nameRu'], row['aggroRadiusStuds'], row['aggressive'])
+        value = (row['nameEn'], row['nameRu'], row['aggroRadiusStuds'], row['aggressive'], row['deathChase'])
         if species.setdefault(key, value) != value:
             raise ValueError('Monster species names / aggro must agree: ' + row['nameEn'])
     swords = {r['id']: r for r in data['weapons'] if r['type'] == 'sword'}

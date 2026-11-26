@@ -579,9 +579,6 @@ local function bindCharacter(newCharacter: Model)
     end
     lastLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
 	local refreshAttributes = { "SkillStunned", "GameplayTestHubRunMultiplier", "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "AnimationAirborne", "AnimationJumpSequence" }
-	for _, channel in ipairs({ "run", "walk" }) do
-		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
-	end
 	for _, attribute in ipairs(refreshAttributes) do
 		table.insert(connections, newCharacter:GetAttributeChangedSignal(attribute):Connect(refreshLoop))
 	end

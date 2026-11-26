@@ -442,7 +442,7 @@ $('option-flora-save').onclick=()=>{
   }catch(error){toast(error.message,true)}
 };
 
-// M548 · browser-local presentation only; moving existing nodes retains drafts.
+// M548 / M557 · browser-local order; drag existing nodes, retaining drafts.
 function game1InitOptionOrder(){
   const key='game1.options.sectionOrder.v1';
   const sections=Array.from(document.querySelectorAll('#options-view > .game1-option-section[data-option-section]'));
@@ -454,25 +454,38 @@ function game1InitOptionOrder(){
   try{const value=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(value))saved=value}catch{}
   const ordered=[...new Set([...saved,...byKey.keys()])].filter(id=>byKey.has(id));
   for(const id of ordered)parent.appendChild(byKey.get(id));
-  const controls=new Map();
-  function refresh(){const nodes=getOrder();nodes.forEach((node,index)=>{const [up,down]=controls.get(node);up.disabled=index===0;down.disabled=index===nodes.length-1})}
-  function move(node,delta){
-    const nodes=getOrder(),index=nodes.indexOf(node),other=nodes[index+delta];if(!other)return;
-    if(delta<0)parent.insertBefore(node,other);else parent.insertBefore(other,node);
-    try{localStorage.setItem(key,JSON.stringify(getOrder().map(item=>item.dataset.optionSection)))}catch{}
-    refresh();
-  }
+  function save(){try{localStorage.setItem(key,JSON.stringify(getOrder().map(item=>item.dataset.optionSection)))}catch{}}
   for(const node of sections){
-    const bar=document.createElement('span');bar.className='game1-option-order';
-    const name=node.querySelector('summary strong')?.textContent||node.dataset.optionSection;
-    const buttons=[-1,1].map(delta=>{
-      const button=document.createElement('button');button.type='button';button.textContent=delta<0?'↑':'↓';
-      button.title=button.ariaLabel=`Move ${name} ${delta<0?'up':'down'}`;
-      button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();move(node,delta)});
-      bar.appendChild(button);return button;
+    const handle=document.createElement('button');handle.type='button';handle.className='game1-option-drag';
+    handle.textContent='⠿';const name=node.querySelector('summary strong')?.textContent||node.dataset.optionSection;
+    handle.title=handle.ariaLabel=`Drag ${name} (or use arrow keys)`;
+    let active=null, destination=null, before=false;
+    function clearDestination(){destination?.classList.remove('game1-option-drop-before','game1-option-drop-after');destination=null}
+    handle.addEventListener('click',event=>{event.preventDefault();event.stopPropagation()});
+    handle.addEventListener('pointerdown',event=>{
+      if(!event.isPrimary||event.button!==0||active!==null)return;
+      event.preventDefault();event.stopPropagation();active=event.pointerId;handle.focus();handle.setPointerCapture(active);node.classList.add('game1-option-dragging');
     });
-    controls.set(node,buttons);node.querySelector('summary').appendChild(bar);
+    handle.addEventListener('pointermove',event=>{
+      if(event.pointerId!==active)return;
+      const other=document.elementFromPoint(event.clientX,event.clientY)?.closest('.game1-option-section[data-option-section]');
+      clearDestination();
+      if(!other||other===node||other.parentElement!==parent)return;
+      const rect=other.querySelector('summary').getBoundingClientRect();
+      destination=other;before=event.clientY<rect.top+rect.height/2;
+      destination.classList.add(before?'game1-option-drop-before':'game1-option-drop-after');
+    });
+    function finish(event){if(event.pointerId!==active)return;active=null;node.classList.remove('game1-option-dragging');
+      const target=destination;clearDestination();
+      if(event.type==='pointerup'&&target){parent.insertBefore(node,before?target:target.nextSibling);handle.focus();save()}
+    }
+    handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',finish);handle.addEventListener('lostpointercapture',finish);
+    handle.addEventListener('keydown',event=>{
+      if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;
+      event.preventDefault();event.stopPropagation();const nodes=getOrder(),other=nodes[nodes.indexOf(node)+(event.key==='ArrowUp'?-1:1)];if(!other)return;
+      if(event.key==='ArrowUp')parent.insertBefore(node,other);else parent.insertBefore(other,node);handle.focus();save();
+    });
+    node.querySelector('summary').appendChild(handle);
   }
-  refresh();
 }
 game1InitOptionOrder();

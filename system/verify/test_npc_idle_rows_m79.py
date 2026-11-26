@@ -26,9 +26,9 @@ class NpcIdleRowsM79Tests(unittest.TestCase):
         catalog = (ROOT / "src/server/bootstrap/ServiceCatalog.luau").read_text(encoding="utf-8")
         self.assertIn('ServiceBootstrap.StartAll(ServiceCatalog.Build(script)', startup)
         self.assertIn('name = "CustomScalingDebugService"', catalog)
-        self.assertIn('name = "MonsterDebugService"', catalog)
+        self.assertNotIn('name = "MonsterDebugService"', catalog)
         self.assertIn('require(dev:WaitForChild("CustomScalingDebugService")).Start()', catalog)
-        self.assertIn('require(dev:WaitForChild("MonsterDebugService")).Start()', catalog)
+        self.assertNotIn('require(dev:WaitForChild("MonsterDebugService")).Start()', catalog)
 
 
 if __name__ == "__main__":

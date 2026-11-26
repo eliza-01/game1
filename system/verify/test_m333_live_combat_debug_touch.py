@@ -32,12 +32,12 @@ class PublishedRuntimeM333(unittest.TestCase):
         self.assertIn('rank >= 200',authorizer)
         self.assertIn('PlayerAdded:Connect(authorize)',authorizer)
         for path in ['src/client/dev/CameraDebugController.luau','src/client/dev/HealthUiDebugController.luau',
-                     'src/client/dev/TestLoadoutController.luau','src/client/dev/MovementDebugController.luau',
-                     'src/client/dev/MonsterDebugController.luau','src/client/dev/CustomScalingDebugController.luau',
+                     'src/client/dev/TestLoadoutController.luau',
+                     'src/client/dev/CustomScalingDebugController.luau',
                      'src/client/dev/HouseSocketDebugController.luau','src/client/weapon/WeaponSelectionController.luau']:
             self.assertIn('PublishedDebugAccess.ClientAllowed()',source(path))
-        for path in ['src/server/dev/TestLoadoutService.luau','src/server/dev/MovementDebugService.luau',
-                     'src/server/dev/MonsterDebugService.luau','src/server/dev/CustomScalingDebugService.luau',
+        for path in ['src/server/dev/TestLoadoutService.luau',
+                     'src/server/dev/CustomScalingDebugService.luau',
                      'src/server/dev/HouseSocketDebugService.luau','src/server/weapon/WeaponSelectionService.luau']:
             self.assertIn('ServerAllowed(',source(path))
 

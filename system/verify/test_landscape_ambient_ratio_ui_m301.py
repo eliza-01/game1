@@ -38,19 +38,11 @@ class LandscapeAmbientM301(unittest.TestCase):
         self.assertIn('remote:FireClient(player, "impact", model, direction.Unit)',server)
         self.assertIn('remote:FireAllClients("wind"',server)
 
-    def test_debug_updates_owner_animation_track(self):
-        server = load('src/server/dev/MovementDebugService.luau')
-        client = load('src/client/dev/MovementDebugController.luau')
+    def test_normal_animation_track_refresh_survives_debug_removal(self):
         animator = load('src/client/character/animation/CharacterAnimationController.luau')
-        self.assertIn('ensureRemoteEvent(remotes, "MovementDebugAnimationRatioChanged")',server)
-        self.assertIn('ratioChangedRemote:FireClient(owner, model, channel, unitsPerPercent)',server)
-        self.assertIn('math.abs(track.Speed) / math.max(0.01, oldScale)',server)
-        self.assertIn('actualSpeed = item.sign * scale * item.multiplier',server)
-        self.assertIn('ratioChangedRemote.OnClientEvent:Connect',client)
-        self.assertIn('model:SetAttribute(AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel), value)',client)
-        self.assertIn('CharacterAnimationController.Refresh()',client)
-        self.assertIn('currentLoop:AdjustSpeed',animator) if False else self.assertIn('applyBackwardPlayback(currentLoop, slot)',animator)
+        self.assertIn('applyBackwardPlayback(currentLoop, slot)',animator)
         self.assertIn('track:AdjustSpeed(playbackScale)',animator)
+        self.assertNotIn('DebugUnitsPerPercentAttribute',animator)
 
     def test_clip_editor_paginates_saved_rules_and_is_stable_in_mature_project(self):
         js = load('system/control-center/static/animation-speed.js')

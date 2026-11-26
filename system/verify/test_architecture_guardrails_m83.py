@@ -22,8 +22,7 @@ class ArchitectureGuardrailsM83(unittest.TestCase):
                 self.assertNotIn('Players.LocalPlayer', content)
 
     def test_debug_mutations_are_studio_only(self):
-        for filename in ('MovementDebugService.luau', 'MonsterDebugService.luau',
-                         'CustomScalingDebugService.luau', 'TestLoadoutService.luau'):
+        for filename in ('CustomScalingDebugService.luau', 'TestLoadoutService.luau'):
             content = (ROOT / 'src/server/dev' / filename).read_text(encoding='utf-8')
             with self.subTest(filename=filename):
                 self.assertIn('RunService:IsStudio()', content)

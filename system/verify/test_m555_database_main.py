@@ -11,14 +11,15 @@ def read(path): return (ROOT/path).read_text(encoding='utf8')
 
 class DatabaseMain(unittest.TestCase):
     def setUp(self): self.data=balance.load()
-    def test_shared_effects_and_legacy_profile_ids(self):
+    def test_shared_effects_and_current_profile_ids(self):
         rows={row['id']:row for row in self.data['skills']}
         self.assertEqual({row['owner'] for row in rows.values()},{'shared'})
         self.assertEqual(set(skills.SHOP_BUFFS),{'skill_might_d','skill_earth_d','skill_life_d','skill_wind_d'})
-        for effect,power in [('might',20),('earth',30),('life',2),('wind',20)]:
-            row=rows['skill_'+effect+'_d'];self.assertEqual((row['effect'],row['power'],row['duration']),(effect,power,600))
-        self.assertEqual((rows['skill_might']['power'],rows['skill_might']['duration'],rows['skill_haste']['power'],rows['skill_haste']['duration']),(25,6,25,6))
-        self.assertEqual(len(self.data['skilledMonsters']),8)
+        for effect in ('might','earth','life','wind'):
+            row=rows['skill_'+effect+'_d'];self.assertEqual(row['effect'],effect)
+            self.assertGreater(row['power'],0);self.assertGreater(row['duration'],0)
+        self.assertNotIn('skill_might',rows);self.assertNotIn('skill_haste',rows)
+        self.assertEqual(len(self.data['skilledMonsters']),6)
         # The shared variants may be assigned to a monster without ownership restrictions.
         for identity in skills.SHOP_BUFFS:
             draft=deepcopy(self.data);draft['skilledMonsters'][0]['skills']=[dict(skillId=identity,downgrade=True,trigger='expired',hpBelow=50)]

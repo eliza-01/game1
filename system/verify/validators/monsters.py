@@ -200,12 +200,11 @@ def check_monster_contracts(
         "refreshWanderLocomotion",
         "locomotionSpeedFor",
         "runTrack",
-        "Game1MonsterDebugLocomotionMode",
         "AnimationPlaybackSpeedPercent",
         "AnimationSpeedScaling",
     ]:
         if required not in monster_runtime_text:
-            report_error(f"monster live movement-debug locomotion missing {required}")
+            report_error(f"monster locomotion missing {required}")
     for required in ['VisualRootWeld', 'animatorFor(runtimeModel, visual)', 'controller.Parent = visual']:
         if required not in monster_runtime_text:
             report_error(f"monster animated-navigation bridge missing {required}")

@@ -19,7 +19,6 @@ REQUIRED_RUNTIME_MODULES = (
     "src/server/combat/AttackService.luau",
     "src/server/combat/DamageService.luau",
     "src/server/combat/EntityHitboxService.luau",
-    "src/server/dev/MovementDebugService.luau",
     "src/server/monster/MonsterSpawnerService.luau",
     "src/server/monster/MonsterPopulationController.luau",
     "src/server/monster/MonsterRigBuilder.luau",
@@ -37,7 +36,6 @@ REQUIRED_RUNTIME_MODULES = (
     "src/client/character/animation/CharacterAnimationController.luau",
     "src/client/combat/AttackController.luau",
     "src/client/combat/AimPoseController.luau",
-    "src/client/dev/MovementDebugController.luau",
     "src/shared/character/CharacterConfig.luau",
     "src/shared/character/CharacterMovementConfig.luau",
     "src/shared/character/CharacterRegistry.luau",
@@ -56,6 +54,10 @@ REQUIRED_RUNTIME_MODULES = (
 
 
 LEGACY_RUNTIME_MODULES = (
+    "src/server/dev/MovementDebugService.luau",
+    "src/client/dev/MovementDebugController.luau",
+    "src/server/dev/MonsterDebugService.luau",
+    "src/client/dev/MonsterDebugController.luau",
     "src/server/CharacterService.luau",
     "src/server/AttackService.luau",
     "src/server/DamageService.luau",

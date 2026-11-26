@@ -27,13 +27,6 @@ function Formula.AuthoredUnits(units)
     )
 end
 
-function Formula.DebugUnits(units, authoredUnits)
-    return math.clamp(
-        Formula.Finite(units, authoredUnits),
-        Formula.MinUnitsPerPercent,
-        Formula.MaxUnitsPerPercent
-    )
-end
 
 function Formula.DetailsPercent(statValue, unitsPerPercent)
     local value = Formula.StatValue(statValue)

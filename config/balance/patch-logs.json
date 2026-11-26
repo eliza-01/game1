@@ -68,6 +68,10 @@
     {
       "patch": 555,
       "message": "Main: единый редактор Database, Skills → Buff / Debuff / Monster / Character. D-баффы теперь в общем каталоге; старые навыки и настройки GP сохранены, численные параметры не изменены."
+    },
+    {
+      "patch": 557,
+      "message": "Death Chase по виду: преследование до выхода из исходной территории; обычный leash при отсутствии границ. Main: Monsters, Skills, Weapons, Levels. Удалены короткие Might/Haste и их тестовые профили."
     }
   ]
 }

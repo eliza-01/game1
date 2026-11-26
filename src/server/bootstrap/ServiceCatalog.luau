@@ -81,15 +81,8 @@ function ServiceCatalog.Build(root: Instance)
         {name = "PublishedDebugAccessService", critical = false, start = function()
             require(dev:WaitForChild("PublishedDebugAccessService")).Start()
         end},
-        {name = "MovementDebugService", critical = false, dependsOn = {"PublishedDebugAccessService"}, start = function()
-            local MovementDebugService = require(dev:WaitForChild("MovementDebugService"))
-            MovementDebugService.Start()
-        end},
         {name = "CustomScalingDebugService", critical = false, start = function()
             require(dev:WaitForChild("CustomScalingDebugService")).Start()
-        end},
-        {name = "MonsterDebugService", critical = false, start = function()
-            require(dev:WaitForChild("MonsterDebugService")).Start()
         end},
         {name = "WeaponSelectionService", critical = false, dependsOn = {"CharacterService"}, start = function()
             require(root:WaitForChild("weapon"):WaitForChild("WeaponSelectionService")).Start()

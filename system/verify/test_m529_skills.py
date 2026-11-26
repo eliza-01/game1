@@ -12,7 +12,7 @@ class SkillCatalogue(unittest.TestCase):
     def test_catalogue_projection(self):
         self.assertEqual(self.data['schemaVersion'],4)
         self.assertEqual(len(self.data['monsters']),70)
-        self.assertEqual({x['effect'] for x in self.data['skills']},s.DEBUFFS|s.BUFFS)
+        self.assertEqual({x['effect'] for x in self.data['skills']},s.DEBUFFS|(s.BUFFS-{'haste'}))
         resolved=s.resolve(self.data)
         self.assertEqual(len(resolved),len(self.data['skilledMonsters']))
         self.assertEqual(b.render(self.data),b.OUTPUT.read_text(encoding='utf8'))

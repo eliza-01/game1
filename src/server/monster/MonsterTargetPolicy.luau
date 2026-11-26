@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
+local DeathChase = require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
 local MonsterTargetPolicy = {}
 local VERTICAL_TOLERANCE = 5
 
@@ -67,6 +68,7 @@ end
 local function allowsTarget(agent: any, target: Model): boolean
     local root = rootOf(target)
     return root ~= nil and Isolation.Allows(agent.model, target)
+        and DeathChase.AllowsPosition(agent.model, root.Position)
 end
 
 local function acquireNearestTarget(agent: any): Model?

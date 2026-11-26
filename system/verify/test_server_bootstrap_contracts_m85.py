@@ -35,7 +35,7 @@ class ServerBootstrapContractsM85(unittest.TestCase):
         self.assertIn('CharacterService', entries['NpcSpawnerService'][1])
         self.assertFalse(entries['NpcSpawnerService'][0])
         self.assertFalse(entries['MonsterSpawnerService'][0])
-        for name in ('MonsterDebugService', 'CustomScalingDebugService', 'MovementDebugService'):
+        for name in ('CustomScalingDebugService',):
             self.assertFalse(entries[name][0])
             self.assertEqual(entries[name][1], [], name)
 

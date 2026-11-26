@@ -46,15 +46,6 @@ def check_actor_runtime_contracts(
         if required not in monster_js_m23 + monster_html_m23:
             report_error(f"Asset Manager monster behavior UI missing {required}")
 
-    monster_debug_server_m23 = (root / "src/server/dev/MonsterDebugService.luau").read_text(encoding="utf-8")
-    monster_debug_client_m23 = (root / "src/client/dev/MonsterDebugController.luau").read_text(encoding="utf-8")
-    for required in ["GetMonsterDebugCatalog", "ApplyMonsterDebug", "MonsterAggressive", "MonsterAggroRadius", "MonsterAttackRadius"]:
-        if required not in monster_debug_server_m23:
-            report_error(f"Monster Debug server contract missing {required}")
-    for required in ["☑ AGGRESSIVE", "☐ PASSIVE", "AGGRO RADIUS", "ATTACK RADIUS", "RESET FROM ASSET MANAGER", "Game1MonsterAggroRadiusPreview", "Game1MonsterAttackRadiusPreview"]:
-        if required not in monster_debug_client_m23:
-            report_error(f"Monster Debug client UI missing {required}")
-
     monster_ai_m23 = (root / "src/server/monster/MonsterAIService.luau").read_text(encoding="utf-8")
     monster_chase_navigation_m104 = (root / "src/server/monster/MonsterChaseNavigation.luau").read_text(encoding="utf-8")
     monster_agent_lifecycle_m105 = (root / "src/server/monster/MonsterAgentLifecycle.luau").read_text(encoding="utf-8")

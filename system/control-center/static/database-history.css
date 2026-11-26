@@ -43,3 +43,15 @@
 #balance-content .character-card{margin:8px 0}
 #balance-content tr[hidden]{display:none}
 #balance-movement-disclosure[hidden]{display:none}
+
+/* Monster table: sort labels and dedicated drag grips. */
+#balance-content .monster-col-header{display:flex;align-items:center;gap:5px;white-space:nowrap}
+#balance-content .monster-col-header button{border:0;background:transparent;padding:2px 3px;margin:0;color:inherit;font:inherit;box-shadow:none}
+#balance-content .monster-col-grip{cursor:grab;opacity:.55;touch-action:none}
+#balance-content .monster-col-grip:active{cursor:grabbing}
+#balance-content .monster-col-grip:hover,#balance-content .monster-col-grip:focus-visible{opacity:1}
+#balance-content .monster-col-sort{cursor:pointer;text-align:left}
+#balance-content th[aria-sort=ascending] .monster-col-sort,#balance-content th[aria-sort=descending] .monster-col-sort{font-weight:700}
+#balance-content th.monster-col-before{box-shadow:inset 3px 0 #55b9a7}
+#balance-content th.monster-col-after{box-shadow:inset -3px 0 #55b9a7}
+#balance-content th.monster-col-dragging{opacity:.5}

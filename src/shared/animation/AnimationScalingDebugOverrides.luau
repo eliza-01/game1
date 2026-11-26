@@ -14,8 +14,5 @@ function Overrides.ClipRule(assetId: string, prefix: string): any?
     }
 end
 
-function Overrides.ModelUnits(model: Model, attributeName: string): number?
-    return tonumber(model:GetAttribute(attributeName))
-end
 
 return table.freeze(Overrides)

@@ -85,7 +85,7 @@ function Layout.Build(origin: CFrame, rows: {any}, maxLevel: number, spacing: nu
             end
             local visit=point+facing*reach+Vector3.yAxis*CharacterConfig.RootAnchorOffset
             local homeRadius=math.min(75,ZONE_SIZE/2-8-math.max(math.abs(item.x),math.abs(item.z)))
-            local slot={point=point,facing=facing,homeRadius=homeRadius,visit=CFrame.lookAt(visit,point+Vector3.yAxis*CharacterConfig.RootAnchorOffset),zone=index}
+            local slot={point=point,facing=facing,homeRadius=homeRadius,visit=CFrame.lookAt(visit,point+Vector3.yAxis*CharacterConfig.RootAnchorOffset),zone=index,zoneFrame=box.top,zoneSize=Vector3.new(box.size.X,64,box.size.Z)}
             if item.extra then table.insert(extraSlots,{row=row,slot=slot}) else slots[row.id]=slot end
         end
     end

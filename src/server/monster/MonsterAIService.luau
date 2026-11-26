@@ -12,6 +12,7 @@ local Special = require(script.Parent:WaitForChild("MonsterSkillCast"))
 local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
 local Lifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
 local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
+local DeathChase = require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
 local HomeLeash = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorHomeLeash"))
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -167,9 +168,9 @@ local function runAgent(agent: any)
         if target then
             if agent.lastDamageAt <= 0 then agent.lastDamageAt = now end
             local targetRoot = rootOf(target)
-            if outsideHome(agent, agent.root.Position)
+            if not DeathChase.IsBound(agent.model) and (outsideHome(agent, agent.root.Position)
                 or (targetRoot and outsideHome(agent, targetRoot.Position))
-                or HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds()) then
+                or HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds())) then
                 beginReturn(agent)
                 updateReturn(agent)
                 continue

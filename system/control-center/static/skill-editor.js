@@ -30,7 +30,7 @@
       const isBuff=buffs.has(s.effect);cell(tr,num(s.duration,v=>s.duration=v,.5,isBuff?3600:20));cell(tr,num(s.cooldown,v=>s.cooldown=v,1.5,isBuff?7200:120));
       cell(tr,['poison','bleed'].includes(s.effect)?num(s.tick,v=>s.tick=v,.5,20):'—');cell(tr,s.id);body.append(tr);
     }
-    const hint=el('small',kind==='buff'?'D = Hub buffer variant. Cooldown applies to combat casts; shop blocks active duplicates.':'Shared effects · no actor ownership.');hint.className='muted';root.append(hint);
+    const hint=el('small',kind==='buff'?'D = Hub buffer variant. Cooldown applies to combat casts; shop refreshes active buffs.':'Shared effects · no actor ownership.');hint.className='muted';root.append(hint);
   }
   function renderProfiles(){
     const profileRoot=el('div');profileRoot.id='skilled-monsters-editor';root.append(profileRoot);if(!snapshot)return;

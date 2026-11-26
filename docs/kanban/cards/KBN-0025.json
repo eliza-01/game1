@@ -7,10 +7,10 @@
   "priority": "P0",
   "owner": "Owner + Codex",
   "specPath": "docs/kanban/specs/KBN-0025.md",
-  "specSha256": "1750cf754e19ed0311fe15a8f9ff0c674df96cebe926f74e20d27a98e3c16e57",
+  "specSha256": "a075e30cf6cd2835492f27127c712e24796ead8ac6ae2d48425a78523ca4ba68",
   "dependsOn": [],
-  "revision": 1,
-  "updatedAt": "2026-11-26T00:00:00+00:00",
+  "revision": 2,
+  "updatedAt": "2026-11-26T04:00:00+00:00",
   "tasks": [
     {
       "id": "KBN-0025-T01",
@@ -26,6 +26,21 @@
       "id": "KBN-0025-T03",
       "title": "Проверить реальные анимации, скорости, отчёт и воспроизводимость в Studio",
       "done": false
+    },
+    {
+      "id": "KBN-0025-T04",
+      "title": "Export / Skip / Retry, автоматический GP_TRIAL и timing-only melee fallback",
+      "done": true
+    },
+    {
+      "id": "KBN-0025-T05",
+      "title": "Независимый Headshot Raycast и уточнение метрик GP",
+      "done": true
+    },
+    {
+      "id": "KBN-0025-T06",
+      "title": "Проверить задержки между атаками и повторить матрицу после M532",
+      "done": false
     }
   ],
   "acceptance": [
@@ -38,6 +53,12 @@
     {
       "id": "KBN-0025-A02",
       "title": "Проверить смерть, отмену, timeout, отсутствие наград и изоляцию теста",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0025-A03",
+      "title": "Headshot кинжалом, fallback 2hs, Export/Skip/Retry в Studio",
       "status": "NOT_RUN",
       "evidence": ""
     }

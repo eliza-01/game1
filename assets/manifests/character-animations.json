@@ -570,6 +570,20 @@
       "status": "PUBLISHED"
     },
     {
+      "id": "human_male__weapon__2hs__attack__01",
+      "characterId": "human_male",
+      "name": "2hs_attack_01",
+      "sourcePath": "assets/source/characters/human/male/human_male/animations/weapons/2hs/2hs_attack_01.rbxm",
+      "preparedPath": "assets/source/characters/human/male/human_male/animations/weapons/2hs/2hs_attack_01.rbxm",
+      "sha256": "86e83e8963e976a0b8586e39c9aed6c003972fc790dafdeb684bce322d7c1b51",
+      "sourceSha256": "86e83e8963e976a0b8586e39c9aed6c003972fc790dafdeb684bce322d7c1b51",
+      "assetId": "95018534036399",
+      "publishedSha256": "86e83e8963e976a0b8586e39c9aed6c003972fc790dafdeb684bce322d7c1b51",
+      "moderationState": "Approved",
+      "revision": 1,
+      "status": "PUBLISHED"
+    },
+    {
       "id": "human_male__base__death__01",
       "characterId": "human_male",
       "name": "base_death_01",
@@ -677,6 +691,20 @@
       "sourceSha256": "02976589484a542c2e3c76846d4d160a2d5a50081f458a0fbcf81d6305c51f6d",
       "assetId": "125331371585949",
       "publishedSha256": "02976589484a542c2e3c76846d4d160a2d5a50081f458a0fbcf81d6305c51f6d",
+      "moderationState": "Approved",
+      "revision": 1,
+      "status": "PUBLISHED"
+    },
+    {
+      "id": "human_male__weapon__dualswords__attack__01",
+      "characterId": "human_male",
+      "name": "dualswords_attack_01",
+      "sourcePath": "assets/source/characters/human/male/human_male/animations/weapons/dualswords/dualswords_attack_01.rbxm",
+      "preparedPath": "assets/source/characters/human/male/human_male/animations/weapons/dualswords/dualswords_attack_01.rbxm",
+      "sha256": "3353c1da7dbbb0653b5be4ee05f2d270fcafb09139b23d67b54c0d071028fdfb",
+      "sourceSha256": "3353c1da7dbbb0653b5be4ee05f2d270fcafb09139b23d67b54c0d071028fdfb",
+      "assetId": "70608987841852",
+      "publishedSha256": "3353c1da7dbbb0653b5be4ee05f2d270fcafb09139b23d67b54c0d071028fdfb",
       "moderationState": "Approved",
       "revision": 1,
       "status": "PUBLISHED"
@@ -1544,6 +1572,18 @@
       "priority": "Movement"
     },
     {
+      "id": "binding__human_male__weapon__2hs__attack__01",
+      "characterId": "human_male",
+      "scope": "weapon",
+      "weaponSet": "2hs",
+      "slot": "attack",
+      "variant": 1,
+      "clipId": "human_male__weapon__2hs__attack__01",
+      "weight": 100,
+      "looped": false,
+      "priority": "Action"
+    },
+    {
       "id": "binding__human_male__weapon__bow__attack__01",
       "characterId": "human_male",
       "scope": "weapon",
@@ -1602,6 +1642,18 @@
       "weight": 100,
       "looped": true,
       "priority": "Movement"
+    },
+    {
+      "id": "binding__human_male__weapon__dualswords__attack__01",
+      "characterId": "human_male",
+      "scope": "weapon",
+      "weaponSet": "dualswords",
+      "slot": "attack",
+      "variant": 1,
+      "clipId": "human_male__weapon__dualswords__attack__01",
+      "weight": 100,
+      "looped": false,
+      "priority": "Action"
     },
     {
       "id": "binding__human_male__weapon__hands__attack__01",

@@ -42,7 +42,9 @@ local function finishTrial(s: any, outcome: string)
     local character=s.player.Character
     if character then character:SetAttribute("GameplayGuideTrial",nil) end
     if outcome=="interrupted" then publishGuide(s,"Interrupted · retry this trial"); return end
+    s.guide.pending=false
     table.insert(s.guide.results,row)
+    Report.EmitTrial(#s.guide.results,row)
     local total=#s.guide.stages; local done=#s.guide.results
     publishGuide(s,("%d/%d · %s · %.1f DPS · %.1fs · HP %d/%d%s"):format(done,total,outcome,row.dps,row.seconds,row.hpLeft,row.maxHP,if done==total then " · Done" else " · Next"))
 end
@@ -240,7 +242,7 @@ local function dispatch(player: Player, action: any, request: any)
     if action == "guideBegin" then
         if s.guide then return result(false,"Guided test already exists") end
         clearGroup(s)
-        s.guide={stages=Plan.Build(),results={},running=false}
+        s.guide={stages=Plan.Build(),results={},running=false,pending=false}
         publishGuide(s,("0/%d · Next to start"):format(#s.guide.stages))
         return result(true,"Guided test ready")
     end
@@ -249,12 +251,46 @@ local function dispatch(player: Player, action: any, request: any)
         if not g or g.running then return result(false,"Finish current trial first") end
         local stage=g.stages[#g.results+1]
         if not stage then return result(false,"All trials complete · Done") end
+        g.pending=true
         local selection,reason=Loadout.Validate(stage)
         if not selection then return result(false,tostring(reason)) end
         local applied=apply(s,selection)
         if not applied.ok then return applied end
         local metadata=table.clone(stage); metadata.visualPlaceholder=selection.placeholder
         return startGroup(s,assert(Balance.Monster(stage.monsterId)),1,metadata)
+    end
+    if action == "guideExport" then
+        local g=s.guide
+        if not g then return result(false,"Start Guided first") end
+        Report.Emit(g.results,RuntimeVersion.Version.." PARTIAL")
+        return result(true,("Exported %d completed trials · session preserved"):format(#g.results))
+    end
+    if action == "guideRetry" then
+        local g=s.guide
+        if not g then return result(false,"Start Guided first") end
+        if g.running then
+            finishTrial(s,"interrupted")
+        elseif not g.pending and #g.results>0 then
+            Report.EmitRetry(#g.results)
+            table.remove(g.results)
+        end
+        g.pending=true
+        clearGroup(s)
+        publishGuide(s,("%d/%d · Next to retry"):format(#g.results,#g.stages))
+        return result(true,"Trial reset · Next when ready")
+    end
+    if action == "guideSkip" then
+        local g=s.guide
+        if not g then return result(false,"Start Guided first") end
+        local stage=g.stages[#g.results+1]
+        if not stage then return result(false,"All trials complete · Done") end
+        if g.running then finishTrial(s,"interrupted") end
+        clearGroup(s)
+        local row={stage=stage,outcome="skipped",reason="manual_skip"}
+        g.pending=false
+        table.insert(g.results,row); Report.EmitTrial(#g.results,row)
+        publishGuide(s,("%d/%d · Skipped · %s"):format(#g.results,#g.stages,if #g.results==#g.stages then "Done" else "Next"))
+        return result(true,"Trial skipped · excluded from summary")
     end
     if action == "guideDone" then
         local g=s.guide
@@ -263,7 +299,7 @@ local function dispatch(player: Player, action: any, request: any)
         s.guide=nil; publishGuide(s,"Report exported · copy GP_REPORT from Output")
         return result(true,"Report exported to server Output")
     end
-    if s.guide then return result(false,"Guided test active · use Next / Done / Cancel") end
+    if s.guide then return result(false,"Guided test active · use guide controls") end
     if action == "recovery" then
         local character = alive(player)
         if not character then return result(false, "Respawn first") end

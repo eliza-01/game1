@@ -614,6 +614,20 @@ return table.freeze({
 						}),
 					}),
 				}),
+				["2hs"] = table.freeze({
+					["attack"] = table.freeze({
+						table.freeze({
+							clipId = "human_male__weapon__2hs__attack__01",
+							assetId = "95018534036399",
+							animationId = "rbxassetid://95018534036399",
+							variant = 1,
+							weight = 100,
+							looped = false,
+							priority = "Action",
+							document = nil,
+						}),
+					}),
+				}),
 				["bow"] = table.freeze({
 					["attack"] = table.freeze({
 						table.freeze({
@@ -672,6 +686,20 @@ return table.freeze({
 							weight = 100,
 							looped = true,
 							priority = "Movement",
+							document = nil,
+						}),
+					}),
+				}),
+				["dualswords"] = table.freeze({
+					["attack"] = table.freeze({
+						table.freeze({
+							clipId = "human_male__weapon__dualswords__attack__01",
+							assetId = "70608987841852",
+							animationId = "rbxassetid://70608987841852",
+							variant = 1,
+							weight = 100,
+							looped = false,
+							priority = "Action",
 							document = nil,
 						}),
 					}),

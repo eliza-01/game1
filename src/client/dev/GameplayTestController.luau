@@ -292,8 +292,12 @@ function Controller.Start()
         local visit = contentButton(navigation, "Go", 30); visit.Activated:Connect(function() invoke("visit") end)
         start.Activated:Connect(function() invoke("start") end)
         local guideRow=row(body,30); horizontal(guideRow)
-        for _,action in ipairs({{"Guided","guideBegin"},{"Next","guideNext"},{"Done","guideDone"},{"Cancel","guideAbort"}}) do
+        for _,action in ipairs({{"Guided","guideBegin"},{"Next","guideNext"},{"Export","guideExport"},{"Done","guideDone"},{"Cancel","guideAbort"}}) do
             local b=contentButton(guideRow,action[1],30); b.Activated:Connect(function() invoke(action[2]) end)
+        end
+        local guideTools=row(body,30); horizontal(guideTools)
+        for _,action in ipairs({{"Skip","guideSkip"},{"Retry","guideRetry"}}) do
+            local b=contentButton(guideTools,action[1],30); b.Activated:Connect(function() invoke(action[2]) end)
         end
         local guideCaption=label(gui,"",UDim2.new(0,350,0,42)); guideCaption.AnchorPoint=Vector2.new(0.5,0)
         guideCaption.Position=UDim2.new(.5,0,0,80); guideCaption.BackgroundColor3=colors.panel; guideCaption.BackgroundTransparency=.15

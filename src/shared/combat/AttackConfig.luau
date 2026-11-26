@@ -8,6 +8,7 @@ return table.freeze({
     -- reticle-ray classification and can upgrade at most one target per attack.
     HeadshotDamageMultiplier = Balance.Rules.headshotMultiplier,
     HeadshotAimOriginMaxDistance = 24,
+    MeleeHeadshotRayDistance = 32,
 
     -- M360: exactly one authoritative contact snapshot at authored HitEnd.
     MeleeDefaultArcAngle = 108,

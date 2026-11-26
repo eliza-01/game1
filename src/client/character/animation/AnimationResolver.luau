@@ -4,6 +4,7 @@ local Game1Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Game1Shared:WaitForChild("character")
 local Registry = require(CharacterShared:WaitForChild("CharacterAnimationRegistry"))
 local VariantMerge = require(CharacterShared:WaitForChild("CharacterAnimationVariantMerge"))
+local GameplayFallback = require(Game1Shared:WaitForChild("combat"):WaitForChild("GameplayAttackFallback"))
 
 local AnimationResolver = {}
 local random = Random.new()
@@ -132,6 +133,9 @@ function AnimationResolver.ResolveAction(character: Model, slot: string)
 			-- A bow cannot play a fallback melee clip and fire an arrow.
 			return nil
 		end
+		-- In GP, missing weapon attack metadata uses an explicitly labelled
+		-- timing-only attack, not an unrelated base/hands clip.
+		if slot == "attack" and GameplayFallback.Allowed(character) then return nil end
 	end
 	return AnimationResolver.Resolve(character, "base", nil, slot)
 end

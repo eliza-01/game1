@@ -1148,15 +1148,15 @@ return table.freeze({
             ["attackSpeed"] = 100,
             ["baseId"] = "monster_020",
             ["critChance"] = 5,
-            ["damage"] = 82,
-            ["factor"] = 0.9719972228650775,
+            ["damage"] = 72,
+            ["factor"] = 0.8624229979466118,
             ["gold"] = 80,
             ["hp"] = 576,
             ["id"] = "skilled_poison",
             ["level"] = 20,
             ["runSpeed"] = 130,
             ["skillBudgets"] = table.freeze({
-                ["skill_poison"] = 0.028809523809523806,
+                ["skill_poison"] = 0.15952380952380954,
             }),
             ["skills"] = table.freeze({
                 table.freeze({
@@ -1174,15 +1174,15 @@ return table.freeze({
             ["attackSpeed"] = 100,
             ["baseId"] = "monster_020",
             ["critChance"] = 5,
-            ["damage"] = 81,
-            ["factor"] = 0.9610983981693363,
+            ["damage"] = 74,
+            ["factor"] = 0.8868243243243245,
             ["gold"] = 80,
             ["hp"] = 576,
             ["id"] = "skilled_bleed",
             ["level"] = 20,
             ["runSpeed"] = 130,
             ["skillBudgets"] = table.freeze({
-                ["skill_bleed"] = 0.040476190476190485,
+                ["skill_bleed"] = 0.12761904761904763,
             }),
             ["skills"] = table.freeze({
                 table.freeze({
@@ -1200,15 +1200,15 @@ return table.freeze({
             ["attackSpeed"] = 100,
             ["baseId"] = "monster_020",
             ["critChance"] = 5,
-            ["damage"] = 84,
-            ["factor"] = 1.0,
+            ["damage"] = 80,
+            ["factor"] = 0.949367088607595,
             ["gold"] = 80,
             ["hp"] = 576,
             ["id"] = "skilled_slow",
             ["level"] = 20,
             ["runSpeed"] = 130,
             ["skillBudgets"] = table.freeze({
-                ["skill_slow"] = 0,
+                ["skill_slow"] = 0.05333333333333333,
             }),
             ["skills"] = table.freeze({
                 table.freeze({
@@ -1226,15 +1226,15 @@ return table.freeze({
             ["attackSpeed"] = 100,
             ["baseId"] = "monster_020",
             ["critChance"] = 5,
-            ["damage"] = 80,
-            ["factor"] = 0.949367088607595,
+            ["damage"] = 70,
+            ["factor"] = 0.8310249307479224,
             ["gold"] = 80,
             ["hp"] = 576,
             ["id"] = "skilled_root",
             ["level"] = 20,
             ["runSpeed"] = 130,
             ["skillBudgets"] = table.freeze({
-                ["skill_root"] = 0.053333333333333344,
+                ["skill_root"] = 0.20333333333333334,
             }),
             ["skills"] = table.freeze({
                 table.freeze({
@@ -1252,15 +1252,15 @@ return table.freeze({
             ["attackSpeed"] = 100,
             ["baseId"] = "monster_020",
             ["critChance"] = 5,
-            ["damage"] = 77,
-            ["factor"] = 0.9207161125319694,
+            ["damage"] = 69,
+            ["factor"] = 0.8256880733944955,
             ["gold"] = 80,
             ["hp"] = 576,
             ["id"] = "skilled_stun",
             ["level"] = 20,
             ["runSpeed"] = 130,
             ["skillBudgets"] = table.freeze({
-                ["skill_stun"] = 0.08611111111111111,
+                ["skill_stun"] = 0.2111111111111111,
             }),
             ["skills"] = table.freeze({
                 table.freeze({
@@ -1474,7 +1474,7 @@ return table.freeze({
     ["skills"] = table.freeze({
         table.freeze({
             ["cooldown"] = 12,
-            ["duration"] = 4,
+            ["duration"] = 10,
             ["effect"] = "poison",
             ["id"] = "skill_poison",
             ["name"] = "Poison",
@@ -1484,7 +1484,7 @@ return table.freeze({
         }),
         table.freeze({
             ["cooldown"] = 15,
-            ["duration"] = 5,
+            ["duration"] = 10,
             ["effect"] = "bleed",
             ["id"] = "skill_bleed",
             ["name"] = "Bleed",
@@ -1494,7 +1494,7 @@ return table.freeze({
         }),
         table.freeze({
             ["cooldown"] = 15,
-            ["duration"] = 4,
+            ["duration"] = 10,
             ["effect"] = "slow",
             ["id"] = "skill_slow",
             ["name"] = "Slow",
@@ -1504,7 +1504,7 @@ return table.freeze({
         }),
         table.freeze({
             ["cooldown"] = 15,
-            ["duration"] = 2,
+            ["duration"] = 5,
             ["effect"] = "root",
             ["id"] = "skill_root",
             ["name"] = "Root",
@@ -1514,7 +1514,7 @@ return table.freeze({
         }),
         table.freeze({
             ["cooldown"] = 18,
-            ["duration"] = 1.5,
+            ["duration"] = 3,
             ["effect"] = "stun",
             ["id"] = "skill_stun",
             ["name"] = "Stun",
@@ -1524,7 +1524,7 @@ return table.freeze({
         }),
         table.freeze({
             ["cooldown"] = 20,
-            ["duration"] = 4,
+            ["duration"] = 5,
             ["effect"] = "silence",
             ["id"] = "skill_silence",
             ["name"] = "Global Silence",

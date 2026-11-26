@@ -25,7 +25,7 @@ function Visuals.Start()
     if started then return end; started=true
     local player=Players.LocalPlayer
     local model: Model?=nil; local folder: Folder?=nil
-    local cloud: Part?=nil; local smoke: ParticleEmitter?=nil; local block: Part?=nil
+    local cloud: Attachment?=nil; local smoke: ParticleEmitter?=nil; local block: Part?=nil
     local billboard: BillboardGui?=nil; local eyes: TextLabel?=nil; local mouth: TextLabel?=nil; local stun: TextLabel?=nil
     local boots: {[MeshPart]: Color3}={}
     local nextPoison,nextBleed,rootSince=0,0,0
@@ -35,6 +35,7 @@ function Visuals.Start()
     end
     local function clear()
         restoreBoots()
+        if cloud then cloud:Destroy() end
         if folder then folder:Destroy() end
         if billboard then billboard:Destroy() end
         folder=nil; cloud=nil; smoke=nil; block=nil; billboard=nil; eyes=nil; mouth=nil; stun=nil
@@ -57,16 +58,17 @@ function Visuals.Start()
         local now=os.clock()
         if effects.Poison then
             if not cloud then
-                cloud=part(targetFolder,"PoisonCloud",Color3.fromRGB(99,185,56)); cloud.Size=Vector3.new(.2,.2,.2); cloud.Transparency=1
+                cloud=Instance.new("Attachment"); cloud.Name="PoisonCloud"; cloud.Parent=root
                 smoke=Instance.new("ParticleEmitter"); smoke.Texture="rbxasset://textures/particles/smoke_main.dds"
-                smoke.Color=ColorSequence.new(Color3.fromRGB(117,211,61),Color3.fromRGB(45,112,40))
-                smoke.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,.6),NumberSequenceKeypoint.new(1,3.2)})
-                smoke.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.28),NumberSequenceKeypoint.new(1,1)})
-                smoke.Lifetime=NumberRange.new(.9,1.6); smoke.Speed=NumberRange.new(.7,2); smoke.SpreadAngle=Vector2.new(180,180)
+                smoke.Color=ColorSequence.new(Color3.fromRGB(190,130,240),Color3.fromRGB(105,55,170))
+                smoke.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,2),NumberSequenceKeypoint.new(.65,6.5),NumberSequenceKeypoint.new(1,8)})
+                smoke.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.82),NumberSequenceKeypoint.new(.3,.64),NumberSequenceKeypoint.new(1,1)})
+                smoke.Lifetime=NumberRange.new(1.6,2.5); smoke.Speed=NumberRange.new(.5,1.3); smoke.SpreadAngle=Vector2.new(180,180)
+                smoke.LockedToPart=true
                 smoke.Rate=0; smoke.RotSpeed=NumberRange.new(-65,65); smoke.Parent=cloud
             end
-            cloud.Position=bonePoint(character,root)
-            if now>=nextPoison then assert(smoke):Emit(18); nextPoison=now+3 end
+            cloud.Position=root.CFrame:PointToObjectSpace(bonePoint(character,root))
+            if now>=nextPoison then assert(smoke):Emit(12); nextPoison=now+3 end
         else
             if cloud then cloud:Destroy(); cloud=nil; smoke=nil end; nextPoison=0
         end
@@ -112,6 +114,8 @@ function Visuals.Start()
                 stun=glyph(billboard,"✦ ✦",UDim2.fromScale(0,.7),UDim2.fromScale(1,.3),Color3.fromRGB(255,210,73))
             end
             assert(eyes).Visible=effects.Silence==true; assert(mouth).Visible=effects.Silence==true; assert(stun).Visible=effects.Stun==true
+            assert(stun).Position=if effects.Silence then UDim2.fromScale(0,.7) else UDim2.fromScale(0,.15)
+            assert(stun).Size=if effects.Silence then UDim2.fromScale(1,.3) else UDim2.fromScale(1,.7)
         elseif billboard then billboard:Destroy(); billboard=nil; eyes=nil; mouth=nil; stun=nil end
     end)
 end

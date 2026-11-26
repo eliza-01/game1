@@ -31,23 +31,20 @@ end
 function AttackAimGeometry.HeadshotSegment(
     rootPosition: Vector3,
     aimOrigin: any,
-    aimDirection: any,
-    attackRange: number
+    aimDirection: any
 ): (Vector3?, Vector3?)
     local origin, direction = AttackAimGeometry.Normalize(rootPosition, aimOrigin, aimDirection)
     if not origin or not direction then
         return nil, nil
     end
 
-    -- Camera distance must not consume melee range. Keep the exact center-screen
-    -- line, but rebase its finite segment to the point on that line closest to
-    -- the attacker. The segment then extends exactly AttackRadius forward.
+    -- Camera offset must not consume the classification budget. Rebase the
+    -- exact reticle line; the resolver supplies the independent 32-stud limit.
     local closestAlongRay = math.max(0, (rootPosition - origin):Dot(direction))
     return origin + direction * closestAlongRay, direction
 end
 
--- Ray headshots only upgrade targets already inside the server arc; a ray
--- never inserts a new damage target. Range remains anchored to the attacker.
+-- Range check for Miss/Far feedback only; not a headshot requirement.
 function AttackAimGeometry.HitWithinAttackRadius(rootPosition: Vector3, hitPosition: any, attackRange: number): boolean
     return typeof(hitPosition) == "Vector3"
         and finiteVector(hitPosition)

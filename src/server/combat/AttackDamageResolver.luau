@@ -34,11 +34,10 @@ function AttackDamageResolver.Apply(query: DamageQuery): (number, Model?, number
     -- global bone-raycast/occlusion checks when there is no eligible victim.
     if #targets > 0 then
         local rayStart, rayDirection = AttackAimGeometry.HeadshotSegment(root.Position,
-            query.aimOrigin, query.aimDirection, query.attackRange)
+            query.aimOrigin, query.aimDirection)
         if rayStart and rayDirection then
-            local aimed = EntityHitboxService.RaycastAimRegions(character, rayStart, rayDirection, query.attackRange)
+            local aimed = EntityHitboxService.RaycastAimRegions(character, rayStart, rayDirection, Config.MeleeHeadshotRayDistance)
             if aimed and aimed.zone == "head"
-                and AttackAimGeometry.HitWithinAttackRadius(root.Position, aimed.hitPosition, query.attackRange)
                 and MeleeTargetQuery.IsUnobstructed(character, aimed.model, root, aimed.hitPosition)
             then
                 -- The target must also be in THIS server-evaluated arc sample.

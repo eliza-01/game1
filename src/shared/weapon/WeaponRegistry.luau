@@ -31,6 +31,29 @@ return table.freeze({
 		}),
 	}),
 	weapons = table.freeze({
+		["newbie_slayer_01"] = table.freeze({
+			slug = "newbie_slayer_01",
+			nameEn = "Newbie Slayer 01",
+			nameRu = "",
+			weaponType = "bigsword",
+			rarity = "common",
+			attackRadiusStuds = 7,
+			meleeArcAngleDegrees = 108,
+			status = "PUBLISHED",
+			modelAssetId = "72367246036941",
+			serverStoragePath = "ServerStorage.weapons.bigsword.newbie_slayer_01.model.newbie_slayer_01",
+			statModifiers = table.freeze({
+				["AttackSpeed"] = 0,
+				["Damage"] = 0,
+			}),
+			atlasVariantId = 87,
+			textures = table.freeze({
+				["atlas"] = table.freeze({
+					assetId = "107219803101477",
+					sha256 = "7ab0ed7b37cb2b4e3ccc9cd024e7b9a2cdc08ea70ff67e70b4fa4a5def0700a1",
+				}),
+			}),
+		}),
 		["newbie_bow"] = table.freeze({
 			slug = "newbie_bow",
 			nameEn = "Newbie Bow",

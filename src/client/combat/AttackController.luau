@@ -116,6 +116,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         local now = os.clock()
         if playerCharacter ~= expectedCharacter
             or not playerCharacter or playerCharacter:GetAttribute("LifeState") ~= "Alive"
+            or playerCharacter:GetAttribute("SkillStunned") == true
             or now > presentationUntil then
             finishPresentation(sequence)
             return
@@ -262,7 +263,7 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             local lead = math.min(BowProjectileConfig.CaptureLeadSeconds, damagePoseStart * 0.5)
             task.delay(math.max(0.025, damagePoseStart - lead), function()
                 if sequence ~= bowCaptureSequence or sequence ~= attackSequence or player.Character ~= character
-                    or character:GetAttribute("LifeState") ~= "Alive" then return end
+                    or character:GetAttribute("LifeState") ~= "Alive" or character:GetAttribute("SkillStunned") == true then return end
                 local origin, direction = aimPoseController.GetAimRay()
                 if not origin or not direction then return end
                 local launchOrigin = BoneMountedAttachmentController.GetBowReleaseOrigin(character)
@@ -289,7 +290,8 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         local lead = math.min(AttackConfig.MeleeAimCaptureLeadSeconds, hitEndEvent.time * 0.5)
         task.delay(math.max(0, hitEndEvent.time - lead), function()
             if sequence ~= attackSequence or activeMeleeAimId ~= sequence
-                or player.Character ~= character or character:GetAttribute("LifeState") ~= "Alive" then return end
+                or player.Character ~= character or character:GetAttribute("LifeState") ~= "Alive"
+                or character:GetAttribute("SkillStunned") == true then return end
             publishMeleeAim()
             activeMeleeAimId = 0
         end)

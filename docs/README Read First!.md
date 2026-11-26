@@ -83,3 +83,7 @@
 - [**M449 · Options → Sockets, постоянные USE/AIM зоны**](workflows/SOCKET_RANGES_OPTIONS_M449_RU.md) — House/Campfire, валидация и HS Studio Debug override.
 
 - [M531 — Guided Combat Analytics, RunSpeed, касты и VFX](workflows/M531_GUIDED_COMBAT_RU.md).
+
+- [M532 — независимый melee Headshot, GP Export/Skip/Retry, timing-only fallback](workflows/M532_HEADSHOT_GP_RECOVERY_RU.md).
+
+- [M533 — Targeted Status Effects](workflows/M533_TARGETED_STATUS_EFFECTS_RU.md).

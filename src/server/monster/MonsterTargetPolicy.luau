@@ -85,17 +85,30 @@ local function acquireNearestTarget(agent: any): Model?
     return closest
 end
 
-local function attackStillConnects(agent: any, target: Model): boolean
+local function withinAttackRange(agent: any, target: Model): boolean
     local targetRoot = rootOf(target)
     if not targetIsValid(target) or not targetRoot or not allowsTarget(agent, target) then return false end
     local delta = horizontalDelta(agent.root.Position, targetRoot.Position)
     if delta.Magnitude > attackRadius(agent) or math.abs(targetRoot.Position.Y - agent.root.Position.Y) > VERTICAL_TOLERANCE then return false end
+    return true
+end
+
+local function canBeginTargetedCast(agent: any, target: Model): boolean
+    return withinAttackRange(agent, target) and hasLineOfSight(agent, target)
+end
+
+local function attackStillConnects(agent: any, target: Model): boolean
+    if not withinAttackRange(agent, target) then return false end
+    local targetRoot = rootOf(target)
+    if not targetRoot then return false end
+    local delta = horizontalDelta(agent.root.Position, targetRoot.Position)
     if delta.Magnitude > 0.001 then
         if agent.root.CFrame.LookVector:Dot(delta.Unit) < math.cos(math.rad(ATTACK_ARC_DEGREES * 0.5)) then return false end
     end
     return hasLineOfSight(agent, target)
 end
 
+MonsterTargetPolicy.CanBeginTargetedCast = canBeginTargetedCast
 MonsterTargetPolicy.AllowsTarget = allowsTarget
 MonsterTargetPolicy.IsStationary = Approach.IsRestricted
 MonsterTargetPolicy.RootOf = rootOf

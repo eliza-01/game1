@@ -8,6 +8,8 @@ local AnimationShared = Shared:WaitForChild("animation")
 local CharacterShared = Shared:WaitForChild("character")
 local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+local GameplayFallback = require(CombatShared:WaitForChild("GameplayAttackFallback"))
+local HitEnd = require(CombatShared:WaitForChild("CharacterAttackHitEnd"))
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
@@ -15,6 +17,7 @@ local GameOptions = require(Shared:WaitForChild("GameOptions"))
 
 local AnimationResolver = require(script.Parent:WaitForChild("AnimationResolver"))
 local AnimationTrackCache = require(script.Parent:WaitForChild("AnimationTrackCache"))
+local SocialAnimationPlayback = require(script.Parent:WaitForChild("SocialAnimationPlayback"))
 local AttackUpperBodyComposer = require(script.Parent:WaitForChild("AttackUpperBodyComposer"))
 
 local CharacterAnimationController = {}
@@ -248,6 +251,40 @@ end
 refreshLoop = function()
 	if not character or not cache or lifeTransition then
 		return
+	end
+	-- The server attribute owns the stun lifetime. Interrupt any composed attack
+	-- and reuse the published social clip in the existing action/cache owner.
+	if character:GetAttribute("SkillStunned") == true then
+		if currentActionSlot ~= "stun" then
+			stopCurrentLoop(0.06)
+			if airborneSequence ~= -1 then jumpStartFinished = true end
+			currentLoop = nil
+			currentLoopClipId = ""
+			stopCurrentAction(0.06)
+			currentAction = nil
+			currentActionSlot = "stun"
+			currentActionLockedUntil = 0
+			local descriptor = SocialAnimationPlayback.Resolve(character, "unaware")
+			local track = descriptor and cache:Get(descriptor) or nil
+			currentAction = track
+			character:SetAttribute("AnimationActionSlot", "stun")
+			character:SetAttribute("AnimationActionClip", descriptor and descriptor.clipId or "")
+			character:SetAttribute("AnimationResolvedSlot", "stun")
+			character:SetAttribute("AnimationResolvedClip", descriptor and descriptor.clipId or "")
+			if track then
+				track.Looped = true
+				track:Play(0.06, 1, animationPlaybackScale("social", descriptor.animationId))
+			else
+				warn("[game1][animation] stun unaware clip unavailable")
+			end
+		end
+		return
+	elseif currentActionSlot == "stun" then
+		stopCurrentAction(0.1)
+		currentAction = nil
+		currentActionSlot = ""
+		character:SetAttribute("AnimationActionSlot", nil)
+		character:SetAttribute("AnimationActionClip", nil)
 	end
 	local slot = movementSlot()
 	local inJump = character:GetAttribute("AnimationAirborne") == true
@@ -540,7 +577,7 @@ local function bindCharacter(newCharacter: Model)
         warn("[game1][animation] Animator missing; visual unavailable, gameplay continues")
     end
     lastLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
-	local refreshAttributes = { "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "AnimationAirborne", "AnimationJumpSequence", "GameplayTestOnTrack" }
+	local refreshAttributes = { "SkillStunned", "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "AnimationAirborne", "AnimationJumpSequence", "GameplayTestOnTrack" }
 	for _, channel in ipairs({ "run", "walk" }) do
 		table.insert(refreshAttributes, AnimationSpeedScaling.DebugUnitsPerPercentAttribute(channel))
 	end
@@ -563,11 +600,12 @@ end
 -- the animation can take many frames or fail; it has no veto over gameplay.
 function CharacterAnimationController.PlayAction(slot: string)
     if not character or lifeTransition then return nil end
+    if character:GetAttribute("SkillStunned") == true then return nil end
     local now = os.clock()
     if currentActionSlot == "attack" and now < currentActionLockedUntil then return nil end
     local descriptor = AnimationResolver.ResolveAction(character, slot)
-    if not descriptor then return nil end
-    local clipId = tostring(descriptor.clipId or "")
+    if not descriptor and slot ~= "attack" then return nil end
+    local clipId = tostring(descriptor and descriptor.clipId or "")
 
     if slot ~= "attack" then
         if not cache then return nil end
@@ -588,9 +626,16 @@ function CharacterAnimationController.PlayAction(slot: string)
     end
 
     local timeline = AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))
-    if not timeline then
-        warn(("[game1][animation] attack clip has no timeline: %s"):format(clipId))
-        return nil
+    local fallback = false
+    local isMelee = character:GetAttribute("EquippedWeaponType") ~= "bow"
+    if not timeline or (isMelee and not HitEnd.Resolve(timeline)) then
+        timeline = GameplayFallback.Resolve(character)
+        if not timeline then
+            warn(("[game1][animation] attack clip has no usable timeline: %s"):format(clipId))
+            return nil
+        end
+        clipId = GameplayFallback.ClipId
+        fallback = true
     end
     local actionStartedAt = os.clock()
     local runtimeDuration = timeline.duration
@@ -620,40 +665,44 @@ function CharacterAnimationController.PlayAction(slot: string)
 
     -- The presentation pipeline is asynchronous; delays below remain based on
     -- actionStartedAt, NOT on when LoadAnimation/upper-body composition finishes.
-    task.spawn(function()
-        local track, reason, loadedSpeed = AttackUpperBodyComposer.Begin(
-            boundCharacter, descriptor, playbackSpeed, function()
-                return character == boundCharacter and cache == boundCache
-                    and currentActionToken == token and currentActionSlot == "attack"
-                    and not lifeTransition and os.clock() < actionStartedAt + runtimeDuration
-            end, timeline.playbackDuration
-        )
-        if currentActionToken ~= token or character ~= boundCharacter then
-            -- Begin's validity guard owns stale resource cleanup.
-            return
-        end
-        if not track then
-            boundCharacter:SetAttribute("AnimationAttackCompositionError", tostring(reason))
-            warn(("[game1][animation] attack %s visual unavailable; gameplay continues: %s")
-                :format(clipId, tostring(reason)))
-            return
-        end
-        currentAction = track
-        currentActionComposed = true
-        -- Visual speed is corrected for the actual loaded animation length,
-        -- while the timeline and server HitEnd are NEVER recalculated.
-        timeline.playbackSpeed = loadedSpeed or playbackSpeed
-        timeline.animationSpeedPercent = timeline.playbackSpeed * 100
-        boundCharacter:SetAttribute("AnimationPlaybackSpeedPercent", timeline.animationSpeedPercent)
-        boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", true)
-        boundCharacter:SetAttribute("AnimationAttackBridgeBone", AttackUpperBodyComposer.GetBridgeName())
-        local elapsed = math.max(0, os.clock() - actionStartedAt)
-        if elapsed > 0 then
-            pcall(function()
-                track.TimePosition = math.min(track.Length - 1 / 120, elapsed * timeline.playbackSpeed)
-            end)
-        end
-    end)
+    if fallback then
+        boundCharacter:SetAttribute("AnimationAttackCompositionError", "GP timing-only fallback")
+    else
+        task.spawn(function()
+            local track, reason, loadedSpeed = AttackUpperBodyComposer.Begin(
+                boundCharacter, descriptor, playbackSpeed, function()
+                    return character == boundCharacter and cache == boundCache
+                        and currentActionToken == token and currentActionSlot == "attack"
+                        and not lifeTransition and os.clock() < actionStartedAt + runtimeDuration
+                end, timeline.playbackDuration
+            )
+            if currentActionToken ~= token or character ~= boundCharacter then
+                -- Begin's validity guard owns stale resource cleanup.
+                return
+            end
+            if not track then
+                boundCharacter:SetAttribute("AnimationAttackCompositionError", tostring(reason))
+                warn(("[game1][animation] attack %s visual unavailable; gameplay continues: %s")
+                    :format(clipId, tostring(reason)))
+                return
+            end
+            currentAction = track
+            currentActionComposed = true
+            -- Visual speed is corrected for the actual loaded animation length,
+            -- while the timeline and server HitEnd are NEVER recalculated.
+            timeline.playbackSpeed = loadedSpeed or playbackSpeed
+            timeline.animationSpeedPercent = timeline.playbackSpeed * 100
+            boundCharacter:SetAttribute("AnimationPlaybackSpeedPercent", timeline.animationSpeedPercent)
+            boundCharacter:SetAttribute("AnimationAttackUpperBodyComposed", true)
+            boundCharacter:SetAttribute("AnimationAttackBridgeBone", AttackUpperBodyComposer.GetBridgeName())
+            local elapsed = math.max(0, os.clock() - actionStartedAt)
+            if elapsed > 0 then
+                pcall(function()
+                    track.TimePosition = math.min(track.Length - 1 / 120, elapsed * timeline.playbackSpeed)
+                end)
+            end
+        end)
+    end
 
     local exitBlend = AttackUpperBodyComposer.GetExitBlendSeconds()
     if runtimeDuration > exitBlend + 0.01 then

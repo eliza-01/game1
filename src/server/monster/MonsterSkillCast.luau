@@ -22,7 +22,7 @@ end
 function Cast.TryBegin(agent: any,target: Model): boolean
     if agent.model:GetAttribute("MonsterSkillCaster")~=true then return false end
     if agent.attacking or os.clock()<agent.nextAttackAt or agent.retreatPending or not Target.IsValid(target) then return false end
-    local skill,victim=Skills.Choose(agent.model,target,Target.AttackStillConnects(agent,target))
+    local skill,victim=Skills.Choose(agent.model,target,Target.CanBeginTargetedCast(agent,target))
     if not skill or not victim then return false end
     local buff=victim==agent.model
     local model=agent.model
@@ -51,9 +51,9 @@ function Cast.TryBegin(agent: any,target: Model): boolean
             CastVisual.Step(cast.pose,t,buff)
             if not committed and t>=.5 then
                 committed=true
-                if buff or Target.AttackStillConnects(agent,target) then
-                    if Effects.Apply(model,victim,skill,tonumber(model:GetAttribute("Damage")) or 0) then Report.Cast(model,skill.id,true) end
-                end
+                -- Targeted cast is committed: no basic-attack arc/range/LOS
+                -- reroll at impact. valid() still enforces life, ownership and cancellation.
+                if Effects.Apply(model,victim,skill,tonumber(model:GetAttribute("Damage")) or 0) then Report.Cast(model,skill.id,true) end
             end
             if t>=1 then break end
             task.wait(.05)

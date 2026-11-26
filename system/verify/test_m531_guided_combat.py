@@ -44,12 +44,12 @@ class GuidedCombat(unittest.TestCase):
             self.assertIn(token,service)
         damage=src('src/server/combat/DamageService.luau');self.assertLess(damage.index('Report.Damage(attacker, target, hp - newHP'),damage.index('target:SetAttribute("HP", newHP)'))
         report=src('src/server/dev/GameplayCombatReport.luau')
-        for token in ['RunService:IsStudio()','GP_REPORT_BEGIN','GP_REPORT_END','GP_SUMMARY','r.dealt/duration','cyclesWithoutContact','firstInRangeSeconds','90 then return "timeout"']:
+        for token in ['RunService:IsStudio()','GP_REPORT_BEGIN','GP_REPORT_END','GP_SUMMARY','r.dealt/duration','cyclesWithoutContact','firstCenterInRangeSeconds','90 then return "timeout"']:
             self.assertIn(token,report)
     def test_cast_presentation_and_kanban(self):
         cast=src('src/server/monster/MonsterSkillCast.luau'); normal=src('src/server/monster/MonsterAttackExecutor.luau')
         self.assertNotIn('Skills.OnHit',normal);self.assertIn('Special.TryBegin',normal)
-        for token in ['agent.attackSerial==serial','Target.AttackStillConnects','Effects.CanCast(model)','Skills.Reserve','"atk_special"','Cast.Cancel(agent)']:
+        for token in ['agent.attackSerial==serial','Target.CanBeginTargetedCast','Effects.CanCast(model)','Skills.Reserve','"atk_special"','Cast.Cancel(agent)']:
             self.assertIn(token,cast)
         visual=src('src/client/combat/StatusEffectVisuals.luau')
         for token in ['nextPoison=now+3','"spine_02"','"BleedDrop"','"RootMarker"','p.CanCollide=false','Color3.fromRGB(225,26,30)','Color3.fromRGB(141,17,19)','mouth.Rotation=90','restoreBoots()']:

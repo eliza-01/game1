@@ -7,6 +7,7 @@ local CharacterShared = Shared:WaitForChild("character")
 local CombatShared = Shared:WaitForChild("combat")
 local Config = require(CombatShared:WaitForChild("AttackConfig"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
+local GameplayFallback = require(CombatShared:WaitForChild("GameplayAttackFallback"))
 local CharacterAttackHitEnd = require(CombatShared:WaitForChild("CharacterAttackHitEnd"))
 local MeleeHitPlan = require(CombatShared:WaitForChild("MeleeHitPlan"))
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
@@ -363,7 +364,9 @@ local function attack(player: Player, payload: any)
 
     if character:GetAttribute("SkillStunned") == true then return end
     local descriptor = allowedAttackDescriptor(character, clipId)
-    if not descriptor then
+    local fallback = clipId == GameplayFallback.ClipId and GameplayFallback.Allowed(character)
+        and character:GetAttribute("Game1GameplayTestOwner") == player.UserId
+    if not descriptor and not fallback then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=invalid_clip clip=%s"):format(player.Name, clipId))
         end
@@ -373,6 +376,7 @@ local function attack(player: Player, payload: any)
     -- Server cadence is authoritative and does not depend on the submitted clip
     -- length or a per-clip animation scaling override.
     local timing = AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))
+    if fallback then timing = GameplayFallback.Resolve(character) end
     if not timing then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=missing_timeline clip=%s"):format(player.Name, clipId))

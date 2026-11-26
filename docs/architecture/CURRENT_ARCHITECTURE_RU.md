@@ -114,3 +114,7 @@ IDs). Ошибка MySQL блокирует audit-sensitive publish/delete/Sync,
 ## M447 · Граница авторского хранения и runtime state (23.11.2026)
 
 [Матрица всех Mechanic-карт и их долгов](../workflows/MECHANICS_RUNTIME_GAPS_M447_RU.md) уточняет ownership без изменения кода: Project Stores/генераторы (`OptionsStore`, `mechanics.settings`, реестры и spawn manifests) владеют **authoring**; серверные `HouseFireplaceService`, `NpcSpawnerService`, `MonsterPopulationController`, `CharacterService` владеют **live session**; клиентские `InformativeWindowDock` и feedback-контроллеры владеют только представлением. Наличие первого слоя не означает DataStore для второго. Будущий persistent world/player adapter должен быть отдельной ответственностью, с безопасным восстановлением при новом Server/Streaming/re-register, без копирования save-кода в каждый service. Studio Play и compiled Runtime Build acceptance остаются открытыми.
+
+## M533 · Направленные статусы
+
+`MonsterTargetPolicy.CanBeginTargetedCast` проверяет допустимость, дальность и LOS до начала; `MonsterSkillCast` применяет зафиксированный навык без повторной hit-геометрии, сохраняя life/isolation/serial guards. `SkillEffects` остаётся владельцем длительности и модификаторов. `CharacterAnimationController` использует существующий cache и social resolver для stun, `AttackController` завершает aim/movement presentation, `StatusEffectVisuals` владеет локальным attachment и VFX. Схема Database и Remote-контракты не меняются. См. M533 workflow.

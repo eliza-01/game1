@@ -137,3 +137,11 @@ Sync Studio работает строго по одному выбранному
 ## M531 · Guided GP, RunSpeed и отдельные специальные касты
 
 См. `docs/workflows/M531_GUIDED_COMBAT_RU.md` и KBN-0025–0030. Database владеет RunSpeed игрока и привязанных монстров. Debuff trigger `cast`; отдельная special-action, визуализация без изменения навигации; GP отчёт серверный, неперсистентный. Studio-приёмка открыта.
+
+## M532 · Headshot и восстановление теста GP
+
+Headshot melee: 32 studs вдоль проверенного reticle ray, независимо от AttackRadius, только уже валидные цели сектора. GP экспортирует завершённые строки на любом шаге, Retry/Skip и автоматический GP_TRIAL; временный melee timing-only fallback ограничен Studio GP, отдельно маркируется. См. `docs/workflows/M532_HEADSHOT_GP_RECOVERY_RU.md`. Баланс без изменений; KBN-0025 не принят в Studio.
+
+## M533 · Targeted Status Effects
+
+См. `docs/workflows/M533_TARGETED_STATUS_EFFECTS_RU.md`. Poison/Bleed/Slow — 10 с, Root/Silence — 5 с, Stun — 3 с; Slow −30%. Начатый направленный дебафф не промахивается по геометрии обычного удара. Отмена невалидного каста сохранена. Poison следует за игроком, Stun использует unaware. Studio-приёмка открыта.

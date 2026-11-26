@@ -8,10 +8,10 @@
   "priority": "P0",
   "owner": "Owner + Codex",
   "specPath": "docs/kanban/specs/KBN-0031.md",
-  "specSha256": "e544a49234f8f372dd0349465a1cc89733a4867258100fda81d8570ce750e3e2",
+  "specSha256": "8f1b847881f1df620ae59c0c469dd4eed8adaf87c048e18eaacb825418394a10",
   "dependsOn": [],
-  "revision": 9,
-  "updatedAt": "2026-11-26T18:00:00+00:00",
+  "revision": 12,
+  "updatedAt": "2026-11-26T18:50:55+00:00",
   "tasks": [
     {
       "id": "KBN-0031-T01",

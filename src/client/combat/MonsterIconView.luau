@@ -10,8 +10,7 @@ function View.DangerColor(delta: number): Color3
     return Color3.fromRGB(155, 161, 169):Lerp(Color3.fromRGB(224, 57, 58), delta/10)
 end
 function View.Create(parent: Instance, model: Model): (Frame, UIStroke)
-    local name = tostring(model:GetAttribute("MonsterDisplayName") or "")
-    local key = string.match(name, "%(([^()]*)%)%s*$") or name
+    local key = tostring(model:GetAttribute("MonsterNameEn") or "")
     local runs = Atlas[key] or Atlas.Unknown
     local plate = Instance.new("Frame")
     plate.Name = "MonsterPortrait"

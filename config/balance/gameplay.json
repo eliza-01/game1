@@ -16,177 +16,212 @@
     {
       "level": 1,
       "hp": 100,
-      "xpNext": 60
+      "xpNext": 60,
+      "attackBonus": 0.0
     },
     {
       "level": 2,
       "hp": 120,
-      "xpNext": 125
+      "xpNext": 125,
+      "attackBonus": 1.0
     },
     {
       "level": 3,
       "hp": 145,
-      "xpNext": 220
+      "xpNext": 220,
+      "attackBonus": 2.18
     },
     {
       "level": 4,
       "hp": 170,
-      "xpNext": 335
+      "xpNext": 335,
+      "attackBonus": 3.57
     },
     {
       "level": 5,
       "hp": 200,
-      "xpNext": 480
+      "xpNext": 480,
+      "attackBonus": 5.21
     },
     {
       "level": 6,
       "hp": 230,
-      "xpNext": 650
+      "xpNext": 650,
+      "attackBonus": 7.02
     },
     {
       "level": 7,
       "hp": 265,
-      "xpNext": 845
+      "xpNext": 845,
+      "attackBonus": 9.02
     },
     {
       "level": 8,
       "hp": 300,
-      "xpNext": 1065
+      "xpNext": 1065,
+      "attackBonus": 11.23
     },
     {
       "level": 9,
       "hp": 335,
-      "xpNext": 1310
+      "xpNext": 1310,
+      "attackBonus": 13.67
     },
     {
       "level": 10,
       "hp": 370,
-      "xpNext": 1585
+      "xpNext": 1585,
+      "attackBonus": 16.37
     },
     {
       "level": 11,
       "hp": 410,
-      "xpNext": 1885
+      "xpNext": 1885,
+      "attackBonus": 19.31
     },
     {
       "level": 12,
       "hp": 445,
-      "xpNext": 2220
+      "xpNext": 2220,
+      "attackBonus": 22.52
     },
     {
       "level": 13,
       "hp": 485,
-      "xpNext": 2580
+      "xpNext": 2580,
+      "attackBonus": 26.02
     },
     {
       "level": 14,
       "hp": 530,
-      "xpNext": 2970
+      "xpNext": 2970,
+      "attackBonus": 29.84
     },
     {
       "level": 15,
       "hp": 570,
-      "xpNext": 3380
+      "xpNext": 3380,
+      "attackBonus": 34.01
     },
     {
       "level": 16,
       "hp": 615,
-      "xpNext": 3825
+      "xpNext": 3825,
+      "attackBonus": 38.42
     },
     {
       "level": 17,
       "hp": 660,
-      "xpNext": 4290
+      "xpNext": 4290,
+      "attackBonus": 43.09
     },
     {
       "level": 18,
       "hp": 705,
-      "xpNext": 4790
+      "xpNext": 4790,
+      "attackBonus": 48.03
     },
     {
       "level": 19,
       "hp": 750,
-      "xpNext": 5310
+      "xpNext": 5310,
+      "attackBonus": 53.26
     },
     {
       "level": 20,
       "hp": 800,
-      "xpNext": 5860
+      "xpNext": 5860,
+      "attackBonus": 58.79
     },
     {
       "level": 21,
       "hp": 850,
-      "xpNext": 6435
+      "xpNext": 6435,
+      "attackBonus": 64.66
     },
     {
       "level": 22,
       "hp": 900,
-      "xpNext": 7040
+      "xpNext": 7040,
+      "attackBonus": 70.89
     },
     {
       "level": 23,
       "hp": 950,
-      "xpNext": 7670
+      "xpNext": 7670,
+      "attackBonus": 77.5
     },
     {
       "level": 24,
       "hp": 1005,
-      "xpNext": 8330
+      "xpNext": 8330,
+      "attackBonus": 84.51
     },
     {
       "level": 25,
       "hp": 1060,
-      "xpNext": 9010
+      "xpNext": 9010,
+      "attackBonus": 91.94
     },
     {
       "level": 26,
       "hp": 1115,
-      "xpNext": 9725
+      "xpNext": 9725,
+      "attackBonus": 99.7
     },
     {
       "level": 27,
       "hp": 1170,
-      "xpNext": 10460
+      "xpNext": 10460,
+      "attackBonus": 107.81
     },
     {
       "level": 28,
       "hp": 1230,
-      "xpNext": 11230
+      "xpNext": 11230,
+      "attackBonus": 116.28
     },
     {
       "level": 29,
       "hp": 1290,
-      "xpNext": 12020
+      "xpNext": 12020,
+      "attackBonus": 125.13
     },
     {
       "level": 30,
       "hp": 1350,
-      "xpNext": 12840
+      "xpNext": 12840,
+      "attackBonus": 134.38
     },
     {
       "level": 31,
       "hp": 1410,
-      "xpNext": 13685
+      "xpNext": 13685,
+      "attackBonus": 143.97
     },
     {
       "level": 32,
       "hp": 1475,
-      "xpNext": 14560
+      "xpNext": 14560,
+      "attackBonus": 153.91
     },
     {
       "level": 33,
       "hp": 1540,
-      "xpNext": 15460
+      "xpNext": 15460,
+      "attackBonus": 164.21
     },
     {
       "level": 34,
       "hp": 1605,
-      "xpNext": 16390
+      "xpNext": 16390,
+      "attackBonus": 174.89
     },
     {
       "level": 35,
       "hp": 1670,
-      "xpNext": 0
+      "xpNext": 0,
+      "attackBonus": 185.96
     }
   ],
   "weapons": [
@@ -706,12 +741,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Жаба (Toad)"
+      "aggressive": true,
+      "aggroRadiusStuds": 52,
+      "nameRu": "Жаба",
+      "nameEn": "Toad"
     },
     {
       "id": "monster_002",
       "level": 2,
-      "hp": 102,
+      "hp": 107,
       "damage": 12,
       "xp": 36,
       "gold": 30,
@@ -720,12 +758,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Жаба (Toad)"
+      "aggressive": true,
+      "aggroRadiusStuds": 52,
+      "nameRu": "Жаба",
+      "nameEn": "Toad"
     },
     {
       "id": "monster_003",
       "level": 3,
-      "hp": 108,
+      "hp": 118,
       "damage": 15,
       "xp": 42,
       "gold": 32,
@@ -734,12 +775,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Деревянный страж (Wooden Guardian)"
+      "aggressive": true,
+      "aggroRadiusStuds": 20,
+      "nameRu": "Деревянный страж",
+      "nameEn": "Wooden Guardian"
     },
     {
       "id": "monster_004",
       "level": 4,
-      "hp": 120,
+      "hp": 137,
       "damage": 17,
       "xp": 48,
       "gold": 35,
@@ -748,12 +792,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Живое пугало (Living Scarecrow)"
+      "aggressive": true,
+      "aggroRadiusStuds": 20,
+      "nameRu": "Живое пугало",
+      "nameEn": "Living Scarecrow"
     },
     {
       "id": "monster_005",
       "level": 5,
-      "hp": 126,
+      "hp": 145,
       "damage": 20,
       "xp": 54,
       "gold": 35,
@@ -762,12 +809,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Волк (Wolf)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Волк",
+      "nameEn": "Wolf"
     },
     {
       "id": "monster_006",
       "level": 6,
-      "hp": 138,
+      "hp": 167,
       "damage": 23,
       "xp": 65,
       "gold": 40,
@@ -776,12 +826,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Зомби (Zombie)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Зомби",
+      "nameEn": "Zombie"
     },
     {
       "id": "monster_007",
       "level": 7,
-      "hp": 144,
+      "hp": 183,
       "damage": 27,
       "xp": 77,
       "gold": 40,
@@ -790,12 +843,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Гигантский паук (Giant Spider)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Гигантский паук",
+      "nameEn": "Giant Spider"
     },
     {
       "id": "monster_008",
       "level": 8,
-      "hp": 150,
+      "hp": 200,
       "damage": 30,
       "xp": 89,
       "gold": 45,
@@ -804,12 +860,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Зомби (Zombie)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Зомби",
+      "nameEn": "Zombie"
     },
     {
       "id": "monster_009",
       "level": 9,
-      "hp": 162,
+      "hp": 226,
       "damage": 34,
       "xp": 110,
       "gold": 45,
@@ -818,12 +877,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Медведь гризли (Grizzly)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Медведь гризли",
+      "nameEn": "Grizzly"
     },
     {
       "id": "monster_010",
       "level": 10,
-      "hp": 300,
+      "hp": 400,
       "damage": 37,
       "xp": 133,
       "gold": 50,
@@ -832,12 +894,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Скарабей (Scarab)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Скарабей",
+      "nameEn": "Scarab"
     },
     {
       "id": "monster_011",
       "level": 11,
-      "hp": 318,
+      "hp": 444,
       "damage": 41,
       "xp": 150,
       "gold": 53,
@@ -846,12 +911,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Гремлин (Gremlin)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Гремлин",
+      "nameEn": "Gremlin"
     },
     {
       "id": "monster_012",
       "level": 12,
-      "hp": 342,
+      "hp": 499,
       "damage": 46,
       "xp": 168,
       "gold": 56,
@@ -860,12 +928,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Каменный голем (Stone Golem)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Каменный голем",
+      "nameEn": "Stone Golem"
     },
     {
       "id": "monster_013",
       "level": 13,
-      "hp": 360,
+      "hp": 555,
       "damage": 50,
       "xp": 187,
       "gold": 59,
@@ -874,12 +945,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Каменный голем (Stone Golem)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Каменный голем",
+      "nameEn": "Stone Golem"
     },
     {
       "id": "monster_014",
       "level": 14,
-      "hp": 372,
+      "hp": 597,
       "damage": 55,
       "xp": 206,
       "gold": 62,
@@ -888,12 +962,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Большой голем (Greater Golem)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Большой голем",
+      "nameEn": "Greater Golem"
     },
     {
       "id": "monster_015",
       "level": 15,
-      "hp": 384,
+      "hp": 577,
       "damage": 59,
       "xp": 225,
       "gold": 65,
@@ -902,12 +979,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Тигр (Tiger)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Тигр",
+      "nameEn": "Tiger"
     },
     {
       "id": "monster_016",
       "level": 16,
-      "hp": 396,
+      "hp": 619,
       "damage": 64,
       "xp": 245,
       "gold": 68,
@@ -916,12 +996,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Тигр (Tiger)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Тигр",
+      "nameEn": "Tiger"
     },
     {
       "id": "monster_017",
       "level": 17,
-      "hp": 414,
+      "hp": 678,
       "damage": 69,
       "xp": 265,
       "gold": 71,
@@ -930,12 +1013,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Тигр (Tiger)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Тигр",
+      "nameEn": "Tiger"
     },
     {
       "id": "monster_018",
       "level": 18,
-      "hp": 426,
+      "hp": 729,
       "damage": 73,
       "xp": 285,
       "gold": 74,
@@ -944,12 +1030,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Тигр (Tiger)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Тигр",
+      "nameEn": "Tiger"
     },
     {
       "id": "monster_019",
       "level": 19,
-      "hp": 438,
+      "hp": 782,
       "damage": 78,
       "xp": 305,
       "gold": 77,
@@ -958,12 +1047,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Древень (Ancient Treant)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Древень",
+      "nameEn": "Ancient Treant"
     },
     {
       "id": "monster_020",
       "level": 20,
-      "hp": 576,
+      "hp": 966,
       "damage": 84,
       "xp": 326,
       "gold": 80,
@@ -972,12 +1064,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Орк-воин (Orc Warrior)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Орк-воин",
+      "nameEn": "Orc Warrior"
     },
     {
       "id": "monster_021",
       "level": 21,
-      "hp": 600,
+      "hp": 1048,
       "damage": 89,
       "xp": 346,
       "gold": 83,
@@ -986,12 +1081,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Орк-воин (Orc Warrior)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Орк-воин",
+      "nameEn": "Orc Warrior"
     },
     {
       "id": "monster_022",
       "level": 22,
-      "hp": 624,
+      "hp": 1134,
       "damage": 94,
       "xp": 367,
       "gold": 86,
@@ -1000,12 +1098,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Орк-воин (Orc Warrior)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Орк-воин",
+      "nameEn": "Orc Warrior"
     },
     {
       "id": "monster_023",
       "level": 23,
-      "hp": 648,
+      "hp": 1231,
       "damage": 99,
       "xp": 387,
       "gold": 89,
@@ -1014,12 +1115,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Орк-воин (Orc Warrior)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Орк-воин",
+      "nameEn": "Orc Warrior"
     },
     {
       "id": "monster_024",
       "level": 24,
-      "hp": 672,
+      "hp": 1331,
       "damage": 105,
       "xp": 408,
       "gold": 92,
@@ -1028,12 +1132,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Орк-воин (Orc Warrior)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Орк-воин",
+      "nameEn": "Orc Warrior"
     },
     {
       "id": "monster_025",
       "level": 25,
-      "hp": 696,
+      "hp": 1271,
       "damage": 110,
       "xp": 429,
       "gold": 95,
@@ -1042,12 +1149,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Малый дракон (Drake)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Малый дракон",
+      "nameEn": "Drake"
     },
     {
       "id": "monster_026",
       "level": 26,
-      "hp": 714,
+      "hp": 1356,
       "damage": 116,
       "xp": 450,
       "gold": 98,
@@ -1056,12 +1166,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Малый дракон (Drake)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Малый дракон",
+      "nameEn": "Drake"
     },
     {
       "id": "monster_027",
       "level": 27,
-      "hp": 738,
+      "hp": 1455,
       "damage": 121,
       "xp": 471,
       "gold": 101,
@@ -1070,12 +1183,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Малый дракон (Drake)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Малый дракон",
+      "nameEn": "Drake"
     },
     {
       "id": "monster_028",
       "level": 28,
-      "hp": 762,
+      "hp": 1565,
       "damage": 127,
       "xp": 493,
       "gold": 104,
@@ -1084,12 +1200,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Малый дракон (Drake)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Малый дракон",
+      "nameEn": "Drake"
     },
     {
       "id": "monster_029",
       "level": 29,
-      "hp": 786,
+      "hp": 1679,
       "damage": 133,
       "xp": 514,
       "gold": 107,
@@ -1098,12 +1217,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Малый дракон (Drake)"
+      "aggressive": true,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Малый дракон",
+      "nameEn": "Drake"
     },
     {
       "id": "monster_030",
       "level": 30,
-      "hp": 900,
+      "hp": 1793,
       "damage": 139,
       "xp": 535,
       "gold": 110,
@@ -1112,12 +1234,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": "Древний дракон (Wyrm)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Древний дракон",
+      "nameEn": "Wyrm"
     },
     {
       "id": "monster_031",
       "level": 31,
-      "hp": 936,
+      "hp": 1927,
       "damage": 145,
       "xp": 556,
       "gold": 113,
@@ -1126,12 +1251,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_032",
       "level": 32,
-      "hp": 972,
+      "hp": 2073,
       "damage": 151,
       "xp": 578,
       "gold": 116,
@@ -1140,12 +1268,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_033",
       "level": 33,
-      "hp": 1014,
+      "hp": 2245,
       "damage": 157,
       "xp": 599,
       "gold": 119,
@@ -1154,12 +1285,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_034",
       "level": 34,
-      "hp": 1050,
+      "hp": 2403,
       "damage": 164,
       "xp": 621,
       "gold": 122,
@@ -1168,12 +1302,15 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_035",
       "level": 35,
-      "hp": 1086,
+      "hp": 2350,
       "damage": 170,
       "xp": 642,
       "gold": 125,
@@ -1182,7 +1319,10 @@
       "attackRange": 10,
       "attackSpeed": 100,
       "runSpeed": 130,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_036",
@@ -1196,12 +1336,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Мандрагора (Mandragora)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Мандрагора",
+      "nameEn": "Mandragora"
     },
     {
       "id": "monster_037",
       "level": 2,
-      "hp": 112,
+      "hp": 117,
       "damage": 16,
       "xp": 36,
       "gold": 30,
@@ -1210,12 +1353,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Мандрагора (Mandragora)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Мандрагора",
+      "nameEn": "Mandragora"
     },
     {
       "id": "monster_038",
       "level": 3,
-      "hp": 119,
+      "hp": 130,
       "damage": 19,
       "xp": 42,
       "gold": 32,
@@ -1224,12 +1370,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Мандрагора (Mandragora)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Мандрагора",
+      "nameEn": "Mandragora"
     },
     {
       "id": "monster_039",
       "level": 4,
-      "hp": 132,
+      "hp": 150,
       "damage": 22,
       "xp": 48,
       "gold": 35,
@@ -1238,12 +1387,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Мандрагора (Mandragora)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Мандрагора",
+      "nameEn": "Mandragora"
     },
     {
       "id": "monster_040",
       "level": 5,
-      "hp": 139,
+      "hp": 160,
       "damage": 26,
       "xp": 54,
       "gold": 35,
@@ -1252,12 +1404,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Скелет-лучник (Skeleton Archer)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Скелет-лучник",
+      "nameEn": "Skeleton Archer"
     },
     {
       "id": "monster_041",
       "level": 6,
-      "hp": 152,
+      "hp": 184,
       "damage": 30,
       "xp": 65,
       "gold": 40,
@@ -1266,12 +1421,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Скелет-лучник (Skeleton Archer)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Скелет-лучник",
+      "nameEn": "Skeleton Archer"
     },
     {
       "id": "monster_042",
       "level": 7,
-      "hp": 158,
+      "hp": 201,
       "damage": 35,
       "xp": 77,
       "gold": 40,
@@ -1280,12 +1438,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Скелет-лучник (Skeleton Archer)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Скелет-лучник",
+      "nameEn": "Skeleton Archer"
     },
     {
       "id": "monster_043",
       "level": 8,
-      "hp": 165,
+      "hp": 220,
       "damage": 39,
       "xp": 89,
       "gold": 45,
@@ -1294,12 +1455,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Скелет-лучник (Skeleton Archer)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Скелет-лучник",
+      "nameEn": "Skeleton Archer"
     },
     {
       "id": "monster_044",
       "level": 9,
-      "hp": 178,
+      "hp": 248,
       "damage": 44,
       "xp": 110,
       "gold": 45,
@@ -1308,12 +1472,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Ледяная парящая нежить (Ice Vale Master)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Ледяная парящая нежить",
+      "nameEn": "Ice Vale Master"
     },
     {
       "id": "monster_045",
       "level": 10,
-      "hp": 330,
+      "hp": 440,
       "damage": 48,
       "xp": 133,
       "gold": 50,
@@ -1322,12 +1489,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_046",
       "level": 11,
-      "hp": 350,
+      "hp": 488,
       "damage": 53,
       "xp": 150,
       "gold": 53,
@@ -1336,12 +1506,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_047",
       "level": 12,
-      "hp": 376,
+      "hp": 548,
       "damage": 60,
       "xp": 168,
       "gold": 56,
@@ -1350,12 +1523,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_048",
       "level": 13,
-      "hp": 396,
+      "hp": 610,
       "damage": 65,
       "xp": 187,
       "gold": 59,
@@ -1364,12 +1540,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_049",
       "level": 14,
-      "hp": 409,
+      "hp": 656,
       "damage": 71,
       "xp": 206,
       "gold": 62,
@@ -1378,12 +1557,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_050",
       "level": 15,
-      "hp": 422,
+      "hp": 634,
       "damage": 76,
       "xp": 225,
       "gold": 65,
@@ -1392,12 +1574,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Споровик (Spore Spitter)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Споровик",
+      "nameEn": "Spore Spitter"
     },
     {
       "id": "monster_051",
       "level": 16,
-      "hp": 436,
+      "hp": 681,
       "damage": 83,
       "xp": 245,
       "gold": 68,
@@ -1406,12 +1591,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Споровик (Spore Spitter)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Споровик",
+      "nameEn": "Spore Spitter"
     },
     {
       "id": "monster_052",
       "level": 17,
-      "hp": 455,
+      "hp": 745,
       "damage": 89,
       "xp": 265,
       "gold": 71,
@@ -1420,12 +1608,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Споровик (Spore Spitter)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Споровик",
+      "nameEn": "Spore Spitter"
     },
     {
       "id": "monster_053",
       "level": 18,
-      "hp": 469,
+      "hp": 802,
       "damage": 95,
       "xp": 285,
       "gold": 74,
@@ -1434,12 +1625,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Споровик (Spore Spitter)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Споровик",
+      "nameEn": "Spore Spitter"
     },
     {
       "id": "monster_054",
       "level": 19,
-      "hp": 482,
+      "hp": 860,
       "damage": 101,
       "xp": 305,
       "gold": 77,
@@ -1448,12 +1642,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Споровик (Spore Spitter)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Споровик",
+      "nameEn": "Spore Spitter"
     },
     {
       "id": "monster_055",
       "level": 20,
-      "hp": 634,
+      "hp": 1063,
       "damage": 109,
       "xp": 326,
       "gold": 80,
@@ -1462,12 +1659,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Орк-лучник (Orc Archer)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Орк-лучник",
+      "nameEn": "Orc Archer"
     },
     {
       "id": "monster_056",
       "level": 21,
-      "hp": 660,
+      "hp": 1153,
       "damage": 115,
       "xp": 346,
       "gold": 83,
@@ -1476,12 +1676,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Орк-лучник (Orc Archer)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Орк-лучник",
+      "nameEn": "Orc Archer"
     },
     {
       "id": "monster_057",
       "level": 22,
-      "hp": 686,
+      "hp": 1247,
       "damage": 122,
       "xp": 367,
       "gold": 86,
@@ -1490,12 +1693,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Орк-лучник (Orc Archer)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Орк-лучник",
+      "nameEn": "Orc Archer"
     },
     {
       "id": "monster_058",
       "level": 23,
-      "hp": 713,
+      "hp": 1354,
       "damage": 128,
       "xp": 387,
       "gold": 89,
@@ -1504,12 +1710,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Орк-шаман (Orc Shaman)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Орк-шаман",
+      "nameEn": "Orc Shaman"
     },
     {
       "id": "monster_059",
       "level": 24,
-      "hp": 739,
+      "hp": 1464,
       "damage": 136,
       "xp": 408,
       "gold": 92,
@@ -1518,12 +1727,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Суккуб (Succubus)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Суккуб",
+      "nameEn": "Succubus"
     },
     {
       "id": "monster_060",
       "level": 25,
-      "hp": 766,
+      "hp": 1399,
       "damage": 142,
       "xp": 429,
       "gold": 95,
@@ -1532,12 +1744,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Парящая голова (Magical Weaver)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Парящая голова",
+      "nameEn": "Magical Weaver"
     },
     {
       "id": "monster_061",
       "level": 26,
-      "hp": 785,
+      "hp": 1491,
       "damage": 150,
       "xp": 450,
       "gold": 98,
@@ -1546,12 +1761,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Парящая голова (Magical Weaver)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Парящая голова",
+      "nameEn": "Magical Weaver"
     },
     {
       "id": "monster_062",
       "level": 27,
-      "hp": 812,
+      "hp": 1601,
       "damage": 157,
       "xp": 471,
       "gold": 101,
@@ -1560,12 +1778,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Огненная парящая нежить (Fire Vale Master)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Огненная парящая нежить",
+      "nameEn": "Fire Vale Master"
     },
     {
       "id": "monster_063",
       "level": 28,
-      "hp": 838,
+      "hp": 1721,
       "damage": 164,
       "xp": 493,
       "gold": 104,
@@ -1574,12 +1795,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Парящая голова (Magical Weaver)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Парящая голова",
+      "nameEn": "Magical Weaver"
     },
     {
       "id": "monster_064",
       "level": 29,
-      "hp": 865,
+      "hp": 1847,
       "damage": 172,
       "xp": 514,
       "gold": 107,
@@ -1588,12 +1812,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Огненная парящая нежить (Fire Vale Master)"
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "Огненная парящая нежить",
+      "nameEn": "Fire Vale Master"
     },
     {
       "id": "monster_065",
       "level": 30,
-      "hp": 990,
+      "hp": 1972,
       "damage": 180,
       "xp": 535,
       "gold": 110,
@@ -1602,12 +1829,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": "Парящая голова (Magical Weaver)"
+      "aggressive": false,
+      "aggroRadiusStuds": 24,
+      "nameRu": "Парящая голова",
+      "nameEn": "Magical Weaver"
     },
     {
       "id": "monster_066",
       "level": 31,
-      "hp": 1030,
+      "hp": 2120,
       "damage": 188,
       "xp": 556,
       "gold": 113,
@@ -1616,12 +1846,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_067",
       "level": 32,
-      "hp": 1069,
+      "hp": 2280,
       "damage": 196,
       "xp": 578,
       "gold": 116,
@@ -1630,12 +1863,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_068",
       "level": 33,
-      "hp": 1115,
+      "hp": 2469,
       "damage": 203,
       "xp": 599,
       "gold": 119,
@@ -1644,12 +1880,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_069",
       "level": 34,
-      "hp": 1155,
+      "hp": 2643,
       "damage": 212,
       "xp": 621,
       "gold": 122,
@@ -1658,12 +1897,15 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     },
     {
       "id": "monster_070",
       "level": 35,
-      "hp": 1195,
+      "hp": 2586,
       "damage": 220,
       "xp": 642,
       "gold": 125,
@@ -1672,7 +1914,10 @@
       "attackRange": 40,
       "attackSpeed": 77,
       "runSpeed": 120,
-      "name": ""
+      "aggressive": true,
+      "aggroRadiusStuds": 30,
+      "nameRu": "",
+      "nameEn": ""
     }
   ],
   "weaponBindings": {

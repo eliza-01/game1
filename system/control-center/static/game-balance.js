@@ -4,8 +4,8 @@
   const gradeNames=['Newbie','D','C','B','A','S','SS','SSS'];
   window.game1EquipmentGrade=level=>{const band=Math.max(0,Math.min(7,Math.floor(level/10)));return {name:gradeNames[band]+(level%10>=5?'+':''),required:Math.max(1,band*10)}};
   const groups={rules:'Character',levels:'Levels',weapons:'Weapons',armor:'Armor',monsters:'Monsters',bindings:'Model bindings'};
-  const fields={levels:['level','hp','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','name','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed']};
-  const names={name:'Name',runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
+  const fields={levels:['level','hp','attackBonus','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','nameEn','nameRu','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed','aggroRadiusStuds','aggressive']};
+  const names={nameEn:'EN',nameRu:'RU',aggroRadiusStuds:'Aggro · studs',aggressive:'Aggressive',runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',attackBonus:'Level ATK bonus',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
   const labels={weapon:'Оружие',armor:'Броня',monster:'Монстр'};
   const label=id=>{const [kind,n]=id.split('_');return `${labels[kind]||kind}_${n}`};
   const node=(tag,text)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el};
@@ -20,15 +20,19 @@
     const all=new Map(models.map(model=>[model.slug,model]));for(const slug of Object.keys(bindings))if(!all.has(slug))all.set(slug,{slug});
     for(const model of all.values()){
       const tr=node('tr');cell(tr,model.slug);const options=[['','—']];
-      for(const r of rows)if(kind==='Monster model'||r.type===model.type)options.push([r.id,`${r.name||label(r.id)} · ${r.type} · LVL ${r.level}`]);
+      for(const r of rows)if(kind==='Monster model'||r.type===model.type)options.push([r.id,`${r.nameEn||label(r.id)} · ${r.type} · LVL ${r.level}`]);
       if(bindings[model.slug]&&!options.some(v=>v[0]===bindings[model.slug]))options.push([bindings[model.slug],`${label(bindings[model.slug])} · incompatible / retired`]);
       cell(tr,select(options,bindings[model.slug]||'',value=>{if(value)bindings[model.slug]=value;else delete bindings[model.slug];change()}));body.append(tr);
     }
   }
+  function applySearch(){const q=$('balance-search').value.trim().toLocaleLowerCase();for(const tr of $('balance-content').querySelectorAll('tbody tr')){const values=[tr.textContent,...Array.from(tr.querySelectorAll('input,select'),el=>el.value),tr.dataset.identity||''];tr.hidden=!!q&&!values.join(' ').toLocaleLowerCase().includes(q)}}
+  $('balance-search').oninput=applySearch;
+  function speciesEdit(row,key,value,body){const group=row.nameEn? snapshot.balance.monsters.filter(r=>r.nameEn===row.nameEn):[row];for(const r of group){r[key]=value;const input=body.querySelector(`[data-row="${r.id}"][data-field="${key}"]`);if(input){if(key==='aggressive')input.checked=value;else if(document.activeElement!==input)input.value=value??''}}change()}
   function render(){
     $('balance-tabs').replaceChildren();$('balance-content').replaceChildren();$('balance-save').disabled=busy||!snapshot||!dirty;
     for(const [key,title] of Object.entries(groups)){const b=node('button',title);b.type='button';b.className=key===tab?'primary':'';b.onclick=()=>{tab=key;render()};$('balance-tabs').append(b)}
     if(!snapshot)return;
+    queueMicrotask(applySearch);
     const d=snapshot.balance;
     if(tab==='rules'){
       const body=table(['Parameter','Value']);for(const [key,val] of Object.entries(d.rules)){const tr=node('tr');cell(tr,({baseRunSpeed:'RunSpeed · /10 studs/s',monsterCastSeconds:'Special cast · s',critChance:'Unarmed crit %',maxCritChance:'Max crit %',critMultiplier:'Crit damage ×'}[key]||key));cell(tr,number(val,v=>d.rules[key]=v));body.append(tr)}return;
@@ -40,13 +44,15 @@
     const columns=fields[tab], headers=columns.map(k=>tab==='monsters'&&k==='damage'?'Damage':names[k]);if(tab==='levels')headers.push('Total XP');if(tab==='weapons')headers.push('Grade · required LVL','ATK +0 / max','Craft recipe · fee');
     const body=table(headers);let total=0;
     const rows=tab==='weapons'?[...d[tab]].sort((a,b)=>a.level-b.level||a.id.localeCompare(b.id)):d[tab];
-    for(const row of rows){const tr=node('tr');let derived,gradeCell;
-      function updateDerived(){if(gradeCell){const g=window.game1EquipmentGrade(row.level);gradeCell.textContent=`${g.name} · ${g.required}`}if(tab==='weapons'&&derived)derived.textContent=`${d.rules.baseDamage+row.damage} / ${d.rules.baseDamage+Math.round(row.damage*(1+d.rules.maxUpgrade*d.rules.upgradePercent/100))}`}
+    for(const row of rows){const tr=node('tr');tr.dataset.identity=row.id||'';let derived,gradeCell;
+      function updateDerived(){if(gradeCell){const g=window.game1EquipmentGrade(row.level);gradeCell.textContent=`${g.name} · ${g.required}`}if(tab==='weapons'&&derived)derived.textContent=`${d.rules.baseDamage+d.levels[row.level-1].attackBonus+row.damage} / ${d.rules.baseDamage+d.levels[row.level-1].attackBonus+Math.round(row.damage*(1+d.rules.maxUpgrade*d.rules.upgradePercent/100))}`}
       for(const key of columns){
         if(key==='id'||key==='type'||(tab==='levels'&&key==='level'))cell(tr,key==='id'?label(row[key]):String(row[key]));
-        else if(key==='name'){const input=node('input');input.type='text';input.maxLength=100;input.value=row.name;input.placeholder='—';input.style.minWidth='180px';input.oninput=()=>{row.name=input.value;change()};cell(tr,input)}
+        else if(key==='aggressive'){const input=node('input');input.type='checkbox';input.checked=row.aggressive;input.dataset.row=row.id;input.dataset.field=key;input.onchange=()=>speciesEdit(row,key,input.checked,body);input.setAttribute('aria-label',`${row.nameEn||row.id} aggressive`);cell(tr,input)}
+        else if(key==='nameEn'||key==='nameRu'){const input=node('input');input.type='text';input.maxLength=100;input.value=row[key];input.dataset.row=row.id;input.dataset.field=key;input.placeholder='—';input.style.minWidth='180px';input.onchange=()=>{const value=input.value.trim();speciesEdit(row,key,value,body)};cell(tr,input)}
         else if(key==='price'&&row.recipe){const source=d.weapons.find(w=>w.id===row.recipe.swordId);const cost=node('span',String(2*source.price+row.recipe.fee));cost.dataset.recipeCost=row.id;cell(tr,cost)}
         else if(key==='rarity')cell(tr,select(['common','uncommon','rare','mythical','legendary','immortal'].map(v=>[v,v]),row[key],v=>{row[key]=v;change()}));
+        else if(key==='aggroRadiusStuds'){const input=number(row[key],v=>speciesEdit(row,key,v,body));input.dataset.row=row.id;input.dataset.field=key;cell(tr,input)}
         else cell(tr,number(row[key],v=>{row[key]=v;updateDerived();if(tab==='levels'&&key==='xpNext'){let sum=0;for(const [i,r] of d.levels.entries()){body.rows[i].lastElementChild.textContent=String(sum);sum+=r.xpNext||0}}}));
       }
       if(tab==='levels'){cell(tr,String(total));total+=row.xpNext||0}
@@ -55,7 +61,7 @@
     }
   }
   async function load(force=false){if(busy)return;if(dirty&&!force){render();return}if(dirty&&!confirm('Discard unsaved balance changes?'))return;busy=true;status('Loading…');try{snapshot=await request('/api/balance');dirty=false;status('Ready')}catch(e){status(e.message)}finally{busy=false;render()}}
-  async function save(){if(busy||!snapshot||!dirty)return;busy=true;$('balance-save').disabled=true;const content=$('balance-content');content.inert=true;$('balance-tabs').inert=true;try{snapshot=await request('/api/balance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({balance:snapshot.balance,revision:snapshot.revision})});dirty=false;status('Saved · Rojo Sync required')}catch(e){status(e.message)}finally{busy=false;content.inert=false;$('balance-tabs').inert=false;render()}}
+  async function save(){if(busy||!snapshot||!dirty)return;busy=true;$('balance-save').disabled=true;const content=$('balance-content');content.inert=true;$('balance-tabs').inert=true;try{snapshot=await request('/api/balance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({balance:snapshot.balance,revision:snapshot.revision})});dirty=false;status('Saved · Rojo Sync required');window.game1MonsterSpawnRefreshDefaults?.()}catch(e){status(e.message)}finally{busy=false;content.inert=false;$('balance-tabs').inert=false;render()}}
   $('balance-reload').onclick=()=>load(true);$('balance-save').onclick=save;
   let logsLoading=false;
   async function loadLogs(){

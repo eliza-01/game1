@@ -37,17 +37,18 @@ class WorldReadability(unittest.TestCase):
             if i==0:
                 melee_one=[points[0],*extras]
                 self.assertLess(max(math.dist((0,168),p) for p in melee_one),min(math.dist((0,168),p) for p in points[1:8]))
-        self.assertIn('if index == 1 and row.type == "ranged" then return false, 24 end',plan)
-        self.assertIn('if index == 1 then return true, 20 end',plan)
-        self.assertIn('record.testAggressive',read('src/server/monster/MonsterInitialAttributes.luau'))
-        self.assertIn('testAggroRadius = if slot then slot.aggroRadius else nil',read('src/server/dev/GameplayTestArena.luau'))
+        rows=json.loads(read('config/balance/gameplay.json'))['monsters']
+        # Defaults are authorable; starter rows must remain correctly typed.
+        self.assertTrue(all(type(row['aggressive']) is bool for row in rows))
+        self.assertIn('balance.aggroRadiusStuds',read('src/server/monster/MonsterInitialAttributes.luau'))
+        self.assertNotIn('HuntingPlan.Aggro',read('src/server/dev/GameplayTestLayout.luau'))
         self.assertIn('local expectedCount = #rows + #s.layout.extraSlots',read('src/server/dev/GameplayTestService.luau'))
 
     def test_atlas_tiles_match_database_and_runtime_pixels(self):
         directory=ROOT/'system/control-center/static/monster-icons'
         catalog=json.loads((directory/'catalog.json').read_text())
         data=json.loads(read('config/balance/gameplay.json'))
-        named={re.search(r'\(([^()]*)\)\s*$',row['name'])[1] for row in data['monsters'] if row.get('name')}
+        named={row['nameEn'] for row in data['monsters'] if row['nameEn']}
         keys={tile['name'] for tile in catalog['tiles']}
         self.assertEqual(named|{'Unknown'},keys)
         self.assertEqual(len(keys),26)

@@ -951,7 +951,7 @@
 </div>
 <div id="balance-panel" class="panel">
 <div class="section-title"><div><span>01 · Gameplay</span><h3>Balance · LVL 1–35</h3></div><div class="actions"><button id="balance-reload" type="button">Refresh</button><button id="balance-save" class="primary" type="button" disabled>Save balance</button></div></div>
-<div id="balance-tabs" class="actions"></div>
+<div id="balance-tabs" class="actions"></div><input id="balance-search" type="search" placeholder="Search Database · EN / RU / ID / level" aria-label="Search Database">
 <div id="balance-content" class="table-wrap"></div>
 <p id="balance-status" role="status" aria-live="polite" class="muted"></p>
 <details class="panel character-card"><summary>Attack movement · animation context</summary>
@@ -1024,7 +1024,7 @@
 <label>slug<input id="monster-slug" readonly><small class="hint">generated from english name as lowercase snake_case. existing registered slugs stay stable.</small></label>
 <div class="monster-stats-grid"><label>HP<input id="monster-stat-hp" type="number" min="0" step="1" value="100"></label><label>attack<input id="monster-stat-damage" type="number" min="0" step="1" value="10"></label><label>attack speed<input id="monster-stat-attack-speed" type="number" min="0" step="1" value="100"></label><label>run speed<input id="monster-stat-run-speed" type="number" min="0" step="1" value="50"></label><label>critical chance %<input id="monster-stat-crit-chance" type="number" min="0" max="100" step="0.1" value="0"></label></div>
 <small class="hint">monster stats are absolute runtime values. critical chance is 0..100 percent.</small>
-<div class="monster-stats-grid"><label class="spawn-enabled"><input id="monster-behavior-aggressive" type="checkbox"><span>aggressive · unchecked = passive</span></label><label>aggro radius · studs<input id="monster-behavior-aggro-radius" type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="monster-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
+<div class="monster-stats-grid"><label class="spawn-enabled"><input id="monster-behavior-aggressive" type="checkbox" title="Fallback for models without Database binding. Bound monsters use Database / spawn overrides."><span>aggressive · unbound model fallback</span></label><label>aggro radius · studs<input id="monster-behavior-aggro-radius" type="number" min="0" step="0.1" value="16"></label><label>attack radius · studs<input id="monster-behavior-attack-radius" type="number" min="0" step="0.1" value="3"></label></div>
 <label class="spawn-enabled"><input id="monster-behavior-rise-from-ground" type="checkbox"><span>rise from ground when spawning</span></label>
 <small class="hint">Every spawn fades in. With this option checked, the monster also rises from below the surface. The setting belongs to the monster asset and does not require FBX republishing.</small>
 <small class="hint">behavior is authored here; Monster Debug can override these values only for the current Play session.</small>
@@ -1093,7 +1093,7 @@
 </div>
 <div class="panel character-card">
 <span class="eyebrow">08 · population</span><h3>spawn settings</h3>
-<div class="monster-spawn-settings-grid"><label>respawn sec<input id="monster-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>home leash · studs<input id="monster-spawn-home-radius" type="number" min="1" max="10000" step="1" value="150" title="Combat boundary measured from the registered spawn center"></label><label>spawn radius<input id="monster-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"></label><label>max alive<input id="monster-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"></label></div>
+<div class="monster-spawn-settings-grid"><label>respawn sec<input id="monster-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>home leash · studs<input id="monster-spawn-home-radius" type="number" min="1" max="10000" step="1" value="150" title="Combat boundary measured from the registered spawn center"></label><label>aggro radius · studs<input id="monster-spawn-aggro-radius" type="number" min="0" max="10000" step="0.1" value="16" title="Defaults from Database; editable per spawn"></label><label class="spawn-enabled"><input id="monster-spawn-aggressive" type="checkbox"><span>aggressive</span></label><label>spawn radius<input id="monster-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"></label><label>max alive<input id="monster-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"></label></div>
 <label class="spawn-enabled"><input id="monster-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
 <small id="monster-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
 <div class="actions"><button id="monster-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="monster-spawn-new" type="button">new spawn</button><button id="monster-spawn-delete" class="danger" type="button" disabled>delete</button></div>
@@ -1301,7 +1301,7 @@
 <script src="lod-reuse-picker.js?v=411"></script>
 <script src="location-asset-workflow.js?v=453"></script>
 <script src="asset-audit.js?v=2"></script>
-<script src="game-balance.js?v=539"></script>
+<script src="game-balance.js?v=552"></script>
 <script src="skill-editor.js?v=531"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
@@ -1318,7 +1318,7 @@
 <script src="real-estate.js?v=435&visual=400&runtime=387&rig=186&atlas=202&physics=232&reuse=411"></script>
 <script src="real-estate-mesh-workflow.js?v=423"></script>
 <script src="real-estate-placement.js?v=2"></script>
-<script src="monster-spawns.js?v=338"></script>
+<script src="monster-spawns.js?v=549"></script>
 <script src="kanban-design-map.js?v=539"></script>
 <script src="kanban.js?v=539"></script>
 <script src="mechanics.js?v=452"></script>

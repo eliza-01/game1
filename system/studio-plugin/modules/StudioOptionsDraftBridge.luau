@@ -7,6 +7,7 @@ return function(services)
     local HttpService = services.HttpService
     local token = services.agentToken
     local specs = {
+        Game1GameplayAggroSync = {route="/api/balance/monster-aggro", maxBytes=18000, receipt=true},
         Game1CameraDebug = {route="/api/options/camera-draft", maxBytes=2000},
         Game1HealthUiDebug = {route="/api/options/health-ui-draft", maxBytes=8000},
         Game1UiPresentationDebug = {route="/api/options/ui-presentation-draft", maxBytes=8000},
@@ -39,6 +40,9 @@ return function(services)
                         Headers={["Content-Type"]="application/json",["X-Control-Token"]=token},
                         Body=payload,
                     })
+                    if spec.receipt then
+                        folder:SetAttribute("Result", HttpService:JSONEncode({nonce=parsed.nonce, ok=sent and response.Success == true, error=if sent then response.Body else tostring(response)}))
+                    end
                     if not sent or not response.Success then
                         warn("[game1][options] Could not send Studio "..name.." draft: " .. tostring(sent and response.Body or response))
                     end

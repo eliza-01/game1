@@ -17,15 +17,15 @@ class ZoneIdentityM544(unittest.TestCase):
         known = {}
         for i, (lo, hi) in enumerate(zones):
             for row in data['monsters']:
-                if not lo <= row['level'] <= hi or not row['name']:
+                if not lo <= row['level'] <= hi or not row['nameEn']:
                     continue
-                key = re.search(r'\(([^()]*)\)\s*$', row['name'])[1].casefold()
-                self.assertEqual(known.setdefault(key, i), i, row['name'])
+                key = row['nameEn'].casefold()
+                self.assertEqual(known.setdefault(key, i), i, row['nameEn'])
         rows = {(r['level'], r['type']): r for r in data['monsters']}
         for level in range(1, 5):
-            self.assertEqual(rows[level, 'ranged']['name'], 'Мандрагора (Mandragora)')
+            self.assertEqual(rows[level, 'ranged']['nameEn'], 'Mandragora')
         for level in range(15, 20):
-            self.assertEqual(rows[level, 'ranged']['name'], 'Споровик (Spore Spitter)')
+            self.assertEqual(rows[level, 'ranged']['nameEn'], 'Spore Spitter')
         spec = KanbanStore(ROOT).detail('KBN-0031')['spec']
         gardens = spec.split('## Забытые сады · LVL 15–19', 1)[1].split('\n## ', 1)[0]
         self.assertNotIn('мандрагор', gardens.casefold())

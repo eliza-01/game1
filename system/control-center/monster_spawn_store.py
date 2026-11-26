@@ -6,6 +6,7 @@ import json
 import math
 import re
 import uuid
+from services import game_balance
 from datetime import datetime, timezone
 
 SCHEMA_VERSION = 1
@@ -96,11 +97,18 @@ class MonsterSpawnStore:
         if not npc:
             result["spawnRadius"] = float(record.get("spawnRadius") or 0)
             result["maxAlive"] = int(record.get("maxAlive") or 1)
+            # Old records without an override inherit the current Database row.
+            if "aggressive" in record:
+                result["aggressive"] = record["aggressive"]
+            if "aggroRadiusStuds" in record:
+                result["aggroRadiusStuds"] = float(record["aggroRadiusStuds"])
         return result
 
     def _fingerprint(self, record: dict) -> str:
         marker = self._core(record, npc=self.kind == "npc")
         marker.pop("homeRadiusStuds", None)
+        marker.pop("aggressive", None)
+        marker.pop("aggroRadiusStuds", None)
         source = json.dumps(marker, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
@@ -109,6 +117,20 @@ class MonsterSpawnStore:
         if not row:
             raise ValueError(f"unknown monster: {slug}")
         return row
+
+    def _behavior_defaults(self, monster: dict, data=None) -> dict:
+        if data is None and (self.root / 'config/balance/gameplay.json').is_file():
+            data = game_balance.load(self.root)
+        return game_balance.monster_spawn_defaults(data, monster)
+
+    def _spawn_behavior(self, monster: dict, payload: dict) -> dict:
+        defaults = self._behavior_defaults(monster)
+        aggressive = payload.get('aggressive', defaults['aggressive'])
+        if type(aggressive) is not bool:
+            raise ValueError('Aggressive must be a boolean')
+        radius = game_balance.number(payload.get('aggroRadiusStuds', defaults['aggroRadiusStuds']),
+                                     0, 10000, 'Aggro Radius', False)
+        return {'aggressive': aggressive, 'aggroRadiusStuds': radius}
 
     def readiness(self, slug: str) -> dict:
         monster = self._monster(slug)
@@ -195,15 +217,19 @@ class MonsterSpawnStore:
         else:
             result["spawnRadius"] = radius
             result["maxAlive"] = int(max_alive)
+            result.update(self._spawn_behavior(monster, payload))
         return result
 
-    def _record_view(self, record: dict) -> dict:
+    def _record_view(self, record: dict, data=None) -> dict:
         value = json.loads(json.dumps(record))
         if self.kind == "npc":
             value.pop("spawnRadius", None)
             value.pop("maxAlive", None)
             value["placedAtUtc"] = value.get("placedAtUtc") or value.get("createdAtUtc")
         monster = self._monster(record.get("monsterSlug"))
+        if self.kind == "monster":
+            for key, default in self._behavior_defaults(monster, data).items():
+                value.setdefault(key, default)
         value["monster"] = {
             "slug": str(monster["slug"]),
             "name": str(monster.get("name_en") or monster["slug"]),
@@ -219,6 +245,7 @@ class MonsterSpawnStore:
     def snapshot(self) -> dict:
         manifest = self._load()
         monster_rows = []
+        data = game_balance.load(self.root) if self.kind == "monster" and (self.root / 'config/balance/gameplay.json').is_file() else None
         for row in self.monsters.list():
             ready = self.readiness(str(row["slug"]))
             monster_rows.append({
@@ -230,8 +257,9 @@ class MonsterSpawnStore:
                 "reasons": ready["reasons"],
                 "animationReady": bool(ready["animationReady"]),
                 "missingAnimationSlots": ready["missingAnimationSlots"],
+                **(game_balance.monster_spawn_defaults(data, row) if self.kind == "monster" else {}),
             })
-        records = [self._record_view(row) for _, row in sorted(manifest["records"].items())]
+        records = [self._record_view(row, data) for _, row in sorted(manifest["records"].items())]
         if self.kind == "npc":
             records.sort(key=lambda row: (row.get("placedAtUtc") or "", row["spawnId"]), reverse=True)
         return {
@@ -253,6 +281,7 @@ class MonsterSpawnStore:
             raise ValueError("Monster Spawn is blocked: " + " ".join(ready["reasons"]))
         spawn_id = str(payload.get("spawnId") or "").strip().lower() or f"spawn-{uuid.uuid4().hex}"
         existing = self._load()["records"].get(spawn_id) or {}
+        behavior = self._spawn_behavior(monster, {**existing, **payload}) if self.kind == "monster" else {}
         result = self.bridge(
             "place",
             operation_id=str(uuid.uuid4()),
@@ -287,6 +316,7 @@ class MonsterSpawnStore:
         else:
             draft["spawnRadius"] = float(payload.get("spawnRadius", existing.get("spawnRadius", 0)))
             draft["maxAlive"] = int(payload.get("maxAlive", existing.get("maxAlive", 1)))
+            draft.update(behavior)
         return {"ok": True, "draft": draft, "studio": result, "readiness": ready}
 
     def register(self, payload: dict) -> dict:

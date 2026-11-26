@@ -19,13 +19,13 @@ LOCK = RLock()
 TYPES = ('dagger', 'sword', 'bigsword', 'bow', 'dualswords')
 RARITIES = ('common', 'uncommon', 'rare', 'mythical', 'legendary', 'immortal')
 FIELDS = {
-    'levels': {'hp': (1, 1000000), 'xpNext': (0, 100000000)},
+    'levels': {'hp': (1, 1000000), 'xpNext': (0, 100000000), 'attackBonus': (0, 1000000)},
     'weapons': {'level': (1, 35), 'damage': (0, 1000000), 'price': (0, 100000000),
                 'attackSpeedDelta': (-100, 200), 'critChance': (0, 50), 'radius': (1, 420), 'arc': (1, 360),
                 'upgradePrice': (0, 100000000)},
     'armor': {'level': (1, 35), 'hp': (0, 1000000), 'price': (0, 100000000)},
     'monsters': {'level': (1, 35), 'hp': (1, 1000000), 'damage': (0, 1000000),
-                 'xp': (0, 100000000), 'gold': (0, 100000000), 'critChance': (0, 50), 'attackRange': (1, 100), 'attackSpeed': (1, 400), 'runSpeed': (1, 400)},
+                 'xp': (0, 100000000), 'gold': (0, 100000000), 'critChance': (0, 50), 'attackRange': (1, 100), 'attackSpeed': (1, 400), 'runSpeed': (1, 400), 'aggroRadiusStuds': (0, 10000)},
 }
 RULES = {'baseDamage': (0, 100000), 'baseAttackSpeed': (25, 400), 'baseRunSpeed': (1, 400), 'monsterCastSeconds': (0.2, 2), 'critChance': (0, 50), 'maxCritChance': (1, 50), 'upgradePercent': (0, 100),
          'maxUpgrade': (0, 20), 'headshotMultiplier': (1, 5), 'critMultiplier': (1, 5)}
@@ -57,7 +57,7 @@ def validate(data):
             raise ValueError(f'{group}: expected {counts[group]} rows')
         for i, row in enumerate(rows, 1):
             extra = {'level'} if group == 'levels' else {'id'}
-            if group == 'monsters': extra |= {'type','name'}
+            if group == 'monsters': extra |= {'type','nameEn','nameRu','aggressive'}
             if group == 'weapons':
                 extra |= {'type','rarity'}
                 if isinstance(row, dict) and row.get('type') == 'dualswords': extra.add('recipe')
@@ -70,11 +70,13 @@ def validate(data):
                 prefix = {'weapons':'weapon','armor':'armor','monsters':'monster'}[group]
                 if row['id'] != f'{prefix}_{i:03d}': raise ValueError(f'{group}: stable ID required')
             for field, (lo, hi) in fields.items():
-                number(row[field], lo, hi, f'{group}.{i}.{field}', field not in ('radius','arc','critChance'))
+                number(row[field], lo, hi, f'{group}.{i}.{field}', field not in ('radius','arc','critChance','aggroRadiusStuds','attackBonus'))
             if group == 'monsters':
-                name = row['name']
-                if not isinstance(name,str) or len(name)>100 or any(ord(c)<32 for c in name):
-                    raise ValueError('Invalid monster name')
+                if type(row['aggressive']) is not bool: raise ValueError('Invalid monster aggressive flag')
+                for field in ('nameEn','nameRu'):
+                    name = row[field]
+                    if not isinstance(name,str) or len(name)>100 or name != name.strip() or any(ord(c)<32 for c in name):
+                        raise ValueError('Invalid monster name')
                 expected_type = 'melee' if i <= 35 else 'ranged'
                 if row['type'] != expected_type or row['level'] != (i - 1) % 35 + 1:
                     raise ValueError('Monster type / level sequence invalid')
@@ -82,6 +84,13 @@ def validate(data):
                     raise ValueError('Ranged attack range must be at least 8 studs')
             if group == 'weapons' and (row['type'] not in TYPES or row['rarity'] not in RARITIES):
                 raise ValueError('Invalid weapon type / rarity')
+    species = {}
+    for row in data['monsters']:
+        if not row['nameEn']: continue
+        key = row['nameEn'].lower()
+        value = (row['nameEn'], row['nameRu'], row['aggroRadiusStuds'], row['aggressive'])
+        if species.setdefault(key, value) != value:
+            raise ValueError('Monster species names / aggro must agree: ' + row['nameEn'])
     swords = {r['id']: r for r in data['weapons'] if r['type'] == 'sword'}
     for row in data['weapons']:
         if row['type'] != 'dualswords': continue
@@ -94,6 +103,8 @@ def validate(data):
         number(recipe['fee'], 0, 100000000, 'recipe.fee')
         if row['price'] != 2 * swords[recipe['swordId']]['price'] + recipe['fee']:
             raise ValueError('Dualswords price must match two swords plus recipe fee')
+    if data['levels'][0]['attackBonus'] != 0 or any(b['attackBonus'] < a['attackBonus'] for a,b in zip(data['levels'], data['levels'][1:])):
+        raise ValueError('Level ATK bonus must start at zero and not decrease')
     if any(b['hp'] < a['hp'] for a,b in zip(data['levels'], data['levels'][1:])):
         raise ValueError('Player HP cannot decrease with level')
     for key, group in (('weaponBindings','weapons'), ('monsterBindings','monsters')):
@@ -140,12 +151,22 @@ def digest(data):
     return hashlib.sha256(json.dumps(data,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 
-def load():
+def load(root=None):
+    source = SOURCE if root is None else root / 'config/balance/gameplay.json'
+    output = OUTPUT if root is None else root / 'src/shared/balance/BalanceRegistry.luau'
     with LOCK:
-        data = validate(json.loads(SOURCE.read_text(encoding='utf-8')))
-        if OUTPUT.read_text(encoding='utf-8') != render(data):
+        data = validate(json.loads(source.read_text(encoding='utf-8')))
+        if output.read_text(encoding='utf-8') != render(data):
             raise ValueError('Balance source and runtime registry differ; restore matching versions')
         return data
+
+
+def monster_spawn_defaults(data, monster):
+    binding = data['monsterBindings'].get(monster['slug']) if data is not None else None
+    row = next((r for r in data['monsters'] if r['id'] == binding), None) if binding else None
+    behavior = row if row is not None else (monster.get('behavior') or {})
+    return {'aggressive': behavior.get('aggressive') is True,
+            'aggroRadiusStuds': float(behavior.get('aggroRadiusStuds', 16))}
 
 
 def atomic(path, content):
@@ -175,3 +196,29 @@ def save(data, expected, models, monsters):
         except BaseException:
             atomic(SOURCE,old_source); atomic(OUTPUT,old_output); raise
         return data
+
+
+def sync_monster_aggro(changes, models, monsters):
+    if not isinstance(changes, list) or not 1 <= len(changes) <= 70:
+        raise ValueError('Invalid species changes')
+    with LOCK:
+        data = load()
+        revision = digest(data)
+        seen = set()
+        for entry in changes:
+            if not isinstance(entry, dict) or set(entry) != {'nameEn','oldRadius','oldAggressive','radius','aggressive'}:
+                raise ValueError('Invalid species change')
+            name = entry['nameEn']
+            if not isinstance(name, str) or not name or name in seen:
+                raise ValueError('Invalid or duplicate species')
+            seen.add(name)
+            number(entry['oldRadius'], 0, 10000, 'old aggro radius', False)
+            if type(entry['oldAggressive']) is not bool: raise ValueError('Invalid old aggressive flag')
+            rows = [r for r in data['monsters'] if r['nameEn'] == name]
+            if not rows or any(r['aggroRadiusStuds'] != entry['oldRadius'] or r['aggressive'] is not entry['oldAggressive'] for r in rows):
+                raise ValueError('Species changed elsewhere; refresh: ' + name)
+            radius = number(entry['radius'], 0, 10000, 'aggro radius', False)
+            if type(entry['aggressive']) is not bool: raise ValueError('Invalid aggressive flag')
+            for row in rows:
+                row.update(aggroRadiusStuds=radius, aggressive=entry['aggressive'])
+        return save(data, revision, models, monsters)

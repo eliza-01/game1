@@ -85,8 +85,7 @@ function Layout.Build(origin: CFrame, rows: {any}, maxLevel: number, spacing: nu
             end
             local visit=point+facing*reach+Vector3.yAxis*CharacterConfig.RootAnchorOffset
             local homeRadius=math.min(75,ZONE_SIZE/2-8-math.max(math.abs(item.x),math.abs(item.z)))
-            local aggressive, aggroRadius = HuntingPlan.Aggro(index,zone.low,row)
-            local slot={point=point,facing=facing,homeRadius=homeRadius,visit=CFrame.lookAt(visit,point+Vector3.yAxis*CharacterConfig.RootAnchorOffset),zone=index,aggressive=aggressive,aggroRadius=aggroRadius}
+            local slot={point=point,facing=facing,homeRadius=homeRadius,visit=CFrame.lookAt(visit,point+Vector3.yAxis*CharacterConfig.RootAnchorOffset),zone=index}
             if item.extra then table.insert(extraSlots,{row=row,slot=slot}) else slots[row.id]=slot end
         end
     end

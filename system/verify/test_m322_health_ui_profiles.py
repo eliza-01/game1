@@ -121,7 +121,7 @@ class HealthRuntimeIntegration(unittest.TestCase):
         self.assertIn('Settings.Changed', settings)
         self.assertIn('Settings.Current().screen', hud)
         self.assertIn('view.ApplyStyle(style)', over)
-        self.assertIn('gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + spec.offsetStuds, 0)', view)
+        self.assertIn('gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + spec.offsetStuds + (if hasPortrait then 1 else 0), 0)', view)
         self.assertIn('first:upper() .. tail:lower()', view)
         for file in (view,hud):
             self.assertIn('ratio <= 0.30', file)

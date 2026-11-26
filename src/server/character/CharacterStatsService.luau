@@ -86,7 +86,7 @@ function Service.Initialize(character: Model, _startingStats: any?, progressionL
     local level = Balance.Level(progressionLevel or 1)
     setBase(character, "Level", level.level)
     setBase(character, "MaxHP", level.hp)
-    setBase(character, "Damage", Balance.Rules.baseDamage)
+    setBase(character, "Damage", Balance.BaseDamageAt(level.level))
     setBase(character, "Defense", 0)
     setBase(character, "AttackSpeed", Balance.Rules.baseAttackSpeed)
     setBase(character, "RunSpeed", Balance.Rules.baseRunSpeed)
@@ -103,6 +103,7 @@ function Service.SetProgressionLevel(character: Model, levelNumber: number)
     local level = Balance.Level(levelNumber)
     character:SetAttribute("BaseLevel", level.level)
     character:SetAttribute("BaseMaxHP", level.hp)
+    character:SetAttribute("BaseDamage", Balance.BaseDamageAt(level.level))
     recompute(character)
 end
 

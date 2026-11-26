@@ -306,7 +306,8 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
     AttackController.RequestAttack = attemptAttack
     UserInputService.InputBegan:Connect(function(input, processed)
         if input.UserInputType == CharacterConfig.InputBindings.AttackPrimary[1]
-            and not UiInputGuard.BlocksWorldInput(input, processed) then
+            and not UiInputGuard.BlocksWorldInput(input, processed)
+            and not UiInputGuard.IsPointerOnWorldInteraction() then
             attemptAttack()
         end
     end)

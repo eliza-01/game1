@@ -15,14 +15,14 @@ class WorldDesign(unittest.TestCase):
         self.assertEqual(len(data['monsters']),70)
         rows={(r['level'],r['type']):r for r in data['monsters']}
         for level,kind,name in [(1,'melee','Жаба (Toad)'),(2,'ranged','Мандрагора (Mandragora)'),(3,'melee','Деревянный страж (Wooden Guardian)'),(4,'melee','Живое пугало (Living Scarecrow)'),(5,'melee','Волк (Wolf)'),(8,'ranged','Скелет-лучник (Skeleton Archer)'),(9,'melee','Медведь гризли (Grizzly)'),(11,'melee','Гремлин (Gremlin)'),(30,'melee','Древний дракон (Wyrm)')]:
-            self.assertEqual(rows[level,kind]['name'],name)
-        self.assertEqual(sum(bool(row['name']) for row in rows.values()),55)
-        self.assertEqual(len({row['name'] for row in rows.values() if row['name']}),25)
+            self.assertEqual(f"{rows[level,kind]['nameRu']} ({rows[level,kind]['nameEn']})",name)
+        self.assertEqual(sum(bool(row['nameEn']) for row in rows.values()),55)
+        self.assertEqual(len({row['nameEn'] for row in rows.values() if row['nameEn']}),25)
         for name in ([],1,'a'*101,'a\nb'):
-            changed=deepcopy(data);changed['monsters'][0]['name']=name
+            changed=deepcopy(data);changed['monsters'][0]['nameEn']=name
             with self.assertRaises(ValueError): balance.validate(changed)
         self.assertEqual(data['monsterBindings']['gremlin'],'monster_001') # existing production spawn unchanged
-        self.assertIn("else if(key==='name')",read('system/control-center/static/game-balance.js'))
+        self.assertIn("else if(key==='nameEn'||key==='nameRu')",read('system/control-center/static/game-balance.js'))
     def test_design_runtime_topology_and_images(self):
         card=KanbanStore(ROOT).detail('KBN-0031');spec=card['spec']
         self.assertTrue(card['card']['favorite'])

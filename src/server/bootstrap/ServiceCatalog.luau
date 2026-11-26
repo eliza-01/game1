@@ -101,6 +101,9 @@ function ServiceCatalog.Build(root: Instance)
         {name = "GameplayTestService", critical = false, dependsOn = {"CharacterService", "MonsterAIService", "PublishedDebugAccessService"}, start = function()
             require(dev:WaitForChild("GameplayTestService")).Start()
         end},
+        {name = "GameplayAggroService", critical = false, dependsOn = {"GameplayTestService"}, start = function()
+            require(dev:WaitForChild("GameplayAggroService")).Start()
+        end},
         {name = "HouseSocketDebugService", critical = false, dependsOn = {"HouseSocketService"}, start = function()
             require(dev:WaitForChild("HouseSocketDebugService")).Start()
         end},

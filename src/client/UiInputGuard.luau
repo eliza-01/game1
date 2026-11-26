@@ -51,6 +51,21 @@ function UiInputGuard.IsPointerOverUi(input: InputObject?): boolean
     return false
 end
 
+-- World interaction actors may opt out of the primary attack click without
+-- affecting camera drag or the normal pointer-over-UI policy.
+function UiInputGuard.IsPointerOnWorldInteraction(): boolean
+    local target = localPlayer:GetMouse().Target
+    local model = target and target:FindFirstAncestorOfClass("Model")
+    local character = localPlayer.Character
+    if not model or not character then return false end
+    local distance = model:GetAttribute("WorldInteractionDistance")
+    if type(distance) ~= "number" or distance <= 0 then return false end
+    local root = character:FindFirstChild("RootCollider")
+    local other = model:FindFirstChild("RootCollider")
+    return root ~= nil and root:IsA("BasePart") and other ~= nil and other:IsA("BasePart")
+        and (root.Position - other.Position).Magnitude <= distance
+end
+
 function UiInputGuard.IsWorldSuspended(): boolean
     local gui = localPlayer:FindFirstChildOfClass("PlayerGui")
     return gui ~= nil and gui:GetAttribute("Game1CharacterSceneInputBlocked") == true

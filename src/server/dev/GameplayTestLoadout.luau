@@ -9,6 +9,7 @@ local Healing = require(script.Parent.Parent:WaitForChild("character"):WaitForCh
 local RunService = game:GetService("RunService")
 local ProgressionView = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterProgressionView"))
 local Critical = require(Shared:WaitForChild("balance"):WaitForChild("CriticalStats"))
+local BufferConfig = require(Shared:WaitForChild("dev"):WaitForChild("GameplayBufferConfig"))
 local Loadout = {}
 local sessions: {[Player]: any} = {}
 
@@ -22,7 +23,8 @@ end
 function Loadout.Set(player: Player, selection: any?)
     if selection and selection.xp == nil then
         selection.xp = Balance.Threshold(selection.level)
-        selection.gold = 0
+        local previous = sessions[player]
+        selection.gold = if previous then previous.gold else BufferConfig.StartingGold
     end
     sessions[player] = selection
     player:SetAttribute("Game1GameplayTestActive", selection ~= nil)
@@ -133,6 +135,19 @@ function Loadout.Apply(player: Player, character: Model): (boolean, string?)
     character:SetAttribute("HP", character:GetAttribute("MaxHP"))
     ProgressionView.Publish(character, selection.xp, selection.gold)
     return ok, reason
+end
+-- A synchronous grant commits payment only if the effect was actually applied.
+-- Called under the GP dispatcher lock; no client-provided cost or balance.
+function Loadout.PurchaseBuff(player: Player, character: Model, grant: ()->boolean): boolean
+    local selection = sessions[player]
+    if not RunService:IsStudio() or not selection or player.Character ~= character
+        or character:GetAttribute("GameplayTestKind") ~= "player"
+        or character:GetAttribute("Game1GameplayTestOwner") ~= player.UserId
+        or selection.gold < BufferConfig.Price then return false end
+    if not grant() then return false end
+    selection.gold -= BufferConfig.Price
+    character:SetAttribute("Gold", selection.gold)
+    return true
 end
 -- Only normal map kills earn rewards; no group/Guided or Skilled farming.
 function Loadout.Reward(player: Player, character: Model, target: Model)

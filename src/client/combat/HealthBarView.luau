@@ -1,5 +1,6 @@
 -- Overhead HP view: no combat state or damage calculation; style is client-only.
 local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 local IconView = require(script.Parent:WaitForChild("MonsterIconView"))
 local HealthBarView = {}
@@ -43,6 +44,11 @@ end
 
 local function displayName(model: Model, monster: boolean): string
     if monster then
+        local english = model:GetAttribute("MonsterNameEn")
+        local russian = model:GetAttribute("MonsterNameRu")
+        if type(english) == "string" and english ~= "" then
+            return if Language.Current() == "ru-ru" and type(russian) == "string" and russian ~= "" then russian else english
+        end
         local testName=model:GetAttribute("MonsterDisplayName")
         if model:GetAttribute("Game1GameplayTestOwner")~=nil and type(testName)=="string" and testName~="" then return testName end
         local slug = model:GetAttribute("NpcSlug") or model:GetAttribute("MonsterSlug")
@@ -90,11 +96,13 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     rowLayout.FillDirection = Enum.FillDirection.Horizontal
     rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    rowLayout.Padding = UDim.new(0, 7)
+    rowLayout.Padding = UDim.new(0, 0)
+    rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
     rowLayout.Parent = titleLine
 
     local number = Instance.new("TextLabel")
     number.Name = "Level"
+    number.LayoutOrder = 3
     number.BackgroundTransparency = 1
     number.Font = Enum.Font.GothamBold
     number.Text = if level and level > 0 then tostring(math.floor(level)) else ""
@@ -106,6 +114,7 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
 
     local title = Instance.new("TextLabel")
     title.Name = "Caption"
+    title.LayoutOrder = 1
     title.Text = nameText
     title.Font = Enum.Font.GothamBold
     title.TextColor3 = Color3.fromRGB(250, 250, 251)
@@ -113,6 +122,12 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     title.TextStrokeColor3 = Color3.new(0, 0, 0)
     title.TextStrokeTransparency = 0
     title.Parent = titleLine
+    local star = Instance.new("TextLabel")
+    star.Name = "AggressiveMark"; star.LayoutOrder = 2
+    star.BackgroundTransparency = 1; star.Font = Enum.Font.GothamBold
+    star.Text = "*"; star.TextColor3 = Color3.fromRGB(240, 55, 55)
+    star.TextStrokeTransparency = 0; star.TextStrokeColor3 = Color3.new(0,0,0)
+    star.Parent = titleLine
 
     local debugLine = Instance.new("TextLabel")
     debugLine.Name = "TestStats"
@@ -212,13 +227,22 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         currentStyle = settings
         nameText = displayName(model, monster)
         title.Text = nameText
+        level = if monster then tonumber(model:GetAttribute("Level")) else nil
+        number.Visible = monster and level ~= nil and level > 0
+        number.Text = if number.Visible then (if Language.Current() == "ru-ru" then "Ур." else "Lv.") .. tostring(math.floor(level or 0)) else ""
+        star.Visible = model:GetAttribute("Game1MonsterRuntime") == true and model:GetAttribute("MonsterAggressive") == true
         local spec = settings[layout]
         local width, height = spec.width, spec.height
         local titleSize = spec.nameSize
         local levelSize = spec.levelSize
         local lineHeight = math.max(titleSize, levelSize) + 5
-        local lineWidth = math.max(width + 28, math.min(580,
-            #nameText * titleSize * 0.68 + (number.Visible and levelSize * 2.5 or 0) + 20))
+        local function measure(text: string, size: number): number
+            return math.ceil(TextService:GetTextSize(text, size, Enum.Font.GothamBold, Vector2.new(2000,100)).X)
+        end
+        local nameWidth = measure(nameText, titleSize)
+        local starWidth = if star.Visible then measure("*", titleSize) else 0
+        local levelWidth = if number.Visible then measure(number.Text, levelSize) + 5 else 0
+        local lineWidth = math.max(width + 28, nameWidth + starWidth + levelWidth + 6)
         local statsHeight = if hasPortrait then 17 else 0
         if hasPortrait then
             debugLine.Text = string.format("%s · %d HP · %d ATK%s",
@@ -236,9 +260,11 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         titleLine.Position = UDim2.fromOffset(0, portraitHeight)
         titleLine.Size = UDim2.fromOffset(lineWidth, lineHeight)
         title.TextSize = titleSize
-        title.Size = UDim2.fromOffset(math.min(lineWidth - 20, #nameText * titleSize * 0.68 + 12), lineHeight)
+        title.Size = UDim2.fromOffset(nameWidth, lineHeight)
+        star.TextSize = titleSize; star.Size = UDim2.fromOffset(starWidth, lineHeight)
         number.TextSize = levelSize
-        number.Size = UDim2.fromOffset(levelSize * 1.7, lineHeight)
+        number.Size = UDim2.fromOffset(levelWidth, lineHeight)
+        number.TextXAlignment = Enum.TextXAlignment.Right
         plate.Size = UDim2.fromOffset(width, height)
         debugLine.Position = UDim2.fromOffset(0, portraitHeight + lineHeight)
         debugLine.Size = UDim2.fromOffset(lineWidth, statsHeight)
@@ -301,6 +327,9 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
             if portrait then portrait:Destroy(); portrait = nil; portraitStroke = nil end
             view.ApplyStyle(currentStyle)
         end))
+    end
+    for _, attribute in ipairs({"Level", "MonsterAggressive", "MonsterNameEn", "MonsterNameRu"}) do
+        table.insert(connections, model:GetAttributeChangedSignal(attribute):Connect(function() view.ApplyStyle(currentStyle) end))
     end
     table.insert(connections, model:GetAttributeChangedSignal("HP"):Connect(update))
     table.insert(connections, model:GetAttributeChangedSignal("MaxHP"):Connect(update))

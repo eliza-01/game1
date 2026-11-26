@@ -40,14 +40,6 @@ local pockets = {
         {-62,-120}, {130,-40}, {-130,-120}, {130,-120},
     }},
 }
--- Starter ranged enemies are voluntary fights. No automatic two-shooter pull.
--- Remaining zones use distinct side pockets and smaller first-contact radius.
-function Plan.Aggro(index: number, low: number, row: any): (boolean, number)
-    if index == 1 and row.type == "ranged" then return false, 24 end
-    if index == 1 then return true, 20 end
-    if index <= 6 and row.level == low then return row.type == "melee", 24 end
-    return true, 30
-end
 -- More than one level-one melee target lets a new player gain XP without
 -- camping one respawn or pulling a level-two ranged monster.
 function Plan.Extra(index: number, low: number, row: any): {Vector2}

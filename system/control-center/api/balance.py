@@ -19,10 +19,13 @@ def read(path, deps):
 
 
 def write(path, body, deps):
-    if path != '/api/balance': return None
+    if path not in ('/api/balance', '/api/balance/monster-aggro'): return None
     try:
         payload = body()
         if not isinstance(payload,dict): raise ValueError('Invalid balance request')
+        if path == '/api/balance/monster-aggro':
+            balance.sync_monster_aggro(payload.get('changes'),deps['weapons'].snapshot()['items'],deps['monsters'].snapshot()['items'])
+            return 200, {'ok': True}
         balance.save(payload.get('balance'),payload.get('revision'),deps['weapons'].snapshot()['items'],deps['monsters'].snapshot()['items'])
         return 200, snapshot(deps)
     except (ValueError,TypeError) as error:

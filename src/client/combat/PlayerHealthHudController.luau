@@ -154,9 +154,8 @@ local function updateProgression()
     local level = tonumber(model:GetAttribute("Level")) or 1
     local xp = tonumber(model:GetAttribute("XPIntoLevel")) or 0
     local nextXP = tonumber(model:GetAttribute("XPNext")) or 0
-    local gold = tonumber(model:GetAttribute("Gold")) or 0
-    progressionCaption.Text = if nextXP > 0 then string.format("LVL %d  ·  XP %d/%d  ·  G %d", level, xp, nextXP, gold)
-        else string.format("LVL %d  ·  MAX  ·  G %d", level, gold)
+    progressionCaption.Text = if nextXP > 0 then string.format("LVL %d  ·  XP %d/%d", level, xp, nextXP)
+        else string.format("LVL %d  ·  MAX", level)
 end
 
 local function applyStyle()
@@ -182,7 +181,7 @@ local function bind(character: Model?)
         for _, key in ipairs({"HP", "MaxHP", "LifeState"}) do
             table.insert(connections, character:GetAttributeChangedSignal(key):Connect(update))
         end
-        for _, key in ipairs({"Level", "XP", "XPIntoLevel", "XPNext", "Gold"}) do
+        for _, key in ipairs({"Level", "XP", "XPIntoLevel", "XPNext"}) do
             table.insert(connections, character:GetAttributeChangedSignal(key):Connect(updateProgression))
         end
     end

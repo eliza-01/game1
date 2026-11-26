@@ -8,8 +8,8 @@ local BUTTON_GAP = 8
 local LEFT = 16
 local TOP = 8
 local WINDOW_TOP = TOP + BUTTON_SIZE + BUTTON_GAP
-local slots = { TL = 0, MV = 1, MO = 2, CS = 3, HS = 4, CD = 5, HP = 6, UI = 7, GP = 8 }
-local SLOT_COUNT = 9
+local slots = { TL = 0, MV = 1, MO = 2, CS = 3, HS = 4, CD = 5, HP = 6, UI = 7, GP = 8, AG = 9 }
+local SLOT_COUNT = 10
 local STEP = BUTTON_SIZE + BUTTON_GAP
 local CLOSED = Color3.fromRGB(28, 37, 48)
 local SELECTED = Color3.fromRGB(31, 76, 70)

@@ -176,13 +176,13 @@ local function spawnOne(state: any): Model?
         local row = assert(Balance.Monster(record.testBalanceId))
         local color = Balance.Grade.Color(row.level)
         TestAppearance.Tint(visual, color)
-        local title = if row.name and row.name ~= "" then row.name else "Монстр_" .. row.id:sub(-3)
+        local title = if row.nameEn and row.nameEn ~= "" then row.nameEn else "Monster_" .. row.id:sub(-3)
         if row.skills then
             local names = {}
             for _, a in ipairs(row.skills) do table.insert(names, Balance.Skill(a.skillId).name) end
             title = table.concat(names, " + ")
         end
-        local proxy = row.name ~= "Гремлин (Gremlin)" or row.skills ~= nil
+        local proxy = row.nameEn ~= "Gremlin" or row.skills ~= nil
         if not record.testZone or record.testZone > 6 then
             TestAppearance.Label(model, ("%s · %s · LVL %d\n%d HP · %d ATK"):format(title .. (if proxy then " [proxy]" else ""), row.type, row.level, row.hp, row.damage), color)
         end

@@ -48,6 +48,9 @@ end
 function Balance.Level(level: number): any
     return Registry.levels[math.clamp(math.floor(level), 1, #Registry.levels)]
 end
+function Balance.BaseDamageAt(level: number): number
+    return Registry.rules.baseDamage + Balance.Level(level).attackBonus
+end
 function Balance.Threshold(level: number): number
     return thresholds[math.clamp(math.floor(level), 1, #thresholds)]
 end

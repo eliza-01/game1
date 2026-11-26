@@ -145,13 +145,13 @@ function Controller.Start()
             return math.max(required, armor().level)
         end
         local first = row(body, 46); horizontal(first)
+        local refreshUpgrade: (() -> ())? = nil
         local refreshLevel = picker(cell(first, "Level"), "Level", function()
             return ("LVL %d\n%d HP"):format(level, Balance.Level(level).hp)
-        end, function(d) level = math.clamp(level + d, minimumLevel(), Balance.MaxLevel) end)
+        end, function(d) level = math.clamp(level + d, minimumLevel(), Balance.MaxLevel); if refreshUpgrade then refreshUpgrade() end end)
         local function ensureLevel()
-            level = math.max(level, minimumLevel()); refreshLevel()
+            level = math.max(level, minimumLevel()); refreshLevel(); if refreshUpgrade then refreshUpgrade() end
         end
-        local refreshUpgrade: (() -> ())? = nil
         local refreshCrit: (() -> ())? = nil
         local refreshWeapon=picker(cell(first, "Weapon"), "Weapon", function()
             local w = weapon(); local grade, required = Balance.Grade.ForLevel(w.level)
@@ -166,7 +166,7 @@ function Controller.Start()
             local a=armor(); return ("LVL %d\n+%d HP"):format(a.level,a.hp)
         end, function(d) armorIndex=wrap(armorIndex,d,#Balance.Armors); ensureLevel() end)
         refreshUpgrade = picker(cell(second, "Upgrade"), "Upgrade", function()
-            return ("+%d\n%d ATK"):format(upgrade, Balance.Rules.baseDamage + Balance.WeaponDamage(weapon(),upgrade))
+            return ("+%d\n%g ATK"):format(upgrade, Balance.BaseDamageAt(level) + Balance.WeaponDamage(weapon(),upgrade))
         end, function(d) upgrade=wrap(upgrade+1,d,Balance.Rules.maxUpgrade+1)-1 end)
         local third = row(body, 46); horizontal(third)
         local monsterCell = cell(third, "Monster")
@@ -180,7 +180,7 @@ function Controller.Start()
                 local skill = Balance.Skill(m.skills[1].skillId)
                 return ("%s%s · LVL %d\n%d HP · %d ATK"):format(skill.name,if #m.skills>1 then " +"..(#m.skills-1) else "",m.level,m.hp,m.damage)
             end
-            return ("%s · LVL %d\n%d HP · %d ATK"):format(if m.name and m.name~="" then m.name else m.id,m.level,m.hp,m.damage)
+            return ("%s · LVL %d\n%d HP · %d ATK"):format(if m.nameEn and m.nameEn~="" then m.nameEn else m.id,m.level,m.hp,m.damage)
         end, function(d)
             if monsterType=="skilled" then skilledIndex=wrap(skilledIndex,d,#Balance.SkilledMonsters)
             else monsterLevel=wrap(monsterLevel,d,Balance.MaxLevel) end

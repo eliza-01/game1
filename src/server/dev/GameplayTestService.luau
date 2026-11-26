@@ -14,12 +14,15 @@ local Loadout = require(script.Parent:WaitForChild("GameplayTestLoadout"))
 local Arena = require(script.Parent:WaitForChild("GameplayTestArena"))
 local Panels = require(script.Parent:WaitForChild("GameplayTestPanels"))
 local Buffer = require(script.Parent:WaitForChild("GameplayBufferDummy"))
+local Buffs = require(Shared:WaitForChild("combat"):WaitForChild("BuffDefinitions"))
+local BufferConfig = require(Shared:WaitForChild("dev"):WaitForChild("GameplayBufferConfig"))
 local Effects = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("SkillEffects"))
 local Report = require(script.Parent:WaitForChild("GameplayCombatReport"))
 local Plan = require(script.Parent:WaitForChild("GameplayGuidedPlan"))
 local RuntimeVersion = require(Shared:WaitForChild("RuntimeVersion"))
 local Service = {}
 local session: any = nil
+local bufferOpen: RemoteEvent? = nil
 local started = false
 local busy: {[Player]: boolean} = {}
 local last: {[Player]: number} = {}
@@ -36,6 +39,17 @@ local function alive(player: Player): Model?
 end
 local function active(s: any): boolean
     return session == s and s.player.Parent == Players
+end
+-- The NPC, price and recipient are selected by the server, never the request.
+local function bufferCharacter(s: any, actor: Player, part: BasePart): Model?
+    if actor~=s.player or not allowed(actor) or not active(s) or s.guide or s.groupStarting or #s.group>0 then return nil end
+    local character=alive(actor)
+    if not character or character:GetAttribute("GameplayTestKind")~="player"
+        or character:GetAttribute("Game1GameplayTestOwner")~=actor.UserId then return nil end
+    local root=character:FindFirstChild("RootCollider")
+    if not root or not root:IsA("BasePart") or not part:IsDescendantOf(s.folder)
+        or (root.Position-part.Position).Magnitude>BufferConfig.InteractionDistance then return nil end
+    return character
 end
 local function publishGuide(s: any, message: string)
     s.player:SetAttribute("GameplayGuideStatus", message)
@@ -195,11 +209,9 @@ local function enter(player: Player, selection: any)
             actor:SetAttribute("GameplayTestStock",string.format("%s|%s|%d|%d",selection.weapon.id,selection.armor.id,selection.level,s.generation))
         end)
     end)
-    Buffer.Build(folder,s.layout,function(actor,part,definition,lift)
-        panelAction(actor,part,function(character)
-            if not Effects.CanCast(character) then return end
-            if Effects.Apply(character,character,definition,0) then lift() end
-        end)
+    s.buffer=Buffer.Build(folder,s.layout,function(actor,part)
+        if not bufferCharacter(s,actor,part) then return end
+        if bufferOpen then bufferOpen:FireClient(actor,s.buffer.model) end
     end)
     return result(count == expectedCount, ("Zone map: %d/%d spawns · %d studs per zone"):format(count, expectedCount, s.layout.zoneSize))
 end
@@ -365,6 +377,22 @@ local function dispatch(player: Player, action: any, request: any)
         return result(true,"Report exported to server Output")
     end
     if s.guide then return result(false,"Guided test active · use guide controls") end
+    if action == "buyBuff" then
+        local fixture=s.buffer
+        local character=if fixture then bufferCharacter(s,player,fixture.root) else nil
+        if not character then return result(false,"Move closer to the buffer") end
+        if character:GetAttribute("AttackEndsAt")~=nil or not Effects.CanCast(character) then return result(false,"Cannot receive buffs now") end
+        local definition=if type(request.effect)=="string" then Buffs.ByEffect[request.effect] else nil
+        if not definition then return result(false,"Unknown buff") end
+        if Effects.IsActive(character,definition.effect) then return result(false,"Already active") end
+        local selection=Loadout.Get(player)
+        if not selection or selection.gold<BufferConfig.Price then return result(false,"Not enough gold") end
+        if not Loadout.PurchaseBuff(player,character,function()
+            return Effects.Apply(character,character,definition,0)
+        end) then return result(false,"Buff not applied") end
+        fixture.lift()
+        return result(true,"Buff received")
+    end
     if action == "recovery" then
         local character = alive(player)
         if not character then return result(false, "Respawn first") end
@@ -414,7 +442,9 @@ function Service.Start()
         end
         return response
     end
-    remote.Parent = RS:WaitForChild("Game1Remotes")
+    local remotes=RS:WaitForChild("Game1Remotes")
+    local open=Instance.new("RemoteEvent"); open.Name="GameplayBufferOpen"; open.Parent=remotes; bufferOpen=open
+    remote.Parent = remotes
     local function bindPlayer(player: Player)
         local function autoStart(character: Model)
             if autoAttempted[player] or not Options.StartInGameplayHub() or not allowed(player)

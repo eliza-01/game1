@@ -22,6 +22,8 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     local maxHP = if balance then balance.hp else math.max(1, finite(stats.MaxHP, 100))
     model:SetAttribute("MonsterSkillCaster", if balance and balance.skills and record.testOwner then true else nil)
     model:SetAttribute("MonsterBalanceId", if balance then balance.id else "")
+    model:SetAttribute("MonsterNameEn", if balance and not balance.skills then balance.nameEn else nil)
+    model:SetAttribute("MonsterNameRu", if balance and not balance.skills then balance.nameRu else nil)
     model:SetAttribute("RewardXP", if balance then balance.xp else 0)
     model:SetAttribute("RewardGold", if balance then balance.gold else 0)
     model:SetAttribute("Game1MonsterRuntime", true)
@@ -49,19 +51,29 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
     model:SetAttribute("CritChance", Critical.Chance(if balance then balance.critChance else finite(stats.CritChance, 0)))
     model:SetAttribute("Defense", if balance then 0 else math.max(0, finite(stats.Defense, 0)))
-    local aggressive = behavior.aggressive == true
+    local aggressive = if balance then balance.aggressive == true else behavior.aggressive == true
+    local aggroRadius = math.clamp(finite(if balance then balance.aggroRadiusStuds else behavior.aggroRadiusStuds, 16), 0, 10000)
+    -- A concrete spawn overrides its bound Database row. False and zero are valid overrides.
+    if type(record.aggressive) == "boolean" then aggressive = record.aggressive end
+    if record.aggroRadiusStuds ~= nil then aggroRadius = math.clamp(finite(record.aggroRadiusStuds, aggroRadius), 0, 10000) end
     if record.testOwner then
         model:SetAttribute("Game1GameplayTestOwner", record.testOwner)
         model:SetAttribute("GameplayTestKind", record.testKind)
         model:SetAttribute("GameplayTestZone", record.testZone)
-        aggressive = record.testKind == "zone" -- guided groups are armed atomically after readiness
-        if record.testKind == "zone" and type(record.testAggressive) == "boolean" then
-            aggressive = record.testAggressive
+        if record.testKind ~= "zone" then
+            -- Guided groups are armed atomically after readiness, independent of world aggro.
+            aggressive = false
+            aggroRadius = 120
+        elseif record.testZone == 8 then
+            -- Dedicated Skilled calibration annex, not a release-zone encounter.
+            aggressive = true
+            aggroRadius = 30
         end
     end
-    local aggroRadius = math.max(0, finite(behavior.aggroRadiusStuds, 16))
-    if record.testOwner then
-        aggroRadius = if record.testKind == "zone" then (record.testAggroRadius or 30) else 120
+    if record.testOwner and record.testKind == "zone" and (record.testZone or 99) <= 6 and balance then
+        local overrides = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayAggroOverrides"))
+        local change = overrides.Get(balance.nameEn)
+        if change then aggressive = change.aggressive; aggroRadius = change.radius end
     end
     local attackRadius = if balance then balance.attackRange else math.max(0, finite(behavior.attackRadiusStuds, 3))
     model:SetAttribute("MonsterCombatType", if balance then balance.type else "melee")

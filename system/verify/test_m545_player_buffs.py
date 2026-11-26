@@ -7,7 +7,7 @@ def read(p): return (ROOT/p).read_text(encoding='utf8')
 class PlayerBuffs(unittest.TestCase):
     def test_definitions_and_slow(self):
         definitions=read('src/shared/combat/BuffDefinitions.luau')
-        rows=dict(re.findall(r'effect="(\w+)".*?power=(\d+), duration=120',definitions))
+        rows=dict(re.findall(r'effect="(\w+)".*?power=(\d+), duration=600',definitions))
         self.assertEqual(rows,dict(might='20',earth='30',life='2',wind='20'))
         data=json.loads(read('config/balance/gameplay.json'))
         self.assertEqual(next(s for s in data['skills'] if s['effect']=='slow')['power'],40)
@@ -41,7 +41,7 @@ class PlayerBuffs(unittest.TestCase):
 
     def test_ui_and_fixture(self):
         fixture=read('src/server/dev/GameplayBufferDummy.luau')
-        for token in ['BufferDummy','Buffs.Rows','ProximityPrompt','Presentation.Step(pose,t,true)','if not playing then onBuff(player,post,row,lift)']:
+        for token in ['BufferDummy','ClickDetector','ProximityPrompt','Presentation.Step(pose,t,true)','onOpen(player,root)']:
             self.assertIn(token,fixture)
         hud=read('src/client/combat/BuffHud.luau')
         for token in ['BuffGain_','BuffUntil_','workspace:GetServerTimeNow()','plate.AbsolutePosition.X+plate.AbsoluteSize.X+8','TextTransparency=1','slot.icon.AbsolutePosition','flight:Play()','slot.icon.Visible=true','Visuals.Play(character,row.color)']:

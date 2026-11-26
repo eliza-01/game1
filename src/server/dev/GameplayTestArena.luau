@@ -108,7 +108,7 @@ function Arena.ShowWeapons(parent: Instance, origin: CFrame, character: Model)
             Appearance.Tint(model, color)
             local grade, required = Balance.Grade.ForLevel(row.level)
             local reference = model:FindFirstChildWhichIsA("BasePart", true)
-            if reference then Appearance.Label(model, ("Оружие_%s · %s · %s\nreq %d · %d ATK"):format(row.id:sub(-3), row.type, grade, required, Balance.Rules.baseDamage + row.damage), color, reference) end
+            if reference then Appearance.Label(model, ("Оружие_%s · %s · %s\nreq %d · %g ATK"):format(row.id:sub(-3), row.type, grade, required, Balance.BaseDamageAt(row.level) + row.damage), color, reference) end
             model.Parent = parent
         end
     end
@@ -135,8 +135,6 @@ function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing
         testOwner = owner.UserId, testKind = kind, testBalanceId = row.id,
         testNoRespawn = kind == "group", testYaw = yaw, testSurface = surface,
         testZone = if slot then slot.zone else nil,
-        testAggressive = if slot then slot.aggressive else nil,
-        testAggroRadius = if slot then slot.aggroRadius else nil,
     })
     table.insert(states, state) -- Registered BEFORE any yielding construction.
     return Spawner.FillTest(state)

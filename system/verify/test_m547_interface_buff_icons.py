@@ -15,9 +15,11 @@ class InterfaceBuffIcons(unittest.TestCase):
         self.assertEqual([row['effect'] for row in catalog['tiles']], ['might', 'earth', 'life', 'wind'])
         self.assertEqual([row['color'] for row in catalog['tiles']], ['#ae66f5', '#f0524c', '#fad34b', '#5fcaf5'])
         hud = (ROOT / 'src/client/combat/BuffHud.luau').read_text()
-        self.assertIn('ipairs(row.iconMask)', hud)
+        icon = (ROOT / 'src/client/combat/BuffIconView.luau').read_text()
+        self.assertIn('ipairs(row.iconMask)', icon)
+        self.assertIn('BuffIconView', hud)
         self.assertNotIn('local MASKS', hud)
-        self.assertIn('row.color', hud)
+        self.assertIn('row.color', icon)
 
     def test_interface_sections_and_existing_monsters(self):
         html = (ROOT / 'system/control-center/static/index.html').read_text()

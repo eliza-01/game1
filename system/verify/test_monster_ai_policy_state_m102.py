@@ -44,8 +44,13 @@ class MonsterAiM102Contracts(unittest.TestCase):
         self.assertIn('TARGET_SCAN_INTERVAL = 0.30', self.ai)
 
     def test_target_hit_geometry_and_los_still_run_at_hit_event(self):
-        for token in ('local ATTACK_ARC_DEGREES = 110', 'local VERTICAL_TOLERANCE = 5',
-                      'agent.root.CFrame.LookVector:Dot(delta.Unit)',
+        # M536: hit-time validation keeps distance, height and LOS, not root yaw.
+        self.assertNotIn('ATTACK_ARC_DEGREES', self.targets)
+        self.assertNotIn('LookVector:Dot', self.targets)
+        for token in ('local VERTICAL_TOLERANCE = 5',
+                      'delta.Magnitude > attackRadius(agent)',
+                      'math.abs(targetRoot.Position.Y - agent.root.Position.Y) > VERTICAL_TOLERANCE',
+                      'not allowsTarget(agent, target)',
                       'Enum.RaycastFilterType.Exclude', 'FilterDescendantsInstances = {agent.model}',
                       'Workspace:Raycast(origin, destination - origin, params)',
                       'return hasLineOfSight(agent, target)'):

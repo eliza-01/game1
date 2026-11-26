@@ -6,7 +6,6 @@ local Workspace = game:GetService("Workspace")
 local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
 local Approach = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestApproach"))
 local MonsterTargetPolicy = {}
-local ATTACK_ARC_DEGREES = 110
 local VERTICAL_TOLERANCE = 5
 
 local function finite(value: any, fallback: number): number
@@ -98,13 +97,10 @@ local function canBeginTargetedCast(agent: any, target: Model): boolean
 end
 
 local function attackStillConnects(agent: any, target: Model): boolean
+    -- Normal monster attacks lock a single server-selected target. Physics yaw
+    -- may lag the goal for a simulation step; it must not become an evasion roll.
+    -- Keep the live distance, height, isolation and obstacle checks at Hit.
     if not withinAttackRange(agent, target) then return false end
-    local targetRoot = rootOf(target)
-    if not targetRoot then return false end
-    local delta = horizontalDelta(agent.root.Position, targetRoot.Position)
-    if delta.Magnitude > 0.001 then
-        if agent.root.CFrame.LookVector:Dot(delta.Unit) < math.cos(math.rad(ATTACK_ARC_DEGREES * 0.5)) then return false end
-    end
     return hasLineOfSight(agent, target)
 end
 

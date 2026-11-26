@@ -30,7 +30,10 @@ class TargetedStatus(unittest.TestCase):
         normal=read('src/server/monster/MonsterAttackExecutor.luau'); self.assertIn('TargetPolicy.AttackStillConnects(agent, target)',normal)
         policy=read('src/server/monster/MonsterTargetPolicy.luau'); begin,hit=policy.split('local function attackStillConnects',1)
         self.assertIn('withinAttackRange(agent, target) and hasLineOfSight(agent, target)',begin)
-        self.assertIn('ATTACK_ARC_DEGREES',hit)
+        # M536 removes only the normal hit's facing gate, not range/LOS.
+        self.assertIn('if not withinAttackRange(agent, target) then return false end',hit)
+        self.assertIn('return hasLineOfSight(agent, target)',hit)
+        self.assertNotIn('ATTACK_ARC_DEGREES',hit)
     def test_visual_and_stun_lifecycle_contract(self):
         visual=read('src/client/combat/StatusEffectVisuals.luau')
         for token in ['cloud=Instance.new("Attachment")','cloud.Parent=root','smoke.LockedToPart=true','PointToObjectSpace(bonePoint(character,root))','Color3.fromRGB(190,130,240)','NumberSequenceKeypoint.new(1,8)','if cloud then cloud:Destroy() end']:

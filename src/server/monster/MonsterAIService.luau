@@ -124,7 +124,6 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
     if not targetRoot then return end
     if horizontalDistance(agent.root.Position, targetRoot.Position) <= attackRadius(agent) then
         stopNavigation(agent)
-        AttackExecutor.FaceDirection(agent, targetRoot.Position - agent.root.Position)
         Presentation.PlayCombatIdle(agent)
         AttackExecutor.Begin(agent, attacker, AttackMovement, random)
     elseif not TargetPolicy.IsStationary(agent.model) then
@@ -190,7 +189,6 @@ local function runAgent(agent: any)
             setState(agent, "Attack")
         elseif action == "BeginAttack" then
             stopNavigation(agent)
-            AttackExecutor.FaceDirection(agent, targetRoot.Position - agent.root.Position)
             Presentation.PlayCombatIdle(agent)
             AttackExecutor.Begin(agent, target, AttackMovement, random)
         elseif action == "Chase" and TargetPolicy.IsStationary(agent.model) then

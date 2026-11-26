@@ -29,7 +29,11 @@ class AttackMovementM72Tests(unittest.TestCase):
         self.assertIn('Facing.Stop(agent.model)', npc)
         self.assertNotIn('agent.root.CFrame = CFrame.lookAt', npc)
         self.assertIn('TargetPolicy.AttackStillConnects(agent, target)', monster)
-        self.assertIn('agent.root.CFrame.LookVector:Dot', read('src/server/monster/MonsterTargetPolicy.luau'))
+        policy = read('src/server/monster/MonsterTargetPolicy.luau')
+        # M536: monster attacks are targeted; NPC keeps the previous facing mode.
+        self.assertNotIn('agent.root.CFrame.LookVector:Dot', policy)
+        self.assertIn('if not withinAttackRange(agent, target) then return false end', policy)
+        self.assertIn('return hasLineOfSight(agent, target)', policy)
 
     def test_attack_chase_keeps_hit_animation_owner(self):
         npc = read('src/server/npc/NpcCombatAIService.luau')

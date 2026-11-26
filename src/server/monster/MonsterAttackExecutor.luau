@@ -29,17 +29,9 @@ end
 
 local rootOf = TargetPolicy.RootOf
 local targetIsValid = TargetPolicy.IsValid
-local horizontalDelta = TargetPolicy.HorizontalDelta
 local attackRadius = TargetPolicy.AttackRadius
 local aggressive = TargetPolicy.IsAggressive
 local setState = CombatState.SetState
-
-function MonsterAttackExecutor.FaceDirection(agent: any, direction: Vector3)
-    local flat = Vector3.new(direction.X, 0, direction.Z)
-    if flat.Magnitude <= 0.001 then return end
-    agent.facing = flat.Unit
-end
-
 
 local function clearAttackPursuit(agent: any)
     agent.attackPursuit:Stop()
@@ -78,7 +70,7 @@ local function maintainAttackPursuit(agent: any, target: Model, serial: number, 
                 clearAttackPursuit(agent)
                 return
             end
-            local pursuing = pursueDirectlyDuringAttack(agent, liveRoot, movement)
+            pursueDirectlyDuringAttack(agent, liveRoot, movement)
             -- Facing is updated continuously by the shared tracker even at rest.
             RunService.Heartbeat:Wait()
         end
@@ -110,7 +102,7 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
         percent = fittedPercent
     end
     agent.attacking = true
-    Facing.Track(agent.model, agent.root, agent.humanoid, target, rootOf)
+    Facing.Track(agent.model, agent.root, agent.humanoid, target, rootOf, true)
     agent.attackSerial += 1
     local serial = agent.attackSerial
     local duration = math.max(0.05, finite(timing.duration, 0.05))
@@ -125,21 +117,12 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
     movement.StopNavigation(agent)
     Presentation.PlayAttack(agent, row, percent)
     agent.model:SetAttribute("MonsterAttackPhase", "Windup")
-    local targetRoot = rootOf(target)
-    if targetRoot then MonsterAttackExecutor.FaceDirection(agent, targetRoot.Position - agent.root.Position) end
     if not Retreat.IsRanged(agent.model) then maintainAttackPursuit(agent, target, serial, movement) end
 
     local hit = timing.events and timing.events.Hit
     local hitTime = math.max(0, finite(hit and hit.time, duration * 0.5))
     task.delay(hitTime, function()
         if not agent.active or agent.attackSerial ~= serial or agent.target ~= target or tostring(agent.model:GetAttribute("LifeState") or "") ~= "Alive" then return end
-        local liveRoot = rootOf(target)
-        if liveRoot then
-            local direction = liveRoot.Position - agent.root.Position
-            local flatDirection = horizontalDelta(Vector3.zero, direction)
-            if flatDirection.Magnitude > 0.001 then agent.facing = flatDirection.Unit end
-            -- Do not snap yaw on Hit: shared tracker already follows the target.
-        end
         if TargetPolicy.AttackStillConnects(agent, target) then
             local damage, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0) * finite(agent.model:GetAttribute("SkillDamageMultiplier"), 1))
             HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true, rootOf(target) and rootOf(target).Position or nil)

@@ -100,7 +100,6 @@ local function registerModel(model: Model, random: Random, runAgent: (any) -> ()
                 nextTargetScanAt = 0,
                 attackPursuitActive = false,
                 attackPursuit = AttackExecutor.NewPursuit(root, humanoid),
-                facing = root.CFrame.LookVector,
                 state = "Idle",
             }
             Navigation.Initialize(agent)

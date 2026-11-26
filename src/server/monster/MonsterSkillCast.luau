@@ -34,7 +34,7 @@ function Cast.TryBegin(agent: any,target: Model): boolean
     local serial=agent.attackSerial
     local now=os.clock(); agent.attackEndsAt=now+duration; agent.nextAttackAt=agent.attackEndsAt
     CombatState.SetState(agent,"Attack")
-    if not buff then Facing.Track(model,agent.root,agent.humanoid,target,Target.RootOf) end
+    if not buff then Facing.Track(model,agent.root,agent.humanoid,target,Target.RootOf,true) end
     local cast={pose=CastVisual.Begin(model)}; agent.specialCast=cast
     model:SetAttribute("MonsterCastingSkill",skill.id)
     model:SetAttribute("MonsterAnimationState","atk_special")

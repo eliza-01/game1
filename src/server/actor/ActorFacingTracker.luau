@@ -26,6 +26,15 @@ local function stop(model: Model)
     release(entry)
 end
 
+local function updateGoal(entry, targetRoot: BasePart)
+    local delta = targetRoot.Position - entry.root.Position
+    local flat = Vector3.new(delta.X, 0, delta.Z)
+    if flat.Magnitude > 0.01 then
+        -- Only the constraint goal rotates; the solver owns the physical root.
+        entry.align.CFrame = CFrame.lookAlong(Vector3.zero, flat.Unit, Vector3.yAxis)
+    end
+end
+
 local function step(_dt: number)
     for model, entry in pairs(active) do
         local root = entry.root
@@ -36,17 +45,11 @@ local function step(_dt: number)
             continue
         end
         if not targetRoot or not targetRoot.Parent then continue end
-        local delta = targetRoot.Position - root.Position
-        local flat = Vector3.new(delta.X, 0, delta.Z)
-        if flat.Magnitude > 0.01 then
-            -- AlignOrientation performs angular smoothing inside physics.
-            -- Only the *goal* rotates, never the replicated physical root.
-            entry.align.CFrame = CFrame.lookAlong(Vector3.zero, flat.Unit, Vector3.yAxis)
-        end
+        updateGoal(entry, targetRoot)
     end
 end
 
-function Tracker.Track(model: Model, root: BasePart, humanoid: Humanoid, target: Model, resolver: (Model) -> BasePart?)
+function Tracker.Track(model: Model, root: BasePart, humanoid: Humanoid, target: Model, resolver: (Model) -> BasePart?, rigid: boolean?)
     local entry = active[model]
     if entry then
         if entry.root ~= root or entry.humanoid ~= humanoid then
@@ -54,6 +57,11 @@ function Tracker.Track(model: Model, root: BasePart, humanoid: Humanoid, target:
         else
             entry.target = target
             entry.resolve = resolver
+            entry.align.RigidityEnabled = rigid == true
+            if rigid then
+                local targetRoot = resolver(target)
+                if targetRoot and targetRoot.Parent then updateGoal(entry, targetRoot) end
+            end
             return
         end
     end
@@ -64,7 +72,7 @@ function Tracker.Track(model: Model, root: BasePart, humanoid: Humanoid, target:
     align.Name = "Game1AttackFacing"
     align.Mode = Enum.OrientationAlignmentMode.OneAttachment
     align.Attachment0 = attachment
-    align.RigidityEnabled = false
+    align.RigidityEnabled = rigid == true
     align.ReactionTorqueEnabled = false
     align.Responsiveness = TURN_RESPONSE
     align.MaxAngularVelocity = MAX_TURN_RATE
@@ -76,6 +84,10 @@ function Tracker.Track(model: Model, root: BasePart, humanoid: Humanoid, target:
         autoRotate = humanoid.AutoRotate, attachment = attachment, align = align,
     }
     humanoid.AutoRotate = false
+    if rigid then
+        local targetRoot = resolver(target)
+        if targetRoot and targetRoot.Parent then updateGoal(active[model], targetRoot) end
+    end
     if not connected then
         connected = true
         RunService.Heartbeat:Connect(step)

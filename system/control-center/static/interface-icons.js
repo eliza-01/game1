@@ -10,11 +10,16 @@
     card.append(icon, caption);
     return card;
   };
-  const monsterTile = (data, tile) => {
+  // The atlas is shared with the model registry; no second icon catalog.
+  window.game1MonsterPortrait = (data, name, size=32) => {
     const icon = document.createElement('span');
-    icon.style.cssText = `display:block;width:64px;height:64px;image-rendering:pixelated;background-image:url(monster-icons/atlas.png);background-size:${data.width*4}px ${data.height*4}px;background-position:-${tile.x*4}px -${tile.y*4}px`;
-    return cardFor(tile.name, icon);
+    const tile=data?.tiles?.find(t=>t.name===name)||data?.tiles?.find(t=>t.name==='Unknown');
+    icon.style.cssText=`display:block;width:${size}px;height:${size}px;flex:none;image-rendering:pixelated`;
+    if(tile){const scale=size/data.tileSize;icon.style.cssText+=`;background-image:url(monster-icons/atlas.png);background-size:${data.width*scale}px ${data.height*scale}px;background-position:-${tile.x*scale}px -${tile.y*scale}px`}
+    else icon.textContent='—';
+    icon.title=name||'Unknown';return icon;
   };
+  const monsterTile = (data, tile) => cardFor(tile.name,window.game1MonsterPortrait(data,tile.name,64));
   const buffTile = (data, tile) => {
     const icon = document.createElement('span');
     icon.style.cssText = `display:grid;place-items:center;box-sizing:border-box;width:64px;height:64px;border-radius:4px;background:#1a1d25;border:2px solid ${tile.color}`;

@@ -216,6 +216,9 @@
       },
       "StudioSkinnedMeshConnection": {
         "$path": "../../src/shared/rig/SkinnedMeshConnection.luau"
+      },
+      "StudioMonsterSpawnAuthoring": {
+        "$path": "modules/StudioMonsterSpawnAuthoring.luau"
       }
     }
   }

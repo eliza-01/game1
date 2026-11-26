@@ -156,6 +156,12 @@ def route(parsed, sources, info):
         except Exception as error:
             return 400, {"error": str(error)}
 
+    if path == "/api/monster-spawns/catalog":
+        try:
+            return 200, sources["monster_spawns"].studio_catalog()
+        except Exception as error:
+            return 400, {"error": str(error)}
+
     # Historically these GET errors were encoded as 400 JSON, not a transport crash.
     simple = {
         "/api/npc-spawns": "npc_spawns",

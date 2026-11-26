@@ -150,7 +150,7 @@ local handleModelLoad = StudioModelLoadCommands({
     bridgeToken = BRIDGE_TOKEN,
 })
 
-local handleMonsterSpawn = StudioActorSpawnCommands({
+local handleMonsterSpawn, monsterSpawnMarkers = StudioActorSpawnCommands({
     plugin = plugin,
     HttpService = HttpService,
     Selection = Selection,
@@ -160,6 +160,15 @@ local handleMonsterSpawn = StudioActorSpawnCommands({
     bridgeUrl = BRIDGE_URL,
     bridgeToken = BRIDGE_TOKEN,
 })
+
+-- Monster zones are authored locally in Studio, not through a reverse browser command.
+local spawnAuthoringOk, spawnAuthoringError = pcall(function()
+    require(script.Parent.modules.StudioMonsterSpawnAuthoring).new({
+        plugin = plugin, toolbar = toolbar, RunService = RunService, HttpService = HttpService,
+        agentBaseUrl = AGENT_BASE_URL, agentToken = AGENT_TOKEN, markers = monsterSpawnMarkers,
+    })
+end)
+if not spawnAuthoringOk then warn("[game1 plugin] Monster Spawns: " .. tostring(spawnAuthoringError)) end
 
 local handleTimelineEditor = StudioTimelineEditorCommands({
     plugin = plugin,
@@ -3339,6 +3348,12 @@ return function(services)
         if kind == "monster" then
             marker:SetAttribute("SpawnRadius", tonumber(data.spawnRadius) or 0)
             marker:SetAttribute("MaxAlive", tonumber(data.maxAlive) or 1)
+            marker:SetAttribute("BalanceId", data.balanceId)
+            marker:SetAttribute("Level", data.level)
+            marker:SetAttribute("Aggressive", data.aggressive)
+            marker:SetAttribute("DeathChase", data.deathChase)
+            marker:SetAttribute("HomeRadiusStuds", data.homeRadiusStuds)
+            marker:SetAttribute("RespawnSeconds", data.respawnSeconds)
         end
         marker:SetAttribute("Enabled", data.enabled ~= false)
         marker.Parent = folder
@@ -3372,7 +3387,7 @@ return function(services)
         if kind == "npc" then
             text.Text = string.format("%s\n%s%s", tostring(data.monsterName or data.monsterSlug or "NPC"), tostring(data.spawnId or ""), preview and " · PREVIEW" or "")
         else
-            text.Text = string.format("%s\n%s · max %d%s", tostring(data.monsterName or data.monsterSlug or "Monster"), tostring(data.spawnId or ""), tonumber(data.maxAlive) or 1, preview and " · PREVIEW" or "")
+            text.Text = string.format("%s%s\n%d alive · R %g%s", tostring(data.monsterName or data.monsterSlug or "Monster"), if data.level then " · Lv." .. tostring(data.level) else "", tonumber(data.maxAlive) or 1, radius, preview and " · PREVIEW" or "")
         end
         text.Parent = billboard
         local corner = Instance.new("UICorner")
@@ -3420,7 +3435,7 @@ return function(services)
         return math.deg(math.atan2(-look.X, -look.Z)) % 360
     end
 
-    local function monsterSpawnPlacementResult(data: any): any
+    local function monsterSpawnPlacementResult(data: any, shouldCancel: (() -> boolean)?): any
         local expectedPlaceId = tonumber(data.placeId) or 0
         if expectedPlaceId > 0 and game.PlaceId > 0 and expectedPlaceId ~= game.PlaceId then
             error(string.format("Open PlaceId %d does not match Spawn PlaceId %d", game.PlaceId, expectedPlaceId))
@@ -3480,7 +3495,7 @@ return function(services)
         local deadline = os.clock() + 295
         repeat
             task.wait(0.05)
-        until finished or cancelled or os.clock() >= deadline
+        until finished or cancelled or (shouldCancel and shouldCancel()) or os.clock() >= deadline
         moveConnection:Disconnect()
         clickConnection:Disconnect()
         inputConnection:Disconnect()
@@ -3512,7 +3527,7 @@ return function(services)
             mapKey = tostring(data.mapKey or "main"),
         }
         local ok, operationError = xpcall(function()
-            if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 or (kind ~= "monster" and kind ~= "npc") then
+            if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 or kind ~= "npc" then
                 error("invalid game1 actor spawn command")
             end
             local action = tostring(data.action or "")
@@ -3595,7 +3610,26 @@ return function(services)
     end
 
 
-    return handleMonsterSpawn
+    return handleMonsterSpawn, {
+        Place = monsterSpawnPlacementResult,
+        Draw = function(data, preview) return createMonsterSpawnMarker(data, if preview then "preview" else "registered", "monster") end,
+        ClearPreview = function(id)
+            for _, child in ipairs(monsterSpawnMarkerFolder("monster"):GetChildren()) do
+                if child:IsA("Model") and child:GetAttribute("PreviewForSpawnId") == id then child:Destroy() end
+            end
+        end,
+        Delete = function(id)
+            local marker = findMonsterSpawnMarker(id, "monster")
+            if marker then marker:Destroy() end
+        end,
+        Restore = function(records)
+            local folder = monsterSpawnMarkerFolder("monster")
+            for _, child in ipairs(folder:GetChildren()) do
+                if child:IsA("Model") and child:GetAttribute("Game1MonsterSpawnMarker") == true then child:Destroy() end
+            end
+            for _, record in ipairs(records) do createMonsterSpawnMarker(record, "registered", "monster") end
+        end,
+    }
 end
 ]]></string>
         </Properties>
@@ -9228,6 +9262,258 @@ end
       </Item>
       <Item class="ModuleScript" referent="43">
         <Properties>
+          <string name="Name">StudioMonsterSpawnAuthoring</string>
+          <string name="Source"><![CDATA[-- Studio owns the draft and map gesture. The host owns saved records and projection.
+local Authoring = {}
+
+function Authoring.new(services)
+    local plugin, runService, http = services.plugin, services.RunService, services.HttpService
+    local markers = services.markers
+    local info = DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Right, false, false, 360, 590, 310, 330)
+    local dock = plugin:CreateDockWidgetPluginGui("Game1MonsterSpawnAuthoring_v1", info)
+    dock.Title = "game1 · Monster Spawns"
+    local toolbarButton = services.toolbar:CreateButton("Game1MonsterSpawnAuthoring", "Author monster spawn zones in Studio", "", "Monster Spawns")
+    toolbarButton.ClickableWhenViewportHidden = true
+    local canvas = Instance.new("ScrollingFrame")
+    canvas.BackgroundColor3 = Color3.fromRGB(26, 31, 39)
+    canvas.BorderSizePixel = 0
+    canvas.Size = UDim2.fromScale(1, 1)
+    canvas.CanvasSize = UDim2.new()
+    canvas.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    canvas.ScrollBarThickness = 6
+    canvas.Parent = dock
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 6)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = canvas
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 9); pad.PaddingBottom = UDim.new(0, 9)
+    pad.PaddingLeft = UDim.new(0, 9); pad.PaddingRight = UDim.new(0, 15)
+    pad.Parent = canvas
+    local order = 0
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, 0, 0, 52); status.TextWrapped = true; status.BackgroundTransparency = 1
+    status.TextColor3 = Color3.fromRGB(187, 219, 211); status.TextSize = 15; status.Font = Enum.Font.SourceSans
+    status.Text = "Open Control Center to load Database."
+    status.LayoutOrder = 0; status.Parent = canvas
+    local content = Instance.new("Frame")
+    content.BackgroundTransparency = 1; content.Size = UDim2.new(1, 0, 0, 0)
+    content.AutomaticSize = Enum.AutomaticSize.Y; content.LayoutOrder = 1; content.Parent = canvas
+    local catalog, draft, group, selected = nil, nil, nil, nil
+    local busy = false
+    local renderList, renderForm
+    local function setStatus(text) status.Text = tostring(text) end
+    local function guard()
+        assert(not runService:IsRunning(), "Stop Play before editing monster spawn zones")
+    end
+    local function request(path, payload)
+        guard()
+        local options = {Url = services.agentBaseUrl .. path, Method = if payload then "POST" else "GET",
+            Headers = {["X-Control-Token"] = services.agentToken, ["Content-Type"] = "application/json"}}
+        if payload then options.Body = http:JSONEncode(payload) end
+        local response = http:RequestAsync(options)
+        local result = http:JSONDecode(response.Body)
+        if not response.Success then error(result.error or tostring(response.StatusCode)) end
+        return result
+    end
+    local function run(action)
+        if busy then return end
+        busy = true
+        local ok, err = pcall(action)
+        busy = false
+        if not ok then setStatus(err) end
+    end
+    local function clear()
+        content:ClearAllChildren()
+        local list = Instance.new("UIListLayout")
+        list.SortOrder = Enum.SortOrder.LayoutOrder; list.Padding = UDim.new(0, 6); list.Parent = content
+        order = 0
+    end
+    local function line(parent, class, text, height)
+        local item = Instance.new(class)
+        order += 1
+        item.LayoutOrder = order; item.Size = UDim2.new(1, 0, 0, height or 30)
+        item.BackgroundColor3 = Color3.fromRGB(43, 52, 63); item.BorderSizePixel = 0
+        item.Text = text; item.TextColor3 = Color3.fromRGB(231, 238, 243); item.TextSize = 15
+        item.Font = Enum.Font.SourceSans; item.Parent = parent
+        return item
+    end
+    local function label(text, height)
+        local item = line(content, "TextLabel", text, height or 24)
+        item.BackgroundTransparency = 1; item.TextXAlignment = Enum.TextXAlignment.Left; item.TextWrapped = true
+        return item
+    end
+    local function button(text, callback)
+        local item = line(content, "TextButton", text, 32)
+        item.Activated:Connect(function()
+            if runService:IsRunning() then setStatus("Stop Play before editing spawn zones"); return end
+            if not busy then callback() end
+        end)
+        return item
+    end
+    local function numberField(title, key, step, lo, hi, integer)
+        label(title)
+        local row = Instance.new("Frame")
+        order += 1; row.LayoutOrder = order; row.Size = UDim2.new(1,0,0,30); row.BackgroundTransparency = 1; row.Parent = content
+        local minus = line(row, "TextButton", "−", 30); minus.Size = UDim2.fromOffset(36,30)
+        local input = line(row, "TextBox", tostring(draft[key]), 30); input.ClearTextOnFocus = false
+        input.Size = UDim2.new(1,-84,0,30); input.Position = UDim2.fromOffset(42,0)
+        local plus = line(row,"TextButton","+",30); plus.Size = UDim2.fromOffset(36,30); plus.Position = UDim2.new(1,-36,0,0)
+        local function set(v)
+            if not draft or not input.Parent then return end
+            if busy or runService:IsRunning() then input.Text = tostring(draft[key]); return end
+            local n = tonumber(v)
+            if n and n == n and n ~= math.huge and n ~= -math.huge then
+                n = math.clamp(n, lo, hi); if integer then n = math.floor(n) end
+                draft[key] = n
+            end
+            input.Text = tostring(draft[key])
+            if draft.position then markers.Draw(draft, true) end
+        end
+        minus.Activated:Connect(function() set(draft[key]-step) end)
+        plus.Activated:Connect(function() set(draft[key]+step) end)
+        input.FocusLost:Connect(function() set(input.Text) end)
+    end
+    local function toggle(title, key)
+        local b
+        local function caption() return (if draft[key] then "☑  " else "☐  ") .. title end
+        b = button(caption(), function() draft[key] = not draft[key]; b.Text = caption() end)
+    end
+    local function cancelDraft()
+        if draft then markers.ClearPreview(draft.spawnId) end
+        draft, group, selected = nil, nil, nil
+    end
+    local function here(record) return tonumber(record.placeId) == game.PlaceId end
+    local function refresh(restore)
+        catalog = request("/api/monster-spawns/catalog")
+        if restore then
+            local records = {}
+            for _, record in ipairs(catalog.records) do if here(record) then table.insert(records, record) end end
+            markers.Restore(records)
+        end
+        setStatus("Database loaded · " .. #catalog.species .. " identities")
+    end
+    local function choose(row, existing)
+        selected = row
+        local d = catalog.defaults
+        draft = if existing then table.clone(existing) else {
+            spawnId = "spawn-" .. http:GenerateGUID(false):lower(), placeId = game.PlaceId,
+            mapKey = d.mapKey, spawnRadius = d.spawnRadius, maxAlive = d.maxAlive,
+            respawnSeconds = d.respawnSeconds, homeRadiusStuds = d.homeRadiusStuds, enabled = d.enabled,
+        }
+        draft.balanceId = row.id; draft.level = row.level; draft.monsterName = if row.nameEn ~= "" then row.nameEn else row.id
+        draft.monsterSlug = ""; draft.aggressive = if existing and type(existing.aggressive) == "boolean" then existing.aggressive else row.aggressive
+        draft.deathChase = if existing and type(existing.deathChase) == "boolean" then existing.deathChase else row.deathChase
+        draft.aggroRadiusStuds = if existing and existing.aggroRadiusStuds ~= nil then existing.aggroRadiusStuds else row.aggroRadiusStuds
+        draft.expectedUpdatedAtUtc = if existing then existing.updatedAtUtc else nil
+        renderForm()
+    end
+    local function levels(species, existing)
+        group = species; clear()
+        button("‹ Monster list", function() cancelDraft(); renderList() end)
+        label((if species.nameEn ~= "" then species.nameEn else species.key) .. " · " .. species.nameRu)
+        for _, row in ipairs(species.levels) do
+            button(("Lv.%d · %s · %s"):format(row.level, row.type, if row.ready then "READY" else "MODEL PENDING"), function() choose(row, existing) end)
+        end
+    end
+    renderForm = function()
+        clear()
+        button("‹ Levels / cancel draft", function() cancelDraft(); renderList() end)
+        label(draft.monsterName .. " · Lv." .. selected.level .. " · " .. selected.type)
+        label(if selected.ready then "Published model and clips ready" else "Planning only · runtime waits for published model and clips", 40)
+        local map = line(content, "TextBox", draft.mapKey, 30); map.ClearTextOnFocus = false
+        map.PlaceholderText = "Map key"
+        map.FocusLost:Connect(function() if draft and not busy and not runService:IsRunning() then draft.mapKey = map.Text end end)
+        numberField("Spawn radius · studs", "spawnRadius", 5, 0, 10000, false)
+        numberField("Monsters in zone", "maxAlive", 1, 1, 1000, true)
+        numberField("Aggro radius · studs", "aggroRadiusStuds", 5, 0, 10000, false)
+        toggle("Aggressive", "aggressive")
+        button(if draft.deathChase then "Chase: Death Chase (territory)" else "Chase: Home Leash", function() draft.deathChase = not draft.deathChase; renderForm() end)
+        if not draft.deathChase then numberField("Home leash · studs", "homeRadiusStuds", 10, 1, 10000, false) end
+        numberField("Respawn · sec", "respawnSeconds", 1, 0, 86400, false)
+        toggle("Enabled", "enabled")
+        button(if draft.position then "Move spawn zone" else "Place spawn zone", function()
+            run(function()
+                guard(); setStatus("Click a world surface · Esc cancels")
+                local point = markers.Place(table.clone(draft), function() return not dock.Enabled or runService:IsRunning() end)
+                draft.position, draft.yawDegrees = point.position, point.yawDegrees
+                setStatus("Position selected · Apply to save to Database")
+                renderForm()
+            end)
+        end)
+        if draft.position then
+            label(("Position: %.1f / %.1f / %.1f"):format(draft.position.x,draft.position.y,draft.position.z))
+            button("Apply · Save to Database", function()
+                run(function()
+                    draft.action = "apply"
+                    local result = request("/api/monster-spawns/studio-apply", draft)
+                    -- HTTP success is authoritative; a marker failure must not lose the saved record.
+                    local saved = result.record
+                    draft.expectedUpdatedAtUtc = saved.updatedAtUtc
+                    markers.Draw(saved, false)
+                    cancelDraft(); refresh(false); renderList(); setStatus("Saved · Database updated · Rojo Sync before Play")
+                end)
+            end)
+        end
+        if draft.expectedUpdatedAtUtc then
+            button("Delete saved zone", function()
+                -- Separate confirm action, never delete just by opening a form.
+                clear(); label("Delete this spawn zone?", 32)
+                button("Confirm delete", function() run(function()
+                    request("/api/monster-spawns/studio-apply", {action="delete", spawnId=draft.spawnId,
+                        placeId=draft.placeId, expectedUpdatedAtUtc=draft.expectedUpdatedAtUtc})
+                    markers.Delete(draft.spawnId); cancelDraft(); refresh(false); renderList(); setStatus("Deleted from Database")
+                end) end)
+                button("Cancel", renderForm)
+            end)
+        end
+    end
+    renderList = function()
+        clear()
+        button("Refresh Database / restore markers", function() run(function() guard(); cancelDraft(); refresh(true); renderList() end) end)
+        if not catalog then return end
+        label("MONSTERS · choose species", 28)
+        for _, species in ipairs(catalog.species) do
+            button((if species.nameEn ~= "" then species.nameEn else species.key) .. " · " .. #species.levels .. " levels", function() levels(species) end)
+        end
+        label("SAVED ZONES · current Place", 28)
+        for _, record in ipairs(catalog.records) do
+            if here(record) then
+                button((record.monsterName or "Monster") .. " · " .. tostring(record.level or "?") .. " · " .. record.spawnId:sub(-8), function()
+                    for _, species in ipairs(catalog.species) do
+                        for _, row in ipairs(species.levels) do
+                            if row.id == record.balanceId then choose(row, record); return end
+                        end
+                    end
+                    -- Legacy records retain their model/binding until explicitly re-authored.
+                    clear(); label("Legacy zone · choose Database identity to edit", 40)
+                    for _, species in ipairs(catalog.species) do
+                        button(if species.nameEn ~= "" then species.nameEn else species.key, function() levels(species, record) end)
+                    end
+                    button("Cancel", renderList)
+                end)
+            end
+        end
+    end
+    local function open()
+        if runService:IsRunning() then setStatus("Stop Play before editing spawn zones"); return end
+        run(function() cancelDraft(); refresh(true); renderList() end)
+    end
+    toolbarButton.Click:Connect(function() dock.Enabled = not dock.Enabled end)
+    dock:GetPropertyChangedSignal("Enabled"):Connect(function()
+        toolbarButton:SetActive(dock.Enabled)
+        if dock.Enabled then open() elseif not busy then cancelDraft() end
+    end)
+    plugin.Unloading:Connect(function() if draft then markers.ClearPreview(draft.spawnId) end end)
+    renderList()
+    if dock.Enabled then task.defer(open) end
+end
+return table.freeze(Authoring)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="44">
+        <Properties>
           <string name="Name">StudioOptionsDraftBridge</string>
           <string name="Source"><![CDATA[--!strict
 -- Studio Play folder -> authenticated local Control Center. Drafts only, never Save.
@@ -9298,7 +9584,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioPlaceRegistryCommands</string>
           <string name="Source"><![CDATA[-- M240: separate Studio Bridge controller, NOT an extension of DecoManager.
@@ -9424,7 +9710,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioPlaceRegistryExternalOwners</string>
           <string name="Source"><![CDATA[-- Explicit ownership for published-mesh matches that do NOT belong to DecoManager.
@@ -9471,7 +9757,7 @@ return table.freeze(ExternalOwners)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioPlaceRegistryInventory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -10214,7 +10500,7 @@ return Inventory
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioPlaceRegistryRepair</string>
           <string name="Source"><![CDATA[-- Metadata-only Repair for canonical Location FBX placements.
@@ -10379,7 +10665,7 @@ return Repair
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioPlaceRegistrySync</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -10727,7 +11013,7 @@ return Sync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioPlacedRigBoneEffects</string>
           <string name="Source"><![CDATA[-- Placement-owned visual decorations attached to authored Bones. Accept either
@@ -10867,7 +11153,7 @@ return table.freeze(BoneEffects)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -10929,7 +11215,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -11014,7 +11300,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -11104,7 +11390,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -11398,7 +11684,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -11896,7 +12182,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioRealEstateAppearance</string>
           <string name="Source"><![CDATA[-- Per-MeshPart visual authoring. No atlas and no SurfaceAppearance by default.
@@ -11919,7 +12205,7 @@ return table.freeze(Appearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- M342: Real Estate visual-mesh authoring. Collision Blueprint Parts are separate.
@@ -11953,7 +12239,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Authored house pivot is always the original Model pivot, never a visual
@@ -11978,7 +12264,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -12378,7 +12664,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -12577,7 +12863,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -12834,7 +13120,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- M342: remove retired COL geometry from pasted/placed managed Real Estates.
@@ -12896,7 +13182,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -12941,7 +13227,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync for a NEW publication of the same stable house type.
@@ -13087,7 +13373,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -13246,7 +13532,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">StudioRetiredColMeshCleanup</string>
           <string name="Source"><![CDATA[-- M342: remove retired dedicated COL meshes from managed templates and placements.
@@ -13383,7 +13669,7 @@ return table.freeze(Cleanup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -13453,7 +13739,7 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -13716,7 +14002,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -14029,7 +14315,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -14208,7 +14494,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -14505,7 +14791,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -14563,7 +14849,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

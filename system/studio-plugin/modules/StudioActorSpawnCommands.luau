@@ -146,6 +146,12 @@ return function(services)
         if kind == "monster" then
             marker:SetAttribute("SpawnRadius", tonumber(data.spawnRadius) or 0)
             marker:SetAttribute("MaxAlive", tonumber(data.maxAlive) or 1)
+            marker:SetAttribute("BalanceId", data.balanceId)
+            marker:SetAttribute("Level", data.level)
+            marker:SetAttribute("Aggressive", data.aggressive)
+            marker:SetAttribute("DeathChase", data.deathChase)
+            marker:SetAttribute("HomeRadiusStuds", data.homeRadiusStuds)
+            marker:SetAttribute("RespawnSeconds", data.respawnSeconds)
         end
         marker:SetAttribute("Enabled", data.enabled ~= false)
         marker.Parent = folder
@@ -179,7 +185,7 @@ return function(services)
         if kind == "npc" then
             text.Text = string.format("%s\n%s%s", tostring(data.monsterName or data.monsterSlug or "NPC"), tostring(data.spawnId or ""), preview and " · PREVIEW" or "")
         else
-            text.Text = string.format("%s\n%s · max %d%s", tostring(data.monsterName or data.monsterSlug or "Monster"), tostring(data.spawnId or ""), tonumber(data.maxAlive) or 1, preview and " · PREVIEW" or "")
+            text.Text = string.format("%s%s\n%d alive · R %g%s", tostring(data.monsterName or data.monsterSlug or "Monster"), if data.level then " · Lv." .. tostring(data.level) else "", tonumber(data.maxAlive) or 1, radius, preview and " · PREVIEW" or "")
         end
         text.Parent = billboard
         local corner = Instance.new("UICorner")
@@ -227,7 +233,7 @@ return function(services)
         return math.deg(math.atan2(-look.X, -look.Z)) % 360
     end
 
-    local function monsterSpawnPlacementResult(data: any): any
+    local function monsterSpawnPlacementResult(data: any, shouldCancel: (() -> boolean)?): any
         local expectedPlaceId = tonumber(data.placeId) or 0
         if expectedPlaceId > 0 and game.PlaceId > 0 and expectedPlaceId ~= game.PlaceId then
             error(string.format("Open PlaceId %d does not match Spawn PlaceId %d", game.PlaceId, expectedPlaceId))
@@ -287,7 +293,7 @@ return function(services)
         local deadline = os.clock() + 295
         repeat
             task.wait(0.05)
-        until finished or cancelled or os.clock() >= deadline
+        until finished or cancelled or (shouldCancel and shouldCancel()) or os.clock() >= deadline
         moveConnection:Disconnect()
         clickConnection:Disconnect()
         inputConnection:Disconnect()
@@ -319,7 +325,7 @@ return function(services)
             mapKey = tostring(data.mapKey or "main"),
         }
         local ok, operationError = xpcall(function()
-            if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 or (kind ~= "monster" and kind ~= "npc") then
+            if tostring(data.project or "") ~= "game1" or tonumber(data.schemaVersion) ~= 1 or kind ~= "npc" then
                 error("invalid game1 actor spawn command")
             end
             local action = tostring(data.action or "")
@@ -402,5 +408,24 @@ return function(services)
     end
 
 
-    return handleMonsterSpawn
+    return handleMonsterSpawn, {
+        Place = monsterSpawnPlacementResult,
+        Draw = function(data, preview) return createMonsterSpawnMarker(data, if preview then "preview" else "registered", "monster") end,
+        ClearPreview = function(id)
+            for _, child in ipairs(monsterSpawnMarkerFolder("monster"):GetChildren()) do
+                if child:IsA("Model") and child:GetAttribute("PreviewForSpawnId") == id then child:Destroy() end
+            end
+        end,
+        Delete = function(id)
+            local marker = findMonsterSpawnMarker(id, "monster")
+            if marker then marker:Destroy() end
+        end,
+        Restore = function(records)
+            local folder = monsterSpawnMarkerFolder("monster")
+            for _, child in ipairs(folder:GetChildren()) do
+                if child:IsA("Model") and child:GetAttribute("Game1MonsterSpawnMarker") == true then child:Destroy() end
+            end
+            for _, record in ipairs(records) do createMonsterSpawnMarker(record, "registered", "monster") end
+        end,
+    }
 end

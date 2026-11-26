@@ -299,14 +299,14 @@ return table.freeze({
 	}),
 	debugUi = table.freeze({
 		desktop = table.freeze({
-			showPublishedControls = true,
+			showPublishedControls = false,
 		}),
 		mobile = table.freeze({
 			showPublishedControls = true,
 		}),
-		startInHub = true,
+		startInHub = false,
 		startedLanguage = true,
-		startLocale = "en-us",
+		startLocale = "ru-ru",
 	}),
 	characterAnimations = table.freeze({
 		deathPlaybackPercent = 50,

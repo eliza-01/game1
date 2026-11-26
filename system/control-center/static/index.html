@@ -1034,7 +1034,7 @@
 </div>
 <div class="panel character-card">
 <div class="section-title"><div><span>versioned registry</span><h3>registered monsters</h3></div><button id="validate-monsters" type="button">refresh</button></div>
-<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>monster</th><th>stats</th><th>skeleton</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="monster-rows"></tbody></table></div>
+<div class="table-wrap weapon-table-wrap"><table><thead><tr><th>Icon</th><th>monster</th><th>stats</th><th>skeleton</th><th>assets</th><th>status</th><th>actions</th></tr></thead><tbody id="monster-rows"></tbody></table></div>
 <div id="monster-details" class="details"><span class="muted">select a monster.</span></div>
 </div>
 </div>
@@ -1067,35 +1067,6 @@
 </div>
 </div>
 
-<div class="panel hero monster-spawn-hero">
-<div><span class="eyebrow">monster spawn authoring · studio handshake</span><h2>monster spawns</h2><p>choose a registered monster, place a marker by clicking a surface in Studio, then register population settings. one spawn record owns position, radius, max alive, respawn delay and enabled state.</p></div>
-<div class="metrics"><div><b id="monster-spawn-count">0</b><span>registered spawns</span></div><div><b id="monster-spawn-synced">0</b><span>studio synced</span></div><div><b id="monster-spawn-stale">0</b><span>stale</span></div></div>
-</div>
-<div class="monster-spawn-workflow">
-<div class="panel character-card">
-<span class="eyebrow">06 · monster and readiness</span><h3>spawn monster</h3>
-<label>monster<select id="monster-spawn-monster"></select></label>
-<div id="monster-spawn-readiness" class="status-box"><strong>select monster</strong><span>published model and required animations are required.</span></div>
-<hr class="card-separator">
-<span class="eyebrow">07 · placement</span><h3 class="subheading">point in Studio</h3>
-<div class="character-grid"><label>spawn id<input id="monster-spawn-id" readonly placeholder="created on placement"></label><label>place id<input id="monster-spawn-place-id" type="number" readonly value="0"></label></div>
-<div class="character-grid"><label>map key<input id="monster-spawn-map-key" value="main"></label><label>yaw °<input id="monster-spawn-yaw" type="number" step="0.1" value="0"></label></div>
-<div class="monster-spawn-position-grid"><label>X<input id="monster-spawn-x" type="number" step="0.001"></label><label>Y<input id="monster-spawn-y" type="number" step="0.001"></label><label>Z<input id="monster-spawn-z" type="number" step="0.001"></label></div>
-<div class="actions"><button id="monster-spawn-place" class="primary" type="button">place point in Studio</button><button id="monster-spawn-select" type="button" disabled>select marker</button></div>
-</div>
-<div class="panel character-card">
-<span class="eyebrow">08 · population</span><h3>spawn settings</h3>
-<div class="monster-spawn-settings-grid"><label>respawn sec<input id="monster-spawn-respawn" type="number" min="0" max="86400" step="0.1" value="10"></label><label>home leash · studs<input id="monster-spawn-home-radius" type="number" min="1" max="10000" step="1" value="150" title="Combat boundary measured from the registered spawn center"></label><label>aggro radius · studs<input id="monster-spawn-aggro-radius" type="number" min="0" max="10000" step="0.1" value="16" title="Defaults from Database; editable per spawn"></label><label class="spawn-enabled"><input id="monster-spawn-aggressive" type="checkbox"><span>aggressive</span></label><label>spawn radius<input id="monster-spawn-radius" type="number" min="0" max="10000" step="0.1" value="15"></label><label>max alive<input id="monster-spawn-max-alive" type="number" min="1" max="1000" step="1" value="3"></label></div>
-<label class="spawn-enabled"><input id="monster-spawn-enabled" type="checkbox" checked><span>enabled · runtime maintains this population</span></label>
-<small id="monster-spawn-radius-hint" class="hint">radius is the random ground area around the authored point. max alive is the population cap for this record.</small>
-<div class="actions"><button id="monster-spawn-register" class="primary" type="button" disabled>register spawn</button><button id="monster-spawn-new" type="button">new spawn</button><button id="monster-spawn-delete" class="danger" type="button" disabled>delete</button></div>
-<div id="monster-spawn-operation" class="status-box"><strong>ready</strong><span>place a point in Studio.</span></div>
-<hr class="card-separator">
-<div class="section-title"><div><span>versioned spawn registry</span><h3>registered points</h3></div><div class="row-actions"><button id="monster-spawn-restore" type="button">restore markers</button><button id="monster-spawn-validate" type="button">validate</button><button id="monster-spawn-refresh" type="button">refresh</button></div></div>
-<div id="monster-spawn-records" class="monster-spawn-records"><span class="muted">no registered spawns.</span></div>
-<details class="naming-guide"><summary>manifest and runtime rule</summary><div id="monster-spawn-manifest" class="details"></div><small class="hint">each death frees one population slot; after respawn seconds exactly one replacement is created, never above max alive. radius 0 means all instances use the authored point.</small></details>
-</div>
-</div>
 </div>
 
 <div id="npcs-view" hidden>
@@ -1256,7 +1227,7 @@
 <script src="publication-descriptions.js?v=1"></script>
 <script src="asset-name-defaults.js?v=437"></script>
 <script src="character-assets.js?v=555"></script>
-<script src="interface-icons.js?v=547"></script>
+<script src="interface-icons.js?v=560"></script>
 <script src="asset-section-order.js?v=1"></script>
 <script src="character-animation-ui.js?v=474"></script>
 <script src="animation-publish-queue-core.js?v=474"></script>
@@ -1294,7 +1265,7 @@
 <script src="location-asset-workflow.js?v=453"></script>
 <script src="asset-audit.js?v=2"></script>
 <script src="monster-table.js?v=559"></script>
-<script src="game-balance.js?v=559"></script>
+<script src="game-balance.js?v=560"></script>
 <script src="skill-editor.js?v=557"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
@@ -1305,13 +1276,12 @@
 <script src="weapon-assets.js?v=514"></script>
 <script src="weapon-workflow.js?v=555"></script>
 <script src="arrow-assets.js?v=437"></script>
-<script src="monster-assets.js?v=437"></script>
+<script src="monster-assets.js?v=560"></script>
 <script src="npc-assets.js?v=437"></script>
 <script src="npc-spawns.js?v=337"></script>
 <script src="real-estate.js?v=435&visual=400&runtime=387&rig=186&atlas=202&physics=232&reuse=411"></script>
 <script src="real-estate-mesh-workflow.js?v=423"></script>
 <script src="real-estate-placement.js?v=2"></script>
-<script src="monster-spawns.js?v=549"></script>
 <script src="kanban-design-map.js?v=539"></script>
 <script src="kanban.js?v=539"></script>
 <script src="mechanics.js?v=452"></script>

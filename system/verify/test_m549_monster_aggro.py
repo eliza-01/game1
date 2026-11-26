@@ -87,4 +87,4 @@ class MonsterAggro(unittest.TestCase):
         self.assertEqual(sum(s['duration']==600 and s['id'].endswith('_d') for s in b.load()['skills']),4)
         self.assertIn('string.format("%d:%02d"',read('src/client/combat/BuffHud.luau'))
         self.assertIn("input.type='checkbox';input.checked=row[key]",read('system/control-center/static/game-balance.js'))
-        self.assertIn('monster-spawn-aggro-radius',read('system/control-center/static/monster-spawns.js'))
+        self.assertIn('numberField("Aggro radius · studs", "aggroRadiusStuds"',read('system/studio-plugin/modules/StudioMonsterSpawnAuthoring.luau'))

@@ -141,7 +141,7 @@ local handleModelLoad = StudioModelLoadCommands({
     bridgeToken = BRIDGE_TOKEN,
 })
 
-local handleMonsterSpawn = StudioActorSpawnCommands({
+local handleMonsterSpawn, monsterSpawnMarkers = StudioActorSpawnCommands({
     plugin = plugin,
     HttpService = HttpService,
     Selection = Selection,
@@ -151,6 +151,15 @@ local handleMonsterSpawn = StudioActorSpawnCommands({
     bridgeUrl = BRIDGE_URL,
     bridgeToken = BRIDGE_TOKEN,
 })
+
+-- Monster zones are authored locally in Studio, not through a reverse browser command.
+local spawnAuthoringOk, spawnAuthoringError = pcall(function()
+    require(script.Parent.modules.StudioMonsterSpawnAuthoring).new({
+        plugin = plugin, toolbar = toolbar, RunService = RunService, HttpService = HttpService,
+        agentBaseUrl = AGENT_BASE_URL, agentToken = AGENT_TOKEN, markers = monsterSpawnMarkers,
+    })
+end)
+if not spawnAuthoringOk then warn("[game1 plugin] Monster Spawns: " .. tostring(spawnAuthoringError)) end
 
 local handleTimelineEditor = StudioTimelineEditorCommands({
     plugin = plugin,

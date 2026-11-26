@@ -3,7 +3,7 @@
   let snapshot=null, tab='monsters', busy=false, dirty=false;
   const gradeNames=['Newbie','D','C','B','A','S','SS','SSS'];
   window.game1EquipmentGrade=level=>{const band=Math.max(0,Math.min(7,Math.floor(level/10)));return {name:gradeNames[band]+(level%10>=5?'+':''),required:Math.max(1,band*10)}};
-  const groups={monsters:'Monsters',skills:'Skills',weapons:'Weapons',levels:'Levels',rules:'Character',armor:'Armor',bindings:'Model bindings'};
+  const groups={monsters:'Monsters',skills:'Skills',weapons:'Weapons',levels:'Levels',rules:'Character',armor:'Armor',bindings:'Model bindings',spawnZones:'Spawn Zones'};
   const fields={levels:['level','hp','attackBonus','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','nameEn','nameRu','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed','aggroRadiusStuds','aggressive','deathChase']};
   const names={nameEn:'EN',nameRu:'RU',aggroRadiusStuds:'Aggro · studs',aggressive:'Aggressive',deathChase:'Death Chase',runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',attackBonus:'Level ATK bonus',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
   const labels={weapon:'Оружие',armor:'Броня',monster:'Монстр'};
@@ -28,12 +28,33 @@
   function applySearch(){const q=$('balance-search').value.trim().toLocaleLowerCase();for(const tr of $('balance-content').querySelectorAll('tbody tr')){const values=[tr.textContent,...Array.from(tr.querySelectorAll('input,select'),el=>el.value),tr.dataset.identity||''];tr.hidden=!!q&&!values.join(' ').toLocaleLowerCase().includes(q)}}
   $('balance-search').oninput=applySearch;
   function speciesEdit(row,key,value,body){const group=row.nameEn? snapshot.balance.monsters.filter(r=>r.nameEn===row.nameEn):[row];for(const r of group){r[key]=value;const input=body.querySelector(`[data-row="${r.id}"][data-field="${key}"]`);if(input){if(key==='aggressive'||key==='deathChase')input.checked=value;else if(document.activeElement!==input)input.value=value??''}}change()}
+  let spawnLoadToken=0;
+  async function renderSpawnZones(){
+    const token=++spawnLoadToken;
+    try{
+      const data=await request('/api/monster-spawns/catalog');
+      if(token!==spawnLoadToken||tab!=='spawnZones')return;
+      $('balance-content').replaceChildren();
+      $('balance-content').append(node('p','Create, edit and delete zones in Studio → game1 → Monster Spawns. Read-only registry.'));
+      const body=table(['Monster','Level','Place / map','Position','Radius','Count','Aggro','Chase','Respawn s','Status']);
+      for(const r of data.records){const tr=node('tr');tr.dataset.identity=r.spawnId;
+        const p=r.position||{};
+        for(const v of [r.monsterName||r.monster?.name,r.level??'—',`${r.placeId} / ${r.mapKey}`,`${p.x}, ${p.y}, ${p.z}`,r.spawnRadius,r.maxAlive,`${r.aggressive?'Yes':'No'} · ${r.aggroRadiusStuds}`,r.deathChase?'Death Chase':`Home Leash · ${r.homeRadiusStuds}`,r.respawnSeconds,!r.enabled?'Disabled':r.readiness?.ready?'Ready':'Model pending'])cell(tr,String(v??'—'));
+        body.append(tr);
+      }
+      if(!data.records.length)$('balance-content').append(node('p','No saved zones.'));
+      applySearch();
+    }catch(e){if(token===spawnLoadToken&&tab==='spawnZones')$('balance-content').replaceChildren(node('p',e.message))}
+  }
+  // Only the read-only spawn panel polls; unsaved balance edits are untouched.
+  setInterval(()=>{if(tab==='spawnZones'&&!$('database-view').hidden&&!$('balance-panel').hidden)renderSpawnZones()},3000);
   function render(){
     $('balance-tabs').replaceChildren();$('balance-content').replaceChildren();$('balance-save').disabled=busy||!snapshot||!dirty;
     for(const [key,title] of Object.entries(groups)){const b=node('button',title);b.type='button';b.className=key===tab?'primary':'';b.onclick=()=>{tab=key;$('balance-search').value='';render()};$('balance-tabs').append(b)}
     $('balance-movement-disclosure').hidden=tab!=='weapons';
     if(!snapshot)return;
     queueMicrotask(applySearch);
+    if(tab==='spawnZones'){renderSpawnZones();return;}
     if(tab==='skills'){window.game1RenderSkills($('balance-content'),snapshot,change,applySearch);return;}
     const d=snapshot.balance;
     if(tab==='rules'){
@@ -64,7 +85,7 @@
     }
   }
   async function load(force=false){if(busy)return;if(dirty&&!force){render();return}if(dirty&&!confirm('Discard unsaved balance changes?'))return;busy=true;status('Loading…');try{snapshot=await request('/api/balance');dirty=false;status('Ready')}catch(e){status(e.message)}finally{busy=false;render()}}
-  async function save(){if(busy||!snapshot||!dirty)return;busy=true;$('balance-save').disabled=true;const content=$('balance-content');content.inert=true;$('balance-tabs').inert=true;try{snapshot=await request('/api/balance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({balance:snapshot.balance,revision:snapshot.revision})});dirty=false;status('Saved · Rojo Sync required');window.game1MonsterSpawnRefreshDefaults?.()}catch(e){status(e.message)}finally{busy=false;content.inert=false;$('balance-tabs').inert=false;render()}}
+  async function save(){if(busy||!snapshot||!dirty)return;busy=true;$('balance-save').disabled=true;const content=$('balance-content');content.inert=true;$('balance-tabs').inert=true;try{snapshot=await request('/api/balance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({balance:snapshot.balance,revision:snapshot.revision})});dirty=false;status('Saved · Rojo Sync required');}catch(e){status(e.message)}finally{busy=false;content.inert=false;$('balance-tabs').inert=false;render()}}
   $('balance-reload').onclick=()=>load(true);$('balance-save').onclick=save;
   let logsLoading=false;
   async function loadLogs(){

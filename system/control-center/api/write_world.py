@@ -541,42 +541,9 @@ def route(path, body, deps):
         except Exception as error:
             return out(400, {"error": str(error)})
 
-    if path == "/api/monster-spawns/place":
+    if path == "/api/monster-spawns/studio-apply":
         try:
-            return out(200, monster_spawns.place(body()))
-        except Exception as error:
-            return out(400, {"error": str(error)})
-
-    if path == "/api/monster-spawns/register":
-        try:
-            payload = body()
-            slug = str(payload.get("monsterSlug") or "").strip().lower()
-            sync_monster_to_studio(slug)
-            return out(200, monster_spawns.register(payload))
-        except Exception as error:
-            return out(400, {"error": str(error)})
-
-    if path == "/api/monster-spawns/select":
-        try:
-            return out(200, monster_spawns.select(body()))
-        except Exception as error:
-            return out(400, {"error": str(error)})
-
-    if path == "/api/monster-spawns/delete":
-        try:
-            return out(200, monster_spawns.delete(body()))
-        except Exception as error:
-            return out(400, {"error": str(error)})
-
-    if path == "/api/monster-spawns/restore":
-        try:
-            return out(200, monster_spawns.restore())
-        except Exception as error:
-            return out(400, {"error": str(error)})
-
-    if path == "/api/monster-spawns/validate":
-        try:
-            return out(200, monster_spawns.validate())
+            return out(200, monster_spawns.studio_apply(body()))
         except Exception as error:
             return out(400, {"error": str(error)})
 

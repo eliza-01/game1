@@ -40,7 +40,8 @@ class MonsterPursuitSpeciesTests(unittest.TestCase):
         ui=(ROOT/'system/control-center/static/index.html').read_text()
         self.assertIn('record.homeRadiusStuds',initial)
         self.assertIn('MonsterHomeRadiusStuds',lifecycle)
-        self.assertIn('id="monster-spawn-home-radius"',ui)
+        self.assertNotIn('id="monster-spawn-home-radius"',ui)
+        self.assertIn('homeRadiusStuds',(ROOT/'system/studio-plugin/modules/StudioMonsterSpawnAuthoring.luau').read_text(encoding='utf-8'))
         self.assertNotIn('id="monster-behavior-pursuit-radius"',ui)
 
 if __name__=='__main__': unittest.main()

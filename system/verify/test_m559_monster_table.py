@@ -11,7 +11,7 @@ class MonsterTableM559(unittest.TestCase):
     def test_ui_wiring(self):
         html=(STATIC/'index.html').read_text(encoding='utf8')
         js=(STATIC/'game-balance.js').read_text(encoding='utf8')
-        self.assertLess(html.index('monster-table.js?v=559'),html.index('game-balance.js?v=559'))
+        self.assertLess(html.index('monster-table.js?v=559'),html.index('game-balance.js?v='))
         self.assertIn('window.game1MonsterTable.columns(fields[tab])',js)
         self.assertIn('window.game1MonsterTable.rows(d.monsters)',js)
         self.assertIn('window.game1MonsterTable.decorate(body.parentElement.tHead.rows[0],columns,render)',js)

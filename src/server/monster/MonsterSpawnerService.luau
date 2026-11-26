@@ -123,6 +123,33 @@ local function spawnOne(state: any): Model?
     local record = state.record
     local slug = tostring(record.monsterSlug or "")
     local definition = monsterDefinition(slug)
+    if record.balanceId and not record.testOwner then
+        local row = Balance.Monster(record.balanceId)
+        local matched, bound, matches, bindings = nil, nil, 0, 0
+        if row and row.nameEn ~= "" then
+            for key, candidate in pairs(MonsterRegistry.monsters or {}) do
+                if string.lower(candidate.nameEn or "") == string.lower(row.nameEn or "") then
+                    matched = candidate; matches += 1
+                    local binding = Balance.MonsterForModel(key)
+                    if binding and binding.id == row.id then bound = candidate; bindings += 1 end
+                end
+            end
+        end
+        definition = if bindings == 1 then bound elseif matches == 1 then matched else nil
+        if not definition then
+            warn("[game1][monster-spawn] pending model for Database row " .. tostring(record.balanceId))
+            return nil
+        end
+        slug = definition.slug
+        local profile = MonsterAnimationRegistry.profiles and MonsterAnimationRegistry.profiles[slug]
+        for _, slot in ipairs({"walk", "run", "combat_idle", "attack", "death"}) do
+            local clips = profile and profile.slots and profile.slots[slot]
+            if not clips or #clips == 0 then
+                warn("[game1][monster-spawn] pending animations for " .. slug .. " · " .. slot)
+                return nil
+            end
+        end
+    end
     if not definition then
         warn("[game1][monster-spawn] unknown monster slug in runtime registry: " .. slug)
         return nil

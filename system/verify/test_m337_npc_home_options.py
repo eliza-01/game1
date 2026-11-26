@@ -88,7 +88,7 @@ class M337Tests(unittest.TestCase):
         self.assertEqual(html.count('class="game1-option-section"'), 6)
         for key in ('option-combat-state-duration', 'health-ui-fields', 'option-camera-save',
                     'option-npc-device', 'option-monster-return-time', 'option-published-debug-buttons',
-                    'monster-spawn-home-radius', 'npc-spawn-home-radius'):
+                    'npc-spawn-home-radius'):
             self.assertIn(f'id="{key}"', html)
 
 

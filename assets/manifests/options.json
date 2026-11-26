@@ -117,14 +117,14 @@
   },
   "debugUi": {
     "desktop": {
-      "showPublishedControls": true
+      "showPublishedControls": false
     },
     "mobile": {
       "showPublishedControls": true
     },
-    "startInHub": true,
+    "startInHub": false,
     "startedLanguage": true,
-    "startLocale": "en-us"
+    "startLocale": "ru-ru"
   },
   "worldStreaming": {
     "targetRadiusStuds": 150

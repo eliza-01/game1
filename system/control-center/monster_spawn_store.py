@@ -6,12 +6,15 @@ import json
 import math
 import re
 import uuid
+import threading
 from services import game_balance
 from datetime import datetime, timezone
 
 SCHEMA_VERSION = 1
 PROJECT = "game1"
 REQUIRED_ANIMATION_SLOTS = ("walk", "run", "combat_idle", "attack", "death")
+MONSTER_SPAWN_DEFAULTS = {"mapKey": "main", "spawnRadius": 15, "maxAlive": 3,
+                          "homeRadiusStuds": 150, "respawnSeconds": 10, "enabled": True}
 
 
 def utc_now() -> str:
@@ -37,6 +40,7 @@ class MonsterSpawnStore:
         self.monsters = monsters
         self.animations = animations
         self.bridge = bridge
+        self._lock = threading.RLock()
         self.manifest_path = self.root / f"assets/manifests/{self.kind}-spawns.json"
         self.registry_path = self.root / ("src/server/npc/NpcSpawnRegistry.luau" if self.kind == "npc" else "src/server/monster/MonsterSpawnRegistry.luau")
         self._ensure()
@@ -98,6 +102,10 @@ class MonsterSpawnStore:
             result["spawnRadius"] = float(record.get("spawnRadius") or 0)
             result["maxAlive"] = int(record.get("maxAlive") or 1)
             # Old records without an override inherit the current Database row.
+            if record.get("balanceId"):
+                result["balanceId"] = record["balanceId"]
+            if "deathChase" in record:
+                result["deathChase"] = record["deathChase"]
             if "aggressive" in record:
                 result["aggressive"] = record["aggressive"]
             if "aggroRadiusStuds" in record:
@@ -164,7 +172,13 @@ class MonsterSpawnStore:
         spawn_id = str(payload.get("spawnId") or "").strip().lower()
         if not re.fullmatch(r"spawn-[a-z0-9-]{12,64}", spawn_id):
             raise ValueError("Spawn ID is invalid")
-        monster = self._monster(payload.get("monsterSlug"))
+        balance_row = None
+        if self.kind == "monster" and payload.get("balanceId"):
+            balance_row = self._balance_row(payload["balanceId"])
+            # A Database row is the authored identity, not a temporary model slug.
+            monster = {"slug": ""}
+        else:
+            monster = self._monster(payload.get("monsterSlug"))
         map_key = str(payload.get("mapKey") or "main").strip().lower()
         if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", map_key):
             raise ValueError("Map key must contain only a-z, 0-9, dot, underscore or dash")
@@ -217,7 +231,22 @@ class MonsterSpawnStore:
         else:
             result["spawnRadius"] = radius
             result["maxAlive"] = int(max_alive)
-            result.update(self._spawn_behavior(monster, payload))
+            if balance_row is not None:
+                result["balanceId"] = balance_row["id"]
+                for key in ("aggressive", "deathChase"):
+                    value = payload.get(key, balance_row[key])
+                    if type(value) is not bool:
+                        raise ValueError(f"{key} must be a boolean")
+                    result[key] = value
+                result["aggroRadiusStuds"] = game_balance.number(
+                    payload.get("aggroRadiusStuds", balance_row["aggroRadiusStuds"]),
+                    0, 10000, "Aggro Radius", False)
+            else:
+                result.update(self._spawn_behavior(monster, payload))
+                if "deathChase" in payload:
+                    if type(payload["deathChase"]) is not bool:
+                        raise ValueError("Death Chase must be a boolean")
+                    result["deathChase"] = payload["deathChase"]
         return result
 
     def _record_view(self, record: dict, data=None) -> dict:
@@ -226,6 +255,19 @@ class MonsterSpawnStore:
             value.pop("spawnRadius", None)
             value.pop("maxAlive", None)
             value["placedAtUtc"] = value.get("placedAtUtc") or value.get("createdAtUtc")
+        if self.kind == "monster" and record.get("balanceId"):
+            data = data if data is not None else game_balance.load(self.root)
+            row = self._balance_row(record["balanceId"], data)
+            model = self._model_for_row(row, data)
+            name = row["nameEn"] or row["id"]
+            value["monsterName"] = name
+            value["level"] = row["level"]
+            value["monster"] = {"slug": model["slug"] if model else "", "name": name,
+                                "nameRu": row["nameRu"], "status": model["status"] if model else "UNREGISTERED"}
+            value["readiness"] = self.readiness(model["slug"]) if model else {
+                "ready": False, "reasons": ["No unique model registered for this species."]}
+            value["syncState"] = "saved"
+            return value
         monster = self._monster(record.get("monsterSlug"))
         if self.kind == "monster":
             for key, default in self._behavior_defaults(monster, data).items():
@@ -237,10 +279,91 @@ class MonsterSpawnStore:
             "status": str(monster.get("status") or ""),
         }
         value["readiness"] = self.readiness(str(monster["slug"]))
+        if self.kind == "monster":
+            binding = data["monsterBindings"].get(monster["slug"]) if data else None
+            row = next((r for r in data["monsters"] if r["id"] == binding), None) if binding else None
+            value["legacyBalanceId"] = binding
+            value["level"] = row["level"] if row else None
+            value["monsterName"] = value["monster"]["name"]
+            value.setdefault("deathChase", bool(row and row["deathChase"]))
         studio_sync = record.get("studioSync") or {}
         synced = studio_sync.get("status") == "synced" and studio_sync.get("recordFingerprint") == self._fingerprint(record)
         value["syncState"] = "synced" if synced else "stale"
         return value
+
+    def _balance_row(self, balance_id, data=None):
+        data = data if data is not None else game_balance.load(self.root)
+        row = next((r for r in data["monsters"] if r["id"] == balance_id), None)
+        if row is None:
+            raise ValueError("Unknown monster Database ID: " + str(balance_id))
+        return row
+
+    def _model_for_row(self, row, data, models=None):
+        # Existing bindings may point at test proxies (Gremlin -> Toad).
+        # For newly authored species require a matching model identity.
+        if not row["nameEn"]:
+            return None
+        candidates = [m for m in (models if models is not None else self.monsters.list())
+                      if str(m.get("name_en") or "").lower() == row["nameEn"].lower()]
+        bound = [m for m in candidates if data["monsterBindings"].get(m["slug"]) == row["id"]]
+        return bound[0] if len(bound) == 1 else candidates[0] if len(candidates) == 1 else None
+
+    def studio_catalog(self):
+        if self.kind != "monster":
+            raise ValueError("Monster authoring only")
+        with self._lock:
+            data = game_balance.load(self.root)
+            groups = {}
+            models = self.monsters.list()
+            readiness = {}
+            for row in data["monsters"]:
+                key = row["nameEn"] or row["id"]
+                group = groups.setdefault(key, {"nameEn": row["nameEn"], "nameRu": row["nameRu"],
+                                                "key": key, "levels": []})
+                model = self._model_for_row(row, data, models)
+                if model and model["slug"] not in readiness:
+                    readiness[model["slug"]] = self.readiness(model["slug"])["ready"]
+                group["levels"].append({**row, "modelSlug": model["slug"] if model else "",
+                                        "ready": readiness[model["slug"]] if model else False})
+            catalog = sorted(groups.values(), key=lambda g: (not bool(g["nameEn"]), g["key"].lower()))
+            for group in catalog:
+                group["levels"].sort(key=lambda r: (r["level"], r["type"], r["id"]))
+            records = [self._record_view(r, data) for r in self._load()["records"].values()]
+            return {"species": catalog, "records": records,
+                    "defaults": dict(MONSTER_SPAWN_DEFAULTS)}
+
+    def studio_apply(self, payload):
+        if self.kind != "monster" or not isinstance(payload, dict):
+            raise ValueError("Monster Studio authoring only")
+        with self._lock:
+            manifest = self._load()
+            spawn_id = str(payload.get("spawnId") or "").strip().lower()
+            existing = manifest["records"].get(spawn_id)
+            if existing and payload.get("expectedUpdatedAtUtc") != existing.get("updatedAtUtc"):
+                raise ValueError("Spawn changed elsewhere; refresh in Studio")
+            if not existing and payload.get("expectedUpdatedAtUtc"):
+                raise ValueError("Spawn was deleted; refresh in Studio")
+            if existing and int(payload.get("placeId", -1)) != int(existing["placeId"]):
+                raise ValueError("Spawn belongs to another Place")
+            if payload.get("action") == "delete":
+                if not existing:
+                    raise ValueError("Spawn does not exist")
+                del manifest["records"][spawn_id]
+                self._commit(manifest)
+                return {"ok": True, "spawnId": spawn_id}
+            if payload.get("action") != "apply":
+                raise ValueError("Unknown Studio spawn action")
+            if not payload.get("balanceId"):
+                raise ValueError("Select a Database monster and level")
+            merged = {**MONSTER_SPAWN_DEFAULTS, **(existing or {}), **payload}
+            if type(merged["enabled"]) is not bool:
+                raise ValueError("Enabled must be a boolean")
+            record = self._validate(merged)
+            view = self._record_view(record)
+            # Only a successful HTTP save projects the record; no reverse bridge
+            # callback into the very plugin that is waiting for this request.
+            self._commit({**manifest, "records": {**manifest["records"], record["spawnId"]: record}})
+            return {"ok": True, "record": view}
 
     def snapshot(self) -> dict:
         manifest = self._load()
@@ -396,6 +519,8 @@ class MonsterSpawnStore:
                 row = self._validate(source)
                 if key != row["spawnId"]:
                     errors.append(f"record key mismatch: {key}")
+                if row.get("balanceId"):
+                    continue  # planned species can exist before publication
                 ready = self.readiness(row["monsterSlug"])
                 if not ready["ready"]:
                     errors.append(f"{key}: {' '.join(ready['reasons'])}")
@@ -407,7 +532,16 @@ class MonsterSpawnStore:
 
     def monster_usage(self, slug: str) -> list[str]:
         slug = str(slug or "").strip().lower()
-        return [str(row.get("spawnId") or "") for row in self._load()["records"].values() if str(row.get("monsterSlug") or "") == slug]
+        result = []
+        for row in self._load()["records"].values():
+            if str(row.get("monsterSlug") or "") == slug:
+                result.append(row["spawnId"])
+            elif self.kind == "monster" and row.get("balanceId"):
+                data = game_balance.load(self.root)
+                model = self._model_for_row(self._balance_row(row["balanceId"], data), data)
+                if model and model["slug"] == slug:
+                    result.append(row["spawnId"])
+        return result
 
     def _write_registry(self, manifest: dict):
         records = [self._core(row, npc=self.kind == "npc") for _, row in sorted(manifest["records"].items())]
@@ -415,16 +549,18 @@ class MonsterSpawnStore:
         payload = {"schemaVersion": 1, "project": PROJECT, "sourceDigest": digest, "records": records}
         encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         self.registry_path.parent.mkdir(parents=True, exist_ok=True)
-        self.registry_path.write_text(
+        game_balance.atomic(self.registry_path,
             "-- generated. do not edit by hand.\n"
             "local HttpService = game:GetService(\"HttpService\")\n"
             f"local data = HttpService:JSONDecode([==[{encoded}]==])\n"
             "return table.freeze(data)\n",
-            encoding="utf-8",
         )
 
     def _commit(self, manifest: dict):
-        tmp = self.manifest_path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        tmp.replace(self.manifest_path)
-        self._write_registry(manifest)
+        previous = self.manifest_path.read_text(encoding="utf-8")
+        game_balance.atomic(self.manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+        try:
+            self._write_registry(manifest)
+        except Exception:
+            game_balance.atomic(self.manifest_path, previous)
+            raise

@@ -26,7 +26,7 @@ class StudioBridgeDecompositionM100(unittest.TestCase):
         self.assertNotIn("local function handleMonsterSpawn(", MAIN)
         self.assertNotIn("local function readStudioDebugPreferences(", MAIN)
         self.assertIn("local handleModelLoad = StudioModelLoadCommands({", MAIN)
-        self.assertIn("local handleMonsterSpawn = StudioActorSpawnCommands({", MAIN)
+        self.assertIn("local handleMonsterSpawn, monsterSpawnMarkers = StudioActorSpawnCommands({", MAIN)
         self.assertIn("StudioDebugPreferenceBridge({", MAIN)
 
     def test_commands_still_dispatch_with_original_names_and_edit_mode_gate(self):
@@ -39,7 +39,7 @@ class StudioBridgeDecompositionM100(unittest.TestCase):
         ):
             with self.subTest(signature=signature):
                 self.assertIn(signature, MAIN)
-        self.assertLess(MAIN.index('local handleMonsterSpawn = '), MAIN.index('local function pollBridge()'))
+        self.assertLess(MAIN.index('local handleMonsterSpawn, monsterSpawnMarkers = '), MAIN.index('local function pollBridge()'))
 
     def test_model_rig_guards_and_original_result_protocol_are_preserved(self):
         source = MODULES['StudioModelLoadCommands']

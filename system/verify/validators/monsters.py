@@ -154,20 +154,22 @@ def check_monster_contracts(
         if required not in spawn_store_text:
             report_error(f"monster spawn store missing {required}")
 
-    monster_spawn_js_path = root / "system/control-center/static/monster-spawns.js"
-    monster_spawn_js_text = monster_spawn_js_path.read_text(encoding="utf-8") if monster_spawn_js_path.is_file() else ""
-    for required in ['id="monster-spawn-monster"', 'id="monster-spawn-place"', 'id="monster-spawn-register"', 'id="monster-spawn-radius"', 'id="monster-spawn-max-alive"']:
-        if required not in ui:
-            report_error(f"monster spawn UI missing {required}")
-    for required in ["/api/monster-spawns/place", "/api/monster-spawns/register", "restore", "validate"]:
-        if required not in monster_spawn_js_text:
-            report_error(f"monster spawn UI javascript missing {required}")
-    for required in ['"/api/monster-spawns"', '"/api/monster-spawns/place"', '"/api/monster-spawns/register"', "MonsterSpawnStore", "run_monster_spawn_bridge"]:
+    spawn_authoring = (root / "system/studio-plugin/modules/StudioMonsterSpawnAuthoring.luau").read_text(encoding="utf-8")
+    balance_ui = (root / "system/control-center/static/game-balance.js").read_text(encoding="utf-8")
+    if (root / "system/control-center/static/monster-spawns.js").exists() or 'id="monster-spawn-register"' in ui:
+        report_error("legacy browser monster spawn authoring must be removed")
+    for required in ['spawnZones', '/api/monster-spawns/catalog', 'Read-only registry']:
+        if required not in balance_ui:
+            report_error(f"Database spawn registry missing {required}")
+    for required in ['"/api/monster-spawns/catalog"', '"/api/monster-spawns/studio-apply"', 'MonsterSpawnStore']:
         if required not in host_agent_text:
             report_error(f"host agent monster spawn API missing {required}")
-    for required in ["monster-spawn", "Game1MonsterSpawnMarker", "Game1Authoring", "MonsterSpawns", "monsterSpawnPlacementResult", "Selection:Set"]:
+    for required in ["Game1MonsterSpawnMarker", "Game1Authoring", "MonsterSpawns", "monsterSpawnPlacementResult", "Selection:Set", "StudioMonsterSpawnAuthoring"]:
         if required not in plugin_text:
             report_error(f"Studio monster spawn authoring missing {required}")
+    for required in ['spawnRadius', 'maxAlive', 'respawnSeconds', 'homeRadiusStuds', 'deathChase', 'balanceId', 'markers.Place', '/api/monster-spawns/studio-apply']:
+        if required not in spawn_authoring:
+            report_error(f"Studio spawn zone form missing {required}")
 
     monster_spawner_path = root / "src/server/monster/MonsterSpawnerService.luau"
     monster_spawner_text = monster_spawner_path.read_text(encoding="utf-8") if monster_spawner_path.is_file() else ""

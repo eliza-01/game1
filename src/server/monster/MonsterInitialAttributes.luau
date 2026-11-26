@@ -19,6 +19,7 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     local stats = definition.stats or {}
     local behavior = definition.behavior or {}
     local balance = Balance.MonsterForModel(tostring(definition.slug or record.monsterSlug or ""))
+    if record.balanceId then balance = assert(Balance.Monster(record.balanceId), "Invalid authored monster balance ID") end
     if record.testOwner then balance = Balance.Monster(record.testBalanceId) end
     local maxHP = if balance then balance.hp else math.max(1, finite(stats.MaxHP, 100))
     model:SetAttribute("MonsterSkillCaster", if balance and balance.skills and record.testOwner then true else nil)
@@ -86,7 +87,8 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("MonsterAggressive", aggressive)
     model:SetAttribute("MonsterAggroRadius", aggroRadius)
     model:SetAttribute("MonsterHomeRadiusStuds", homeRadius)
-    DeathChase.Configure(model, record, balance ~= nil and balance.deathChase == true)
+    local deathChase = if type(record.deathChase) == "boolean" then record.deathChase else balance ~= nil and balance.deathChase == true
+    DeathChase.Configure(model, record, deathChase)
     model:SetAttribute("MonsterAttackRadius", attackRadius)
     model:SetAttribute("MonsterCombatActive", false)
     model:SetAttribute("MonsterAttackPursuitActive", false)

@@ -139,7 +139,7 @@ class MonsterRespawnSpawnFxTests(unittest.TestCase):
         self.assertIn('id="monster-behavior-rise-from-ground"', html)
         self.assertIn("behavior.riseFromGround===true", js)
         self.assertIn("riseFromGround:$('monster-behavior-rise-from-ground').checked", js)
-        self.assertNotIn('riseFromGround', (ROOT / 'system/control-center/static/monster-spawns.js').read_text(encoding='utf-8'))
+        self.assertNotIn('riseFromGround', (ROOT / 'system/studio-plugin/modules/StudioMonsterSpawnAuthoring.luau').read_text(encoding='utf-8'))
         self.assertNotIn('riseFromGround', (ROOT / 'system/control-center/static/npc-assets.js').read_text(encoding='utf-8'))
 
 

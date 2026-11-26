@@ -1,1 +1,1 @@
-return table.freeze({ Version = "2026.11.26.559", SourceDigest = "game1-m559-monster-table-rebased" })
+return table.freeze({ Version = "2026.11.26.560", SourceDigest = "game1-m560-studio-monster-spawns" })

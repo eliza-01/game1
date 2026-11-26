@@ -7,12 +7,12 @@
   "priority": "P1",
   "owner": "Owner + Codex",
   "specPath": "docs/kanban/specs/KBN-0029.md",
-  "specSha256": "6641a2da502346b89df7e1bf765e0b6e794f94e9871d033cbfc7aeb4428e49be",
+  "specSha256": "cdcac2ae6ee3e306a32709bbdc692ed9fb1f6000677ef89d6342f27916af0095",
   "dependsOn": [
     "KBN-0028"
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-26T00:00:00+00:00",
+  "revision": 2,
+  "updatedAt": "2026-11-26T14:36:00+00:00",
   "tasks": [
     {
       "id": "KBN-0029-T01",

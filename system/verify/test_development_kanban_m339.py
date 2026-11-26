@@ -179,7 +179,7 @@ class TestDevelopmentKanbanM339(unittest.TestCase):
         js = (base / 'character-assets.js').read_text(encoding='utf-8')
         self.assertIn('id="nav-kanban"', html)
         self.assertIn('id="kanban-view"', html)
-        self.assertIn('kanban.js?v=339', html)
+        self.assertRegex(html, r'kanban\.js\?v=\d+')
         self.assertIn("view!=='kanban'", js)
         self.assertIn("game1KanbanLoad", js)
         self.assertTrue((base / 'kanban.js').is_file())

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0031",
+  "title": "Design",
+  "domain": "Design",
+  "favorite": true,
+  "status": "IN_PROGRESS",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0031.md",
+  "specSha256": "90cd7939fb218f5f2a187e70ee604fb6c78595afa8c62096ac89408cc4ecf0cc",
+  "dependsOn": [],
+  "revision": 2,
+  "updatedAt": "2026-11-26T14:47:45+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0031-T01",
+      "title": "Согласовать топологию карты и состав шести зон",
+      "done": false
+    },
+    {
+      "id": "KBN-0031-T02",
+      "title": "Согласовать цели всех уровней 1–30, квесты и NPC",
+      "done": false
+    },
+    {
+      "id": "KBN-0031-T03",
+      "title": "Проверить темп XP/Gold и бюджет каждого грейда по GP",
+      "done": false
+    },
+    {
+      "id": "KBN-0031-T04",
+      "title": "Согласовать навыки без классов и эффективность по грейду оружия",
+      "done": false
+    },
+    {
+      "id": "KBN-0031-T05",
+      "title": "Согласовать endgame и две резервные зоны",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0031-A01",
+      "title": "Пройти маршрут шести зон и проверить доступность всех целей 1–30",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0031-A02",
+      "title": "Получить B на LVL 30 за 9–12 ч по фактическому тесту; проверить промежуточные грейды и покупки",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0031-A03",
+      "title": "Проверить endgame, сохранение прогресса и мобильную приёмку",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

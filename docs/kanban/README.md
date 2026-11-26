@@ -29,3 +29,7 @@
 ## M531 · следующий цикл
 
 KBN-0025–0030: Combat Analytics, Effects & Status System, Character Skills, Monster Archetypes, Progression & Economy, Test Suite Cleanup. KBN-0025 — код готов, Studio-приёмка открыта; KBN-0026 — начат с процедурных кастов/VFX.
+
+## M537 · Design и Favorites
+
+[Design · KBN-0031](specs/KBN-0031.md) — закреплённая карточка продуктового плана: маршрут 1–30, Any, локации и цели каждого уровня, навыки без классов. Звезда в заголовке любой карточки переключает `favorite` (boolean, отсутствует = false); сохранение через revision/backup/history. Закреплённые показываются первыми среди результатов фильтра, затем ID; экспорт также учитывает закрепление.

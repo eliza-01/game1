@@ -18,15 +18,26 @@
     const tasks=model.cards.flatMap(c=>c.tasks||[]);
     $kb('kb-metrics').innerHTML=`<span><strong>${total}</strong>карточек</span><span><strong>${model.cards.filter(c=>c.status==='IN_PROGRESS').length}</strong>в работе</span><span><strong>${model.cards.filter(c=>c.status==='DONE').length}</strong>проверено</span><span><strong>${tasks.filter(x=>x.done).length}/${tasks.length}</strong>пунктов</span>`;
   }
+  // API stays in stable ID order; only presentation/export prioritize favorites.
+  function orderedCards(){return [...model.cards].sort((a,b)=>Number(b.favorite===true)-Number(a.favorite===true)||a.id.localeCompare(b.id))}
+  function paintFavorite(button,c){
+    const pinned=c.favorite===true;
+    button.textContent=pinned?'★':'☆';
+    button.setAttribute('aria-pressed',String(pinned));
+    button.title=pinned?'Открепить':'Закрепить вверху';
+    button.setAttribute('aria-label',`${button.title}: ${c.title}`);
+  }
   function cards() {
     metric();const host=$kb('kb-cards');host.replaceChildren();
     const query=$kb('kb-search').value.toLowerCase().trim(),filter=$kb('kb-status').value;
-    for(const c of model.cards){
+    for(const c of orderedCards()){
       if(filter&&c.status!==filter)continue;
       if(query&&!`${c.id} ${c.title} ${c.domain} ${c.owner} ${(c.tasks||[]).map(t=>t.title).join(' ')}`.toLowerCase().includes(query))continue;
       const el=document.createElement('details');el.className='kb-card';el.dataset.id=c.id;el.open=model.open===c.id;
       const count=c.tasks.filter(t=>t.done).length;
-      el.innerHTML=`<summary><div class="kb-head"><span class="kb-title">${escape(c.title)}</span><span class="kb-sub">${escape(c.id)} · ${escape(c.domain)} · ${escape(c.status)} · ${escape(c.priority)} · ${escape(c.owner)} · r${c.revision}</span></div><span class="kb-progress">${count}/${c.tasks.length} ▾</span></summary><div class="kb-body"></div>`;
+      el.innerHTML=`<summary><div class="kb-head"><span class="kb-title">${escape(c.title)}</span><span class="kb-sub">${escape(c.id)} · ${escape(c.domain)} · ${escape(c.status)} · ${escape(c.priority)} · ${escape(c.owner)} · r${c.revision}</span></div><div class="kb-summary-actions"><span class="kb-progress">${count}/${c.tasks.length} ▾</span><button type="button" class="kb-favorite"></button></div></summary><div class="kb-body"></div>`;
+      const star=el.querySelector('.kb-favorite');paintFavorite(star,c);
+      star.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();toggleFavorite(c.id)});
       el.addEventListener('toggle',()=>{if(el.open){model.open=c.id;for(const sibling of host.children)if(sibling!==el)sibling.open=false;loadDetail(c.id)}else if(model.open===c.id){model.open=null;model.detail=null}});
       host.append(el);
       if(el.open&&model.detail?.card.id===c.id)renderDetail(el.querySelector('.kb-body'),model.detail);
@@ -38,8 +49,31 @@
     catch(error){notice(error.message,true)}
   }
   async function loadDetail(id){
-    try{const data=await api('/'+encode(id));if(model.open!==id)return;model.detail=data;const el=Array.from($kb('kb-cards').children).find(e=>e.dataset.id===id);if(el)renderDetail(el.querySelector('.kb-body'),data)}
+    try{const data=await api('/'+encode(id));if(model.open!==id)return;if((model.cards.find(c=>c.id===id)?.revision??0)>data.card.revision)return;model.detail=data;const el=Array.from($kb('kb-cards').children).find(e=>e.dataset.id===id);if(el)renderDetail(el.querySelector('.kb-body'),data)}
     catch(error){notice(error.message,true)}
+  }
+  async function toggleFavorite(id){
+    if(model.busy)return;
+    const current=model.cards.find(c=>c.id===id);
+    if(!current)return;
+    model.busy=true;
+    try{
+      const data=await api('/'+encode(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:current.revision,action:'favorite',favorite:current.favorite!==true})});
+      model.cards=model.cards.map(c=>c.id===id?data.card:c);
+      const needsDetail=model.open===id&&model.detail?.card.id!==id;
+      if(model.open===id)model.detail=data;
+      // Reorder the existing nodes, retaining an open document and unsaved inputs.
+      const host=$kb('kb-cards');
+      const nodes=new Map([...host.children].map(el=>[el.dataset.id,el]));
+      for(const c of orderedCards()){
+        const el=nodes.get(c.id);if(!el)continue;
+        if(c.id===id){paintFavorite(el.querySelector('.kb-favorite'),c);el.querySelector('.kb-sub').textContent=`${c.id} · ${c.domain} · ${c.status} · ${c.priority} · ${c.owner} · r${c.revision}`}
+        host.append(el);
+        if(c.id===id&&needsDetail)renderDetail(el.querySelector('.kb-body'),data);
+      }
+      notice(`${id} ${data.card.favorite?'закреплена':'откреплена'}`);
+    }catch(error){await load();notice(error.message,true)}
+    finally{model.busy=false}
   }
   async function mutate(id,payload){
     if(model.busy)return;
@@ -56,6 +90,46 @@
     finally{model.busy=false}
   }
   function optionSet(values,current){return values.map(value=>`<option value="${value}" ${value===current?'selected':''}>${value}</option>`).join('')}
+  // Render the Design document's limited Markdown subset with text nodes only.
+  // The source Markdown remains authoritative and is edited by the normal spec editor.
+  function designPreview(spec){
+    const host=document.createElement('div');host.className='kb-design-preview';
+    const lines=spec.split(/\r?\n/);let section=host;
+    const add=(tag,value,parent=section)=>{const el=document.createElement(tag);el.textContent=value;parent.append(el);return el};
+    const cells=line=>line.trim().slice(1,-1).split('|').map(x=>x.trim());
+    const tableLine=line=>line?.trim().startsWith('|')&&line.trim().endsWith('|');
+    for(let i=0;i<lines.length;i++){
+      const line=lines[i];if(!line.trim())continue;
+      if(line.startsWith('## ')){
+        const detail=document.createElement('details');detail.className='kb-design-section';
+        add('summary',line.slice(3),detail);detail.open=/^Карта/.test(line.slice(3));
+        const range=line.match(/ · LVL (\d+–\d+)$/);if(range)detail.dataset.zoneRange=range[1];
+        host.append(detail);section=document.createElement('div');detail.append(section);continue;
+      }
+      if(line.startsWith('# ')){add('h3',line.slice(2));continue}
+      if(line.startsWith('```')){const code=[];while(++i<lines.length&&!lines[i].startsWith('```'))code.push(lines[i]);add('pre',code.join('\n'));continue}
+      if(tableLine(line)&&tableLine(lines[i+1])&&cells(lines[i+1]).every(x=>/^:?-{3,}:?$/.test(x))){
+        const headings=cells(line);
+        if(window.game1KanbanDesignMap.isMapHeader(headings)){
+          let end=i+2;const rows=[];while(tableLine(lines[end])){rows.push(cells(lines[end]));end++}
+          const map=window.game1KanbanDesignMap.render(rows,range=>{
+            const target=Array.from(host.querySelectorAll('[data-zone-range]')).find(el=>el.dataset.zoneRange===range);
+            if(target){target.open=true;target.querySelector('summary').focus();target.scrollIntoView({block:'nearest'})}
+          });
+          if(map){section.append(map);i=end-1;continue}
+          const warning=add('p','Карта: проверьте координаты и связи. Ниже исходная таблица.');warning.className='kb-error';
+        }
+        const wrap=document.createElement('div');wrap.className='kb-design-table';section.append(wrap);
+        const table=document.createElement('table');wrap.append(table);
+        const head=table.createTHead().insertRow();for(const value of cells(line)){const th=add('th',value,head);th.scope='col'}
+        const body=table.createTBody();i+=2;
+        while(i<lines.length&&tableLine(lines[i])){const row=body.insertRow();for(const value of cells(lines[i]))add('td',value,row);i++}i--;continue;
+      }
+      add('p',line);
+    }
+    window.game1KanbanDesignMap.colorSections(host);
+    return host;
+  }
   function renderDetail(body,data){
     if(!body)return;
     const c=data.card,id=c.id;
@@ -91,7 +165,7 @@
     addTestButton.onclick=()=>mutate(id,{action:'acceptance-add',title:testText.value});addTest.append(testText,addTestButton);testGroup.append(addTest);body.append(testGroup);
     const doc=document.createElement('section');doc.className='kb-group kb-doc';doc.innerHTML='<h4>Документация механики · единственный канонический файл</h4>';
     const path=document.createElement('small');path.className='kb-notice';path.textContent=c.specPath;doc.append(path);
-    const pre=document.createElement('pre');pre.textContent=data.spec;doc.append(pre);
+    const pre=c.domain==='Design'?designPreview(data.spec):document.createElement('pre');if(c.domain!=='Design')pre.textContent=data.spec;doc.append(pre);
     const edit=document.createElement('textarea');edit.value=data.spec;edit.hidden=true;doc.append(edit);
     const reason=document.createElement('input');reason.type='text';reason.maxLength=1000;reason.placeholder='Причина изменения (не менее 8 символов)';reason.hidden=true;doc.append(reason);
     const approval=document.createElement('label');approval.className='kb-item';approval.hidden=true;
@@ -103,7 +177,14 @@
     function editing(value){pre.hidden=value;edit.hidden=!value;reason.hidden=!value;approval.hidden=!value;save.hidden=!value;cancel.hidden=!value;toggle.hidden=value}
     toggle.onclick=()=>editing(true);cancel.onclick=()=>editing(false);
     save.onclick=()=>mutate(id,{action:'spec',spec:edit.value,reason:reason.value,confirmPolicyChange:confirm.checked});
-    buttons.append(toggle,save,cancel);doc.append(buttons);body.append(doc);
+    buttons.append(toggle,save,cancel);doc.append(buttons);
+    // Product design starts with the plan; engineering cards retain their existing order.
+    if(c.domain==='Design'){doc.classList.add('kb-design-doc');body.prepend(doc);
+      for(const [group,label] of [[taskGroup,'Обязательные шаги'],[testGroup,'Проверки']]){
+        const details=document.createElement('details');details.className='kb-design-section';
+        const summary=document.createElement('summary');summary.textContent=label;details.append(summary);group.replaceWith(details);details.append(group);
+      }
+    }else body.append(doc);
     const history=document.createElement('section');history.className='kb-group';
     history.innerHTML='<h4>История изменений</h4>';
     const loadHistory=document.createElement('button');loadHistory.type='button';loadHistory.textContent='Показать историю';

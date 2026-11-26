@@ -1,1 +1,2 @@
 {"revision": 1, "time": "2026-11-26T00:00:00+00:00", "action": "planning", "detail": "M531: согласованный план; Studio-приёмка открыта", "beforeSha256": null, "afterSha256": "e923a8d9b7c2f7d6ae50fb7116bd3442f0151969af21fece52b46522263fd580"}
+{"revision": 2, "time": "2026-11-26T14:36:00+00:00", "action": "spec", "detail": "M537: уточнение Design; без изменения runtime и статуса", "beforeSha256": "bba67a1655ebcb906d4edaf217371e52d49a608cc2d12679b4107f9a78dfab39", "afterSha256": "0dbca0c08ac23ea624bf5eca4bdd52dd3c46696ba39db18afef88547becfcd98"}

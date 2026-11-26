@@ -45,7 +45,7 @@ class KanbanStore:
     """One document and one card per ID; card revision protects every write.
 
     Sources are project-tracked JSON/Markdown. Local backups are outside Git.
-    The API never accepts a path from a browser or creates a new card.
+    The API never accepts a path from a browser. Favorites are card metadata.
     """
 
     def __init__(self, root: Path):
@@ -73,6 +73,8 @@ class KanbanStore:
             raise KanbanError(f'cannot load card: {error}', 500) from error
         if not isinstance(card, dict) or card.get('id') != identifier or card.get('schemaVersion') != 1:
             raise KanbanError('invalid card contract', 500)
+        if type(card.get('favorite', False)) is not bool:
+            raise KanbanError('invalid favorite contract', 500)
         if card.get('specPath') != f'docs/kanban/specs/{identifier}.md':
             raise KanbanError('invalid documentation path', 500)
         if card.get('specSha256') != _digest(spec):
@@ -105,9 +107,9 @@ class KanbanStore:
         with self._lock:
             cards = self.list_cards()['cards']
             lines = ['# Eyesland — Development Kanban', '', 'Снимок текущего состояния (не заменяет спецификации).', '']
-            for card in cards:
+            for card in sorted(cards, key=lambda c: (not c.get('favorite', False), c['id'])):
                 checked = sum(task['done'] for task in card['tasks'])
-                lines.extend([f"## {card['id']} · {card['title']}",
+                lines.extend([f"## {'★ ' if card.get('favorite', False) else ''}{card['id']} · {card['title']}",
                               f"Статус: {card['status']} · Приоритет: {card['priority']} · Ответственный: {card['owner']}",
                               f"Документ: {card['specPath']} · Ревизия: {card['revision']} · Чек-лист: {checked}/{len(card['tasks'])}", ''])
                 for task in card['tasks']:
@@ -149,7 +151,7 @@ class KanbanStore:
                    '## Проверки и критерии приёмки\n\nУказать Studio, устройство, логи, регрессионные тесты.\n\n'
                    '## Миграция и откат\n\nНазначить резервные копии и порядок возврата.\n')
             card = {'schemaVersion': 1, 'id': identifier, 'title': title.strip(),
-                    'domain': domain, 'status': 'PROPOSED', 'priority': priority, 'owner': owner,
+                    'domain': domain, 'status': 'PROPOSED', 'priority': priority, 'owner': owner, 'favorite': False,
                     'specPath': f'docs/kanban/specs/{identifier}.md', 'specSha256': _digest(doc),
                     'dependsOn': [], 'revision': 1,
                     'updatedAt': datetime.now(timezone.utc).isoformat(timespec='seconds'),
@@ -174,13 +176,21 @@ class KanbanStore:
             if type(expected) is not int or expected != card['revision']:
                 raise KanbanError(f"stale revision; current is {card['revision']}", 409)
             action = payload.get('action')
-            if card['status'] == 'DONE' and action != 'status':
+            if card['status'] == 'DONE' and action not in ('status', 'favorite'):
                 raise KanbanError('reopen DONE card before changing its tasks, tests or contract', 409)
             new_spec = spec
             previous = json.dumps(card, ensure_ascii=False, indent=2) + '\n'
             updated = json.loads(previous)
             detail = ''
-            if action in ('task-add', 'acceptance-add'):
+            if action == 'favorite':
+                favorite = payload.get('favorite')
+                if type(favorite) is not bool:
+                    raise KanbanError('favorite must be a boolean')
+                if favorite == card.get('favorite', False):
+                    return {'card': card, 'spec': spec}
+                updated['favorite'] = favorite
+                detail = f'favorite: {favorite}'
+            elif action in ('task-add', 'acceptance-add'):
                 title = payload.get('title')
                 if not isinstance(title, str) or not 4 <= len(title.strip()) <= 300:
                     raise KanbanError('item title must contain 4–300 characters')

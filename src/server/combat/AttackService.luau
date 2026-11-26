@@ -48,7 +48,7 @@ local function rowsForEquippedAttack(character: Model): any
         local rows = VariantMerge.Rows(ownWeapon and ownWeapon.attack, commonWeapon and commonWeapon.attack)
         if #rows > 0 then return rows end
         -- In particular, a bow may NEVER fire using the fallback hands clip.
-        if weaponSet == "bow" or weaponSet == "dualswords" then return nil end
+        if weaponSet == "bow" or weaponSet == "dualswords" or (weaponSet == "2hs" and GameplayFallback.Allowed(character)) then return nil end
     end
     return VariantMerge.Rows(profile.base and profile.base.attack, shared and shared.base and shared.base.attack)
 end
@@ -388,9 +388,7 @@ local function attack(player: Player, payload: any)
     local releaseEvent = if isBow then timing.events and timing.events[BowProjectileConfig.ReleaseEvent] else nil
     local hitEndEvent = if isBow then nil else CharacterAttackHitEnd.Resolve(timing)
     local isDual = character:GetAttribute("EquippedWeaponType") == "dualswords"
-    local testPreview = RunService:IsStudio() and character:GetAttribute("GameplayTestKind") == "player"
-        and character:GetAttribute("AnimationWeaponSet") == "1hs"
-    local meleePlan = if isBow then nil else MeleeHitPlan.Resolve(timing, isDual, testPreview)
+    local meleePlan = if isBow then nil else MeleeHitPlan.Resolve(timing, isDual)
     if (isBow and not releaseEvent) or (not isBow and (not hitEndEvent or not meleePlan)) then
         if Config.DebugLogs then
             print(("[game1][attack] reject player=%s reason=missing_character_damage_window clip=%s"):format(player.Name, clipId))

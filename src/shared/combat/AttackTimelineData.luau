@@ -48,10 +48,23 @@ local BY_CLIP = {
             HitEnd = table.freeze({ normalizedTime = 0.5 }),
         }),
     }),
+    ["human_male__weapon__2hs__attack__01"] = table.freeze({
+        duration = 1.5,
+        events = table.freeze({
+            HitEnd = table.freeze({ normalizedTime = 0.538726334 }),
+        }),
+    }),
     ["human_male__weapon__bow__attack__01"] = table.freeze({
         duration = 1.5,
         events = table.freeze({
             Release = table.freeze({ normalizedTime = 0.60397 }),
+        }),
+    }),
+    ["human_male__weapon__dualswords__attack__01"] = table.freeze({
+        duration = 1.5,
+        events = table.freeze({
+            HitEnd = table.freeze({ normalizedTime = 0.62908778 }),
+            HitFirst = table.freeze({ normalizedTime = 0.277969019 }),
         }),
     }),
     ["human_male__weapon__hands__attack__01"] = table.freeze({

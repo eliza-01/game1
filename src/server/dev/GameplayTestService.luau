@@ -111,6 +111,7 @@ local function enter(player: Player, selection: any)
     if session then return result(false, "Arena is already occupied") end
     local character = alive(player)
     if not character or character:GetAttribute("InCombat") == true then return result(false, "Enter the world and leave combat first") end
+    if character:GetAttribute("CharacterArchetype") ~= "human_male" then return result(false, "GP currently requires human_male; select male first") end
     local size = Spawner.TestTemplateSize()
     if not size then return result(false, "Gremlin template is not synced into ServerStorage") end
     local root = character:FindFirstChild("RootCollider")
@@ -158,7 +159,7 @@ local function apply(s: any, selection: any)
         if previous then Loadout.Apply(s.player, character) end
         return result(false, tostring(reason))
     end
-    return result(true, if selection.weapon and selection.weapon.type == "dualswords" and character:GetAttribute("AnimationWeaponSet") == "1hs" then "Applied · dualswords 1hs animation preview" elseif selection.placeholder then "Applied · sword visual placeholder" else "Loadout applied")
+    return result(true, "Loadout applied")
 end
 local function startGroup(s: any, row: any, count: number, stage: any?)
     local character = alive(s.player)

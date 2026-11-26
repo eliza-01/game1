@@ -9,7 +9,8 @@ local CharacterShared = Shared:WaitForChild("character")
 local DeathAnimationPolicy = require(CombatShared:WaitForChild("DeathAnimationPolicy"))
 local AttackTimelineConfig = require(CombatShared:WaitForChild("AttackTimelineConfig"))
 local GameplayFallback = require(CombatShared:WaitForChild("GameplayAttackFallback"))
-local HitEnd = require(CombatShared:WaitForChild("CharacterAttackHitEnd"))
+local HitPlan = require(CombatShared:WaitForChild("MeleeHitPlan"))
+local TestPolicy = require(Shared:WaitForChild("dev"):WaitForChild("GameplayTestAnimationPolicy"))
 local WeaponBounceConfig = require(CombatShared:WaitForChild("WeaponBounceConfig"))
 local AnimationSpeedScaling = require(AnimationShared:WaitForChild("AnimationSpeedScaling"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
@@ -628,7 +629,8 @@ function CharacterAnimationController.PlayAction(slot: string)
     local timeline = AttackTimelineConfig.ResolveCharacterRuntime(clipId, character:GetAttribute("AttackSpeed"))
     local fallback = false
     local isMelee = character:GetAttribute("EquippedWeaponType") ~= "bow"
-    if not timeline or (isMelee and not HitEnd.Resolve(timeline)) then
+    local isDual = character:GetAttribute("EquippedWeaponType") == "dualswords"
+    if not timeline or (isMelee and not HitPlan.Resolve(timeline, isDual)) then
         timeline = GameplayFallback.Resolve(character)
         if not timeline then
             warn(("[game1][animation] attack clip has no usable timeline: %s"):format(clipId))
@@ -667,7 +669,12 @@ function CharacterAnimationController.PlayAction(slot: string)
     -- actionStartedAt, NOT on when LoadAnimation/upper-body composition finishes.
     if fallback then
         boundCharacter:SetAttribute("AnimationAttackCompositionError", "GP timing-only fallback")
-    else
+    end
+    -- A published GP attack can still be previewed with the explicit temporary
+    -- timing schedule. Never borrow an attack from 1hs or claim authored hits.
+    local previewAuthored = fallback and descriptor ~= nil and TestPolicy.BorrowsLocomotion(
+        boundCharacter, tostring(boundCharacter:GetAttribute("AnimationWeaponSet") or ""))
+    if not fallback or previewAuthored then
         task.spawn(function()
             local track, reason, loadedSpeed = AttackUpperBodyComposer.Begin(
                 boundCharacter, descriptor, playbackSpeed, function()

@@ -145,3 +145,11 @@ Headshot melee: 32 studs вдоль проверенного reticle ray, нез
 ## M533 · Targeted Status Effects
 
 См. `docs/workflows/M533_TARGETED_STATUS_EFFECTS_RU.md`. Poison/Bleed/Slow — 10 с, Root/Silence — 5 с, Stun — 3 с; Slow −30%. Начатый направленный дебафф не промахивается по геометрии обычного удара. Отмена невалидного каста сохранена. Poison следует за игроком, Stun использует unaware. Studio-приёмка открыта.
+
+## M534 · GP male, 2hs и dualswords
+
+См. `docs/workflows/M534_MALE_GP_WEAPON_ANIMATIONS_RU.md`. Только Studio GP: human_male, bigsword из newbie_slayer_01, dualswords — два newbie_sword_01. Небоевые weapon slots берутся из 1hs, атаки — из собственных 2hs/dualswords. Отсутствие авторского таймлайна маркируется timing-only; реальный клип может проигрываться как preview. Female, production bindings, параметры баланса и опубликованные ID не изменены.
+
+## M535 · Bigsword left grip
+
+Обычная экипировка персонажа и GP: bigsword крепится к weapon_grip_l, как bow; sword/dagger и основной клинок dualswords остаются справа, второй клинок dualswords — слева. NPC сохраняют явно выбранную руку. Используется существующий BoneModelMount и WeaponTargetBoneName; анимации, таймлайны, данные и опубликованные ID не меняются. Studio-приёмка: проверить крепление в idle/run/attack на human_male и смену оружия.

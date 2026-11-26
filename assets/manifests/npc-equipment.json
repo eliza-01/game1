@@ -21,6 +21,12 @@
   },
   "weapons": [
     {
+      "slug": "newbie_slayer_01",
+      "nameEn": "Newbie Slayer 01",
+      "weaponType": "bigsword",
+      "status": "PUBLISHED"
+    },
+    {
       "slug": "newbie_bow",
       "nameEn": "Newbie Bow",
       "weaponType": "bow",

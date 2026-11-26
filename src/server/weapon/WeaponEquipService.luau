@@ -30,6 +30,7 @@ end
 local WeaponAttackMovement = require(WeaponShared:WaitForChild("WeaponAttackMovement"))
 local CharacterStatsService = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterStatsService"))
 
+local TestPolicy = require(Shared:WaitForChild("dev"):WaitForChild("GameplayTestAnimationPolicy"))
 local WeaponEquipService = {}
 local EQUIPPED_NAME = "EquippedWeapon"
 local LEFT_EQUIPPED_NAME = "EquippedWeaponLeft"
@@ -46,7 +47,7 @@ local function dualAnimationReady(character: Model): boolean
     local rows = VariantMerge.Rows(own and own.attack, common and common.attack)
     if #rows == 0 then return false end
     for _, clip in ipairs(rows) do
-        if not HitPlan.Resolve(Timeline.ResolveCharacterRuntime(clip.clipId, 180), true, false) then return false end
+        if not HitPlan.Resolve(Timeline.ResolveCharacterRuntime(clip.clipId, 180), true) then return false end
     end
     return true
 end
@@ -83,7 +84,8 @@ local function findCharacterBone(character: Model, names: { string }): Bone?
 end
 
 local function socketNames(weaponType: string): { string }
-    return if string.lower(weaponType) == "bow" then LEFT_SOCKET_NAMES else RIGHT_SOCKET_NAMES
+    local kind = string.lower(weaponType)
+    return if kind == "bow" or kind == "bigsword" then LEFT_SOCKET_NAMES else RIGHT_SOCKET_NAMES
 end
 
 local function weaponReferencePart(model: Model): BasePart?
@@ -194,10 +196,10 @@ function WeaponEquipService.Equip(character: Model, slugValue: any, testId: stri
     local slug = string.lower(tostring(slugValue or ""))
     local row = gameplayRow(slug)
     if testId then
-        if character:GetAttribute("GameplayTestKind") ~= "player" then return false, "Test override denied" end
+        if not TestPolicy.IsMaleTest(character) then return false, "Test override denied" end
         local stats = Balance.Weapon(testId)
         local model = WeaponRegistry.weapons[slug]
-        if not stats or not model or (model.weaponType ~= stats.type and not ((stats.type == "bigsword" or stats.type == "dualswords") and model.weaponType == "sword")) then
+        if not stats or not model or (model.weaponType ~= stats.type and not (stats.type == "dualswords" and model.weaponType == "sword")) then
             return false, "Incompatible test model"
         end
         row = gameplayRow(slug, stats, upgrade)
@@ -268,7 +270,7 @@ function WeaponEquipService.Equip(character: Model, slugValue: any, testId: stri
     local attackMovement = WeaponAttackMovement.Resolve(row.weaponType)
     character:SetAttribute("AttackRadius", attackRadiusFor(row))
     character:SetAttribute("MeleeArcAngle", meleeArcFor(row))
-    character:SetAttribute("AnimationWeaponSet", if isDual then (if dualReady then "dualswords" else "1hs") else attackMovement.animationSet)
+    character:SetAttribute("AnimationWeaponSet", if isDual then "dualswords" else attackMovement.animationSet)
     character:SetAttribute("AttackMovementLocomotionMode", attackMovement.locomotionMode)
     character:SetAttribute("AttackMovementRunSpeedMultiplier", attackMovement.runSpeedMultiplier)
     CharacterStatsService.ApplyModifiers(character, row.statModifiers or {})
@@ -348,6 +350,16 @@ function WeaponEquipService.ListAvailable(): { any }
 end
 
 function WeaponEquipService.TestModel(weaponType: string): (string?, boolean)
+    -- GP must use the real 2hs model and the requested pair of identical swords.
+    if weaponType == "bigsword" or weaponType == "dualswords" then
+        local slug = if weaponType == "bigsword" then "newbie_slayer_01" else "newbie_sword_01"
+        local expected = if weaponType == "bigsword" then "bigsword" else "sword"
+        local row = WeaponRegistry.weapons[slug]
+        local model = row and row.weaponType == expected and tonumber(row.modelAssetId)
+            and findByStudioPath(tostring(row.serverStoragePath or ""))
+        if model and model:IsA("Model") then return slug, false end
+        return nil, false
+    end
     local preferred = {sword="newbie_sword_01", dagger="newbie_dagger", bow="newbie_bow"}
     local candidates = {}
     for slug, row in pairs(WeaponRegistry.weapons or {}) do
@@ -359,10 +371,6 @@ function WeaponEquipService.TestModel(weaponType: string): (string?, boolean)
         local row = WeaponRegistry.weapons[slug]
         local model = row and findByStudioPath(tostring(row.serverStoragePath or ""))
         if model and model:IsA("Model") then return slug, false end
-    end
-    if weaponType == "bigsword" or weaponType == "dualswords" then
-        local slug = WeaponEquipService.TestModel("sword")
-        return slug, true
     end
     return nil, false
 end

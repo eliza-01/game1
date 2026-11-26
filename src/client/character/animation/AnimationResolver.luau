@@ -6,6 +6,8 @@ local Registry = require(CharacterShared:WaitForChild("CharacterAnimationRegistr
 local VariantMerge = require(CharacterShared:WaitForChild("CharacterAnimationVariantMerge"))
 local GameplayFallback = require(Game1Shared:WaitForChild("combat"):WaitForChild("GameplayAttackFallback"))
 
+local TestPolicy = require(Game1Shared:WaitForChild("dev"):WaitForChild("GameplayTestAnimationPolicy"))
+
 local AnimationResolver = {}
 local random = Random.new()
 
@@ -52,6 +54,7 @@ function AnimationResolver.Resolve(character: Model, scope: string, weaponSet: s
 	end
 	local rows = nil
 	if scope == "weapon" then
+        weaponSet = TestPolicy.WeaponSet(character, tostring(weaponSet or ""), slot)
 		local weapon = profile.weapons and profile.weapons[tostring(weaponSet or "")]
 		rows = weapon and weapon[slot]
 	elseif scope == "emotions" then

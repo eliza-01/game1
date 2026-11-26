@@ -75,11 +75,32 @@
       }
     },
     {
+      "clipId": "human_male__weapon__2hs__attack__01",
+      "duration": 1.5,
+      "events": {
+        "HitEnd": {
+          "normalizedTime": 0.5387263339070568
+        }
+      }
+    },
+    {
       "clipId": "human_male__weapon__bow__attack__01",
       "duration": 1.5,
       "events": {
         "Release": {
           "normalizedTime": 0.60397
+        }
+      }
+    },
+    {
+      "clipId": "human_male__weapon__dualswords__attack__01",
+      "duration": 1.5,
+      "events": {
+        "HitFirst": {
+          "normalizedTime": 0.27796901893287435
+        },
+        "HitEnd": {
+          "normalizedTime": 0.6290877796901894
         }
       }
     },

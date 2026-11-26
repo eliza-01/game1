@@ -47,7 +47,10 @@ function Loadout.Validate(request: any): (any?, string?)
     local slug, placeholder = nil, false
     if weapon then
         slug, placeholder = Weapons.TestModel(weapon.type)
-        if not slug then return nil, "No synced model for " .. weapon.type end
+        if not slug then
+            local required = if weapon.type == "bigsword" then "newbie_slayer_01" elseif weapon.type == "dualswords" then "newbie_sword_01" else weapon.type
+            return nil, "No published/synced GP model: " .. required
+        end
     end
     return {level=level, weapon=weapon, armor=armor, upgrade=upgrade, slug=slug, placeholder=placeholder, regen=regen, vampiric=vampiric, critPercent=critPercent, critFlat=critFlat, critMultiplier=critMultiplier}, nil
 end

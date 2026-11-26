@@ -5,6 +5,7 @@ local HttpService = game:GetService("HttpService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
 local Movement = require(Shared:WaitForChild("character"):WaitForChild("CharacterMovementConfig"))
 local Fallback = require(Shared:WaitForChild("combat"):WaitForChild("GameplayAttackFallback"))
+local TestPolicy = require(Shared:WaitForChild("dev"):WaitForChild("GameplayTestAnimationPolicy"))
 local Report = {}
 local current: any = nil -- one arena owner per server
 local function number(model: Model, name: string): number
@@ -94,7 +95,8 @@ function Report.Finish(outcome: string): any?
         playerRunStudsPerSecond=Movement.StudsPerSecond(nil,r.playerRunSpeed,"Run"),
         monsterRunStudsPerSecond=Movement.StudsPerSecond(nil,r.monsterRunSpeed,"Run"),
         animationSet=tostring(r.character:GetAttribute("AnimationWeaponSet") or ""), attackClips=r.clips,
-        animationPreview=r.stage.weaponType=="dualswords" and r.character:GetAttribute("AnimationWeaponSet")=="1hs",
+        animationPreview=TestPolicy.BorrowsLocomotion(r.character,tostring(r.character:GetAttribute("AnimationWeaponSet") or "")),
+        locomotionSet=TestPolicy.WeaponSet(r.character,tostring(r.character:GetAttribute("AnimationWeaponSet") or ""),"run"),
         equippedModel=tostring(r.character:GetAttribute("EquippedWeaponSlug") or "")}
 end
 function Report.EmitTrial(index: number, row: any)

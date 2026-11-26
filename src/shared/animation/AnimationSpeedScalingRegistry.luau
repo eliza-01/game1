@@ -275,6 +275,10 @@ return table.freeze({
 			label = "character / human_male / 1hs_walk_01",
 			channel = "walk",
 		}),
+		["95018534036399"] = table.freeze({
+			label = "character / human_male / 2hs_attack_01",
+			channel = "attack",
+		}),
 		["124597466760206"] = table.freeze({
 			label = "character / human_male / base_death_01",
 			channel = "death",
@@ -306,6 +310,10 @@ return table.freeze({
 		["125331371585949"] = table.freeze({
 			label = "character / human_male / bow_walk_01",
 			channel = "walk",
+		}),
+		["70608987841852"] = table.freeze({
+			label = "character / human_male / dualswords_attack_01",
+			channel = "attack",
 		}),
 		["71666921186730"] = table.freeze({
 			label = "character / human_male / hands_attack_01",

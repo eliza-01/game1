@@ -8,7 +8,9 @@
     "maxUpgrade": 10,
     "headshotMultiplier": 1.5,
     "critMultiplier": 2,
-    "maxCritChance": 50
+    "maxCritChance": 50,
+    "baseRunSpeed": 160,
+    "monsterCastSeconds": 0.7
   },
   "levels": [
     {
@@ -702,7 +704,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_002",
@@ -714,7 +717,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_003",
@@ -726,7 +730,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_004",
@@ -738,7 +743,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_005",
@@ -750,7 +756,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_006",
@@ -762,7 +769,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_007",
@@ -774,7 +782,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_008",
@@ -786,7 +795,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_009",
@@ -798,7 +808,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_010",
@@ -810,7 +821,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_011",
@@ -822,7 +834,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_012",
@@ -834,7 +847,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_013",
@@ -846,7 +860,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_014",
@@ -858,7 +873,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_015",
@@ -870,7 +886,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_016",
@@ -882,7 +899,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_017",
@@ -894,7 +912,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_018",
@@ -906,7 +925,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_019",
@@ -918,7 +938,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_020",
@@ -930,7 +951,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_021",
@@ -942,7 +964,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_022",
@@ -954,7 +977,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_023",
@@ -966,7 +990,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_024",
@@ -978,7 +1003,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_025",
@@ -990,7 +1016,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_026",
@@ -1002,7 +1029,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_027",
@@ -1014,7 +1042,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_028",
@@ -1026,7 +1055,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_029",
@@ -1038,7 +1068,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_030",
@@ -1050,7 +1081,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_031",
@@ -1062,7 +1094,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_032",
@@ -1074,7 +1107,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_033",
@@ -1086,7 +1120,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_034",
@@ -1098,7 +1133,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_035",
@@ -1110,7 +1146,8 @@
       "critChance": 5,
       "type": "melee",
       "attackRange": 5,
-      "attackSpeed": 100
+      "attackSpeed": 100,
+      "runSpeed": 130
     },
     {
       "id": "monster_036",
@@ -1122,7 +1159,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_037",
@@ -1134,7 +1172,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_038",
@@ -1146,7 +1185,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_039",
@@ -1158,7 +1198,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_040",
@@ -1170,7 +1211,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_041",
@@ -1182,7 +1224,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_042",
@@ -1194,7 +1237,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_043",
@@ -1206,7 +1250,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_044",
@@ -1218,7 +1263,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_045",
@@ -1230,7 +1276,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_046",
@@ -1242,7 +1289,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_047",
@@ -1254,7 +1302,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_048",
@@ -1266,7 +1315,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_049",
@@ -1278,7 +1328,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_050",
@@ -1290,7 +1341,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_051",
@@ -1302,7 +1354,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_052",
@@ -1314,7 +1367,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_053",
@@ -1326,7 +1380,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_054",
@@ -1338,7 +1393,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_055",
@@ -1350,7 +1406,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_056",
@@ -1362,7 +1419,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_057",
@@ -1374,7 +1432,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_058",
@@ -1386,7 +1445,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_059",
@@ -1398,7 +1458,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_060",
@@ -1410,7 +1471,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_061",
@@ -1422,7 +1484,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_062",
@@ -1434,7 +1497,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_063",
@@ -1446,7 +1510,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_064",
@@ -1458,7 +1523,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_065",
@@ -1470,7 +1536,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_066",
@@ -1482,7 +1549,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_067",
@@ -1494,7 +1562,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_068",
@@ -1506,7 +1575,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_069",
@@ -1518,7 +1588,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     },
     {
       "id": "monster_070",
@@ -1530,7 +1601,8 @@
       "critChance": 5,
       "type": "ranged",
       "attackRange": 40,
-      "attackSpeed": 77
+      "attackSpeed": 77,
+      "runSpeed": 120
     }
   ],
   "weaponBindings": {
@@ -1645,7 +1717,7 @@
         {
           "skillId": "skill_poison",
           "downgrade": true,
-          "trigger": "hit",
+          "trigger": "cast",
           "hpBelow": 50
         }
       ]
@@ -1658,7 +1730,7 @@
         {
           "skillId": "skill_bleed",
           "downgrade": true,
-          "trigger": "hit",
+          "trigger": "cast",
           "hpBelow": 50
         }
       ]
@@ -1671,7 +1743,7 @@
         {
           "skillId": "skill_slow",
           "downgrade": true,
-          "trigger": "hit",
+          "trigger": "cast",
           "hpBelow": 50
         }
       ]
@@ -1684,7 +1756,7 @@
         {
           "skillId": "skill_root",
           "downgrade": true,
-          "trigger": "hit",
+          "trigger": "cast",
           "hpBelow": 50
         }
       ]
@@ -1697,7 +1769,7 @@
         {
           "skillId": "skill_stun",
           "downgrade": true,
-          "trigger": "hit",
+          "trigger": "cast",
           "hpBelow": 50
         }
       ]
@@ -1710,7 +1782,7 @@
         {
           "skillId": "skill_silence",
           "downgrade": true,
-          "trigger": "hit",
+          "trigger": "cast",
           "hpBelow": 50
         }
       ]

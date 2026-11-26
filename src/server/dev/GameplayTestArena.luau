@@ -115,8 +115,8 @@ function Arena.ShowWeapons(parent: Instance, origin: CFrame, character: Model)
         end
     end
 end
-function Arena.GroupPoint(origin: CFrame, index: number, count: number, size: Vector3): Vector3
-    local radius = math.max(9, count * (math.max(size.X, size.Z) + 2) / (2 * math.pi))
+function Arena.GroupPoint(origin: CFrame, index: number, count: number, size: Vector3, startDistance: number?): Vector3
+    local radius = startDistance or math.max(9, count * (math.max(size.X, size.Z) + 2) / (2 * math.pi))
     local angle = (index - 1) * 2 * math.pi / count
     return origin:PointToWorldSpace(Vector3.new(math.sin(angle) * radius, -CharacterConfig.RootAnchorOffset, -math.cos(angle) * radius))
 end

@@ -22,23 +22,23 @@ class SkillCatalogue(unittest.TestCase):
     def test_budget_seed_math_and_toggle(self):
         data=deepcopy(self.data)
         profile=data['skilledMonsters'][0];profile['level']=20;profile['type']='melee'
-        profile['skills']=[{'skillId':'skill_poison','downgrade':True,'trigger':'hit','hpBelow':50}]
+        profile['skills']=[{'skillId':'skill_poison','downgrade':True,'trigger':'cast','hpBelow':50}]
         base=next(x for x in data['monsters'] if x['level']==20 and x['type']=='melee')
         poison=next(x for x in data['skills'] if x['id']=='skill_poison')
         poison.update(duration=4,cooldown=12,power=15,tick=1)
         base.update(damage=84,attackSpeed=100,critChance=5)
         data['rules']['critMultiplier']=2
         row=s.resolve(data)[0]
-        self.assertAlmostEqual(row['factor'],1/(1+.6*1.83/12/1.05))
-        self.assertEqual(row['damage'],77)
+        self.assertAlmostEqual(row['factor'],1/(1+max(0,.6*1.83/12/1.05-data['rules']['monsterCastSeconds']/12)))
+        self.assertEqual(row['damage'],math.floor(base['damage']*row['factor']+.5))
         profile['skills'][0]['downgrade']=False
         self.assertEqual(s.resolve(data)[0]['damage'],84)
         profile['skills'][0]['downgrade']=True
-        profile['skills'].append({'skillId':'skill_stun','downgrade':True,'trigger':'hit','hpBelow':50})
+        profile['skills'].append({'skillId':'skill_stun','downgrade':True,'trigger':'cast','hpBelow':50})
         stun=next(x for x in data['skills'] if x['id']=='skill_stun');stun.update(duration=1.5,cooldown=18,power=100)
         combo=s.resolve(b.validate(data))[0]
-        self.assertAlmostEqual(combo['factor'],row['factor']/1.125)
-        self.assertEqual(combo['damage'],69)
+        self.assertAlmostEqual(combo['factor'],row['factor']/(1+max(0,.125-data['rules']['monsterCastSeconds']/18)))
+        self.assertEqual(combo['damage'],math.floor(base['damage']*combo['factor']+.5))
         profile['type']='ranged'
         self.assertLess(s.resolve(data)[0]['factor'],combo['factor'])
     def test_reject_invalid_references_and_bounds(self):
@@ -58,7 +58,9 @@ class SkillCatalogue(unittest.TestCase):
         self.assertIn('state[effect] then return false',effects)
         self.assertIn('active[target] ~= state',effects)
         self.assertIn('Effects.CanCast(model)',read('src/server/monster/MonsterSkills.luau'))
-        self.assertIn('Skills.OnHit',read('src/server/monster/MonsterAttackExecutor.luau'))
+        self.assertNotIn('Skills.OnHit',read('src/server/monster/MonsterAttackExecutor.luau'))
+        self.assertIn('Special.TryBegin',read('src/server/monster/MonsterAttackExecutor.luau'))
+        self.assertIn('Effects.Apply(model,victim,skill',read('src/server/monster/MonsterSkillCast.luau'))
         self.assertIn('SkillMoveMultiplier',read('src/client/character/MovementController.luau'))
         self.assertIn('t.y + 100',read('src/server/dev/GameplayTestLoadout.luau'))
         self.assertIn('SkillsBridge',read('src/server/dev/GameplayTestLayout.luau'))

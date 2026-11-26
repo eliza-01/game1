@@ -11,6 +11,9 @@ local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild
 local Spawner = require(script.Parent.Parent:WaitForChild("monster"):WaitForChild("MonsterSpawnerService"))
 local Loadout = require(script.Parent:WaitForChild("GameplayTestLoadout"))
 local Arena = require(script.Parent:WaitForChild("GameplayTestArena"))
+local Report = require(script.Parent:WaitForChild("GameplayCombatReport"))
+local Plan = require(script.Parent:WaitForChild("GameplayGuidedPlan"))
+local RuntimeVersion = require(Shared:WaitForChild("RuntimeVersion"))
 local Service = {}
 local session: any = nil
 local started = false
@@ -29,7 +32,22 @@ end
 local function active(s: any): boolean
     return session == s and s.player.Parent == Players
 end
+local function publishGuide(s: any, message: string)
+    s.player:SetAttribute("GameplayGuideStatus", message)
+end
+local function finishTrial(s: any, outcome: string)
+    local row=Report.Finish(outcome)
+    if not row or not s.guide then return end
+    s.guide.running=false
+    local character=s.player.Character
+    if character then character:SetAttribute("GameplayGuideTrial",nil) end
+    if outcome=="interrupted" then publishGuide(s,"Interrupted · retry this trial"); return end
+    table.insert(s.guide.results,row)
+    local total=#s.guide.stages; local done=#s.guide.results
+    publishGuide(s,("%d/%d · %s · %.1f DPS · %.1fs · HP %d/%d%s"):format(done,total,outcome,row.dps,row.seconds,row.hpLeft,row.maxHP,if done==total then " · Done" else " · Next"))
+end
 local function clearGroup(s: any)
+    if s.guide and s.guide.running then finishTrial(s, Report.Outcome() or "interrupted") end
     s.generation += 1
     Arena.Clear(s.group)
     s.groupSupports:ClearAllChildren()
@@ -44,6 +62,7 @@ local function clearSession(s: any)
     s.folder:Destroy()
     if s.deathConnection then s.deathConnection:Disconnect() end
     Loadout.Set(s.player, nil)
+    s.player:SetAttribute("GameplayGuideStatus", nil)
 end
 -- One server-side zone check for the owner, not 35 Touched listeners.
 local function bindTrack(s: any)
@@ -51,8 +70,14 @@ local function bindTrack(s: any)
     s.trackConnection = RunService.Heartbeat:Connect(function(dt)
         elapsed += dt
         if elapsed < 0.1 then return end
+        local sample=elapsed
         elapsed = 0
         if not active(s) then return end
+        if s.guide and s.guide.running then
+            Report.Sample(sample)
+            local outcome=Report.Outcome()
+            if outcome then finishTrial(s,outcome); clearGroup(s) end
+        end
         local character = s.player.Character
         if not character then return end
         local root = character:FindFirstChild("RootCollider")
@@ -61,7 +86,7 @@ local function bindTrack(s: any)
             and character:GetAttribute("Game1GameplayTestOwner") == s.player.UserId
             and root ~= nil and root:IsA("BasePart")
         local onTrack = false
-        if eligible and root and root:IsA("BasePart") then
+        if eligible and root and root:IsA("BasePart") and not (s.guide and s.guide.running) then
             for _, track in ipairs(s.layout.tracks) do
                 if Arena.IsOnTrack(track.top, track.size, root.Position) then onTrack = true; break end
             end
@@ -133,7 +158,7 @@ local function apply(s: any, selection: any)
     end
     return result(true, if selection.weapon and selection.weapon.type == "dualswords" and character:GetAttribute("AnimationWeaponSet") == "1hs" then "Applied · dualswords 1hs animation preview" elseif selection.placeholder then "Applied · sword visual placeholder" else "Loadout applied")
 end
-local function startGroup(s: any, row: any, count: number)
+local function startGroup(s: any, row: any, count: number, stage: any?)
     local character = alive(s.player)
     if not character then return result(false, "Respawn first") end
     clearGroup(s)
@@ -147,7 +172,7 @@ local function startGroup(s: any, row: any, count: number)
     end
     for index = 1, count do
         if not current() then return result(false, "Encounter cancelled") end
-        local point = Arena.GroupPoint(origin, index, count, s.size)
+        local point = Arena.GroupPoint(origin, index, count, s.size, stage and stage.distance)
         local model = Arena.Add(s.player, row, "group", point, origin.Position - point, s.group, s.groupSupports)
         if not current() then return result(false, "Encounter cancelled") end
         if not model then clearGroup(s); return result(false, "Group spawn failed") end
@@ -161,7 +186,15 @@ local function startGroup(s: any, row: any, count: number)
             if not model.Parent then clearGroup(s); return result(false, "Group member disappeared") end
             if model:GetAttribute("MonsterSpawning") == true or model:GetAttribute("Damageable") ~= true then ready = false end
         end
-        if ready then
+        if ready and (not stage or character:GetAttribute("AttackEndsAt")==nil) then
+            if stage then
+                Arena.Warp(character,origin)
+                character:SetAttribute("GameplayGuideTrial",true)
+                Report.Begin(s.player,character,models[1],stage)
+                Report.Sample(0)
+                s.guide.running=true
+                publishGuide(s,("%d/%d · %s · Fight!"):format(#s.guide.results+1,#s.guide.stages,stage.label))
+            end
             for _, model in ipairs(models) do
                 model:SetAttribute("GameplayTestArmed", true)
                 model:SetAttribute("MonsterAggressive", true)
@@ -201,6 +234,36 @@ local function dispatch(player: Player, action: any, request: any)
     local s = session
     if not s or s.player ~= player then return result(false, "Enter Gameplay Test first") end
     if action == "exit" then return exit(s) end
+    if action == "guideAbort" then
+        clearGroup(s); s.guide=nil; publishGuide(s,"Guided test cancelled"); return result(true,"Guided test cancelled")
+    end
+    if action == "guideBegin" then
+        if s.guide then return result(false,"Guided test already exists") end
+        clearGroup(s)
+        s.guide={stages=Plan.Build(),results={},running=false}
+        publishGuide(s,("0/%d · Next to start"):format(#s.guide.stages))
+        return result(true,"Guided test ready")
+    end
+    if action == "guideNext" then
+        local g=s.guide
+        if not g or g.running then return result(false,"Finish current trial first") end
+        local stage=g.stages[#g.results+1]
+        if not stage then return result(false,"All trials complete · Done") end
+        local selection,reason=Loadout.Validate(stage)
+        if not selection then return result(false,tostring(reason)) end
+        local applied=apply(s,selection)
+        if not applied.ok then return applied end
+        local metadata=table.clone(stage); metadata.visualPlaceholder=selection.placeholder
+        return startGroup(s,assert(Balance.Monster(stage.monsterId)),1,metadata)
+    end
+    if action == "guideDone" then
+        local g=s.guide
+        if not g or g.running or #g.results~=#g.stages then return result(false,"Complete all trials first") end
+        Report.Emit(g.results,RuntimeVersion.Version)
+        s.guide=nil; publishGuide(s,"Report exported · copy GP_REPORT from Output")
+        return result(true,"Report exported to server Output")
+    end
+    if s.guide then return result(false,"Guided test active · use Next / Done / Cancel") end
     if action == "recovery" then
         local character = alive(player)
         if not character then return result(false, "Respawn first") end

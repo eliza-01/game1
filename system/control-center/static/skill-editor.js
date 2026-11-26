@@ -33,7 +33,7 @@
   function renderProfiles(){
     const root=$('skilled-editor');root.replaceChildren();if(!snapshot)return;
     const data=snapshot.balance,top=el('div');top.className='actions';top.append(check('Spawn skilled monsters',data.test.skilledEnabled,v=>data.test.skilledEnabled=v));
-    const add=action('+ Monster',()=>{if(data.skilledMonsters.length>=24)return;const s=data.skills.find(s=>!buffs.has(s.effect))||data.skills[0];if(!s)return;data.skilledMonsters.push({id:'skilled_'+crypto.randomUUID().replaceAll('-',''),level:20,type:'melee',skills:[{skillId:s.id,downgrade:true,trigger:buffs.has(s.effect)?'hpBelow':'hit',hpBelow:50}]});change();renderProfiles()});top.append(add);root.append(top);
+    const add=action('+ Monster',()=>{if(data.skilledMonsters.length>=24)return;const s=data.skills.find(s=>!buffs.has(s.effect))||data.skills[0];if(!s)return;data.skilledMonsters.push({id:'skilled_'+crypto.randomUUID().replaceAll('-',''),level:20,type:'melee',skills:[{skillId:s.id,downgrade:true,trigger:buffs.has(s.effect)?'hpBelow':'cast',hpBelow:50}]});change();renderProfiles()});top.append(add);root.append(top);
     const saved=new Map((snapshot.resolvedSkilledMonsters||[]).map(r=>[r.id,r]));
     for(const p of data.skilledMonsters){const panel=el('div');panel.className='panel character-card';const header=el('div');header.className='actions';
       const names=()=>p.skills.map(a=>data.skills.find(s=>s.id===a.skillId)?.name||a.skillId).join(' + ');
@@ -43,10 +43,10 @@
       for(const a of p.skills){const s=data.skills.find(s=>s.id===a.skillId);const isBuff=buffs.has(s?.effect);const tr=el('tr');
         const choices=data.skills.filter(x=>buffs.has(x.effect)===isBuff && !p.skills.some(other=>other!==a&&data.skills.find(y=>y.id===other.skillId)?.effect===x.effect));
         cell(tr,select(choices.map(x=>[x.id,x.name]),a.skillId,v=>{a.skillId=v;queueMicrotask(renderProfiles)}));const budget=r?.skillBudgets?.[a.skillId];cell(tr,check(budget==null?'Auto':`Auto −${(100*budget/(1+budget)).toFixed(1)}%`,a.downgrade,v=>a.downgrade=v));
-        cell(tr,isBuff?select([['attacked','Was attacked'],['hpBelow','HP below'],['expired','Effect expired']],a.trigger,v=>{a.trigger=v;queueMicrotask(renderProfiles)}):'On successful hit');
+        cell(tr,isBuff?select([['attacked','Was attacked'],['hpBelow','HP below'],['expired','Effect expired']],a.trigger,v=>{a.trigger=v;queueMicrotask(renderProfiles)}):'Independent cast');
         cell(tr,isBuff&&a.trigger==='hpBelow'?num(a.hpBelow,v=>a.hpBelow=v,1,99,1):'—');cell(tr,action('−',()=>{if(p.skills.length===1)return;p.skills=p.skills.filter(x=>x!==a);change();renderProfiles()}));body.append(tr);
       }
-      const actions=el('div');actions.className='actions';for(const isBuff of [false,true]){const b=action(isBuff?'+ Buff':'+ Debuff',()=>{const s=data.skills.find(x=>buffs.has(x.effect)===isBuff&&!p.skills.some(a=>data.skills.find(y=>y.id===a.skillId)?.effect===x.effect));if(!s||p.skills.length>=8)return;p.skills.push({skillId:s.id,downgrade:true,trigger:isBuff?'hpBelow':'hit',hpBelow:50});change();renderProfiles()});b.disabled=p.skills.length>=8||!data.skills.some(x=>buffs.has(x.effect)===isBuff&&!p.skills.some(a=>data.skills.find(y=>y.id===a.skillId)?.effect===x.effect));actions.append(b)}panel.append(actions);root.append(panel);
+      const actions=el('div');actions.className='actions';for(const isBuff of [false,true]){const b=action(isBuff?'+ Buff':'+ Debuff',()=>{const s=data.skills.find(x=>buffs.has(x.effect)===isBuff&&!p.skills.some(a=>data.skills.find(y=>y.id===a.skillId)?.effect===x.effect));if(!s||p.skills.length>=8)return;p.skills.push({skillId:s.id,downgrade:true,trigger:isBuff?'hpBelow':'cast',hpBelow:50});change();renderProfiles()});b.disabled=p.skills.length>=8||!data.skills.some(x=>buffs.has(x.effect)===isBuff&&!p.skills.some(a=>data.skills.find(y=>y.id===a.skillId)?.effect===x.effect));actions.append(b)}panel.append(actions);root.append(panel);
     }
   }
   function render(){renderSkills();renderProfiles();buttons()}

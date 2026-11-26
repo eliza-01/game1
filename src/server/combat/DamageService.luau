@@ -9,6 +9,7 @@ local ActorDamageSignals = require(script.Parent:WaitForChild("ActorDamageSignal
 
 local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
 local Healing = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CharacterHealing"))
+local Report = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayCombatReport"))
 local DamageService = {}
 local criticalRandom = Random.new()
 local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
@@ -38,6 +39,7 @@ function DamageService.Apply(attacker: Model?, target: Model, rawDamage: number,
     local hp = math.max(0, tonumber(target:GetAttribute("HP")) or 0)
     local newHP = math.max(0, hp - finalDamage)
 
+    Report.Damage(attacker, target, hp - newHP, critical, headshot == true, periodic == true)
     target:SetAttribute("HP", newHP)
     target:SetAttribute("LastDamage", finalDamage)
     target:SetAttribute("LastCritical", critical)

@@ -61,12 +61,7 @@ local function recompute(character: Model)
     character:SetAttribute("MoveSpeed", tonumber(character:GetAttribute("RunSpeed")) or Config.Default.RunSpeed)
 end
 
-function Service.Initialize(character: Model, startingStats: any?, progressionLevel: number?)
-    local d = Config.Default
-    local stats = if type(startingStats) == "table" then startingStats else {}
-    local function value(stat: string): number
-        return tonumber(stats[stat]) or tonumber(d[stat]) or 0
-    end
+function Service.Initialize(character: Model, _startingStats: any?, progressionLevel: number?)
 
     modifierSources[character] = {}
     local level = Balance.Level(progressionLevel or 1)
@@ -75,11 +70,11 @@ function Service.Initialize(character: Model, startingStats: any?, progressionLe
     setBase(character, "Damage", Balance.Rules.baseDamage)
     setBase(character, "Defense", 0)
     setBase(character, "AttackSpeed", Balance.Rules.baseAttackSpeed)
-    setBase(character, "RunSpeed", value("RunSpeed"))
+    setBase(character, "RunSpeed", Balance.Rules.baseRunSpeed)
     setBase(character, "CritChance", Balance.Rules.critChance)
     character:SetAttribute("CritChance", Critical.Chance(Balance.Rules.critChance))
     setBase(character, "CritMultiplier", Balance.Rules.critMultiplier)
-    character:SetAttribute("MoveSpeed", value("RunSpeed"))
+    character:SetAttribute("MoveSpeed", Balance.Rules.baseRunSpeed)
     character:SetAttribute("HP", level.hp)
     character:SetAttribute("Damageable", true)
     character:SetAttribute("LifeState", "Alive")

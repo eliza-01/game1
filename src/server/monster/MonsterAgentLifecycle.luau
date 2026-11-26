@@ -8,6 +8,7 @@ local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor
 local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
 local TargetPolicy = require(script.Parent:WaitForChild("MonsterTargetPolicy"))
 
+local Special = require(script.Parent:WaitForChild("MonsterSkillCast"))
 local Retreat = require(script.Parent:WaitForChild("MonsterRangedRetreat"))
 local MonsterAgentLifecycle = {}
 local agents: {[Model]: any} = {}
@@ -21,6 +22,7 @@ local function releaseAgent(agent: any)
     if agents[model] ~= agent then return end
     agents[model] = nil
     agent.active = false
+    Special.Cancel(agent)
     Retreat.Clear(agent)
     agent.attackSerial += 1 -- Invalidate delayed Hit and attack-finish callbacks.
     for _, connection in ipairs(agent.lifecycleConnections or {}) do
@@ -38,6 +40,7 @@ local function stopOnDeath(agent: any)
     local model = agent.model
     if agents[model] ~= agent or tostring(model:GetAttribute("LifeState") or "") == "Alive" then return end
     agent.attackSerial += 1
+    Special.Cancel(agent)
     Retreat.Clear(agent)
     Facing.Stop(model)
     agent.attacking = false

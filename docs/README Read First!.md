@@ -81,3 +81,5 @@
 - [M234 · Shared Atlas Editor / Apply Changes / Studio Sync](workflows/SHARED_ATLAS_EDITOR_APPLY_M234_RU.md) — CURRENT: единый редактор атласов для Real Estate и Location Assets, сохранение привязанных вариантов, предпросмотр совместного republish, только явный Studio Sync.
 
 - [**M449 · Options → Sockets, постоянные USE/AIM зоны**](workflows/SOCKET_RANGES_OPTIONS_M449_RU.md) — House/Campfire, валидация и HS Studio Debug override.
+
+- [M531 — Guided Combat Analytics, RunSpeed, касты и VFX](workflows/M531_GUIDED_COMBAT_RU.md).

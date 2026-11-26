@@ -40,7 +40,7 @@ def validate(data, number):
             s=ids[a['skillId']]; e=s['effect']
             if e in effects: raise ValueError('Duplicate effect in profile')
             effects.add(e)
-            if a['trigger'] not in (('hit',) if e in DEBUFFS else ('attacked','hpBelow','expired')): raise ValueError('Invalid skill trigger')
+            if a['trigger'] not in (('cast',) if e in DEBUFFS else ('attacked','hpBelow','expired')): raise ValueError('Invalid skill trigger')
             number(a['hpBelow'],1,99,'HP threshold')
 
 
@@ -59,7 +59,10 @@ def resolve(data):
     out=[]
     for p in data['skilledMonsters']:
         base=bases[p['level'],p['type']]
-        budgets={a['skillId']:budget(skills[a['skillId']],base,data['rules']['critMultiplier']) for a in p['skills']}
+        # Independent casts occupy time that would otherwise be spent attacking.
+        # Retain a downgrade only for the positive net threat budget.
+        budgets={a['skillId']:max(0,budget(skills[a['skillId']],base,data['rules']['critMultiplier'])
+                  - data['rules']['monsterCastSeconds']/skills[a['skillId']]['cooldown']) for a in p['skills']}
         factor=1/prod(1+budgets[a['skillId']] for a in p['skills'] if a['downgrade'])
         row=dict(base,id=p['id'],baseId=base['id'],damage=floor(base['damage']*factor+.5),factor=factor,skills=p['skills'],skillBudgets=budgets)
         out.append(row)

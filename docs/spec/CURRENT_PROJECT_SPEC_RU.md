@@ -132,3 +132,8 @@ Sync Studio работает строго по одному выбранному
 выводится как pendingGeometry, без ложной отметки о применённой геометрии.
 Сохраняется отдельная append-only история изменений ID в Host Agent и журнал
 внутри размещения. См. M216 workflow.
+
+
+## M531 · Guided GP, RunSpeed и отдельные специальные касты
+
+См. `docs/workflows/M531_GUIDED_COMBAT_RU.md` и KBN-0025–0030. Database владеет RunSpeed игрока и привязанных монстров. Debuff trigger `cast`; отдельная special-action, визуализация без изменения навигации; GP отчёт серверный, неперсистентный. Studio-приёмка открыта.

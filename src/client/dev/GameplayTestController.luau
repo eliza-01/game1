@@ -231,7 +231,7 @@ function Controller.Start()
         local queuedAction: string? = nil
         local queuedRecovery = false
         local lastRequestAt = -math.huge
-        local closeOnSuccess = {enter=true, apply=true, start=true, visit=true, exit=true}
+        local closeOnSuccess = {enter=true, apply=true, start=true, visit=true, exit=true, guideNext=true}
         invoke = function(action: string)
             if action == "enter" or action == "apply" or action == "start" or action == "exit" then
                 recoveryRevision += 1
@@ -291,6 +291,21 @@ function Controller.Start()
         local navigation = row(body, 30)
         local visit = contentButton(navigation, "Go", 30); visit.Activated:Connect(function() invoke("visit") end)
         start.Activated:Connect(function() invoke("start") end)
+        local guideRow=row(body,30); horizontal(guideRow)
+        for _,action in ipairs({{"Guided","guideBegin"},{"Next","guideNext"},{"Done","guideDone"},{"Cancel","guideAbort"}}) do
+            local b=contentButton(guideRow,action[1],30); b.Activated:Connect(function() invoke(action[2]) end)
+        end
+        local guideCaption=label(gui,"",UDim2.new(0,350,0,42)); guideCaption.AnchorPoint=Vector2.new(0.5,0)
+        guideCaption.Position=UDim2.new(.5,0,0,80); guideCaption.BackgroundColor3=colors.panel; guideCaption.BackgroundTransparency=.15
+        guideCaption.TextXAlignment=Enum.TextXAlignment.Center; rounded(guideCaption)
+        local function refreshGuide()
+            local value=player:GetAttribute("GameplayGuideStatus")
+            guideCaption.Visible=type(value)=="string" and value~="" and player:GetAttribute("Game1GameplayTestActive")==true
+            guideCaption.Text=tostring(value or "")
+        end
+        player:GetAttributeChangedSignal("GameplayGuideStatus"):Connect(refreshGuide)
+        player:GetAttributeChangedSignal("Game1GameplayTestActive"):Connect(refreshGuide)
+        refreshGuide()
         local function refresh()
             local inWorld = player.Character ~= nil and playerGui:GetAttribute("Game1CharacterSceneInputBlocked") ~= true
             gui.Enabled = inWorld

@@ -146,7 +146,15 @@ local function createNavigationRig(runtimeModel: Model, visual: Model, visualRoo
     rootWeld.Part1 = root
     rootWeld.Parent = navigationRoot
 
-    local visualWeld = Instance.new("WeldConstraint")
+    local visualWeld
+    if runtimeModel:GetAttribute("MonsterSkillCaster") == true then
+        navigationRoot.RootPriority=127
+        local castWeld=Instance.new("Weld")
+        castWeld.C0=root.CFrame:ToObjectSpace(visualRoot.CFrame)
+        visualWeld=castWeld
+    else
+        visualWeld=Instance.new("WeldConstraint")
+    end
     visualWeld.Name = "VisualRootWeld"
     visualWeld.Part0 = root
     visualWeld.Part1 = visualRoot

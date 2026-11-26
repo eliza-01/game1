@@ -20,6 +20,7 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     local balance = Balance.MonsterForModel(tostring(definition.slug or record.monsterSlug or ""))
     if record.testOwner then balance = Balance.Monster(record.testBalanceId) end
     local maxHP = if balance then balance.hp else math.max(1, finite(stats.MaxHP, 100))
+    model:SetAttribute("MonsterSkillCaster", if balance and balance.skills and record.testOwner then true else nil)
     model:SetAttribute("MonsterBalanceId", if balance then balance.id else "")
     model:SetAttribute("RewardXP", if balance then balance.xp else 0)
     model:SetAttribute("RewardGold", if balance then balance.gold else 0)
@@ -42,7 +43,8 @@ local function applyMonsterAttributes(model: Model, definition: any, record: any
     model:SetAttribute("HP", maxHP)
     model:SetAttribute("Damage", if balance then balance.damage else math.max(0, finite(stats.Damage, 10)))
     model:SetAttribute("AttackSpeed", if balance then balance.attackSpeed else math.max(1, finite(stats.AttackSpeed, 100)))
-    model:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
+    model:SetAttribute("RunSpeed", if balance then balance.runSpeed else math.max(0, finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)))
+    model:SetAttribute("BaseRunSpeed", model:GetAttribute("RunSpeed"))
     local debugLocomotion = tostring(Workspace:GetAttribute("Game1MonsterDebugLocomotionMode") or "Walk")
     model:SetAttribute("MonsterLocomotionMode", string.lower(debugLocomotion) == "run" and "Run" or "Walk")
     model:SetAttribute("CritChance", Critical.Chance(if balance then balance.critChance else finite(stats.CritChance, 0)))

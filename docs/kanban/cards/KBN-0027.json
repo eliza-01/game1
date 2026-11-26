@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0027",
+  "title": "Character Skills",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0027.md",
+  "specSha256": "1b0f3a48b526edbe299e1b27bd24cdb9157a603f0e7dda888ee6b27a5ddf8fed",
+  "dependsOn": [
+    "KBN-0026"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-26T00:00:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0027-T01",
+      "title": "Согласовать по три навыка на каждый из пяти видов оружия",
+      "done": false
+    },
+    {
+      "id": "KBN-0027-T02",
+      "title": "Реализовать общую архитектуру каста, затрат времени, cooldown и анимаций",
+      "done": false
+    },
+    {
+      "id": "KBN-0027-T03",
+      "title": "Сбалансировать навыки по GP, включая Global Silence",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0027-A01",
+      "title": "Все пять типов оружия имеют три проверенных навыка",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0027-A02",
+      "title": "Серверная авторизация каста и урона, PC/mobile",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

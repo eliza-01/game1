@@ -31,6 +31,7 @@ local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursui
 local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
 
 
+local Report = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayCombatReport"))
 local AttackService = {}
 local pendingBowReleases: { [Player]: any } = {}
 
@@ -412,6 +413,7 @@ local function attack(player: Player, payload: any)
         local origin, direction = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
         AttackSessionStore.SetAim(player, character, serial, clientAttackId, origin, direction)
     end
+    Report.Attack(character, serial, clipId)
     character:SetAttribute("AttackSerial", serial)
     character:SetAttribute("AttackClipId", clipId)
     character:SetAttribute("AttackStartedAt", now)

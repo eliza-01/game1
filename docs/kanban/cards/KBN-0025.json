@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0025",
+  "title": "Combat Analytics · управляемый GP",
+  "domain": "Balance",
+  "status": "CODE_COMPLETE",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0025.md",
+  "specSha256": "1750cf754e19ed0311fe15a8f9ff0c674df96cebe926f74e20d27a98e3c16e57",
+  "dependsOn": [],
+  "revision": 1,
+  "updatedAt": "2026-11-26T00:00:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0025-T01",
+      "title": "Серверный учёт фактически снятых HP, критов, попаданий, времени и эффектов",
+      "done": true
+    },
+    {
+      "id": "KBN-0025-T02",
+      "title": "Пошаговая серия: 5 видов оружия, melee/ranged, 3 повтора, skilled monsters",
+      "done": true
+    },
+    {
+      "id": "KBN-0025-T03",
+      "title": "Проверить реальные анимации, скорости, отчёт и воспроизводимость в Studio",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0025-A01",
+      "title": "Провести все испытания и получить GP_REPORT / GP_SUMMARY без пропусков",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0025-A02",
+      "title": "Проверить смерть, отмену, timeout, отсутствие наград и изоляцию теста",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

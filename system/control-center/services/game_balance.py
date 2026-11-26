@@ -25,9 +25,9 @@ FIELDS = {
                 'upgradePrice': (0, 100000000)},
     'armor': {'level': (1, 35), 'hp': (0, 1000000), 'price': (0, 100000000)},
     'monsters': {'level': (1, 35), 'hp': (1, 1000000), 'damage': (0, 1000000),
-                 'xp': (0, 100000000), 'gold': (0, 100000000), 'critChance': (0, 50), 'attackRange': (1, 100), 'attackSpeed': (1, 400)},
+                 'xp': (0, 100000000), 'gold': (0, 100000000), 'critChance': (0, 50), 'attackRange': (1, 100), 'attackSpeed': (1, 400), 'runSpeed': (1, 400)},
 }
-RULES = {'baseDamage': (0, 100000), 'baseAttackSpeed': (25, 400), 'critChance': (0, 50), 'maxCritChance': (1, 50), 'upgradePercent': (0, 100),
+RULES = {'baseDamage': (0, 100000), 'baseAttackSpeed': (25, 400), 'baseRunSpeed': (1, 400), 'monsterCastSeconds': (0.2, 2), 'critChance': (0, 50), 'maxCritChance': (1, 50), 'upgradePercent': (0, 100),
          'maxUpgrade': (0, 20), 'headshotMultiplier': (1, 5), 'critMultiplier': (1, 5)}
 
 
@@ -43,7 +43,7 @@ def validate(data):
     if not isinstance(data['rules'], dict) or set(data['rules']) != set(RULES):
         raise ValueError('Invalid rules')
     for field, (lo, hi) in RULES.items():
-        number(data['rules'][field], lo, hi, field, field not in ('upgradePercent','headshotMultiplier','critMultiplier','critChance','maxCritChance'))
+        number(data['rules'][field], lo, hi, field, field not in ('upgradePercent','headshotMultiplier','critMultiplier','critChance','maxCritChance','monsterCastSeconds'))
     if not isinstance(data['test'], dict) or set(data['test']) != {'x','y','z','yaw','maxGroup','skilledEnabled'}:
         raise ValueError('Invalid gameplay test configuration')
     for axis in ('x','y','z'): number(data['test'][axis], -100000, 100000, axis, False)

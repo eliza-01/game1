@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0028",
+  "title": "Monster Archetypes",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0028.md",
+  "specSha256": "471f62ed1999e40450db93230518b9bcda9809ddfa7d1342e4c1d6bf15956e5a",
+  "dependsOn": [
+    "KBN-0025",
+    "KBN-0026",
+    "KBN-0027"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-26T00:00:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0028-T01",
+      "title": "Обычные, быстрые, танки, усиленные, элитные, саппорты",
+      "done": false
+    },
+    {
+      "id": "KBN-0028-T02",
+      "title": "Независимые коэффициенты характеристик, навыки, награды",
+      "done": false
+    },
+    {
+      "id": "KBN-0028-T03",
+      "title": "Сравнить сложность, TTK и эффективность группы по отчётам",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0028-A01",
+      "title": "Архетипы имеют измеримые различия без доминирующей стратегии",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

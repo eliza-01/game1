@@ -178,6 +178,7 @@ function Controller.Start()
     if started then return end
     started = true
     build(player:WaitForChild("PlayerGui"))
+    require(script.Parent:WaitForChild("StatusEffectVisuals")).Start()
     Settings.Changed(applyStyle)
     applyStyle()
     player.CharacterAdded:Connect(bind)

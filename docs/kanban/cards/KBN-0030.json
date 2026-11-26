@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0030",
+  "title": "Test Suite Cleanup",
+  "domain": "Tooling",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0030.md",
+  "specSha256": "07bd98ff84f73df96028fd8537a444c6f4dbae062398aef15e5ab2976e79f991",
+  "dependsOn": [],
+  "revision": 1,
+  "updatedAt": "2026-11-26T00:00:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0030-T01",
+      "title": "Разделить устаревшие контрактные проверки и реальные ошибки",
+      "done": false
+    },
+    {
+      "id": "KBN-0030-T02",
+      "title": "Исправить предупреждения SQLite и тестовые фикстуры Character Components",
+      "done": false
+    },
+    {
+      "id": "KBN-0030-T03",
+      "title": "Запустить весь набор с ResourceWarning и зафиксировать результаты",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0030-A01",
+      "title": "Полный регрессионный прогон воспроизводим без скрытых пропусков",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

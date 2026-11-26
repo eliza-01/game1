@@ -47,7 +47,7 @@ class CompactGameplay(unittest.TestCase):
         self.assertIn('if not enabled then return 0 end', UI)
         self.assertIn('input.FocusLost:Connect', UI)
         self.assertIn('invoke("recovery")', UI)
-        self.assertIn('local closeOnSuccess = {enter=true, apply=true, start=true, visit=true, exit=true}', UI)
+        self.assertIn('local closeOnSuccess = {enter=true, apply=true, start=true, visit=true, exit=true, guideNext=true}', UI)
         self.assertIn('response.ok and closeOnSuccess[action]', UI)
         self.assertIn('if action == "recovery" then queuedRecovery = true else queuedAction = action end', UI)
         self.assertIn('local delaySeconds = 0.4 - (os.clock() - lastRequestAt)', UI)

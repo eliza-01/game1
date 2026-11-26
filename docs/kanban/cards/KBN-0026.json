@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0026",
+  "title": "Effects & Status System",
+  "domain": "Balance",
+  "status": "IN_PROGRESS",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0026.md",
+  "specSha256": "53645f4e13797a2d308ec5c0ea51206af32709b16933d500067c73afa18e0b80",
+  "dependsOn": [
+    "KBN-0025"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-26T00:00:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0026-T01",
+      "title": "Независимый atk_special с cooldown и проверкой дальности, процедурные касты и VFX",
+      "done": true
+    },
+    {
+      "id": "KBN-0026-T02",
+      "title": "Проверить визуальные эффекты и ограничения движения в Studio, в том числе на втором клиенте",
+      "done": false
+    },
+    {
+      "id": "KBN-0026-T03",
+      "title": "Довести UI статусов, иммунитеты, правила обновления/снятия и серверную защиту перемещения",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0026-A01",
+      "title": "Каждый эффект визуально читаем, не изменяет физику и корректно очищается",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0026-A02",
+      "title": "Длительность, иммунитеты и правила повторного наложения проверены",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

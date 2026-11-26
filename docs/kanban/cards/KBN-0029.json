@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0029",
+  "title": "Progression & Economy",
+  "domain": "Balance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "specPath": "docs/kanban/specs/KBN-0029.md",
+  "specSha256": "6641a2da502346b89df7e1bf765e0b6e794f94e9871d033cbfc7aeb4428e49be",
+  "dependsOn": [
+    "KBN-0028"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-26T00:00:00+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0029-T01",
+      "title": "Пересчитать XP, золото, цену, заточку и достижение грейдов",
+      "done": false
+    },
+    {
+      "id": "KBN-0029-T02",
+      "title": "Сопоставить 15-минутные сессии по GP и реальному gameplay",
+      "done": false
+    },
+    {
+      "id": "KBN-0029-T03",
+      "title": "Подтвердить числа с владельцем до изменения экономики",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0029-A01",
+      "title": "Прогрессия и экономика проверены на контрольных сценариях",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

@@ -16,7 +16,7 @@ local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
 
 local Retreat = require(script.Parent:WaitForChild("MonsterRangedRetreat"))
-local Skills = require(script.Parent:WaitForChild("MonsterSkills"))
+local Special = require(script.Parent:WaitForChild("MonsterSkillCast"))
 local MonsterAttackExecutor = {}
 local ATTACK_PURSUIT_SPEED_MULTIPLIER = 1.65
 MonsterAttackExecutor.PursuitSpeedMultiplier = ATTACK_PURSUIT_SPEED_MULTIPLIER
@@ -87,6 +87,7 @@ end
 
 function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, random: Random)
     if agent.attacking or os.clock() < agent.nextAttackAt then return end
+    if Special.TryBegin(agent,target) then return end
     local row = Presentation.WeightedRow(agent.attackRows, random)
     if not row then return end
     local percent = AnimationSpeedScaling.ResolveForAnimation(agent.model, "attack", row.animationId)
@@ -141,7 +142,6 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
         end
         if TargetPolicy.AttackStillConnects(agent, target) then
             local damage, killed = DamageService.Apply(agent.model, target, finite(agent.model:GetAttribute("Damage"), 0) * finite(agent.model:GetAttribute("SkillDamageMultiplier"), 1))
-            if damage > 0 and not killed then Skills.OnHit(agent.model,target) end
             HitEffectService.Publish(agent.model, target, target:GetAttribute("LastCritical") == true, rootOf(target) and rootOf(target).Position or nil)
             agent.model:SetAttribute("LastMonsterAttackDamage", damage)
             agent.model:SetAttribute("MonsterAttackPhase", if damage > 0 then "Hit" else "Miss")

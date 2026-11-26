@@ -47,7 +47,7 @@ function Healing.OnDamage(attacker: Model?, target: Model, actualLoss: number)
     local owner = testOwner(attacker)
     if not owner or target:GetAttribute("Game1GameplayTestOwner") ~= owner.UserId then return end
     local kind = target:GetAttribute("GameplayTestKind")
-    if kind ~= "line" and kind ~= "group" then return end
+    if kind ~= "zone" and kind ~= "group" then return end
     local rate = Healing.TestRate(attacker, "GameplayTestVampiric")
     if rate > 0 then Healing.Restore(attacker, actualLoss * rate / 100) end
 end

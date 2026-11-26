@@ -1,4 +1,4 @@
-"""M518: passive line monsters participate in the normal retaliation pipeline."""
+"""M518: zone monsters participate in the normal retaliation pipeline."""
 from pathlib import Path
 import unittest
 
@@ -7,14 +7,14 @@ def read(path):
     return (ROOT / path).read_text(encoding='utf8')
 
 class TestRetaliation(unittest.TestCase):
-    def test_line_uses_mobile_agent_but_remains_passive(self):
+    def test_zone_uses_mobile_agent(self):
         lifecycle = read('src/server/monster/MonsterAgentLifecycle.luau')
         spawner = read('src/server/monster/MonsterSpawnerService.luau')
         initial = read('src/server/monster/MonsterInitialAttributes.luau')
-        self.assertNotIn('if model:GetAttribute("GameplayTestKind") == "line" then return end', lifecycle)
+        self.assertNotIn('if model:GetAttribute("GameplayTestKind") == "zone" then return end', lifecycle)
         self.assertNotIn('navigationRoot.Anchored = true', spawner)
         self.assertIn('if not record.testOwner then wanderController:Start', spawner)
-        self.assertIn('aggressive = false -- group is armed atomically', initial)
+        self.assertIn('aggressive = record.testKind == "zone"', initial)
         ai = read('src/server/monster/MonsterAIService.luau')
         self.assertIn('if not aggressive(agent) and not agent.retaliating and not agent.returning', ai)
         self.assertIn('DamageSignals.Event:Connect(onDamaged)', ai)
@@ -23,8 +23,8 @@ class TestRetaliation(unittest.TestCase):
     def test_owner_only_damage_both_directions(self):
         policy = read('src/server/dev/GameplayTestIsolation.luau')
         self.assertIn('if source == nil or source ~= destination or not attacker then return false end', policy)
-        self.assertIn('(sourceKind == "player" and (targetKind == "line" or targetKind == "group"))', policy)
-        self.assertIn('((sourceKind == "line" or sourceKind == "group") and targetKind == "player")', policy)
+        self.assertIn('(sourceKind == "player" and (targetKind == "zone" or targetKind == "group"))', policy)
+        self.assertIn('((sourceKind == "zone" or sourceKind == "group") and targetKind == "player")', policy)
         self.assertIn('sourceKind == "group" and attacker:GetAttribute("GameplayTestArmed") ~= true', policy)
         self.assertIn('targetKind == "group" and target:GetAttribute("GameplayTestArmed") ~= true', policy)
         self.assertIn('Isolation.Allows(attacker, target)', read('src/server/combat/DamageService.luau'))

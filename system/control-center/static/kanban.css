@@ -69,7 +69,7 @@
 .kb-map-zone{cursor:pointer;outline:none}
 .kb-map-zone rect{fill:var(--zone-color);fill-opacity:.16;stroke:var(--zone-color);stroke-width:1.5}
 .kb-map-zone:hover rect,.kb-map-zone:focus-visible rect{fill-opacity:.32;stroke-width:3}
-.kb-map-name{fill:var(--text);font-size:19px;font-weight:750}
+.kb-map-name{fill:var(--text);font-size:16px;font-weight:750}
 .kb-map-level{fill:var(--text);font-size:14px;opacity:.8}
 .kb-map-route path{stroke:#bfa574;stroke-width:3}
 .kb-map-route polygon{fill:#bfa574}
@@ -84,3 +84,5 @@
 .kb-design-section>.kb-group{margin:0 10px 10px;border:0}
 .kb-design-table tbody tr:nth-child(even){background:var(--panel2)}
 .kb-design-table td:first-child{font-weight:600}
+
+.kb-zone-art{display:block;width:100%;height:auto;aspect-ratio:24/7;object-fit:cover;border-radius:10px;margin:5px 0 12px;border:1px solid color-mix(in srgb,var(--zone-color,#8090a0) 45%,transparent);background:#28343b}

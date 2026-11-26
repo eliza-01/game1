@@ -1,36 +1,32 @@
--- Run in Studio server Command Bar after Rojo Sync, without entering GP.
-local dev = game:GetService("ServerScriptService"):WaitForChild("Game1Server"):WaitForChild("dev")
-local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
-local Balance = require(Shared.balance.Balance)
-local Config = require(Shared.character.CharacterConfig)
-local Layout = require(dev.GameplayTestLayout)
-local Approach = require(dev.GameplayTestApproach)
-local origin = CFrame.new(236.646, -53.76, 49.04) * CFrame.Angles(0, math.rad(137.647), 0)
-local spacing = 40
-local layout = Layout.Build(origin, Balance.Monsters, Balance.MaxLevel, spacing, Vector3.new(3, 5, 3), 12)
-assert(#layout.tracks == 2 and Balance.MaxLevel == 35)
-local function feetToRoot(point) return point + Vector3.new(0, Config.RootAnchorOffset, 0) end
-local count = 0
-for _, row in ipairs(Balance.Monsters) do
-    local slot = assert(layout.slots[row.id]); count += 1
-    if row.type == "ranged" then
-        local track = layout.tracks[2]
-        local relative = track.top:PointToObjectSpace(slot.point)
-        assert(math.abs(math.abs(relative.Z) - track.size.Z / 2 - row.attackRange) < 0.001)
-        local model = Instance.new("Model")
-        model:SetAttribute("GameplayTestKind", "line")
-        model:SetAttribute("MonsterCombatType", "ranged")
-        model:SetAttribute("GameplayTestApproachFrame", slot.approachFrame)
-        model:SetAttribute("GameplayTestApproachSize", slot.approachSize)
-        assert(Approach.Allows(model, slot.visit.Position), row.id .. " Go should activate lane")
-        assert(not Approach.Allows(model, feetToRoot(track.top:PointToWorldSpace(Vector3.new(relative.X,0,0)))))
-        assert(not Approach.Allows(model, feetToRoot(slot.approachFrame.Position + origin.RightVector * spacing)))
-        model:SetAttribute("GameplayTestKind", "group")
-        assert(Approach.Allows(model, feetToRoot(track.top.Position)))
-        model:Destroy()
-    else
-        assert(slot.approachFrame == nil)
-    end
+-- M539 replacement for the retired lane test. Studio Server Command Bar, without entering GP.
+local dev=game:GetService("ServerScriptService"):WaitForChild("Game1Server"):WaitForChild("dev")
+local Shared=game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+local Balance=require(Shared.balance.Balance)
+local Layout=require(dev.GameplayTestLayout)
+local origin=CFrame.new(236.646,46.24,49.04)*CFrame.Angles(0,math.rad(137.647),0)
+local layout=Layout.Build(origin,Balance.Monsters,Balance.MaxLevel,40,Vector3.new(3,5,3),12,Balance.SkilledMonsters)
+assert(Balance.MaxLevel==35)
+local count=0
+for _,row in ipairs(Balance.Monsters) do
+    local slot=assert(layout.slots[row.id]); count+=1
+    local box=assert(layout.boxes[slot.zone]); assert(row.level>=box.low and row.level<=box.high)
+    local p=box.top:PointToObjectSpace(slot.point)
+    assert(math.abs(p.X)<box.size.X/2 and math.abs(p.Z)<box.size.Z/2 and math.abs(p.Y)<0.01)
+    local v=box.top:PointToObjectSpace(slot.visit.Position)
+    assert(math.abs(v.X)<box.size.X/2 and math.abs(v.Z)<box.size.Z/2)
+    assert(box.size.X==384 and box.size.Z==384 and box.size.Y==16)
 end
-assert(count == 70)
-print("[M526] 70 slots, rotated frame, range offsets, Go, safe track, neighbouring lane and group checks passed")
+assert(count==70)
+for _,row in ipairs(Balance.SkilledMonsters) do assert(layout.slots[row.id].zone==8) end
+for _,slot in pairs(layout.slots) do
+    local box=layout.boxes[slot.zone]
+    local p=box.top:PointToObjectSpace(slot.point)
+    local v=box.top:PointToObjectSpace(slot.visit.Position)
+    assert(math.abs(p.X)+slot.homeRadius<=192 and math.abs(p.Z)+slot.homeRadius<=192)
+    assert(math.abs(v.X)<192 and math.abs(v.Z)<192)
+end
+for _,box in pairs(layout.boxes) do
+    local e=box.top:PointToObjectSpace(box.entry.Position)
+    assert(math.abs(e.Z)<192 and math.abs(e.X)<192)
+end
+print("[M540] 70 slots, rotated frame, zone bounds, visits and skilled annex passed")

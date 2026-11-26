@@ -128,7 +128,7 @@ local function baseMoveSpeedForCurrentState(targetCharacter: Model): number
 		targetCharacter:GetAttribute("CharacterArchetype"),
 		targetCharacter:GetAttribute("RunSpeed"),
 		movementMode
-	) * CharacterMovementConfig.TestTrackRunMultiplier(targetCharacter, movementMode)
+	)
 end
 
 local function bindCharacter(newCharacter: Model)
@@ -197,7 +197,7 @@ local function bindCharacter(newCharacter: Model)
 	-- Movement owns jump state; animation only reads these presentation attributes.
 	newCharacter:SetAttribute("AnimationAirborne", false)
 	newCharacter:SetAttribute("AnimationJumpSequence", 0)
-	for _, attribute in ipairs({"RunSpeed", "GameplayTestOnTrack"}) do
+	for _, attribute in ipairs({"RunSpeed"}) do
 		newCharacter:GetAttributeChangedSignal(attribute):Connect(function()
 			if character == newCharacter and controllerManager then
 				controllerManager.BaseMoveSpeed = baseMoveSpeedForCurrentState(newCharacter)
@@ -445,7 +445,7 @@ local function applyMovementMode(walkModifierActive: boolean, backwardActive: bo
 				character:GetAttribute("CharacterArchetype"),
 				character:GetAttribute("RunSpeed"),
 				nextMode
-			) * CharacterMovementConfig.TestTrackRunMultiplier(character, nextMode)
+			)
 		end
         controllerManager.BaseMoveSpeed *= math.clamp(tonumber(character:GetAttribute("SkillMoveMultiplier")) or 1,0,1)
 	end

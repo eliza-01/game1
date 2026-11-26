@@ -213,7 +213,7 @@ return table.freeze({
 		maxActiveLeaves = 32,
 	}),
 	characterCreation = table.freeze({
-		enabled = true,
+		enabled = false,
 		useStudioAnchors = true,
 		transitionSeconds = 0.9,
 		faceTransitionSeconds = 0.65,

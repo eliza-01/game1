@@ -1,87 +1,73 @@
 --!strict
--- Pure geometry in the authored origin frame. No spawning or AI state.
+-- Compact graybox map. Coordinates are in the authored origin frame.
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
 local CharacterConfig = require(Shared:WaitForChild("character"):WaitForChild("CharacterConfig"))
 local Layout = {}
+local ZONE_SIZE = 384
+local GAP = 24
+local PITCH = ZONE_SIZE + GAP
+local HEIGHT = 16
+-- Same topology as Design. The annex is not release content.
+local zones = {
+    {name="Солнечная долина", low=1, high=4, col=2, row=4, color=Color3.fromHex("83ad61"), gear={1,5,10}},
+    {name="Безмолвный лес", low=5, high=9, col=1, row=4, color=Color3.fromHex("9b85c4"), gear={1,5,10}},
+    {name="Расколотые земли", low=10, high=14, col=1, row=3, color=Color3.fromHex("c4a16f"), gear={5,10,15}},
+    {name="Забытые сады", low=15, high=19, col=2, row=3, color=Color3.fromHex("45b6a0"), gear={10,15,20}},
+    {name="Пепельный бастион", low=20, high=24, col=2, row=2, color=Color3.fromHex("c77659"), gear={15,20,25}},
+    {name="Драконий предел", low=25, high=30, col=2, row=1, color=Color3.fromHex("789bd4"), gear={20,25,30}},
+    {name="Резерв · GP", low=31, high=35, col=1, row=1, color=Color3.fromHex("7c8490"), gear={25,30,35}},
+    {name="Skilled · GP", low=20, high=20, col=1, row=2, color=Color3.fromHex("a17eb7"), gear={15,20,25}, skilled=true},
+}
 function Layout.Build(origin: CFrame, rows: {any}, maxLevel: number, spacing: number, size: Vector3, maxGroup: number, skilledRows: {any})
-    local columns = math.ceil(maxLevel / 2)
-    local groupMargin = math.max(12, math.max(size.X, size.Z) / 2 + 4, math.ceil(maxGroup * (math.max(size.X, size.Z) + 2) / (2 * math.pi)) + 4)
-    local width = (columns - 1) * spacing + 2 * groupMargin
-    local centerX = (columns - 1) * spacing / 2
     local floorY = -CharacterConfig.RootAnchorOffset
-    local trackWidth = 12
-    local meleeGap = math.max(16, spacing / 2)
-    local hubHalf = math.max(44, groupMargin + 8)
-    local meleeTrackZ = -(hubHalf + 40 + groupMargin + meleeGap)
-    local maxRange = 0
-    for _, row in ipairs(rows) do if row.type == "ranged" then maxRange = math.max(maxRange, row.attackRange) end end
-    local rangedTrackZ = meleeTrackZ - meleeGap - groupMargin * 2 - maxRange - trackWidth / 2 - 32
-    local function frame(x: number, z: number): CFrame
-        return origin * CFrame.new(x, floorY, z)
+    local function frame(x: number, z: number): CFrame return origin * CFrame.new(x, floorY, z) end
+    local platforms, slots, boxes = {}, {}, {}
+    local hubWidth = math.max(216, spacing * 3, maxGroup * (size.Magnitude + 2) / math.pi + 100)
+    table.insert(platforms,{name="Hub",top=frame(0,0),size=Vector3.new(hubWidth,0,hubWidth),color=Color3.fromRGB(64,76,92)})
+    local firstZ = -(hubWidth/2 + GAP + ZONE_SIZE/2)
+    local function center(zone: any): CFrame
+        return frame((zone.col-2)*PITCH, firstZ+(zone.row-4)*PITCH)
     end
-    local tracks = {
-        {name="MeleeSprintTrack", top=frame(centerX, meleeTrackZ), size=Vector3.new(width, 0, trackWidth)},
-        {name="RangedSprintTrack", top=frame(centerX, rangedTrackZ), size=Vector3.new(width, 0, trackWidth)},
-    }
-    local slots = {}
-    for _, row in ipairs(rows) do
-        local side = if row.level <= columns then 1 else -1
-        local column = (row.level - 1) % columns
-        local x = column * spacing
-        local ranged = row.type == "ranged"
-        local trackZ = if ranged then rangedTrackZ else meleeTrackZ
-        local offset = if ranged then trackWidth / 2 + row.attackRange else meleeGap
-        local z = trackZ + side * offset
-        local approachFrame: CFrame? = nil
-        local approachSize: Vector3? = nil
-        if ranged then
-            approachFrame = frame(x, trackZ + side * (trackWidth / 2 + row.attackRange / 2))
-            approachSize = Vector3.new(math.min(10, spacing - 4), 0, row.attackRange)
+    local function addBridge(name: string, a: CFrame, b: CFrame, length: number)
+        local midpoint = (a.Position+b.Position)/2
+        local direction = (b.Position-a.Position).Unit
+        table.insert(platforms,{name=name,top=CFrame.lookAt(midpoint,midpoint+direction),size=Vector3.new(32,0,length+4),color=Color3.fromRGB(78,86,94)})
+    end
+    for index, zone in ipairs(zones) do
+        if zone.low>maxLevel or (zone.skilled and #skilledRows==0) then continue end
+        local top = center(zone)
+        local box = {index=index,name=zone.name,low=zone.low,high=math.min(zone.high,maxLevel),top=top,size=Vector3.new(ZONE_SIZE,HEIGHT,ZONE_SIZE),color=zone.color,gear=zone.gear,
+            entry=top*CFrame.new(0,CharacterConfig.RootAnchorOffset,ZONE_SIZE/2-24),skilled=zone.skilled}
+        boxes[index]=box
+        table.insert(platforms,{name="Zone_"..index,top=top,size=Vector3.new(ZONE_SIZE,0,ZONE_SIZE),color=zone.color:Lerp(Color3.fromRGB(40,46,52),0.65)})
+        local selected={}
+        for _, row in ipairs(if zone.skilled then skilledRows else rows) do
+            if zone.skilled or (row.level>=zone.low and row.level<=zone.high) then table.insert(selected,row) end
         end
-        local visitDistance = if ranged then row.attackRange * 0.75 else math.min(5, meleeGap - trackWidth / 2 - 1)
-        local visit = frame(x, z - side * visitDistance)
-        local point = frame(x, z).Position
-        local facing = origin.LookVector * side
-        slots[row.id] = {point=point, facing=facing, approachFrame=approachFrame, approachSize=approachSize,
-            visit=CFrame.lookAt(visit.Position + Vector3.new(0, CharacterConfig.RootAnchorOffset, 0), point + Vector3.new(0, CharacterConfig.RootAnchorOffset, 0))}
-    end
-    local meleeHalf = meleeGap + groupMargin
-    local rangedHalf = trackWidth / 2 + maxRange + groupMargin
-    local hubWidth = groupMargin*2 + 104
-    local westX = -groupMargin - 12
-    local farZ = rangedTrackZ
-    local platforms = {
-        {name="Hub", top=frame(-36,0), size=Vector3.new(hubWidth,0,hubHalf*2), color=Color3.fromRGB(64,76,92)},
-        {name="Melee", top=frame(centerX,meleeTrackZ), size=Vector3.new(width,0,meleeHalf*2), color=Color3.fromRGB(81,71,65)},
-        {name="Ranged", top=frame(centerX,rangedTrackZ), size=Vector3.new(width,0,rangedHalf*2), color=Color3.fromRGB(55,72,87)},
-        {name="Connector", top=frame(westX,(farZ-hubHalf)/2), size=Vector3.new(24,0,-farZ-hubHalf), color=Color3.fromRGB(68,79,86)},
-    }
-    local signs = {{name="HUB / GROUP", point=frame(0, 12)}, {name="MELEE / RANGED",point=frame(westX,-hubHalf+4)}, {name="MELEE", point=frame(westX,meleeTrackZ)}, {name="RANGED", point=frame(westX,rangedTrackZ)}}
-    if #skilledRows > 0 then
-        local cell = math.max(spacing, 2 * (math.max(maxRange,meleeGap) + groupMargin + 8))
-        local gap = 16
-        local pitch = cell + gap
-        local cols = math.min(6,#skilledRows)
-        local z0 = hubHalf + cell/2 + 32
-        for index, row in ipairs(skilledRows) do
-            local x = (index-1)%cols*pitch
-            local z = z0 + math.floor((index-1)/cols)*pitch
-            local reach = if row.type == "ranged" then row.attackRange else meleeGap
-            local point = frame(x,z).Position
-            local visit = frame(x,z-reach*0.75)
-            slots[row.id] = {point=point, facing=origin.LookVector, homeRadius=math.min(150,cell/2-8), visit=CFrame.lookAt(visit.Position+Vector3.yAxis*CharacterConfig.RootAnchorOffset,point+Vector3.yAxis*CharacterConfig.RootAnchorOffset),
-                approachFrame=if row.type=="ranged" then frame(x,z-reach/2) else nil, approachSize=if row.type=="ranged" then Vector3.new(10,0,reach) else nil}
-            table.insert(platforms,{name=row.id,top=frame(x,z),size=Vector3.new(cell,0,cell),color=Color3.fromRGB(88,67,102)})
-            if (index-1)%cols > 0 then
-                table.insert(platforms,{name="SkillBridgeH_"..index,top=frame(x-pitch/2,z),size=Vector3.new(gap,0,16),color=Color3.fromRGB(88,67,102)})
-            end
-            if index>cols then
-                table.insert(platforms,{name="SkillBridgeV_"..index,top=frame(x,z-pitch/2),size=Vector3.new(16,0,gap),color=Color3.fromRGB(88,67,102)})
-            end
+        -- Two independent types per level; separate hunting points, not groups.
+        local cols=if zone.skilled then math.min(4,math.max(1,#selected)) else 2
+        local lines=math.max(1,math.ceil(#selected/cols))
+        for k,row in ipairs(selected) do
+            local column=if zone.skilled then (k-1)%cols else (if row.type=="melee" then 0 else 1)
+            local line=if zone.skilled then math.floor((k-1)/cols) else row.level-zone.low
+            -- Keep combat reach in studs, not scaled with the map. Visit from the central aisle.
+            local x=(column-(cols-1)/2)*(if zone.skilled then 72 else 216)
+            local z=((lines-1)/2-line)*(if zone.skilled then 120 else math.min(44,220/math.max(1,lines-1)))
+            local point=(top*CFrame.new(x,0,z)).Position
+            local facing=if zone.skilled then top.ZVector*(if z>0 then -1 else 1) else top.RightVector*(if x>0 then -1 else 1)
+            local reach=math.max(30,row.attackRange+12)
+            local visit=point+facing*reach+Vector3.yAxis*CharacterConfig.RootAnchorOffset
+            slots[row.id]={point=point,facing=facing,homeRadius=75,visit=CFrame.lookAt(visit,point+Vector3.yAxis*CharacterConfig.RootAnchorOffset),zone=index}
         end
-        table.insert(platforms,{name="SkillsBridge",top=frame(0,hubHalf+16),size=Vector3.new(16,0,32),color=Color3.fromRGB(88,67,102)})
-        table.insert(signs,{name="SKILLED MONSTERS",point=frame(0,hubHalf)})
     end
-    return {slots=slots, tracks=tracks, platforms=platforms, signs=signs, weaponOrigin=origin*CFrame.new(-groupMargin,0,0)}
+    -- Main route + return shortcut. Bridges meet the actual box boundaries.
+    for index=1,5 do if boxes[index] and boxes[index+1] then addBridge("Road_"..index,boxes[index].top,boxes[index+1].top,GAP) end end
+    if boxes[1] and boxes[4] then addBridge("ReturnRoad",boxes[1].top,boxes[4].top,GAP) end
+    if boxes[1] then
+        local hubEdge=frame(0,-hubWidth/2)
+        local zoneEdge=boxes[1].top*CFrame.new(0,0,ZONE_SIZE/2)
+        addBridge("HubRoad",hubEdge,zoneEdge,GAP)
+    end
+    return {slots=slots,platforms=platforms,boxes=boxes,hubWidth=hubWidth,zoneSize=ZONE_SIZE,hub=origin,weaponOrigin=origin*CFrame.new(-15,0,-60)}
 end
 return table.freeze(Layout)

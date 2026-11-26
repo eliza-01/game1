@@ -44,9 +44,6 @@ local function destination(agent: any, targetRoot: BasePart, speed: number, rema
     if not ground then return nil end
     for _, point in ipairs(Retreat.Candidates(position, targetRoot.Position, TargetPolicy.AttackRadius(agent), speed * remaining)) do
         if HomeLeash.Outside(agent.spawnCenter, point, math.max(0, agent.homeRadius - STOP_DISTANCE)) then continue end
-        -- The line can only move within its own small home pocket. The lane
-        -- gate still controls the PLAYER's position, not the monster position.
-        if TargetPolicy.IsStationary(agent.model) and TargetPolicy.HorizontalDistance(agent.home, point) > MAX_DISTANCE then continue end
         local delta = point - position
         if Workspace:Raycast(position, delta, params) then continue end
         local supported = true

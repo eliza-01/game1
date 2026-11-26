@@ -43,56 +43,48 @@ function Arena.Support(parent: Instance, point: Vector3, width: number)
     pad.Parent = parent
 end
 -- A single continuous deck, tiled only if a Part would exceed the engine size limit.
-local function deck(parent: Instance, name: string, top: CFrame, width: number, depth: number, color: Color3, overlay: boolean?)
+local function deck(parent: Instance, name: string, top: CFrame, width: number, depth: number, color: Color3)
     local folder = Instance.new("Folder")
     folder.Name = name
     folder.Parent = parent
-    local count = math.max(1, math.ceil(width / 1024))
-    local segment = width / count
-    for index = 1, count do
-        local part = Instance.new("Part")
-        part.Name = name .. "_" .. index
-        part.Size = Vector3.new(segment, if overlay then 0.05 else 1, depth)
-        part.CFrame = top * CFrame.new(-width / 2 + (index - 0.5) * segment, if overlay then 0.025 else -0.5, 0)
-        if overlay then part.CanCollide = false; part.CanTouch = false; part.CanQuery = false end
-        part.Anchored = true
-        part.Material = Enum.Material.SmoothPlastic
-        part.Color = color
-        part.TopSurface = Enum.SurfaceType.Smooth
-        part.BottomSurface = Enum.SurfaceType.Smooth
-        part.Parent = folder
-    end
+    local nx,nz = math.max(1,math.ceil(width/1024)),math.max(1,math.ceil(depth/1024))
+    local sx,sz=width/nx,depth/nz
+    for x=1,nx do for z=1,nz do
+        local part=Instance.new("Part")
+        part.Name=name.."_"..x.."_"..z; part.Size=Vector3.new(sx,1,sz)
+        part.CFrame=top*CFrame.new(-width/2+(x-0.5)*sx,-0.5,-depth/2+(z-0.5)*sz)
+        part.Anchored=true; part.Material=Enum.Material.SmoothPlastic; part.Color=color
+        part.TopSurface=Enum.SurfaceType.Smooth; part.BottomSurface=Enum.SurfaceType.Smooth; part.Parent=folder
+    end end
     return folder
 end
 
-function Arena.BuildLinePlatform(parent: Instance, origin: CFrame, spacing: number, size: Vector3): any
-    local layout = Layout.Build(origin, Balance.Monsters, Balance.MaxLevel, spacing, size, Balance.Test.maxGroup, if Balance.Test.skilledEnabled then Balance.SkilledMonsters else {})
-    for _, platform in ipairs(layout.platforms) do
-        deck(parent, platform.name, platform.top, platform.size.X, platform.size.Z, platform.color)
+function Arena.BuildZonePlatform(parent: Instance, origin: CFrame, spacing: number, size: Vector3): any
+    local layout=Layout.Build(origin,Balance.Monsters,Balance.MaxLevel,spacing,size,Balance.Test.maxGroup,if Balance.Test.skilledEnabled then Balance.SkilledMonsters else {})
+    for _,platform in ipairs(layout.platforms) do
+        deck(parent,platform.name,platform.top,platform.size.X,platform.size.Z,platform.color)
     end
-    for _, sign in ipairs(layout.signs) do
-        local anchor = Instance.new("Part")
-        anchor.Name = "Wayfinding"; anchor.Anchored = true; anchor.CanCollide = false; anchor.CanTouch = false; anchor.CanQuery = false
-        anchor.Transparency = 1; anchor.Size = Vector3.one; anchor.CFrame = sign.point + Vector3.yAxis * 12; anchor.Parent = parent
-        local gui = Instance.new("BillboardGui"); gui.Size = UDim2.fromOffset(300,60); gui.MaxDistance = 300; gui.AlwaysOnTop = true; gui.Adornee = anchor; gui.Parent = anchor
-        local label = Instance.new("TextLabel"); label.Size = UDim2.fromScale(1,1); label.BackgroundTransparency = 1; label.Text = sign.name; label.TextColor3 = Color3.fromRGB(235,240,250); label.TextStrokeTransparency = 0.25; label.Font = Enum.Font.GothamBold; label.TextScaled = true; label.Parent = gui
-    end
-    for _, track in ipairs(layout.tracks) do
-        deck(parent, track.name, track.top, track.size.X, track.size.Z, Color3.fromRGB(45, 115, 98), true)
-    end
-    for id, slot in pairs(layout.slots) do
-        if slot.approachFrame then
-            deck(parent, "Approach_" .. id, slot.approachFrame, slot.approachSize.X, slot.approachSize.Z, Color3.fromRGB(106, 92, 63), true)
+    for index,box in pairs(layout.boxes) do
+        local folder=Instance.new("Folder"); folder.Name="Bounds_"..index; folder.Parent=parent
+        local half=box.size.X/2
+        for side=0,3 do
+            local rotation=CFrame.Angles(0,math.rad(side*90),0)
+            local wall=Instance.new("Part"); wall.Name="Wall_"..side
+            wall.Size=Vector3.new(box.size.X,box.size.Y,1)
+            wall.CFrame=box.top*rotation*CFrame.new(0,box.size.Y/2,-half)
+            wall.Anchored=true; wall.CanCollide=false; wall.CanTouch=false; wall.CanQuery=false
+            wall.Material=Enum.Material.SmoothPlastic; wall.Color=box.color; wall.Transparency=0.82; wall.Parent=folder
         end
+        local anchor=Instance.new("Part"); anchor.Name="ZoneLabel"; anchor.Anchored=true; anchor.CanCollide=false; anchor.CanTouch=false; anchor.CanQuery=false
+        anchor.Transparency=1; anchor.Size=Vector3.one; anchor.CFrame=box.entry+Vector3.yAxis*15; anchor.Parent=folder
+        local gui=Instance.new("BillboardGui"); gui.Size=UDim2.fromOffset(330,75); gui.MaxDistance=450; gui.Adornee=anchor; gui.Parent=anchor
+        local label=Instance.new("TextLabel"); label.Size=UDim2.fromScale(1,1); label.BackgroundTransparency=1; label.Text=box.name.." · LVL "..box.low.."–"..box.high; label.TextColor3=box.color; label.TextStrokeTransparency=0.15; label.Font=Enum.Font.GothamBold; label.TextScaled=true; label.Parent=gui
+    end
+    for id,slot in pairs(layout.slots) do
+        local marker=Instance.new("Part"); marker.Name="Spawn_"..id; marker.Size=Vector3.new(8,0.1,8); marker.Position=slot.point+Vector3.yAxis*0.05
+        marker.Anchored=true; marker.CanCollide=false; marker.CanTouch=false; marker.CanQuery=false; marker.Transparency=0.45; marker.Color=layout.boxes[slot.zone].color; marker.Parent=parent
     end
     return layout
-end
-
-function Arena.IsOnTrack(trackTop: CFrame, trackSize: Vector3, rootPosition: Vector3): boolean
-    local feet = rootPosition - Vector3.new(0, CharacterConfig.RootAnchorOffset, 0)
-    local point = trackTop:PointToObjectSpace(feet)
-    return math.abs(point.X) <= trackSize.X / 2
-        and math.abs(point.Z) <= trackSize.Z / 2 and point.Y >= -0.75 and point.Y <= 4
 end
 
 function Arena.ShowWeapons(parent: Instance, origin: CFrame, character: Model)
@@ -122,9 +114,9 @@ function Arena.GroupPoint(origin: CFrame, index: number, count: number, size: Ve
 end
 function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing: Vector3, states: {any}, supports: Instance, slot: any?): Model?
     serial += 1
-    -- The line uses the exact authored deck plane, never the surrounding terrain.
+    -- Zone points use the exact deck plane, never surrounding terrain.
     local surface = point
-    if kind ~= "line" then
+    if kind ~= "zone" then
         local grounded
         surface, grounded = Arena.Surface(point, owner.Character)
         if not grounded then Arena.Support(supports, point, 18) end
@@ -136,7 +128,6 @@ function Arena.Add(owner: Player, row: any, kind: string, point: Vector3, facing
         spawnRadius = 0, homeRadiusStuds = if slot and slot.homeRadius then slot.homeRadius else 150, maxAlive = 1, respawnSeconds = 2,
         testOwner = owner.UserId, testKind = kind, testBalanceId = row.id,
         testNoRespawn = kind == "group", testYaw = yaw, testSurface = surface,
-        testApproachFrame = slot and slot.approachFrame, testApproachSize = slot and slot.approachSize,
     })
     table.insert(states, state) -- Registered BEFORE any yielding construction.
     return Spawner.FillTest(state)

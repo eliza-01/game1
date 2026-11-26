@@ -12,7 +12,7 @@ local sessions: {[Player]: any} = {}
 
 function Loadout.Origin(): CFrame
     local t = Balance.Test
-    return CFrame.new(t.x, t.y + 100, t.z) * CFrame.Angles(0, math.rad(t.yaw), 0)
+    return CFrame.new(t.x, t.y + 1024, t.z) * CFrame.Angles(0, math.rad(t.yaw), 0)
 end
 function Loadout.Get(player: Player): any?
     return sessions[player]
@@ -53,6 +53,22 @@ function Loadout.Validate(request: any): (any?, string?)
         end
     end
     return {level=level, weapon=weapon, armor=armor, upgrade=upgrade, slug=slug, placeholder=placeholder, regen=regen, vampiric=vampiric, critPercent=critPercent, critFlat=critFlat, critMultiplier=critMultiplier}, nil
+end
+-- Stock tier from the canonical equipment catalogue; retain the selected type when available.
+function Loadout.Stock(player: Player, level: number): (any?,string?)
+    local current=sessions[player]
+    local kind=if current and current.weapon then current.weapon.type else "sword"
+    local weapon, fallback, armor=nil,nil,nil
+    for _,row in ipairs(Balance.Weapons) do
+        if row.level==level then
+            if row.type==kind then weapon=row end
+            if row.type=="sword" then fallback=row end
+        end
+    end
+    for _,row in ipairs(Balance.Armors) do if row.level==level then armor=row; break end end
+    weapon=weapon or fallback
+    if not weapon or not armor then return nil,"Stock tier missing" end
+    return Loadout.Validate({level=level,weapon=weapon.id,armor=armor.id,upgrade=0})
 end
 local function applyRecovery(character: Model, selection: any)
     character:SetAttribute("GameplayTestRegen", selection.regen)
@@ -99,6 +115,12 @@ function Loadout.Apply(player: Player, character: Model): (boolean, string?)
         CritMultiplier=selection.critMultiplier - Balance.Rules.critMultiplier,
     })
     character:SetAttribute("GameplayTestError", if ok then nil else tostring(reason))
+    if ok then
+        local armorGrade=Balance.Grade.ForLevel(selection.armor.level)
+        local weaponGrade=if selection.weapon then Balance.Grade.ForLevel(selection.weapon.level) else "—"
+        local weaponType=if selection.weapon then selection.weapon.type else "hands"
+        character:SetAttribute("GameplayTestEquipment",string.format("%s %s +%d · Armor %s",weaponGrade,weaponType,selection.upgrade,armorGrade))
+    end
     character:SetAttribute("GameplayTestArmorId", selection.armor.id)
     character:SetAttribute("GameplayTestUpgrade", selection.upgrade)
     character:SetAttribute("WeaponLoadoutSource", "gameplay-test")

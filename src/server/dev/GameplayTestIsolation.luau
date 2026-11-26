@@ -11,7 +11,7 @@ function Policy.Allows(attacker: Model?, target: Model): boolean
     if targetKind == "player" and target:GetAttribute("GameplayGuideTrial") == true and sourceKind ~= "group" then return false end
     if sourceKind == "group" and attacker:GetAttribute("GameplayTestArmed") ~= true then return false end
     if targetKind == "group" and target:GetAttribute("GameplayTestArmed") ~= true then return false end
-    return (sourceKind == "player" and (targetKind == "line" or targetKind == "group"))
-        or ((sourceKind == "line" or sourceKind == "group") and targetKind == "player")
+    return (sourceKind == "player" and (targetKind == "zone" or targetKind == "group"))
+        or ((sourceKind == "zone" or sourceKind == "group") and targetKind == "player")
 end
 return table.freeze(Policy)

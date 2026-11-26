@@ -705,7 +705,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Жаба (Toad)"
     },
     {
       "id": "monster_002",
@@ -718,7 +719,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Жаба (Toad)"
     },
     {
       "id": "monster_003",
@@ -731,7 +733,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Деревянный страж (Wooden Guardian)"
     },
     {
       "id": "monster_004",
@@ -744,7 +747,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Живое пугало (Living Scarecrow)"
     },
     {
       "id": "monster_005",
@@ -757,7 +761,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Волк (Wolf)"
     },
     {
       "id": "monster_006",
@@ -770,7 +775,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Зомби (Zombie)"
     },
     {
       "id": "monster_007",
@@ -783,7 +789,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Гигантский паук (Giant Spider)"
     },
     {
       "id": "monster_008",
@@ -796,7 +803,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Зомби (Zombie)"
     },
     {
       "id": "monster_009",
@@ -809,7 +817,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Медведь гризли (Grizzly)"
     },
     {
       "id": "monster_010",
@@ -822,7 +831,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Скарабей (Scarab)"
     },
     {
       "id": "monster_011",
@@ -835,7 +845,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Гремлин (Gremlin)"
     },
     {
       "id": "monster_012",
@@ -848,7 +859,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Каменный голем (Stone Golem)"
     },
     {
       "id": "monster_013",
@@ -861,7 +873,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Каменный голем (Stone Golem)"
     },
     {
       "id": "monster_014",
@@ -874,7 +887,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Большой голем (Greater Golem)"
     },
     {
       "id": "monster_015",
@@ -887,7 +901,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Тигр (Tiger)"
     },
     {
       "id": "monster_016",
@@ -900,7 +915,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Тигр (Tiger)"
     },
     {
       "id": "monster_017",
@@ -913,7 +929,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Тигр (Tiger)"
     },
     {
       "id": "monster_018",
@@ -926,7 +943,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Тигр (Tiger)"
     },
     {
       "id": "monster_019",
@@ -939,7 +957,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Древень (Ancient Treant)"
     },
     {
       "id": "monster_020",
@@ -952,7 +971,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Орк-воин (Orc Warrior)"
     },
     {
       "id": "monster_021",
@@ -965,7 +985,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Орк-воин (Orc Warrior)"
     },
     {
       "id": "monster_022",
@@ -978,7 +999,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Орк-воин (Orc Warrior)"
     },
     {
       "id": "monster_023",
@@ -991,7 +1013,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Орк-воин (Orc Warrior)"
     },
     {
       "id": "monster_024",
@@ -1004,7 +1027,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Орк-воин (Orc Warrior)"
     },
     {
       "id": "monster_025",
@@ -1017,7 +1041,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Малый дракон (Drake)"
     },
     {
       "id": "monster_026",
@@ -1030,7 +1055,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Малый дракон (Drake)"
     },
     {
       "id": "monster_027",
@@ -1043,7 +1069,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Малый дракон (Drake)"
     },
     {
       "id": "monster_028",
@@ -1056,7 +1083,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Малый дракон (Drake)"
     },
     {
       "id": "monster_029",
@@ -1069,7 +1097,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Малый дракон (Drake)"
     },
     {
       "id": "monster_030",
@@ -1082,7 +1111,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": "Древний дракон (Wyrm)"
     },
     {
       "id": "monster_031",
@@ -1095,7 +1125,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": ""
     },
     {
       "id": "monster_032",
@@ -1108,7 +1139,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": ""
     },
     {
       "id": "monster_033",
@@ -1121,7 +1153,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": ""
     },
     {
       "id": "monster_034",
@@ -1134,7 +1167,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": ""
     },
     {
       "id": "monster_035",
@@ -1147,7 +1181,8 @@
       "type": "melee",
       "attackRange": 5,
       "attackSpeed": 100,
-      "runSpeed": 130
+      "runSpeed": 130,
+      "name": ""
     },
     {
       "id": "monster_036",
@@ -1160,7 +1195,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Мандрагора (Mandragora)"
     },
     {
       "id": "monster_037",
@@ -1173,7 +1209,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Мандрагора (Mandragora)"
     },
     {
       "id": "monster_038",
@@ -1186,7 +1223,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Мандрагора (Mandragora)"
     },
     {
       "id": "monster_039",
@@ -1199,7 +1237,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Мандрагора (Mandragora)"
     },
     {
       "id": "monster_040",
@@ -1212,7 +1251,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Скелет-лучник (Skeleton Archer)"
     },
     {
       "id": "monster_041",
@@ -1225,7 +1265,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Скелет-лучник (Skeleton Archer)"
     },
     {
       "id": "monster_042",
@@ -1238,7 +1279,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Скелет-лучник (Skeleton Archer)"
     },
     {
       "id": "monster_043",
@@ -1251,7 +1293,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Скелет-лучник (Skeleton Archer)"
     },
     {
       "id": "monster_044",
@@ -1264,7 +1307,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Ледяная парящая нежить (Ice Vale Master)"
     },
     {
       "id": "monster_045",
@@ -1277,7 +1321,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_046",
@@ -1290,7 +1335,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_047",
@@ -1303,7 +1349,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_048",
@@ -1316,7 +1363,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_049",
@@ -1329,7 +1377,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_050",
@@ -1342,7 +1391,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Мандрагора (Mandragora)"
     },
     {
       "id": "monster_051",
@@ -1355,7 +1405,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Мандрагора (Mandragora)"
     },
     {
       "id": "monster_052",
@@ -1368,7 +1419,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Споровик (Spore Spitter)"
     },
     {
       "id": "monster_053",
@@ -1381,7 +1433,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Споровик (Spore Spitter)"
     },
     {
       "id": "monster_054",
@@ -1394,7 +1447,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Споровик (Spore Spitter)"
     },
     {
       "id": "monster_055",
@@ -1407,7 +1461,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Орк-лучник (Orc Archer)"
     },
     {
       "id": "monster_056",
@@ -1420,7 +1475,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Орк-лучник (Orc Archer)"
     },
     {
       "id": "monster_057",
@@ -1433,7 +1489,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Орк-лучник (Orc Archer)"
     },
     {
       "id": "monster_058",
@@ -1446,7 +1503,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Орк-шаман (Orc Shaman)"
     },
     {
       "id": "monster_059",
@@ -1459,7 +1517,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Суккуб (Succubus)"
     },
     {
       "id": "monster_060",
@@ -1472,7 +1531,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Парящая голова (Magical Weaver)"
     },
     {
       "id": "monster_061",
@@ -1485,7 +1545,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Парящая голова (Magical Weaver)"
     },
     {
       "id": "monster_062",
@@ -1498,7 +1559,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Огненная парящая нежить (Fire Vale Master)"
     },
     {
       "id": "monster_063",
@@ -1511,7 +1573,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Парящая голова (Magical Weaver)"
     },
     {
       "id": "monster_064",
@@ -1524,7 +1587,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Огненная парящая нежить (Fire Vale Master)"
     },
     {
       "id": "monster_065",
@@ -1537,7 +1601,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": "Парящая голова (Magical Weaver)"
     },
     {
       "id": "monster_066",
@@ -1550,7 +1615,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_067",
@@ -1563,7 +1629,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_068",
@@ -1576,7 +1643,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_069",
@@ -1589,7 +1657,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     },
     {
       "id": "monster_070",
@@ -1602,7 +1671,8 @@
       "type": "ranged",
       "attackRange": 40,
       "attackSpeed": 77,
-      "runSpeed": 120
+      "runSpeed": 120,
+      "name": ""
     }
   ],
   "weaponBindings": {

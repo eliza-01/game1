@@ -8,7 +8,7 @@ class TestRecovery(unittest.TestCase):
     def test_default_and_scope(self):
         self.assertIn('RegenerationHPPerSecond = 0', read('src/shared/character/CharacterStatsConfig.luau'))
         healing = read('src/server/character/CharacterHealing.luau')
-        for text in ('not RunService:IsStudio()', 'Players:GetPlayerFromCharacter(character)', 'owner.Character ~= character', 'Game1GameplayTestActive', 'Game1GameplayTestOwner', 'kind ~= "line" and kind ~= "group"', 'amount < math.huge', 'math.min(amount, maxHP - hp)', 'value >= 0 and value <= maximum'):
+        for text in ('not RunService:IsStudio()', 'Players:GetPlayerFromCharacter(character)', 'owner.Character ~= character', 'Game1GameplayTestActive', 'Game1GameplayTestOwner', 'kind ~= "zone" and kind ~= "group"', 'amount < math.huge', 'math.min(amount, maxHP - hp)', 'value >= 0 and value <= maximum'):
             self.assertIn(text, healing)
         regen = read('src/server/character/CharacterRegenerationService.luau')
         self.assertIn('if not RunService:IsStudio() and Config.RegenerationHPPerSecond <= 0 then return end', regen)

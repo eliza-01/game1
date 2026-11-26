@@ -167,14 +167,16 @@ local function spawnOne(state: any): Model?
         local row = assert(Balance.Monster(record.testBalanceId))
         local color = Balance.Grade.Color(row.level)
         TestAppearance.Tint(visual, color)
-        local title = "Монстр_" .. row.id:sub(-3)
+        local title = if row.name and row.name ~= "" then row.name else "Монстр_" .. row.id:sub(-3)
         if row.skills then
             local names = {}
             for _, a in ipairs(row.skills) do table.insert(names, Balance.Skill(a.skillId).name) end
             title = table.concat(names, " + ")
         end
-        TestAppearance.Label(model, ("%s · %s · LVL %d\n%d HP · %d ATK"):format(title, row.type, row.level, row.hp, row.damage), color)
-        -- Test targets never wander; only ranged approach lanes enable proximity aggro.
+        local proxy = row.name ~= "Гремлин (Gremlin)" or row.skills ~= nil
+        TestAppearance.Label(model, ("%s · %s · LVL %d\n%d HP · %d ATK"):format(title .. (if proxy then " [proxy]" else ""), row.type, row.level, row.hp, row.damage), color)
+        model:SetAttribute("MonsterDisplayName", title)
+        model:SetAttribute("GameplayTestVisualPlaceholder", proxy)
     end
     local riseFromGround = not record.testOwner and definition.behavior and definition.behavior.riseFromGround == true
     local spawnPresentation = MonsterSpawnPresentation.Prepare(model, visual, navigationRoot, humanoid, riseFromGround)

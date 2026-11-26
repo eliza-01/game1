@@ -1,7 +1,7 @@
 /* M538 · Read-only projection of the Design Markdown topology table. */
 (() => {
   const headers=['Территория','LVL','Колонка','Ряд','Дорога далее','Обратный путь'];
-  const palette=['#71b98c','#58a99b','#d5ab70','#a5a665','#be8d75','#9e9bdc'];
+  const palette=['#83ad61','#9b85c4','#c4a16f','#45b6a0','#c77659','#789bd4'];
   const isMapHeader=values=>values.length===headers.length&&headers.every((v,i)=>v===values[i]);
   function parse(rows){
     if(!Array.isArray(rows)||rows.length<2||rows.length>8)return null;
@@ -38,7 +38,7 @@
     nodes.forEach((n,i)=>{
       const g=el('g',{class:'kb-map-zone',role:'button',tabindex:0,'aria-label':`${n.name}, уровень ${n.range}`,'data-range':n.range});g.style.setProperty('--zone-color',n.color);
       el('rect',{x:n.x-108,y:n.y-37,width:216,height:74,rx:12},g);
-      el('text',{x:n.x,y:n.y-4,'text-anchor':'middle',class:'kb-map-name'},g,n.name);
+      el('text',{x:n.x,y:n.y-4,'text-anchor':'middle',class:'kb-map-name','font-size':n.name.length>17?'15':'17'},g,n.name);
       el('text',{x:n.x,y:n.y+20,'text-anchor':'middle',class:'kb-map-level'},g,`LVL ${n.range}${i===0?' · старт':''}`);
       g.addEventListener('click',()=>onSelect(n.range));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(n.range)}});
     });

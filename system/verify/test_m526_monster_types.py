@@ -1,4 +1,4 @@
-"""M526 schema, lane geometry/ownership and independent player cap."""
+"""M526 schema, zone geometry/ownership and independent player cap."""
 from copy import deepcopy
 from pathlib import Path
 import sys
@@ -47,11 +47,11 @@ class MonsterTypes(unittest.TestCase):
         self.assertIn('startGroup(s, monster, request.count)', service)
         self.assertIn('s.layout.slots[monster.id].visit', service)
 
-    def test_lane_gates_all_target_transitions(self):
+    def test_isolation_gates_all_target_transitions(self):
         policy = read('src/server/monster/MonsterTargetPolicy.luau')
         ai = read('src/server/monster/MonsterAIService.luau')
         attack = read('src/server/monster/MonsterAttackExecutor.luau')
-        self.assertIn('Isolation.Allows(agent.model, target) and Approach.Allows(agent.model, root.Position)', policy)
+        self.assertIn('Isolation.Allows(agent.model, target)', policy)
         self.assertIn('targetRoot and allowsTarget(agent, character)', policy)
         self.assertIn('not allowsTarget(agent, target)', policy)
         self.assertIn('TargetPolicy.AllowsTarget(agent, agent.target)', ai)
@@ -59,7 +59,8 @@ class MonsterTypes(unittest.TestCase):
         self.assertIn('if not Retreat.IsRanged(agent.model) then maintainAttackPursuit', attack)
         self.assertIn('TargetPolicy.AttackStillConnects(agent, target)', attack)
         self.assertIn('if balance then balance.attackRange', read('src/server/monster/MonsterInitialAttributes.luau'))
-        self.assertIn('model:GetAttribute("GameplayTestKind") == "line" and model:GetAttribute("MonsterCombatType") == "ranged"', read('src/server/dev/GameplayTestApproach.luau'))
+        self.assertNotIn("Approach.Allows", policy)
+        self.assertNotIn("IsStationary", ai)
 
 
 if __name__ == '__main__': unittest.main()

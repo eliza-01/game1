@@ -22,7 +22,7 @@ class GameplayTest(unittest.TestCase):
         arena=read('src/server/dev/GameplayTestArena.luau')
         self.assertIn('2 * (reach + size.Magnitude) + 4',arena)
         self.assertIn('row.type ~= "bow"',arena)
-        self.assertIn('column * spacing',read('src/server/dev/GameplayTestLayout.luau'))
+        self.assertIn('local ZONE_SIZE = 384',read('src/server/dev/GameplayTestLayout.luau'))
         self.assertIn('2 * math.pi / count',arena)
         self.assertIn('Weapons.CloneTestDisplay(row.type)',arena)
         self.assertIn('Arena.Support(supports, point, 18)',arena)

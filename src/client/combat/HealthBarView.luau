@@ -42,6 +42,8 @@ end
 
 local function displayName(model: Model, monster: boolean): string
     if monster then
+        local testName=model:GetAttribute("MonsterDisplayName")
+        if model:GetAttribute("Game1GameplayTestOwner")~=nil and type(testName)=="string" and testName~="" then return testName end
         local slug = model:GetAttribute("NpcSlug") or model:GetAttribute("MonsterSlug")
         if typeof(slug) == "string" and Language.Has("actors." .. slug) then
             return Language.Translate("actors." .. slug)

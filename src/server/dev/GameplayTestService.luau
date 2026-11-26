@@ -11,6 +11,7 @@ local Weapons = require(script.Parent.Parent:WaitForChild("weapon"):WaitForChild
 local Spawner = require(script.Parent.Parent:WaitForChild("monster"):WaitForChild("MonsterSpawnerService"))
 local Loadout = require(script.Parent:WaitForChild("GameplayTestLoadout"))
 local Arena = require(script.Parent:WaitForChild("GameplayTestArena"))
+local Panels = require(script.Parent:WaitForChild("GameplayTestPanels"))
 local Report = require(script.Parent:WaitForChild("GameplayCombatReport"))
 local Plan = require(script.Parent:WaitForChild("GameplayGuidedPlan"))
 local RuntimeVersion = require(Shared:WaitForChild("RuntimeVersion"))
@@ -56,20 +57,19 @@ local function clearGroup(s: any)
 end
 local function clearSession(s: any)
     if session == s then session = nil end
-    if s.trackConnection then s.trackConnection:Disconnect(); s.trackConnection = nil end
-    local character = s.player.Character
-    if character then character:SetAttribute("GameplayTestOnTrack", nil) end
+    if s.sampleConnection then s.sampleConnection:Disconnect(); s.sampleConnection = nil end
     clearGroup(s)
-    Arena.Clear(s.line)
+    Arena.Clear(s.population)
     s.folder:Destroy()
     if s.deathConnection then s.deathConnection:Disconnect() end
     Loadout.Set(s.player, nil)
     s.player:SetAttribute("GameplayGuideStatus", nil)
+    s.player:SetAttribute("GameplayTestStock",nil)
 end
--- One server-side zone check for the owner, not 35 Touched listeners.
-local function bindTrack(s: any)
+-- Single sampling loop for the isolated guided fight.
+local function bindReport(s: any)
     local elapsed = 0
-    s.trackConnection = RunService.Heartbeat:Connect(function(dt)
+    s.sampleConnection = RunService.Heartbeat:Connect(function(dt)
         elapsed += dt
         if elapsed < 0.1 then return end
         local sample=elapsed
@@ -80,33 +80,17 @@ local function bindTrack(s: any)
             local outcome=Report.Outcome()
             if outcome then finishTrial(s,outcome); clearGroup(s) end
         end
-        local character = s.player.Character
-        if not character then return end
-        local root = character:FindFirstChild("RootCollider")
-        local eligible = character:GetAttribute("LifeState") == "Alive"
-            and character:GetAttribute("GameplayTestKind") == "player"
-            and character:GetAttribute("Game1GameplayTestOwner") == s.player.UserId
-            and root ~= nil and root:IsA("BasePart")
-        local onTrack = false
-        if eligible and root and root:IsA("BasePart") and not (s.guide and s.guide.running) then
-            for _, track in ipairs(s.layout.tracks) do
-                if Arena.IsOnTrack(track.top, track.size, root.Position) then onTrack = true; break end
-            end
-        end
-        if (character:GetAttribute("GameplayTestOnTrack") == true) ~= onTrack then
-            character:SetAttribute("GameplayTestOnTrack", if onTrack then true else nil)
-        end
     end)
 end
 local function bindCharacter(s: any, character: Model)
     if s.deathConnection then s.deathConnection:Disconnect() end
     s.deathConnection = character:GetAttributeChangedSignal("LifeState"):Connect(function()
         if active(s) and character:GetAttribute("LifeState") == "Dying" then
-            character:SetAttribute("GameplayTestOnTrack", nil)
             clearGroup(s)
         end
     end)
 end
+local apply: (any,any)->any
 local function enter(player: Player, selection: any)
     if session then return result(false, "Arena is already occupied") end
     local character = alive(player)
@@ -117,15 +101,15 @@ local function enter(player: Player, selection: any)
     local root = character:FindFirstChild("RootCollider")
     if not root or not root:IsA("BasePart") then return result(false, "RootCollider is missing") end
     local s = {player=player, normalFrame=root.CFrame, normalWeapon=tostring(character:GetAttribute("EquippedWeaponSlug") or ""),
-        archetype=tostring(character:GetAttribute("CharacterArchetype") or ""), line={}, group={}, size=size, generation=0, spacing=Arena.Spacing(size)}
+        archetype=tostring(character:GetAttribute("CharacterArchetype") or ""), population={}, group={}, size=size, generation=0, spacing=Arena.Spacing(size)}
     local folder = Instance.new("Folder")
     folder.Name = "Game1GameplayTest"; folder.Parent = workspace
     s.folder = folder
     local groupSupports = Instance.new("Folder"); groupSupports.Name = "GroupSupports"; groupSupports.Parent = folder; s.groupSupports = groupSupports
     local origin = Loadout.Origin()
-    s.layout = Arena.BuildLinePlatform(folder, origin, s.spacing, size)
+    s.layout = Arena.BuildZonePlatform(folder, origin, s.spacing, size)
     session = s
-    bindTrack(s)
+    bindReport(s)
     Loadout.Set(player, selection)
     local replacement = CharacterService.Respawn(player, s.archetype)
     if not replacement or not active(s) then
@@ -141,12 +125,37 @@ local function enter(player: Player, selection: any)
     for _, row in ipairs(rows) do
         if not active(s) then return result(false, "Test cancelled") end
         local slot = s.layout.slots[row.id]
-        local monster = Arena.Add(player, row, "line", slot.point, slot.facing, s.line, s.folder, slot)
+        local monster = Arena.Add(player, row, "zone", slot.point, slot.facing, s.population, s.folder, slot)
         if monster then count += 1 end
     end
-    return result(count == #rows, ("Line: %d/%d · spacing %d studs"):format(count, #rows, s.spacing))
+    if not active(s) then return result(false,"Test cancelled") end
+    local function panelAction(actor: Player, part: BasePart, callback: (Model)->())
+        if actor~=s.player or not allowed(actor) or not active(s) or s.guide or busy[actor] then return end
+        local character=alive(actor); if not character or character:GetAttribute("GameplayTestKind")~="player" or character:GetAttribute("Game1GameplayTestOwner")~=actor.UserId or character:GetAttribute("AttackEndsAt")~=nil then return end
+        local root=character:FindFirstChild("RootCollider")
+        if not root or not root:IsA("BasePart") or not part:IsDescendantOf(s.folder) or (root.Position-part.Position).Magnitude>12 then return end
+        local now=os.clock(); if now-(last[actor] or -math.huge)<0.35 then return end
+        last[actor]=now; busy[actor]=true
+        local ok,reason=pcall(callback,character); busy[actor]=nil
+        if not ok then warn("[game1][gameplay-test] panel: "..tostring(reason)) end
+    end
+    Panels.Build(folder,s.layout,function(actor,part,index)
+        panelAction(actor,part,function(character)
+            clearGroup(s)
+            Arena.Warp(character,if index then s.layout.boxes[index].entry else s.layout.hub)
+        end)
+    end,function(actor,part,level)
+        panelAction(actor,part,function(_character)
+            local selection,reason=Loadout.Stock(actor,level)
+            if not selection then warn("[game1][gameplay-test] "..tostring(reason)); return end
+            local response=apply(s,selection)
+            if not response.ok then warn("[game1][gameplay-test] "..tostring(response.message)); return end
+            actor:SetAttribute("GameplayTestStock",string.format("%s|%s|%d|%d",selection.weapon.id,selection.armor.id,selection.level,s.generation))
+        end)
+    end)
+    return result(count == #rows, ("Zone map: %d/%d spawns · %d studs per zone"):format(count, #rows, s.layout.zoneSize))
 end
-local function apply(s: any, selection: any)
+apply = function(s: any, selection: any)
     local character = alive(s.player)
     if not character then return result(false, "Respawn first") end
     if character:GetAttribute("AttackEndsAt") ~= nil then return result(false, "Finish current attack first") end

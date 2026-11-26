@@ -16,6 +16,7 @@ local fill: Frame? = nil
 local caption: TextLabel? = nil
 local progressionCaption: TextLabel? = nil
 local effectsCaption: TextLabel? = nil
+local equipmentCaption: TextLabel? = nil
 local tween: Tween? = nil
 local first = true
 
@@ -92,11 +93,22 @@ local function build(parent: PlayerGui)
     constraint.MaxTextSize = 13
     constraint.Parent = progressionCaption
     progressionCaption.Parent = plate
+    equipmentCaption=Instance.new("TextLabel")
+    equipmentCaption.Name="TestEquipment"; equipmentCaption.BackgroundTransparency=1
+    equipmentCaption.Position=UDim2.new(0,0,1,22); equipmentCaption.Size=UDim2.new(1,0,0,18)
+    equipmentCaption.Font=Enum.Font.GothamBold; equipmentCaption.TextColor3=Color3.fromRGB(201,223,244)
+    equipmentCaption.TextStrokeTransparency=0.15; equipmentCaption.TextScaled=true; equipmentCaption.Visible=false; equipmentCaption.Parent=plate
     effectsCaption = Instance.new("TextLabel")
     effectsCaption.Name = "SkillEffects"; effectsCaption.BackgroundTransparency = 1
     effectsCaption.Position = UDim2.new(0,0,1,22); effectsCaption.Size = UDim2.new(1,0,0,18)
     effectsCaption.Font = Enum.Font.GothamBold; effectsCaption.TextColor3 = Color3.fromRGB(232,185,255)
     effectsCaption.TextStrokeTransparency = 0.15; effectsCaption.TextScaled = true; effectsCaption.Parent = plate
+end
+local function updateEquipment()
+    if not equipmentCaption then return end
+    equipmentCaption.Text=if watched and watched:GetAttribute("GameplayTestKind")=="player" then tostring(watched:GetAttribute("GameplayTestEquipment") or "") else ""
+    equipmentCaption.Visible=equipmentCaption.Text~=""
+    if effectsCaption then effectsCaption.Position=UDim2.new(0,0,1,if equipmentCaption.Visible then 42 else 22) end
 end
 local function updateEffects()
     if not effectsCaption then return end
@@ -168,9 +180,13 @@ local function bind(character: Model?)
             table.insert(connections, character:GetAttributeChangedSignal(key):Connect(updateProgression))
         end
     end
-    if character then table.insert(connections,character:GetAttributeChangedSignal("ActiveSkillEffects"):Connect(updateEffects)) end
+    if character then
+        table.insert(connections,character:GetAttributeChangedSignal("ActiveSkillEffects"):Connect(updateEffects))
+        table.insert(connections,character:GetAttributeChangedSignal("GameplayTestEquipment"):Connect(updateEquipment))
+    end
     update()
     updateProgression()
+    updateEquipment()
     updateEffects()
 end
 

@@ -4,8 +4,8 @@
   const gradeNames=['Newbie','D','C','B','A','S','SS','SSS'];
   window.game1EquipmentGrade=level=>{const band=Math.max(0,Math.min(7,Math.floor(level/10)));return {name:gradeNames[band]+(level%10>=5?'+':''),required:Math.max(1,band*10)}};
   const groups={rules:'Character',levels:'Levels',weapons:'Weapons',armor:'Armor',monsters:'Monsters',bindings:'Model bindings'};
-  const fields={levels:['level','hp','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed']};
-  const names={runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
+  const fields={levels:['level','hp','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','name','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed']};
+  const names={name:'Name',runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
   const labels={weapon:'Оружие',armor:'Броня',monster:'Монстр'};
   const label=id=>{const [kind,n]=id.split('_');return `${labels[kind]||kind}_${n}`};
   const node=(tag,text)=>{const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el};
@@ -20,7 +20,7 @@
     const all=new Map(models.map(model=>[model.slug,model]));for(const slug of Object.keys(bindings))if(!all.has(slug))all.set(slug,{slug});
     for(const model of all.values()){
       const tr=node('tr');cell(tr,model.slug);const options=[['','—']];
-      for(const r of rows)if(kind==='Monster model'||r.type===model.type)options.push([r.id,`${label(r.id)} · ${r.type} · LVL ${r.level}`]);
+      for(const r of rows)if(kind==='Monster model'||r.type===model.type)options.push([r.id,`${r.name||label(r.id)} · ${r.type} · LVL ${r.level}`]);
       if(bindings[model.slug]&&!options.some(v=>v[0]===bindings[model.slug]))options.push([bindings[model.slug],`${label(bindings[model.slug])} · incompatible / retired`]);
       cell(tr,select(options,bindings[model.slug]||'',value=>{if(value)bindings[model.slug]=value;else delete bindings[model.slug];change()}));body.append(tr);
     }
@@ -44,6 +44,7 @@
       function updateDerived(){if(gradeCell){const g=window.game1EquipmentGrade(row.level);gradeCell.textContent=`${g.name} · ${g.required}`}if(tab==='weapons'&&derived)derived.textContent=`${d.rules.baseDamage+row.damage} / ${d.rules.baseDamage+Math.round(row.damage*(1+d.rules.maxUpgrade*d.rules.upgradePercent/100))}`}
       for(const key of columns){
         if(key==='id'||key==='type'||(tab==='levels'&&key==='level'))cell(tr,key==='id'?label(row[key]):String(row[key]));
+        else if(key==='name'){const input=node('input');input.type='text';input.maxLength=100;input.value=row.name;input.placeholder='—';input.style.minWidth='180px';input.oninput=()=>{row.name=input.value;change()};cell(tr,input)}
         else if(key==='price'&&row.recipe){const source=d.weapons.find(w=>w.id===row.recipe.swordId);const cost=node('span',String(2*source.price+row.recipe.fee));cost.dataset.recipeCost=row.id;cell(tr,cost)}
         else if(key==='rarity')cell(tr,select(['common','uncommon','rare','mythical','legendary','immortal'].map(v=>[v,v]),row[key],v=>{row[key]=v;change()}));
         else cell(tr,number(row[key],v=>{row[key]=v;updateDerived();if(tab==='levels'&&key==='xpNext'){let sum=0;for(const [i,r] of d.levels.entries()){body.rows[i].lastElementChild.textContent=String(sum);sum+=r.xpNext||0}}}));

@@ -126,7 +126,7 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
         stopNavigation(agent)
         Presentation.PlayCombatIdle(agent)
         AttackExecutor.Begin(agent, attacker, AttackMovement, random)
-    elseif not TargetPolicy.IsStationary(agent.model) then
+    else
         setState(agent, "Chase")
         AttackExecutor.ClearPursuit(agent)
         Presentation.PlayRun(agent)
@@ -191,15 +191,6 @@ local function runAgent(agent: any)
             stopNavigation(agent)
             Presentation.PlayCombatIdle(agent)
             AttackExecutor.Begin(agent, target, AttackMovement, random)
-        elseif action == "Chase" and TargetPolicy.IsStationary(agent.model) then
-            -- A line shooter can retreat locally, but never chase along the lane.
-            if horizontalDistance(agent.root.Position, agent.home) > 1 then
-                beginReturn(agent)
-                updateReturn(agent)
-            else
-                stopNavigation(agent)
-                Presentation.PlayCombatIdle(agent)
-            end
         elseif action == "Chase" then
             setState(agent, "Chase")
             AttackExecutor.ClearPursuit(agent)

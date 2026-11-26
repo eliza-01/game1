@@ -57,7 +57,7 @@ def validate(data):
             raise ValueError(f'{group}: expected {counts[group]} rows')
         for i, row in enumerate(rows, 1):
             extra = {'level'} if group == 'levels' else {'id'}
-            if group == 'monsters': extra.add('type')
+            if group == 'monsters': extra |= {'type','name'}
             if group == 'weapons':
                 extra |= {'type','rarity'}
                 if isinstance(row, dict) and row.get('type') == 'dualswords': extra.add('recipe')
@@ -72,6 +72,9 @@ def validate(data):
             for field, (lo, hi) in fields.items():
                 number(row[field], lo, hi, f'{group}.{i}.{field}', field not in ('radius','arc','critChance'))
             if group == 'monsters':
+                name = row['name']
+                if not isinstance(name,str) or len(name)>100 or any(ord(c)<32 for c in name):
+                    raise ValueError('Invalid monster name')
                 expected_type = 'melee' if i <= 35 else 'ranged'
                 if row['type'] != expected_type or row['level'] != (i - 1) % 35 + 1:
                     raise ValueError('Monster type / level sequence invalid')

@@ -71,7 +71,7 @@ local function picker(parent: Frame, caption: string, read: () -> string, adjust
     refresh()
     return refresh
 end
-local function recoveryField(parent: Frame, caption: string, changed: () -> ()): () -> number?
+local function recoveryField(parent: Frame, caption: string, changed: () -> ()): (() -> number?, () -> ())
     local title = label(parent, caption, UDim2.new(1, 0, 0, 15)); title.TextColor3 = colors.muted; title.TextSize = 12
     local check = button(parent, "", UDim2.fromOffset(25, 30)); check.Name = "Enabled"; check.Position = UDim2.fromOffset(0, 16)
     check.AutoButtonColor = false
@@ -91,9 +91,9 @@ local function recoveryField(parent: Frame, caption: string, changed: () -> ()):
     return function()
         if not enabled then return 0 end
         return tonumber((input.Text:gsub(",", ".")))
-    end
+    end, function() enabled=false; check.Text=""; check.BackgroundColor3=colors.control; input.Text="0" end
 end
-local function numericField(parent: Frame, caption: string, value: number, changed: () -> ()): () -> number?
+local function numericField(parent: Frame, caption: string, value: number, changed: () -> ()): (() -> number?, () -> ())
     local title = label(parent, caption, UDim2.new(1, 0, 0, 15)); title.TextColor3 = colors.muted; title.TextSize = 12
     local input = Instance.new("TextBox")
     input.Name = "Value"; input.Text = tostring(value); input.ClearTextOnFocus = false
@@ -101,7 +101,7 @@ local function numericField(parent: Frame, caption: string, value: number, chang
     input.BackgroundColor3 = colors.control; input.TextColor3 = colors.text; input.BorderSizePixel = 0
     input.Font = Enum.Font.Gotham; input.TextSize = 14; input.Parent = parent; rounded(input)
     input:GetPropertyChangedSignal("Text"):Connect(changed)
-    return function() return tonumber((input.Text:gsub(",", "."))) end
+    return function() return tonumber((input.Text:gsub(",", "."))) end, function() input.Text=tostring(value) end
 end
 local function wrap(value: number, delta: number, maximum: number): number
     return (value - 1 + delta) % maximum + 1
@@ -153,7 +153,7 @@ function Controller.Start()
         end
         local refreshUpgrade: (() -> ())? = nil
         local refreshCrit: (() -> ())? = nil
-        picker(cell(first, "Weapon"), "Weapon", function()
+        local refreshWeapon=picker(cell(first, "Weapon"), "Weapon", function()
             local w = weapon(); local grade, required = Balance.Grade.ForLevel(w.level)
             return if w.id == "" then "Hands" else ("%s %s\n%s · req %d"):format(w.id:sub(-3), w.type, grade, required)
         end, function(d)
@@ -162,7 +162,7 @@ function Controller.Start()
             if refreshCrit then refreshCrit() end
         end)
         local second = row(body, 46); horizontal(second)
-        picker(cell(second, "Armor"), "Armor", function()
+        local refreshArmor=picker(cell(second, "Armor"), "Armor", function()
             local a=armor(); return ("LVL %d\n+%d HP"):format(a.level,a.hp)
         end, function(d) armorIndex=wrap(armorIndex,d,#Balance.Armors); ensureLevel() end)
         refreshUpgrade = picker(cell(second, "Upgrade"), "Upgrade", function()
@@ -180,7 +180,7 @@ function Controller.Start()
                 local skill = Balance.Skill(m.skills[1].skillId)
                 return ("%s%s · LVL %d\n%d HP · %d ATK"):format(skill.name,if #m.skills>1 then " +"..(#m.skills-1) else "",m.level,m.hp,m.damage)
             end
-            return ("LVL %d · %d HP\n%d ATK · %g studs"):format(m.level,m.hp,m.damage,m.attackRange)
+            return ("%s · LVL %d\n%d HP · %d ATK"):format(if m.name and m.name~="" then m.name else m.id,m.level,m.hp,m.damage)
         end, function(d)
             if monsterType=="skilled" then skilledIndex=wrap(skilledIndex,d,#Balance.SkilledMonsters)
             else monsterLevel=wrap(monsterLevel,d,Balance.MaxLevel) end
@@ -209,14 +209,14 @@ function Controller.Start()
                 if revision == recoveryRevision and player:GetAttribute("Game1GameplayTestActive") then invoke("recovery") end
             end)
         end
-        local readRegen = recoveryField(cell(recoveryRow, "Regeneration"), "Regen · HP/sec", recoveryChanged)
-        local readVampiric = recoveryField(cell(recoveryRow, "Vampiric"), "Vampiric · %", recoveryChanged)
+        local readRegen, resetRegen = recoveryField(cell(recoveryRow, "Regeneration"), "Regen · HP/sec", recoveryChanged)
+        local readVampiric, resetVampiric = recoveryField(cell(recoveryRow, "Vampiric"), "Vampiric · %", recoveryChanged)
         local critRow = row(body, 46); horizontal(critRow)
         local function critChanged() if refreshCrit then refreshCrit() end end
-        local readCritPercent = numericField(cell(critRow, "CritPercent"), "Crit buff · %", 0, critChanged)
-        local readCritFlat = numericField(cell(critRow, "CritFlat"), "Crit bonus · pp", 0, critChanged)
+        local readCritPercent, resetCritPercent = numericField(cell(critRow, "CritPercent"), "Crit buff · %", 0, critChanged)
+        local readCritFlat, resetCritFlat = numericField(cell(critRow, "CritFlat"), "Crit bonus · pp", 0, critChanged)
         local critDamageRow = row(body, 46); horizontal(critDamageRow)
-        local readCritMultiplier = numericField(cell(critDamageRow, "CritMultiplier"), "Crit damage · ×", Balance.Rules.critMultiplier, critChanged)
+        local readCritMultiplier, resetCritMultiplier = numericField(cell(critDamageRow, "CritMultiplier"), "Crit damage · ×", Balance.Rules.critMultiplier, critChanged)
         local preview = cell(critDamageRow, "CritPreview")
         local previewTitle = label(preview, "Effective crit", UDim2.new(1, 0, 0, 15)); previewTitle.TextColor3 = colors.muted; previewTitle.TextSize = 12
         local previewValue = label(preview, "", UDim2.new(1, 0, 0, 30)); previewValue.Position = UDim2.fromOffset(0, 16)
@@ -231,6 +231,21 @@ function Controller.Start()
         local queuedAction: string? = nil
         local queuedRecovery = false
         local lastRequestAt = -math.huge
+        player:GetAttributeChangedSignal("GameplayTestStock"):Connect(function()
+            local value=player:GetAttribute("GameplayTestStock")
+            if type(value)~="string" then return end
+            local wid,aid,lvl=value:match("^([^|]+)|([^|]+)|(%d+)|%d+$")
+            if not lvl then return end
+            for i,w in ipairs(weapons) do if w.id==wid then weaponIndex=i; break end end
+            for i,a in ipairs(Balance.Armors) do if a.id==aid then armorIndex=i; break end end
+            level=tonumber(lvl) or level; upgrade=0
+            recoveryRevision+=1; queuedRecovery=false
+            resetRegen(); resetVampiric(); resetCritPercent(); resetCritFlat(); resetCritMultiplier()
+            refreshWeapon(); refreshArmor(); refreshLevel()
+            if refreshUpgrade then refreshUpgrade() end
+            if refreshCrit then refreshCrit() end
+            status.Text="Stock loadout applied · +0"
+        end)
         local closeOnSuccess = {enter=true, apply=true, start=true, visit=true, exit=true, guideNext=true}
         invoke = function(action: string)
             if action == "enter" or action == "apply" or action == "start" or action == "exit" then

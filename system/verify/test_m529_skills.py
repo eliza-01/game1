@@ -62,8 +62,8 @@ class SkillCatalogue(unittest.TestCase):
         self.assertIn('Special.TryBegin',read('src/server/monster/MonsterAttackExecutor.luau'))
         self.assertIn('Effects.Apply(model,victim,skill',read('src/server/monster/MonsterSkillCast.luau'))
         self.assertIn('SkillMoveMultiplier',read('src/client/character/MovementController.luau'))
-        self.assertIn('t.y + 100',read('src/server/dev/GameplayTestLoadout.luau'))
-        self.assertIn('SkillsBridge',read('src/server/dev/GameplayTestLayout.luau'))
+        self.assertIn('t.y + 1024',read('src/server/dev/GameplayTestLoadout.luau'))
+        self.assertIn('Skilled · GP',read('src/server/dev/GameplayTestLayout.luau'))
         self.assertIn('skilled-monsters-disclosure',read('system/control-center/static/index.html'))
         self.assertIn('resolvedSkilledMonsters',read('system/control-center/api/balance.py'))
 

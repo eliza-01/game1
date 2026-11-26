@@ -27,7 +27,7 @@ class DesignMapM538(unittest.TestCase):
 const assert=require('node:assert/strict');global.window={};require(process.argv[1]);
 const map=window.game1KanbanDesignMap,rows=JSON.parse(process.argv[2]);
 const nodes=map.parse(rows);assert.equal(nodes.length,6);
-assert.equal(nodes[0].name,'Деревня');assert.equal(nodes[5].name,'Цитадель');
+assert.equal(nodes[0].name,'Солнечная долина');assert.equal(nodes[5].name,'Драконий предел');
 assert.equal(nodes[3].back,'1–4');assert.equal(new Set(nodes.map(n=>n.color)).size,6);
 for(const mutate of [r=>r[1][2]=r[0][2],r=>r[1][1]='9–10',r=>r[3][5]='2–3',r=>r[5][4]='road',r=>r[0][2]='999']){
  const bad=structuredClone(rows);mutate(bad);assert.equal(map.parse(bad),null);

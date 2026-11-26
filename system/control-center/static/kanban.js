@@ -107,6 +107,9 @@
         host.append(detail);section=document.createElement('div');detail.append(section);continue;
       }
       if(line.startsWith('# ')){add('h3',line.slice(2));continue}
+      const illustration=line.match(/^!\[([^\]]+)\]\(design-zones\/(valley|forest|quarry|gardens|bastion|dragon)\.svg\)$/);
+      if(illustration){const img=document.createElement('img');img.className='kb-zone-art';img.src='design-zones/'+illustration[2]+'.svg';img.alt=illustration[1];img.loading='lazy';section.append(img);continue}
+
       if(line.startsWith('```')){const code=[];while(++i<lines.length&&!lines[i].startsWith('```'))code.push(lines[i]);add('pre',code.join('\n'));continue}
       if(tableLine(line)&&tableLine(lines[i+1])&&cells(lines[i+1]).every(x=>/^:?-{3,}:?$/.test(x))){
         const headings=cells(line);

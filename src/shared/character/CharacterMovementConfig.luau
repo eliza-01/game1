@@ -63,13 +63,4 @@ function CharacterMovementConfig.RunSpeedFromStudsPerSecond(studsPerSecond: any)
     return math.max(0, tonumber(studsPerSecond) or 0) * CharacterMovementConfig.RunSpeedUnitsPerStud
 end
 
--- Server-authored transient Studio test-zone flag. Never modifies the RunSpeed stat.
-function CharacterMovementConfig.TestTrackRunMultiplier(model: Model, movementMode: string): number
-    if movementMode == "Run" and model:GetAttribute("GameplayTestKind") == "player"
-        and model:GetAttribute("GameplayTestOnTrack") == true then
-        return 3
-    end
-    return 1
-end
-
 return table.freeze(CharacterMovementConfig)

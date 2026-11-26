@@ -84,8 +84,8 @@ class KanbanFavoritesM537(unittest.TestCase):
         for identifier in ('KBN-0027','KBN-0029'):
             self.assertIn('KBN-0031.md', KanbanStore(ROOT).detail(identifier)['spec'])
         html = (ROOT/'system/control-center/static/index.html').read_text('utf-8')
-        self.assertIn('kanban.js?v=538', html)
-        self.assertIn('kanban.css?v=538', html)
+        self.assertIn('kanban.js?v=539', html)
+        self.assertIn('kanban.css?v=539', html)
 
 
 if __name__ == '__main__':

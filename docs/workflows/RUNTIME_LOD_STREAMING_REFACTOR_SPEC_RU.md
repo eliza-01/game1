@@ -1,7 +1,7 @@
 # Eyesland / Game1 — ТЗ: Runtime LOD Streaming
 
 **Карточка:** KBN-0037 (клиентская производительность), связанные KBN-0007 / KBN-0017.
-**Рабочая база:** диагностический срез M613 от 27.11.2026 + подтверждённая последовательность M614–M621; M622 — текущая реализация Runtime Location. Патчи M619–M622 code/oracle checked в восстановленной sandbox-копии, Roblox Studio/DEV/Mobile и профильная приёмка не выполнены.
+**Рабочая база:** диагностический срез M613 от 27.11.2026 + подтверждённая последовательность M614–M622; M623 — текущая интеграция Real Estate. Патчи M619–M623 code/oracle checked в восстановленной sandbox-копии, Roblox Studio/DEV/Mobile и профильная приёмка не выполнены.
 **Статус:** этапы 0–3 реализованы: Static Placement Index, LOD Transition Queue, Prototype Readiness Cache. В этапе 1 выбрано дерево 3D influence bounds (BVH) вместо сетки: произвольные радиусы и разреженная карта без обхода пустых ячеек. Следующие этапы — Incremental Assembly & Work Budget и Real Estate Integration.
 
 ## 1. Цель
@@ -101,8 +101,8 @@
 2. M620: LodThresholdCache + LodTransitionQueue.
 3. M621: Prototype Readiness Cache + immutable assembly metadata / bounds.
 4. M622: Incremental Assembly & Real Work Budget — Runtime Location (static/multipart/composite FULL); общий House budget и порционный Studio Preview остаются открыты.
-5. Next: Real Estate Integration.
-6. Integration & Acceptance — исправления по фактическим результатам, не закрывать задачу заранее.
+5. M623: Real Estate Integration — общий spatial index, queue, work budget и lifecycle.
+6. Next: Integration & Acceptance — исправления по фактическим результатам, не закрывать задачу заранее.
 
 Перед каждым патчем восстановить актуальную базу из дампа + подтверждённых патчей. Проверить производителей и потребителей, Rojo/Runtime, применение/обратную проверку, профильные тесты, Luau preflight и verify.py. Обновить Mechanics (LOD / House), основное ТЗ, архитектуру, AGENTS/Read First при необходимости, KBN-0037 и связанные карточки только по реальному прогрессу. Выдать один проверенный .patch, краткий отчёт, один PowerShell-блок (нижний регистр команд; проверка → применение → тесты → при необходимости install plugin → строго control-center-stop.ps1 и control-center.ps1). Не менять пользовательские manifests, настройки или данные без необходимости; независимый откат каждого этапа через Git. Без нового дампа, если цепочка восстанавливается.
 
@@ -130,6 +130,10 @@ Cache хранит frozen metadata: source MeshPart refs, relative transforms, c
 ## M622 · Этап 4 — Incremental Assembly & Real Work Budget (Runtime Location)
 
 M622: Runtime Location stage 4 — `LodAssemblyJob` / `LodRuntimeWork`: detached incremental assembly (single mesh, multipart LOD, composite FULL); 12 build + 8 cleanup operation groups/frame, separate atomic commit reservation up to 132 groups, 16 queue checks/category/frame, one active job (≤64 visual meshes), at most two retired bundles. Commit revalidates proxy identity/current CFrames, preserves previous visual until swap and keeps effects tied to actual. Desired/prototype generation/root changes cancel staging; cleanup is incremental. Old Location cost clamp removed. House keeps independent 8/tick reservation pending stage 5; Studio Preview multipart drains the same job synchronously. Counts are not a hard CPU deadline; native streaming, effect traversal and Studio/DEV/Mobile profiling remain acceptance items. T03/A03 open.
+
+## M623 · Real Estate Integration
+
+M623: Real Estate stage 5 — every house part is a record in the common static BVH, threshold cache, aging transition queue and `LodRuntimeWork`. House influence uses a conservative sphere around scaled snapshot bounds; exact policy remains `ResolveHouse` with surface distance and per-part hide/LOD1. FULL acquisition (`HouseMeshRequests`) has four combined in-flight/ready slots, 15 s retry, generation and moving-proxy identity checks; async completion cannot publish. Detached result enters the common job, old actual survives until atomic commit, failure or absent preferred prototype preserves old actual; cold missing LOD1 can fall back to FULL. Missing unpublished part LOD1 retains FULL→UNLOADED. Shared unload/retirement handles committed geometry. Discard of a stale raw async MeshPart is immediate (bounded by four slots), outside the staged assembly counters. Only active moving parts are followed each frame; lost proxy detaches the owned mesh and removes DoorRaycast binding, stream-in rebinds using current CFrame and appearance. Static active parts refresh proxy color/material during local observation. Server physics, manifest, sockets and authority unchanged. Lua mocked lifecycle and mixed spatial/async oracles; actual Studio/DEV/Mobile, House5 interactions/two-client and profiling remain NOT_RUN. Preview still synchronous; T03/A03 open.
 
 Сборка: `Prepare` создаёт job; `Advance` выполняет ограниченное число операций, включая вклад каждого target mesh в bounds, clone, configure/appearance, staging parent и weld. `BindForCommit` подтверждает все proxy до изменения CFrames и установки Part0; до commit weld не соединён с серверным proxy. `Release` передаёт готовый bundle placement; при отмене ownership list включает даже ещё не прикреплённые clones. Cleanup удаляет отдельные staged instances / retired direct meshes, не серверный root. Смена camera проверяется перед продолжением jobs даже между наблюдениями; очередь сохраняет поколение readiness. Независимые unload/build/cleanup lanes, большой atomic commit получает резерв при необходимости.
 

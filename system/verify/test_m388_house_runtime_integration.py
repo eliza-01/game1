@@ -188,19 +188,20 @@ class HouseRuntimeIntegration(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'texture'):
             inspect(tree,inputs)
 
-    def test_one_shared_client_scheduler_and_reserved_house_budget(self):
+    def test_one_shared_client_scheduler_and_house_budget(self):
         client=(ROOT/'src/client/world/LocationWorldStreamer.luau').read_text(encoding='utf-8')
         helper=(ROOT/'src/client/world/HouseVisualAdapter.luau').read_text(encoding='utf-8')
-        self.assertIn('houseAdapter:Resolve(cameraPosition)',client)
-        self.assertIn('houseAdapter:Step(MAX_CHANGES_PER_TICK)',client)
+        self.assertIn('houseAdapter:Observe(record, previousDesired, queue)',client)
+        self.assertIn('houseAdapter:Commit(transition, job, work)',client)
+        self.assertNotIn('houseAdapter:Step(',client)
         self.assertIn('runtimeWork:Step(callbacks)',client)
         self.assertEqual(client.count('RunService.Heartbeat:Connect'), 1)
         self.assertNotIn('RunService.Heartbeat',helper)
         self.assertNotIn('RenderStepped:Connect',helper)
-        self.assertIn('MAX_PENDING = 4',helper)
+        self.assertIn('MAX_PENDING = 4',(ROOT/'src/client/world/HouseMeshRequests.luau').read_text())
         self.assertIn('visual.generation == ticket',helper)
-        self.assertIn('InsertService.CreateMeshPartAsync',helper)
-        self.assertIn('Policy.ResolveHouse',helper)
+        self.assertIn('InsertService:CreateMeshPartAsync',helper)
+        self.assertIn('policy.ResolveHouse',(ROOT/'src/client/world/LodThresholdCache.luau').read_text())
         self.assertIn('Game1HouseClientVisuals',helper)
         self.assertNotIn('LoadAssetAsync',helper)
         self.assertNotIn('RemoteEvent',helper)

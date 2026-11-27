@@ -28,14 +28,14 @@ class LodTransitionQueueM620(unittest.TestCase):
                        'LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)',
                        'record.part:IsDescendantOf(Workspace)', 'not available(record, status, prototype, metadata, variant)',
                        'queue:Remove(record)', 'continue', 'queue:Set(record, variant, prototype, metadata, force)',
-                       'queue:Ordered(LodThresholdCache.Distance)', 'runtimeWork:Step(callbacks)',
-                       'queue:Remove(record)', 'ipairs(composites)', 'houseAdapter:Step('):
+                       'queue:Ordered(function(record, position)', 'runtimeWork:Step(callbacks)',
+                       'queue:Remove(record)', 'ipairs(composites)', 'houseAdapter:Observe('):
             self.assertIn(needle, tick)
         self.assertNotIn('local transitions = {}', tick)
         self.assertNotIn('if not cameraChanged then return', tick)
         self.assertLess(tick.index('queue:Begin'), tick.index('queue:Set'))
         self.assertLess(tick.index('queue:Set'), tick.index('queue:Ordered'))
-        self.assertIn('runtimeWork:Begin(queue:Ordered(LodThresholdCache.Distance))', tick)
+        self.assertIn('runtimeWork:Begin(queue:Ordered(function(record, position)', tick)
         self.assertIn('runtimeWork:Step(callbacks)', tick)
 
     def test_pure_helpers_no_new_runtime_ownership(self):

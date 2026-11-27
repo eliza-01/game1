@@ -190,7 +190,6 @@ function Streamer.Start()
                 end
             end
         end
-        candidates = LocationLodCandidates.new(StaticPlacementIndex.new(records))
         queue = LodTransitionQueue.new(LocationLodCandidates.SortTransitions)
         prototypeCache = LodPrototypeCache.new(ReplicatedStorage, Contract.TemplateFolder, LodAssembly)
         local dependentsByName = {}
@@ -214,8 +213,9 @@ function Streamer.Start()
     end
     local houseAdapter = nil
     if manifest and manifest.houses then
-        houseAdapter = HouseVisualAdapter.new(manifest.houses, prototypeCache, manifest.hysteresis)
+        houseAdapter = HouseVisualAdapter.new(manifest.houses, prototypeCache, manifest.hysteresis, records)
     end
+    if manifest then candidates = LocationLodCandidates.new(StaticPlacementIndex.new(records)) end
     local preview = nil
     if not marker and RunService:IsStudio() then
         preview = require(script.Parent:WaitForChild("StudioLodPreviewAdapter")).new(function(part)
@@ -234,12 +234,13 @@ function Streamer.Start()
         if queue.entries[record] ~= transition or transition.desired ~= record.desired
             or transition.actual ~= record.actual or (transition.attemptTick == queue.tick and not job) then return false end
         -- Recheck active work against the current camera, even between observations.
-        if Policy.Resolve((cameraPosition - record.pivot).Magnitude, record.desired,
-            record.distances, record.mode) ~= transition.desired then return false end
+        if LodThresholdCache.ResolveAt(record, LodThresholdCache.Measure(record, cameraPosition, Policy),
+            Policy, record.desired) ~= transition.desired then return false end
         if transition.prototype then
             local cacheFolder = prototypeCache:Folder()
             if not cacheFolder or transition.prototype.Parent ~= cacheFolder then return false end
         end
+        if record.house then return houseAdapter:Valid(transition, job) end
         if transition.epoch ~= (record.prototypeEpoch or 0) then return false end
         if job and job.root and not LocationCompositeVisual.RootAlive(job, record) then return false end
         return true
@@ -248,6 +249,7 @@ function Streamer.Start()
         queue:Attempted(transition)
         transition.attemptTick = queue.tick
         local record, variant, prototype = transition.record, transition.variant, transition.prototype
+        if record.house then return houseAdapter:Prepare(transition) end
         local asset = Registry.assets[record.slug]
         local job, reason
         if variant ~= "FULL" and (record.components or prototype:IsA("Model")) then
@@ -266,6 +268,7 @@ function Streamer.Start()
     function callbacks.failed(transition, reason, retryable)
         local record, variant, prototype = transition.record, transition.variant, transition.prototype
         transition.attemptTick = queue.tick
+        if record.house then houseAdapter:Failed(transition, reason, retryable); return end
         if retryable then return end
         record.failedAssemblies = record.failedAssemblies or {}
         record.failedAssemblies[variant] = prototype
@@ -277,6 +280,11 @@ function Streamer.Start()
     end
     function callbacks.commit(transition, job, work)
         local record, variant, prototype = transition.record, transition.variant, transition.prototype
+        if record.house then
+            local ok, reason, retryable = houseAdapter:Commit(transition, job, work)
+            if ok then queue:Remove(record) end
+            return ok, reason, retryable
+        end
         local replacement = job and job.bundle
         if replacement then
             local ok, bound = pcall(function()
@@ -318,7 +326,6 @@ function Streamer.Start()
             visualElapsed = 0
             if preview then preview:Resolve(cameraPosition) end
             sampleVisuals(cameraPosition, preview)
-            if houseAdapter then houseAdapter:Resolve(cameraPosition) end
         end
         if elapsed < TICK then
             if manifest then runtimeWork:Step(callbacks) end
@@ -338,6 +345,10 @@ function Streamer.Start()
         for _, record in ipairs(localRecords) do
             local previousDesired = record.desired
             LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)
+            if record.house then
+                houseAdapter:Observe(record, previousDesired, queue)
+                continue
+            end
             if record.desired ~= previousDesired then record.prototypeDirty = true end
             -- Roblox native streaming can independently remove the parent
             -- technical Model. Recover when that root later streams back in.
@@ -402,7 +413,9 @@ function Streamer.Start()
                 if queue.entries[record] then queue.entries[record].epoch = record.prototypeEpoch or 0 end
             end
         end
-        runtimeWork:Begin(queue:Ordered(LodThresholdCache.Distance))
+        runtimeWork:Begin(queue:Ordered(function(record, position)
+            return LodThresholdCache.Distance(record, position, Policy)
+        end))
         runtimeWork:Step(callbacks)
         candidates:Retain(localRecords)
         -- Keep the existing effect lifecycle for every composite, including
@@ -413,7 +426,6 @@ function Streamer.Start()
                 LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")
             end
         end
-        if houseAdapter then houseAdapter:Step(MAX_CHANGES_PER_TICK) end
         if prototypeCache:FolderReady() ~= true and os.clock() - lastWarning > 15 then
             lastWarning = os.clock()
             warn("[game1][LOD] template staging incomplete; never publish this build before visual validation")

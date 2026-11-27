@@ -1,40 +1,19 @@
---!strict
--- House-specific geometry adapter for the ONE LocationWorldStreamer scheduler.
--- No heartbeat, Workspace scans, per-house polling, or client-submitted IDs.
--- FULL meshes are created on demand from compiler-authorized published Mesh IDs.
--- Server keeps only tiny invisible physics/socket proxies and the original Plot.
+-- House parts are ordinary records of the single LocationWorldStreamer index,
+-- threshold cache, transition queue and work scheduler. Only acquisition and
+-- proxy-specific appearance/interaction belong to this adapter.
 local InsertService = game:GetService("InsertService")
+local Workspace = game:GetService("Workspace")
 local Appearance = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
     :WaitForChild("world"):WaitForChild("RuntimeVisualAppearance"))
-local Workspace = game:GetService("Workspace")
 local DoorRaycast = require(script.Parent:WaitForChild("DoorInteractionRaycast"))
-local Policy = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
-    :WaitForChild("world"):WaitForChild("LocationLodDistancePolicy"))
+local Job = require(script.Parent:WaitForChild("LodAssemblyJob"))
+local Requests = require(script.Parent:WaitForChild("HouseMeshRequests"))
 
 local Adapter = {}
 Adapter.__index = Adapter
-local MAX_PENDING = 4
-local RETRY_SECONDS = 15
 
-type Visual = {
-    spec: any, desired: string?, part: MeshPart?, lodPart: MeshPart?,
-    templateName: string, fetching: boolean,
-    generation: number, retryAt: number, proxy: BasePart?,
-    lodPrototype: Instance?, lodGeneration: number?, prototypeDirty: boolean,
-    worldFrame: CFrame, worldSize: Vector3,
-}
-type House = {
-    slug: string, plotIndex: number, path: {string}, pivot: CFrame,
-    mode: string, config: any, state: string, scale: number,
-    visual: {Visual}, distance: number, root: Model?,
-}
-
-local function fromComponents(values): CFrame
-    return CFrame.new(table.unpack(values))
-end
-local surfaceDistance = Policy.SurfaceDistance
-local function resolvePath(start: Instance, path: {string}): Instance?
-    local node: Instance? = start
+local function resolvePath(start, path)
+    local node = start
     for _, key in ipairs(path) do
         if not node then return nil end
         node = node:FindFirstChild(key)
@@ -42,316 +21,234 @@ local function resolvePath(start: Instance, path: {string}): Instance?
     return node
 end
 
-function Adapter.new(houses: any, prototypeCache: any, hysteresis: number)
-    local self = setmetatable({}, Adapter)
-    self.prototypeCache = prototypeCache
-    self.hysteresis = hysteresis
-    self.destroyed = false
-    self.templateDependents = {}
+function Adapter.new(houses, prototypeCache, hysteresis, records)
+    local self = setmetatable({prototypeCache=prototypeCache, records={}, moving={},
+        templateDependents={}, destroyed=false, errors=0}, Adapter)
     self.folder = Instance.new("Folder")
     self.folder.Name = "Game1HouseClientVisuals"
     self.folder.Parent = Workspace
-    self.records = {} :: {House}
-    self.pending = 0
-    self.errors = 0
-    self.failed = false
+    self.requests = Requests.new(os.clock, task.spawn, function(visual)
+        local part = InsertService:CreateMeshPartAsync("rbxassetid://" .. visual.spec.meshId,
+            if visual.spec.moving then Enum.CollisionFidelity.Default else Enum.CollisionFidelity.Box,
+            Enum.RenderFidelity.Performance)
+        if part and part:IsA("MeshPart") then return part end
+        if part then part:Destroy() end
+        error("FULL acquisition did not return MeshPart")
+    end, function(part) part:Destroy() end, function(visual, reason)
+        self:_warn(visual, reason)
+    end)
     for _, row in ipairs(houses.placements) do
         local config = houses.types[row.slug]
-        local entries = {} :: {Visual}
-        local pivot = fromComponents(row.pivot)
+        local pivot = CFrame.new(table.unpack(row.pivot))
         for _, spec in ipairs(config.parts) do
-            local localFrame = fromComponents(spec.cframe)
-            local worldFrame = pivot * CFrame.new(localFrame.Position * row.scale)
-                * localFrame.Rotation
-            table.insert(entries, {spec = spec, desired = nil, part = nil,
-                lodPart = nil, templateName = "__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId),
-                fetching = false, generation = 0, retryAt = 0, proxy = nil,
-                lodPrototype = nil, lodGeneration = nil, prototypeDirty = true,
-                worldFrame = worldFrame,
-                worldSize = Vector3.new(table.unpack(spec.size)) * row.scale})
-        end
-        table.insert(self.records, {
-            slug = row.slug, plotIndex = row.plotIndex, path = row.path,
-            pivot = fromComponents(row.pivot), scale = row.scale,
-            mode = config.mode, config = config,
-            state = "UNLOADED", visual = entries,
-            distance = math.huge, root = nil,
-        })
-        for _, visual in ipairs(entries) do
-            local dependents = self.templateDependents[visual.templateName]
-            if not dependents then
-                dependents = {}
+            local localFrame = CFrame.new(table.unpack(spec.cframe))
+            local worldFrame = pivot * CFrame.new(localFrame.Position * row.scale) * localFrame.Rotation
+            local mode = if config.mode == "lod1" and spec.lod1ModelAssetId ~= "" then "lod1" else "full"
+            local visual = {house=true, order=#records+1, slug=row.slug, path=row.path, spec=spec,
+                pivot=worldFrame.Position, worldFrame=worldFrame,
+                worldSize=Vector3.new(table.unpack(spec.size))*row.scale,
+                mode=mode, distances={mode=mode, lod1=spec.lod1From, hide=spec.hideFrom, hysteresis=hysteresis},
+                actual="UNLOADED", generation=0, retryAt=0, prototypeDirty=true,
+                templateName="__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId), distance=math.huge}
+            records[#records+1] = visual
+            self.records[#self.records+1] = visual
+            if mode == "lod1" then
+                local dependents = self.templateDependents[visual.templateName] or {}
                 self.templateDependents[visual.templateName] = dependents
+                dependents[#dependents+1] = visual
             end
-            table.insert(dependents, visual)
         end
     end
-    if prototypeCache and prototypeCache.ConnectChanged then
-        self.cacheChangedConnection = prototypeCache:ConnectChanged(function(name)
-            for _, visual in ipairs(self.templateDependents[name] or {}) do
-                visual.prototypeDirty = true
-            end
-        end)
-    end
+    self.cacheChangedConnection = prototypeCache:ConnectChanged(function(name)
+        for _, visual in ipairs(self.templateDependents[name] or {}) do
+            visual.prototypeDirty = true
+            visual.prototypeEpoch = (visual.prototypeEpoch or 0) + 1
+        end
+    end)
     return self
 end
 
-function Adapter:_root(record: House): Model?
-    if record.root and record.root:IsDescendantOf(Workspace) then return record.root end
-    local candidate = resolvePath(Workspace, record.path)
-    if candidate and candidate:IsA("Model") then
-        record.root = candidate
-        return candidate
-    end
-    record.root = nil
+function Adapter:_warn(visual, reason)
+    self.errors += 1
+    if self.errors <= 8 then warn("[game1][HouseLOD] " .. visual.slug .. "/" .. visual.spec.name .. ": " .. tostring(reason)) end
+end
+
+function Adapter:_proxy(visual)
+    local root = resolvePath(Workspace, visual.path)
+    local proxy = root and root:IsA("Model") and resolvePath(root, visual.spec.path)
+    if proxy and proxy:IsA("Part") and proxy:IsDescendantOf(Workspace) then return proxy end
     return nil
 end
 
-function Adapter:_proxy(record: House, visual: Visual): BasePart?
-    if visual.proxy and visual.proxy:IsDescendantOf(Workspace) then return visual.proxy end
-    local root = self:_root(record)
-    if not root then return nil end
-    local proxy = resolvePath(root, visual.spec.path)
-    if proxy and proxy:IsA("Part") then
-        visual.proxy = proxy
-        return proxy
-    end
-    visual.proxy = nil
-    return nil
-end
-
-function Adapter:Resolve(cameraPosition: Vector3)
-    for _, house: House in ipairs(self.records) do
-        house.distance = math.huge
-        for _, visual: Visual in ipairs(house.visual) do
-            local spec = visual.spec
-            local distance = surfaceDistance(cameraPosition, visual.worldFrame, visual.worldSize)
-            house.distance = math.min(house.distance, distance)
-            -- No published per-part LOD1: FULL stays until THIS part's unload
-            -- distance. Never create a visibility gap before a group LOD switch.
-            local mode = if house.mode == "lod1" and spec.lod1ModelAssetId ~= ""
-                then "lod1" else "full"
-            local nextState = Policy.ResolveHouse(distance, visual.desired, {
-                mode = mode, lod1 = spec.lod1From, hide = spec.hideFrom,
-                hysteresis = self.hysteresis,
-            })
-            if nextState ~= visual.desired then
-                visual.desired = nextState
-                visual.generation += 1
-            end
-        end
+local function customAppearance(visual, part, proxy)
+    if proxy and visual.spec.mode ~= "atlas" then
+        if part.Color ~= proxy.Color then part.Color = proxy.Color end
+        if part.Material ~= proxy.Material then part.Material = proxy.Material end
     end
 end
 
-function Adapter:_removeVisual(visual: Visual): boolean
-    if visual.part then
-        visual.part:Destroy()
-        visual.part = nil
-        return true
-    end
-    return false
+function Adapter:_unbind(visual)
+    if visual.boundProxy and visual.part then DoorRaycast.Unbind(visual.boundProxy, visual.part) end
+    visual.boundProxy = nil
 end
 
-function Adapter:_startVisual(house: House, visual: Visual)
-    if self.destroyed or self.pending >= MAX_PENDING or visual.fetching then return false end
-    if os.clock() < visual.retryAt then return false end
-    -- Static visuals can be created from immutable authored CFrames even if
-    -- Roblox's own Instance Streaming has not yet replicated distant proxies.
-    -- A moving door must wait for its server-owned proxy transform.
-    local proxy = self:_proxy(house, visual)
-    if visual.spec.moving and not proxy then return false end
-    visual.fetching = true
-    self.pending += 1
-    local ticket = visual.generation
-    local meshId = visual.spec.meshId
-    task.spawn(function()
-        local ok, result = pcall(InsertService.CreateMeshPartAsync,
-            InsertService, "rbxassetid://" .. meshId,
-            if visual.spec.moving then Enum.CollisionFidelity.Default else Enum.CollisionFidelity.Box,
-            Enum.RenderFidelity.Performance)
-        local part = if ok and typeof(result) == "Instance" and result:IsA("MeshPart")
-            then result else nil
-        if part then
-            local success, reason = pcall(function()
-                part.Name = visual.spec.name
-                part.Anchored = true
-                part.CanCollide = false
-                part.CanTouch = false
-                part.CanQuery = false
-                part.CastShadow = true
-                part.Size = visual.worldSize
-                part.CFrame = if proxy then proxy.CFrame else visual.worldFrame
-                if not Appearance.Apply(part, {
-                    mode = visual.spec.mode, material = visual.spec.material,
-                    color = visual.spec.color, textureId = visual.spec.textureId,
-                    alpha = visual.spec.alpha,
-                }) then error("unsupported visual appearance") end
-                -- Custom colors belong to the player's house proxy, not to
-                -- the potentially shared published LOD geometry.
-                if proxy and visual.spec.mode ~= "atlas" then
-                    part.Color = proxy.Color
-                    part.Material = proxy.Material
-                end
-            end)
-            if not success then
-                warn("[game1][HouseLOD] appearance rejected " .. tostring(reason))
-                part:Destroy()
-                part = nil
-            end
-        end
-        visual.fetching = false
-        self.pending -= 1
-        if self.destroyed then
-            if part then part:Destroy() end
-            return
-        end
-        if part and visual.desired == "FULL"
-            and visual.generation == ticket
-            and (not visual.spec.moving or (proxy ~= nil and proxy:IsDescendantOf(Workspace))) then
-            visual.part = part
-            part.Parent = self.folder
-            if visual.spec.moving and proxy then DoorRaycast.Bind(proxy, part) end
-        else
-            if part then part:Destroy() end
-            if not ok then
-                self.errors += 1
-                if self.errors <= 8 then
-                    warn("[game1][HouseLOD] mesh load failed " .. meshId .. ": " .. tostring(result))
-                end
-                visual.retryAt = os.clock() + RETRY_SECONDS
-            end
-        end
-    end)
+-- Moving meshes remain owned while their proxy streams out, but are detached
+-- and unbound; stream-in reuses the mesh with the new live proxy identity.
+function Adapter:_refresh(visual)
+    local part = visual.part
+    if not part then return end
+    local proxy = self:_proxy(visual)
+    customAppearance(visual, part, proxy)
+    if not visual.spec.moving then return end
+    if proxy ~= visual.boundProxy then self:_unbind(visual) end
+    if not proxy then
+        if part.Parent then part.Parent = nil end
+        return
+    end
+    if part.CFrame ~= proxy.CFrame then part.CFrame = proxy.CFrame end
+    if part.Parent ~= self.folder then part.Parent = self.folder end
+    if visual.boundProxy ~= proxy then
+        DoorRaycast.Bind(proxy, part)
+        visual.boundProxy = proxy
+    end
+end
+
+-- Called only for shared spatial candidates/retained records at observation.
+function Adapter:Observe(visual, previousDesired, queue)
+    if visual.desired ~= previousDesired then
+        visual.generation += 1
+        self.requests:Invalidate(visual)
+        visual.prototypeDirty = true
+    end
+    self.requests:Prune(visual)
+    if visual.part and not visual.spec.moving then self:_refresh(visual) end
+    if visual.desired == "UNLOADED" then
+        queue:Set(visual, "UNLOADED", nil, nil, false)
+        return
+    end
+    if visual.desired == "FULL" then
+        queue:Set(visual, "FULL", nil, nil, false)
+        return
+    end
+    if not visual.prototypeDirty then return end
+    local status, prototype, metadata = self.prototypeCache:Resolve(visual.templateName, "LOD1")
+    visual.prototypeDirty = status == "incomplete" or (status == "missing" and self.prototypeCache:FolderReady() == false)
+    if status ~= "ready" or not prototype or not prototype:IsA("MeshPart") then
+        -- A missing LOD must never remove an existing representation. On a
+        -- cold entry fall back to FULL until the prototype becomes available.
+        if visual.part then queue:Remove(visual) else queue:Set(visual, "FULL", nil, nil, false) end
+        return
+    end
+    self.requests:Invalidate(visual) -- preferred LOD ready; release any fallback FULL ticket
+    local force = visual.actual == "LOD1" and (visual.actualPrototype ~= prototype
+        or visual.actualPrototypeGeneration ~= metadata.generation)
+    queue:Set(visual, "LOD1", prototype, metadata, force)
+    if queue.entries[visual] then queue.entries[visual].epoch = visual.prototypeEpoch or 0 end
+end
+
+function Adapter:Valid(transition, job)
+    local visual = transition.record
+    if transition.prototype and transition.epoch ~= (visual.prototypeEpoch or 0) then return false end
+    if job and visual.spec.moving and self:_proxy(visual) ~= job.proxy then return false end
     return true
 end
 
--- The existing LocationWorldStreamer grants this adapter its shared budget.
--- Every part transitions independently; no group-wide render gate.
-function Adapter:Step(budget: number): number
-    if self.destroyed then return 0 end
-    local operations = 0
-    table.sort(self.records, function(a: House, b: House)
-        return a.distance < b.distance
-    end)
-    for _, house: House in ipairs(self.records) do
-        if operations >= budget then break end
-        local hasFull, hasLod = false, false
-        for _, visual: Visual in ipairs(house.visual) do
-            if operations >= budget then break end
-            local desired = visual.desired
-            if desired ~= "FULL" and self:_removeVisual(visual) then
-                operations += 1
-            end
-            if desired ~= "LOD1" and visual.lodPart then
-                visual.lodPart:Destroy()
-                visual.lodPart = nil
-                visual.lodPrototype = nil
-                visual.lodGeneration = nil
-                operations += 1
-            end
-            -- Never show FULL and LOD together, including under low budget.
-            if operations < budget and desired == "LOD1"
-                and not visual.part and not visual.fetching
-                and (not visual.lodPart or visual.prototypeDirty) then
-                visual.prototypeDirty = false
-                local status, prototype, metadata = self.prototypeCache:Resolve(visual.templateName, "LOD1")
-                if status == "ready" and prototype and prototype:IsA("MeshPart") then
-                    local rebuild = not visual.lodPart or visual.lodPrototype ~= prototype
-                        or visual.lodGeneration ~= metadata.generation
-                    if rebuild then
-                        local lod = prototype:Clone()
-                        lod.Name = visual.spec.name .. "__LOD1"
-                        lod.Anchored = true
-                        lod.CanCollide = false
-                        lod.CanTouch = false
-                        lod.CanQuery = false
-                        lod.Size = visual.worldSize
-                        lod.CFrame = visual.worldFrame
-                        local ok = Appearance.Apply(lod, {
-                            mode = visual.spec.mode, material = visual.spec.material,
-                            color = visual.spec.color, textureId = visual.spec.textureId,
-                            alpha = visual.spec.alpha,
-                        })
-                        if ok then
-                            local proxy = self:_proxy(house, visual)
-                            if proxy and visual.spec.mode ~= "atlas" then
-                                lod.Color = proxy.Color
-                                lod.Material = proxy.Material
-                            end
-                            if visual.spec.moving and proxy then
-                                lod.CFrame = proxy.CFrame
-                            end
-                            lod.Parent = self.folder
-                            local previous = visual.lodPart
-                            visual.lodPart = lod
-                            visual.lodPrototype = prototype
-                            visual.lodGeneration = metadata.generation
-                            if previous then previous:Destroy() end
-                            if visual.spec.moving and proxy then DoorRaycast.Bind(proxy, lod) end
-                            operations += 1
-                        else
-                            lod:Destroy()
-                        end
-                    end
-                end
-            end
-            if operations < budget and desired == "FULL" and not visual.lodPart
-                and not visual.part and self:_startVisual(house, visual) then
-                operations += 1
-            end
-            -- Preserve player-specific material/color on both representations.
-            if visual.part or visual.lodPart then
-                local proxy = self:_proxy(house, visual)
-                if proxy and visual.spec.mode ~= "atlas" then
-                    if visual.part and (visual.part.Color ~= proxy.Color or visual.part.Material ~= proxy.Material) then
-                        visual.part.Color = proxy.Color
-                        visual.part.Material = proxy.Material
-                    end
-                    if visual.lodPart and (visual.lodPart.Color ~= proxy.Color or visual.lodPart.Material ~= proxy.Material) then
-                        visual.lodPart.Color = proxy.Color
-                        visual.lodPart.Material = proxy.Material
-                    end
-                end
-            end
-            if desired == "FULL" then hasFull = true
-            elseif desired == "LOD1" then hasLod = true end
-        end
-        house.state = if hasFull then "FULL" elseif hasLod then "LOD1" else "UNLOADED"
+function Adapter:Prepare(transition)
+    local visual = transition.record
+    if transition.variant == "LOD1" and os.clock() < (visual.lodRetryAt or 0) then
+        return nil, "retry backoff", true
     end
-    return operations
+    local proxy = self:_proxy(visual)
+    if visual.spec.moving and not proxy then return nil, "proxy unavailable", true end
+    local acquired
+    if transition.variant == "FULL" then
+        acquired = self.requests:TakeOrStart(visual, function(ticket)
+            return not self.destroyed and visual.generation == ticket
+                and visual.desired == transition.desired
+                and (not visual.spec.moving or self:_proxy(visual) == proxy)
+        end)
+        if not acquired then return nil, "FULL pending", true end
+    end
+    local job = Job.new(function(build)
+        local part = acquired or build:Own(transition.prototype:Clone())
+        build.bundle = part
+        build:Unit()
+        part.Name = visual.spec.name .. (if transition.variant == "LOD1" then "__LOD1" else "")
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanTouch = false
+        part.CanQuery = false
+        if transition.variant == "FULL" then part.CastShadow = true end
+        part.Size = visual.worldSize
+        part.CFrame = visual.worldFrame
+        if not Appearance.Apply(part, {mode=visual.spec.mode, material=visual.spec.material,
+            color=visual.spec.color, textureId=visual.spec.textureId, alpha=visual.spec.alpha}) then
+            error("unsupported visual appearance")
+        end
+    end)
+    -- Own the async result immediately, even if cancelled before first Advance.
+    if acquired then job:Own(acquired) end
+    job.proxy = proxy
+    return job
+end
+
+function Adapter:Failed(transition, reason, retryable)
+    if retryable then return end
+    if transition.variant == "LOD1" then transition.record.lodRetryAt = os.clock() + Requests.RetrySeconds
+    else self.requests:Backoff(transition.record) end
+    self:_warn(transition.record, reason)
+end
+
+function Adapter:Commit(transition, job, work)
+    local visual = transition.record
+    local part = job and job.bundle
+    local proxy = part and self:_proxy(visual)
+    if part and visual.spec.moving and (not proxy or proxy ~= job.proxy) then
+        return false, "proxy changed at commit", true
+    end
+    if part then
+        local ok, reason = pcall(function()
+            customAppearance(visual, part, proxy)
+            if proxy and (visual.spec.moving or transition.variant == "FULL") then part.CFrame = proxy.CFrame end
+            part.Parent = self.folder
+        end)
+        if not ok then return false, reason, false end
+        job:Release()
+    end
+    self:_unbind(visual)
+    if visual.part then work:Retire(visual.part) end
+    visual.part = part
+    visual.actual = if part then transition.variant else "UNLOADED"
+    visual.actualPrototype = if part then transition.prototype else nil
+    visual.actualPrototypeGeneration = if part and transition.metadata then transition.metadata.generation else nil
+    self.moving[visual] = nil
+    if part and visual.spec.moving then
+        DoorRaycast.Bind(proxy, part)
+        visual.boundProxy = proxy
+        self.moving[visual] = true
+    end
+    -- A fallback FULL may complete while desired is LOD1; retry readiness
+    -- on the next observation, not by dropping the usable fallback.
+    if visual.actual ~= visual.desired then visual.prototypeDirty = true end
+    return true
 end
 
 function Adapter:FollowMoving()
     if self.destroyed then return end
-    -- No independent RenderStepped or Heartbeat subscription. Only the few
-    -- nearby animated door visuals need a transform while their server proxies move.
-    for _, house: House in ipairs(self.records) do
-        for _, visual: Visual in ipairs(house.visual) do
-            local part = visual.part or visual.lodPart
-            if visual.spec.moving and part and visual.proxy and visual.proxy:IsDescendantOf(Workspace) then
-                if part.CFrame ~= visual.proxy.CFrame then part.CFrame = visual.proxy.CFrame end
-            end
-        end
-    end
+    for visual in pairs(self.moving) do self:_refresh(visual) end
 end
 
 function Adapter:Destroy()
     if self.destroyed then return end
     self.destroyed = true
-    if self.cacheChangedConnection then
-        pcall(function() self.cacheChangedConnection:Disconnect() end)
-        self.cacheChangedConnection = nil
+    self.cacheChangedConnection:Disconnect()
+    self.requests:Destroy()
+    for _, visual in ipairs(self.records) do
+        self:_unbind(visual)
+        if visual.part then visual.part:Destroy(); visual.part = nil end
     end
-    for _, house in ipairs(self.records) do
-        for _, visual in ipairs(house.visual) do
-            visual.generation += 1
-            if visual.part then visual.part:Destroy(); visual.part = nil end
-            if visual.lodPart then visual.lodPart:Destroy(); visual.lodPart = nil end
-            visual.lodPrototype = nil
-            visual.lodGeneration = nil
-        end
-    end
-    if self.folder then self.folder:Destroy(); self.folder = nil end
+    self.moving = {}
+    self.folder:Destroy()
 end
 
 return table.freeze(Adapter)

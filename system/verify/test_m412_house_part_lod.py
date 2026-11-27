@@ -142,7 +142,7 @@ class HousePartLodM412(unittest.TestCase):
         self.assertIn('partIdsAttempted[name] = true',server)
         self.assertIn('"__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId)',server)
         self.assertIn('"__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId)',client)
-        self.assertIn('Appearance.Apply(lod, {',client)
+        self.assertIn('Appearance.Apply(part, {',client)
         self.assertIn('if spec.lod1ModelAssetId == "" then continue end',server)
         self.assertIn('if profile.mode == "lod1" and lodParts == 0 then',contract)
 

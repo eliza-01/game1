@@ -23,13 +23,13 @@ class IncrementalAssemblyM622(unittest.TestCase):
 
     def test_runtime_uses_jobs_not_synchronous_clone_loop(self):
         streamer = source('LocationWorldStreamer.luau')
-        self.assertIn('runtimeWork:Begin(queue:Ordered(LodThresholdCache.Distance))', streamer)
+        self.assertIn('runtimeWork:Begin(queue:Ordered(function(record, position)', streamer)
         self.assertIn('runtimeWork:Step(callbacks)', streamer)
         self.assertIn('LodAssembly.PrepareSingle', streamer)
         self.assertIn('LodAssembly.Prepare(', streamer)
         self.assertIn('LocationCompositeVisual.Prepare(', streamer)
         self.assertIn('transition.epoch ~= (record.prototypeEpoch or 0)', streamer)
-        self.assertIn('Policy.Resolve((cameraPosition - record.pivot).Magnitude', streamer)
+        self.assertIn('LodThresholdCache.ResolveAt(record, LodThresholdCache.Measure(record, cameraPosition, Policy)', streamer)
         self.assertIn('queue.entries[record] ~= transition', streamer)
         self.assertIn('state.runtimeWork:Destroy()', streamer)
         self.assertNotIn('LodAssembly.Create(', streamer)

@@ -25,7 +25,6 @@ class StaticPlacementIndexM619(unittest.TestCase):
     def test_existing_policy_and_adapters_unchanged(self):
         for path, digest in {
             'src/shared/world/LocationLodDistancePolicy.luau': 'b30f83c16c45d73f1ab34543a278860038b123b2fda2fd7531f4ab2bf8312515',
-            'src/client/world/HouseVisualAdapter.luau': '1b9ee259a67e5a4b0b30d2b6f64201605ddb615052cbf13e5b057b56a733099c',
             'src/client/world/StudioLodPreviewAdapter.luau': '4c86f261a55fba2a3e1244cdec515da8106bb090847a61093a11c404e72765c8',
         }.items():
             self.assertEqual(hashlib.sha256(read(path).encode()).hexdigest(), digest, path)
@@ -36,9 +35,9 @@ class StaticPlacementIndexM619(unittest.TestCase):
         self.assertNotIn('ipairs(records)', tick)
         self.assertNotIn('table.sort(records', source)
         for needle in ('candidates:Collect(cameraPosition, cameraChanged)', 'LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)',
-                       'queue:Ordered(LodThresholdCache.Distance)', 'candidates:Retain(localRecords)',
+                       'queue:Ordered(function(record, position)', 'candidates:Retain(localRecords)',
                        'ipairs(composites)', 'LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")',
-                       'record.part:IsDescendantOf(Workspace)', 'houseAdapter:Step(MAX_CHANGES_PER_TICK)'):
+                       'record.part:IsDescendantOf(Workspace)', 'houseAdapter:Observe(record, previousDesired, queue)'):
             self.assertIn(needle, tick)
         self.assertEqual(source.count('RunService.Heartbeat:Connect'), 1)
         self.assertIn('local TICK = 0.25', source)

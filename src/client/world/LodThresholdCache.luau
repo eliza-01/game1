@@ -14,12 +14,22 @@ local function clearance(distance, config, mode)
     return gap
 end
 
-function Cache.Distance(record, position)
+function Cache.Measure(record, position, policy)
+    if record.house then return policy.SurfaceDistance(position, record.worldFrame, record.worldSize) end
+    return (position - record.pivot).Magnitude
+end
+
+function Cache.Distance(record, position, policy)
     if record.distancePosition ~= position then
-        record.distance = (position - record.pivot).Magnitude
+        record.distance = Cache.Measure(record, position, policy)
         record.distancePosition = position
     end
     return record.distance
+end
+
+function Cache.ResolveAt(record, distance, policy, previous)
+    if record.house then return policy.ResolveHouse(distance, previous, record.distances) end
+    return policy.Resolve(distance, previous, record.distances, record.mode)
 end
 
 function Cache.Resolve(record, position, policy, force)
@@ -37,9 +47,9 @@ function Cache.Resolve(record, position, policy, force)
             if sample.gap > displacement + guard then return false end
         end
     end
-    local distance = Cache.Distance(record, position)
+    local distance = Cache.Distance(record, position, policy)
     local previous = record.desired
-    local result = policy.Resolve(distance, previous, record.distances, record.mode)
+    local result = Cache.ResolveAt(record, distance, policy, previous)
     record.desired = result
     record.thresholdSample = {position=position, distance=distance, result=result,
         gap=clearance(distance, record.distances, record.mode), fixed=previous == result}

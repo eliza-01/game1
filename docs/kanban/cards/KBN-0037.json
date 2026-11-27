@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "5b0cd2d0d5c9fb4ba4abe40962d5e5b8f9e385fb25af9cd917d5f7a4a59ab7c2",
+  "specSha256": "c50cd82e1e2a3457770e77c1e88ccf8d7f188e2adffc2d53ad506f686f3a0db0",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 11,
-  "updatedAt": "2026-11-28T13:00:00+00:00",
+  "revision": 12,
+  "updatedAt": "2026-11-28T14:00:00+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -69,7 +69,7 @@
       "id": "KBN-0037-A03",
       "title": "Неподвижный игрок не вызывает глобальную пересортировку LOD; большие сборки бюджетируются; streaming/коллизии/телепорты работают",
       "status": "NOT_RUN",
-      "evidence": "M619–M622: static index, threshold queue, shared readiness cache, Runtime Location incremental jobs and bounded retirement; Lua scheduler oracle covers static/composite 1/8/32/64 parts, cancellation, proxy rejection and cleanup. House shared spatial/queue/budget, budgeted Studio Preview scheduling, Studio/DEV Mobile, two-client collision/navigation and profile NOT_RUN."
+      "evidence": "M619–M623: shared static index/threshold queue/prototype cache, Location/House incremental jobs and retirement. Mixed bounds/index, async slots and mocked adapter lifecycle oracles cover atomic swaps, retry, proxy stream-out/in, appearance and raycast unbind. Budgeted Studio Preview scheduling, actual Studio/DEV Mobile, House5/two-client interactions, collisions/navigation and profiling NOT_RUN."
     },
     {
       "id": "KBN-0037-A04",

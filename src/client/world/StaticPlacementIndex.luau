@@ -68,6 +68,9 @@ function Index.new(records)
         -- Include the entire hysteresis band, even at equality. Small numeric
         -- margin makes scalar bounds conservative versus Vector3 float math.
         local radius = record.distances.hide + record.distances.hysteresis
+        -- House policy measures distance to rotated snapshot bounds. A
+        -- circumscribed sphere conservatively contains the entire box.
+        if record.worldSize then radius = radius + record.worldSize.Magnitude * 0.5 end
         entries[#entries+1] = {record=record, pivot=record.pivot, radius=radius+0.05}
     end
     return setmetatable({root=build(entries)}, Index)

@@ -29,6 +29,7 @@ SOURCES = {
     'lod-assembly-job': ('src/client/world/LodAssemblyJob.luau', 'LOD · staged assembly job'),
     'lod-runtime-work': ('src/client/world/LodRuntimeWork.luau', 'LOD · бюджет и lifecycle'),
     'location-lod-policy': ('src/shared/world/LocationLodDistancePolicy.luau', 'LOD · пороги и гистерезис'),
+    'house-mesh-requests': ('src/client/world/HouseMeshRequests.luau', 'House · bounded async FULL'),
     'house-visual-adapter': ('src/client/world/HouseVisualAdapter.luau', 'House · визуальный LOD частей'),
     'location-composite-visual': ('src/client/world/LocationCompositeVisual.luau', 'LOD · составные объекты и эффекты'),
     'runtime-lod-spec': ('docs/workflows/RUNTIME_LOD_STREAMING_REFACTOR_SPEC_RU.md', 'LOD · ТЗ этапов'),

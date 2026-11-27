@@ -7,6 +7,9 @@ local visuals: {[BasePart]: MeshPart} = setmetatable({}, {__mode = "kv"}) :: any
 function Raycast.Bind(proxy: BasePart, mesh: MeshPart)
     visuals[proxy] = mesh
 end
+function Raycast.Unbind(proxy: BasePart, mesh: MeshPart)
+    if visuals[proxy] == mesh then visuals[proxy] = nil end
+end
 function Raycast.DoorOf(socket: Attachment): Model?
     local node: Instance? = socket.Parent
     while node and node ~= Workspace do

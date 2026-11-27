@@ -25,9 +25,9 @@ class StaticPlacementIndexM619(unittest.TestCase):
     def test_existing_policy_and_adapters_unchanged(self):
         for path, digest in {
             'src/shared/world/LocationLodDistancePolicy.luau': 'b30f83c16c45d73f1ab34543a278860038b123b2fda2fd7531f4ab2bf8312515',
-            'src/client/world/LocationCompositeVisual.luau': '01dfe4fc79e0b98cbed6b66192aaa4a4cf42acde67f619100257f3dd621dafeb',
-            'src/client/world/HouseVisualAdapter.luau': 'f230ad17061d46eac2b3aa06744371a007deb7b569a2ca418a365a9b04b4c9a2',
-            'src/client/world/LocationLodAssembly.luau': '13ef8592ce4e53c03dc83a0b5251a4d503c5b8c5569dc555bfa8970a5503683d',
+            'src/client/world/LocationCompositeVisual.luau': '93dd1d59ee53ebef2197c91474c1f945e6f1e7ddf3e757e630c6ea288b2727cf',
+            'src/client/world/HouseVisualAdapter.luau': '1b9ee259a67e5a4b0b30d2b6f64201605ddb615052cbf13e5b057b56a733099c',
+            'src/client/world/LocationLodAssembly.luau': '930efdd5669a7c19d73cdf1635c2827127634f87fdb551149c6625094cc969c8',
             'src/client/world/StudioLodPreviewAdapter.luau': '4c86f261a55fba2a3e1244cdec515da8106bb090847a61093a11c404e72765c8',
         }.items():
             self.assertEqual(hashlib.sha256(read(path).encode()).hexdigest(), digest, path)

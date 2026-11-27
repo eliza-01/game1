@@ -1,8 +1,8 @@
 # Eyesland / Game1 — ТЗ: Runtime LOD Streaming
 
 **Карточка:** KBN-0037 (клиентская производительность), связанные KBN-0007 / KBN-0017.
-**Рабочая база:** дамп M613 от 27.11.2026 + M614–M618. M618 — последняя выданная ревизия; перед разработкой подтвердить фактическую установленную версию. Начало реализации условно M619.
-**Статус:** согласованный план. M619 реализует этапы 0–1; Studio/DEV и профилирование открыты. В этапе 1 выбрано дерево 3D influence bounds (BVH) вместо сетки: произвольные радиусы и разреженная карта без обхода пустых ячеек. Следующие этапы не реализованы.
+**Рабочая база:** диагностический срез M613 от 27.11.2026 + подтверждённая последовательность M614–M620; M621 — текущая реализация. Патчи M619–M621 code-complete в восстановленной sandbox-копии, Roblox Studio/DEV/Mobile и профильная приёмка не выполнены.
+**Статус:** этапы 0–3 реализованы: Static Placement Index, LOD Transition Queue, Prototype Readiness Cache. В этапе 1 выбрано дерево 3D influence bounds (BVH) вместо сетки: произвольные радиусы и разреженная карта без обхода пустых ячеек. Следующие этапы — Incremental Assembly & Work Budget и Real Estate Integration.
 
 ## 1. Цель
 
@@ -97,11 +97,11 @@
 
 ## 13. Порядок выдачи патчей
 
-1. M619 (условно): эталонные тесты + Static Placement Index.
-2. Следующая ревизия: Dirty / Threshold Transition Queue.
-3. Следующая: Prototype Readiness Cache.
-4. Следующая: Incremental Assembly & Real Work Budget (разбить при необходимости, если затронуты разные сборщики).
-5. Следующая: Real Estate Integration.
+1. M619: эталонные тесты + Static Placement Index.
+2. M620: LodThresholdCache + LodTransitionQueue.
+3. M621: Prototype Readiness Cache + immutable assembly metadata / bounds.
+4. Next: Incremental Assembly & Real Work Budget (разбить при необходимости, если затронуты разные сборщики).
+5. Next: Real Estate Integration.
 6. Integration & Acceptance — исправления по фактическим результатам, не закрывать задачу заранее.
 
 Перед каждым патчем восстановить актуальную базу из дампа + подтверждённых патчей. Проверить производителей и потребителей, Rojo/Runtime, применение/обратную проверку, профильные тесты, Luau preflight и verify.py. Обновить Mechanics (LOD / House), основное ТЗ, архитектуру, AGENTS/Read First при необходимости, KBN-0037 и связанные карточки только по реальному прогрессу. Выдать один проверенный .patch, краткий отчёт, один PowerShell-блок (нижний регистр команд; проверка → применение → тесты → при необходимости install plugin → строго control-center-stop.ps1 и control-center.ps1). Не менять пользовательские manifests, настройки или данные без необходимости; независимый откат каждого этапа через Git. Без нового дампа, если цепочка восстанавливается.
@@ -116,3 +116,12 @@ LOD для персонажей/монстров, изменение AI, пер�
 M620: Runtime LOD этап 2 — LodThresholdCache (запас до порогов ±h, смещение от последнего resolve, точные границы и смена камеры) и LodTransitionQueue (одна заявка на placement, отмена/замена, сортировка только при изменении приоритета). При неподвижной камере BVH и стабильные дистанции не пересчитываются; fallback/proxy/effects продолжают обслуживаться. Aging 8 ticks; тяжёлая просроченная Location-заявка может получить полный бюджет на чётном tick, нечётный сохраняет резерв House. Policy, интервал и визуальный контракт сохранены. Кэш готовности, порционная сборка, Real Estate и Studio/DEV/профиль открыты.
 
 Lua oracle: 129212 сравнений desired, 2356 samples; стационарный cache и lifecycle очереди проверены. Переходы Actual могут обслуживаться в другом порядке вследствие aging. Event-driven prototype/root invalidation остаётся этапом 3; до него используется прежняя периодическая reconciliation, включая ошибки сборки и позднюю репликацию. Геометрия и серверный код не менялись.
+
+
+## M621 · Реализация этапа 3 — Prototype Readiness Cache
+
+**Code complete:** `LodPrototypeCache.luau` event-driven cache по Instance identity, generation, variant и FULL component contract. Readiness состояния: missing / incomplete / ready / invalid. Слежение за поздним cache folder и Ready, prototype ChildAdded/Removed/Name, required attributes, direct child Name/Size/CFrame/MeshId и `Game1LodSourceName`. Неполные случаи получают максимум две bounded retries (1 с), missing template-folder scan ограничен двумя проверками до Ready; после Ready=true отсутствующие прототипы event-only.
+
+Cache хранит frozen metadata: source MeshPart refs, relative transforms, count, published pivot, source bounds/base и FULL component map. `LocationLodAssembly.BuildMetadata` считает bounds один раз на prototype generation; `Assembly.Create` использует metadata. `LocationCompositeVisual.Create` использует FULL component map. Cache folder не блокирует streamer через WaitForChild(30): runtime продолжает manifest reconciliation, поздняя папка/Ready/children wake dependent records. Replacement generation форсирует атомарную замену старого visual. Placement-local `failedAssemblies` хранит prototype и generation; ошибка одной сборки снимает очередь этой заявки и переводит её к fallback, не инвалидируя shared prototype. `Streamer.Stop` очищает cache/queue ownership, connections, локальные визуалы и восстанавливает composite effects. House LOD1 использует shared cache и rebuild при stale prototype, но общий House index/queue/budget остаётся этапом 5.
+
+**Checks:** M621 readiness/cache oracle passed: late folder, missing/incomplete/ready/invalid, component contract, bounded retries, replacement generation, metadata memoization, event cleanup. M619 and M620 profile tests passed. `validate_luau.py` passed. Roblox Studio, published DEV PC, physical phone, collision/navigation two-client and performance profile remain NOT_RUN. T03/A03 remains open.

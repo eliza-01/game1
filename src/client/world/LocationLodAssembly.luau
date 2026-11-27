@@ -60,33 +60,73 @@ function Assembly.AppearanceName(mesh, names)
     return match
 end
 
-function Assembly.Create(prototype, targetFrame, targetParts, applyAppearance)
-    if Assembly.Count(prototype) == 0 or #targetParts == 0 then return nil end
+function Assembly.BuildMetadata(prototype)
+    if prototype:IsA("MeshPart") then
+        local sourceFrame = prototype:GetAttribute("Game1LodPublishedPivot")
+        if typeof(sourceFrame) ~= "CFrame" then sourceFrame = prototype.CFrame end
+        local sourceLow, sourceHigh = bounds(sourceFrame, {prototype})
+        local sourceSize = sourceHigh - sourceLow
+        return {prototype = prototype, kind = "meshpart", count = 1,
+            sourceFrame = sourceFrame, sourceLow = sourceLow, sourceHigh = sourceHigh,
+            sourceSize = sourceSize, sourceBase = base(sourceLow, sourceHigh),
+            sourceName = Assembly.SourceName(prototype), parts = {{
+                source = prototype, relative = sourceFrame:ToObjectSpace(prototype.CFrame),
+                size = prototype.Size, sourceName = Assembly.SourceName(prototype),
+            }}}, "ready"
+    end
+    if not prototype:IsA("Model") then return nil, "invalid" end
+    local expected = prototype:GetAttribute("Game1LodVisualCount")
+    local sourceFrame = prototype:GetAttribute("Game1LodPublishedPivot")
+    local children = prototype:GetChildren()
+    if expected == nil or typeof(sourceFrame) ~= "CFrame" then
+        return nil, "incomplete"
+    end
+    if type(expected) ~= "number" or expected < 2 or expected > 64
+        or expected ~= math.floor(expected) then
+        return nil, "invalid"
+    end
+    if #children < expected then return nil, "incomplete" end
+    if #children > expected then return nil, "invalid" end
+    local parts = {}
+    for _, source in ipairs(children) do
+        if not source:IsA("MeshPart") then return nil, "invalid" end
+        local relative = sourceFrame:ToObjectSpace(source.CFrame)
+        table.insert(parts, {source = source, relative = relative, size = source.Size,
+            sourceName = Assembly.SourceName(source)})
+    end
+    local sourceLow, sourceHigh = bounds(sourceFrame, children)
+    local sourceSize = sourceHigh - sourceLow
+    local sourceBase = base(sourceLow, sourceHigh)
+    return {prototype = prototype, kind = "model", count = #parts, sourceFrame = sourceFrame,
+        sourceLow = sourceLow, sourceHigh = sourceHigh, sourceSize = sourceSize,
+        sourceBase = sourceBase, parts = parts}, "ready"
+end
+
+function Assembly.Create(prototype, targetFrame, targetParts, applyAppearance, metadata)
+    metadata = metadata or Assembly.BuildMetadata(prototype)
+    if not metadata or metadata.prototype ~= prototype
+        or (metadata.kind ~= "model" and metadata.kind ~= "meshpart")
+        or metadata.count < 1 or metadata.count > 64 or #targetParts == 0 then
+        return nil, "invalid assembly input"
+    end
     local bundle = Instance.new("Model")
     local ok, reason = pcall(function()
-        local sources = if prototype:IsA("MeshPart") then {prototype} else prototype:GetChildren()
-        local sourceFrame = prototype:GetAttribute("Game1LodPublishedPivot")
-        if typeof(sourceFrame) ~= "CFrame" then
-            assert(prototype:IsA("MeshPart"), "missing published LOD frame")
-            sourceFrame = prototype.CFrame
-        end
-        local sourceLow, sourceHigh = bounds(sourceFrame, sources)
         local targetLow, targetHigh = bounds(targetFrame, targetParts)
-        local sourceSize, targetSize = sourceHigh-sourceLow, targetHigh-targetLow
-        -- A single uniform factor preserves all relative positions and rotations;
-        -- use the dominant extent rather than stretching individual tree parts.
+        local targetSize = targetHigh - targetLow
+        local sourceSize = metadata.sourceSize
         local scale = if sourceSize.Y >= sourceSize.X and sourceSize.Y >= sourceSize.Z
             then targetSize.Y/sourceSize.Y elseif sourceSize.X >= sourceSize.Z
             then targetSize.X/sourceSize.X else targetSize.Z/sourceSize.Z
         assert(scale >= 0.001 and scale <= 1000, "invalid assembly scale")
-        local sourceBase, targetBase = base(sourceLow, sourceHigh), base(targetLow, targetHigh)
-        for _, source in ipairs(sources) do
+        local targetBase = base(targetLow, targetHigh)
+        for _, descriptor in ipairs(metadata.parts) do
+            local source = descriptor.source
             local copy = source:Clone()
             copy.Parent = bundle
-            copy.Name = Assembly.SourceName(source)
-            local relative = sourceFrame:ToObjectSpace(source.CFrame)
-            copy.Size = source.Size * scale
-            copy.CFrame = targetFrame * CFrame.new(targetBase + (relative.Position-sourceBase)*scale) * relative.Rotation
+            copy.Name = descriptor.sourceName
+            copy.Size = descriptor.size * scale
+            copy.CFrame = targetFrame * CFrame.new(targetBase + (descriptor.relative.Position-metadata.sourceBase)*scale)
+                * descriptor.relative.Rotation
             copy.Anchored = true
             copy.CanCollide = false
             copy.CanTouch = false

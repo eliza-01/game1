@@ -52,15 +52,16 @@ function Adapter.SetEffects(record: any, active: boolean)
     record.effectState = active
 end
 
-function Adapter.Create(prototype: Model, record: any, paint: any, asset: any): Folder?
+function Adapter.Create(prototype: Model, record: any, paint: any, asset: any, metadata: any?): (Folder?, string?)
     local root = rootFor(record.modelPath)
-    if not root then return nil end -- Roblox's own streaming may defer the technical root
+    if not root then return nil, "root unavailable" end -- Roblox's own streaming may defer the technical root
     local confirmed = {}
     for _, spec in ipairs(record.components) do
         local proxy = root:FindFirstChild(spec.name, true)
-        local source = prototype:FindFirstChild(spec.name)
+        local source = if metadata and metadata.childrenByName
+            then metadata.childrenByName[spec.name] else prototype:FindFirstChild(spec.name)
         if not proxy or not proxy:IsA("Part") or not source or not source:IsA("MeshPart") then
-            return nil -- never draw a detached or visually incomplete rig
+            return nil, "component unavailable" -- never draw a detached or visually incomplete rig
         end
         table.insert(confirmed, {proxy = proxy, source = source})
     end
@@ -92,10 +93,10 @@ function Adapter.Create(prototype: Model, record: any, paint: any, asset: any): 
     if not ok then
         warn("[game1][LOD] composite visual assembly failed: " .. tostring(problem))
         bundle:Destroy()
-        return nil
+        return nil, "assembly failed"
     end
     bundle.Parent = root -- same root as the original server-owned rig_carrier
-    return bundle
+    return bundle, "ready"
 end
 
 return table.freeze(Adapter)

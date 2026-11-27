@@ -15,9 +15,11 @@ local StaticPlacementIndex = require(script.Parent:WaitForChild("StaticPlacement
 local LocationLodCandidates = require(script.Parent:WaitForChild("LocationLodCandidates"))
 local LodThresholdCache = require(script.Parent:WaitForChild("LodThresholdCache"))
 local LodTransitionQueue = require(script.Parent:WaitForChild("LodTransitionQueue"))
+local LodPrototypeCache = require(script.Parent:WaitForChild("LodPrototypeCache"))
 local Appearance = require(World:WaitForChild("RuntimeVisualAppearance"))
 local Streamer = {}
 local started = false
+local active = nil
 local TICK = 0.25
 local MAX_CHANGES_PER_TICK = 8 -- max clone/destroy actions per tick; per-client
 local VISUAL_TAG = "Game1DistanceVisual"
@@ -73,6 +75,13 @@ local function transform(values)
     return CFrame.new(table.unpack(values))
 end
 
+local function componentsSignature(components)
+    if not components then return nil end
+    local names = {}
+    for _, component in ipairs(components) do table.insert(names, component.name) end
+    return table.concat(names, "\30")
+end
+
 local missingAppearance = {}
 local function paint(mesh, asset, reduced)
     -- The per-mesh selection is shared with registered Location Assets.
@@ -108,27 +117,27 @@ local function paint(mesh, asset, reduced)
     if not ok then warn("[game1][LOD] invalid runtime visual appearance: " .. mesh.Name) end
 end
 
-local function available(record, candidate, level)
-    if not candidate or (record.failedAssemblies and record.failedAssemblies[level] == candidate) then return false end
+local function available(record, status, candidate, metadata, level)
+    if status ~= "ready" or not candidate or not metadata then return false end
+    local failed = record.failedAssemblies and record.failedAssemblies[level]
+    local failedGeneration = record.failedAssemblyGenerations and record.failedAssemblyGenerations[level]
+    if failed == candidate and failedGeneration == metadata.generation then return false end
     if level == "FULL" then
         if record.components then
-            if not candidate:IsA("Model") then return false end
-            for _, component in ipairs(record.components) do
-                local mesh = candidate:FindFirstChild(component.name)
-                if not mesh or not mesh:IsA("MeshPart") then return false end
-            end
-            return true
+            return candidate:IsA("Model") and metadata.kind == "composite"
         end
-        return candidate:IsA("MeshPart")
+        return candidate:IsA("MeshPart") and metadata.kind == "meshpart"
     end
-    return LodAssembly.Count(candidate) > 0
+    return metadata.count > 0 and (candidate:IsA("MeshPart") or candidate:IsA("Model"))
 end
 
+
 local function work(transition)
-    local record, variant, prototype = transition.record, transition.variant, transition.prototype
+    local record, variant, prototype, metadata = transition.record, transition.variant,
+        transition.prototype, transition.metadata
     local useAssembly = prototype and variant ~= "FULL"
         and (record.components ~= nil or prototype:IsA("Model"))
-    local targetCost = if useAssembly then LodAssembly.Count(prototype)
+    local targetCost = if useAssembly then (metadata and metadata.count or 0)
         elseif variant == "FULL" and record.components then #record.components else 1
     return math.min(MAX_CHANGES_PER_TICK, math.max(1, targetCost, record.visualCost or 1)), useAssembly, targetCost
 end
@@ -138,8 +147,8 @@ function Streamer.Start()
     started = true
     -- Shared visual distance owner: CollectionService supplies exact MeshParts,
     -- while Location LOD continues to use its existing manifest snapshot.
-    CollectionService:GetInstanceAddedSignal(VISUAL_TAG):Connect(addVisual)
-    CollectionService:GetInstanceRemovedSignal(VISUAL_TAG):Connect(removeVisual)
+    local visualAddedConnection = CollectionService:GetInstanceAddedSignal(VISUAL_TAG):Connect(addVisual)
+    local visualRemovedConnection = CollectionService:GetInstanceRemovedSignal(VISUAL_TAG):Connect(removeVisual)
     for _, part in ipairs(CollectionService:GetTagged(VISUAL_TAG)) do addVisual(part) end
 
     local manifest = nil
@@ -162,7 +171,8 @@ function Streamer.Start()
     local composites = {}
     local candidates = nil
     local queue = nil
-    local cache = nil
+    local prototypeCache = nil
+    local prototypeChangedConnection = nil
     if manifest then
         folder = Instance.new("Folder")
         folder.Name = Contract.VisualFolder
@@ -174,6 +184,9 @@ function Streamer.Start()
                 pivotFrame = transform(row.pivot),
                 mode = manifest.modes[row.slug], distances = Policy.WithHysteresis(manifest.assetDistances[row.slug], manifest.hysteresis), desired = nil, actual = "UNLOADED", part = nil, distance = math.huge,
                 modelPath = row.modelPath, components = row.components,
+                componentContract = componentsSignature(row.components),
+                prototypeDirty = true, prototypeDesired = nil, prototypeActual = nil,
+                actualPrototype = nil, actualPrototypeGeneration = nil,
             })
             local record = records[#records]
             record.fullBounds = {{CFrame=record.cframe, Size=record.size}}
@@ -187,15 +200,26 @@ function Streamer.Start()
         end
         candidates = LocationLodCandidates.new(StaticPlacementIndex.new(records))
         queue = LodTransitionQueue.new(LocationLodCandidates.SortTransitions)
-        cache = ReplicatedStorage:WaitForChild(Contract.TemplateFolder, 30)
-        if not cache then
-            warn("[game1][LOD] server template cache missing; runtime visuals disabled")
-            manifest = nil
+        prototypeCache = LodPrototypeCache.new(ReplicatedStorage, Contract.TemplateFolder, LodAssembly)
+        local dependentsByName = {}
+        for _, record in ipairs(records) do
+            for _, variantName in ipairs({"FULL", "LOD1", "LOD2"}) do
+                local name = record.slug .. "__" .. variantName
+                local dependents = dependentsByName[name]
+                if not dependents then
+                    dependents = {}
+                    dependentsByName[name] = dependents
+                end
+                dependents[record] = true
+            end
         end
+        prototypeChangedConnection = prototypeCache:ConnectChanged(function(name)
+            for record in pairs(dependentsByName[name] or {}) do record.prototypeDirty = true end
+        end)
     end
     local houseAdapter = nil
     if manifest and manifest.houses then
-        houseAdapter = HouseVisualAdapter.new(manifest.houses, cache, manifest.hysteresis)
+        houseAdapter = HouseVisualAdapter.new(manifest.houses, prototypeCache, manifest.hysteresis)
     end
     local preview = nil
     if not marker and RunService:IsStudio() then
@@ -208,7 +232,7 @@ function Streamer.Start()
     local visualElapsed = VISUAL_INTERVAL -- first distance test immediately
     local lastWarning = 0
     local lastCamera = nil
-    RunService.Heartbeat:Connect(function(dt)
+    local heartbeatConnection = RunService.Heartbeat:Connect(function(dt)
         if houseAdapter then houseAdapter:FollowMoving() end
         elapsed += dt
         visualElapsed += dt
@@ -235,31 +259,67 @@ function Streamer.Start()
         local localRecords = candidates:Collect(cameraPosition, cameraChanged)
         local deferredEffects = {}
         for _, record in ipairs(localRecords) do
+            local previousDesired = record.desired
             LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)
+            if record.desired ~= previousDesired then record.prototypeDirty = true end
             -- Roblox native streaming can independently remove the parent
             -- technical Model. Recover when that root later streams back in.
             if record.part and not record.part:IsDescendantOf(Workspace) then
                 record.part = nil
                 record.actual = "UNLOADED"
+                record.actualPrototype = nil
+                record.actualPrototypeGeneration = nil
+                record.prototypeDirty = true
             end
-            local variant = record.desired
-            local prototype = if variant ~= "UNLOADED"
-                then cache:FindFirstChild(record.slug .. "__" .. variant) else nil
-            if variant ~= "UNLOADED" and not available(record, prototype, variant) then
-                prototype = nil
-                -- Never instantiate a partially replicated assembly. Preserve
-                -- a valid available detail level while the desired one loads.
-                for _, fallback in ipairs({"LOD1", "FULL"}) do
-                    local candidate = cache:FindFirstChild(record.slug .. "__" .. fallback)
-                    if available(record, candidate, fallback) then prototype = candidate; variant = fallback; break end
+            if record.prototypeDirty or record.prototypeDesired ~= record.desired
+                or record.prototypeActual ~= record.actual then
+                record.prototypeDirty = false
+                record.prototypeDesired = record.desired
+                record.prototypeActual = record.actual
+                local variant = record.desired
+                local prototype, metadata = nil, nil
+                local retryPrototypes = false
+                local status = "missing"
+                if variant ~= "UNLOADED" then
+                    status, prototype, metadata = prototypeCache:Resolve(
+                        record.slug .. "__" .. variant, variant, record.components, record.componentContract)
+                    retryPrototypes = status == "incomplete"
+                        or (status == "missing" and prototypeCache:FolderReady() == false)
                 end
-                if not prototype then
-                    if record.part and record.components then deferredEffects[record] = true end
-                    if record.part then queue:Remove(record); continue end
-                    variant = "UNLOADED"
+                if variant ~= "UNLOADED" and not available(record, status, prototype, metadata, variant) then
+                    prototype, metadata = nil, nil
+                    -- Preserve the existing fallback order. Cache readiness is
+                    -- structural and shared; the placement contract stays local.
+                    for _, fallback in ipairs({"LOD1", "FULL"}) do
+                        local fallbackComponents = if fallback == "FULL" then record.components else nil
+                        local fallbackContract = if fallback == "FULL" then record.componentContract else nil
+                        local fallbackStatus, candidate, candidateMetadata = prototypeCache:Resolve(
+                            record.slug .. "__" .. fallback, fallback, fallbackComponents, fallbackContract)
+                        if fallbackStatus == "incomplete"
+                            or (fallbackStatus == "missing" and prototypeCache:FolderReady() == false) then
+                            retryPrototypes = true
+                        end
+                        if available(record, fallbackStatus, candidate, candidateMetadata, fallback) then
+                            prototype, metadata, variant = candidate, candidateMetadata, fallback
+                            break
+                        end
+                    end
+                    if not prototype then
+                        if record.part and record.components then deferredEffects[record] = true end
+                        if record.part then
+                            record.prototypeDirty = retryPrototypes
+                            queue:Remove(record)
+                            continue
+                        end
+                        variant = "UNLOADED"
+                    end
                 end
+                local force = variant == record.actual and record.part ~= nil and prototype ~= nil
+                    and (record.actualPrototype ~= prototype
+                        or record.actualPrototypeGeneration ~= metadata.generation)
+                record.prototypeDirty = retryPrototypes
+                queue:Set(record, variant, prototype, metadata, force)
             end
-            queue:Set(record, variant, prototype)
         end
         local transitions = queue:Ordered(LodThresholdCache.Distance)
         -- Preserve the shared house reservation except for an aged large
@@ -272,18 +332,22 @@ function Streamer.Start()
         for _, transition in ipairs(transitions) do
             local record, variant, prototype = transition.record, transition.variant, transition.prototype
             local cost, useAssembly, targetCost = work(transition)
-            if variant ~= record.actual and changes + cost <= MAX_CHANGES_PER_TICK then
+            if (variant ~= record.actual or transition.force) and changes + cost <= MAX_CHANGES_PER_TICK then
                 queue:Attempted(transition)
                 local replacement = nil
+                local placementError = nil
                 if useAssembly then
-                    local assemblyError
-                    replacement, assemblyError = LodAssembly.Create(prototype, record.pivotFrame, record.fullBounds, function(mesh)
+                    replacement, placementError = LodAssembly.Create(prototype, record.pivotFrame, record.fullBounds, function(mesh)
                         paint(mesh, Registry.assets[record.slug], true)
-                    end)
-                    if assemblyError then
+                    end, transition.metadata)
+                    if placementError then
                         record.failedAssemblies = record.failedAssemblies or {}
                         record.failedAssemblies[variant] = prototype
-                        warn("[game1][LOD] assembly placement failed: " .. record.slug .. " " .. tostring(assemblyError))
+                        record.failedAssemblyGenerations = record.failedAssemblyGenerations or {}
+                        record.failedAssemblyGenerations[variant] = transition.metadata and transition.metadata.generation
+                        record.prototypeDirty = true
+                        queue:Remove(record)
+                        warn("[game1][LOD] assembly placement failed: " .. record.slug .. " " .. tostring(placementError))
                     end
                     if replacement then
                         replacement.Name = record.slug .. "__" .. record.id
@@ -302,16 +366,32 @@ function Streamer.Start()
                     replacement.Name = record.slug .. "__" .. record.id
                     replacement.Parent = folder
                 elseif variant == "FULL" and record.components and prototype and prototype:IsA("Model") then
-                    replacement = LocationCompositeVisual.Create(prototype, record, paint,
-                        Registry.assets[record.slug])
+                    replacement, placementError = LocationCompositeVisual.Create(prototype, record, paint,
+                        Registry.assets[record.slug], transition.metadata)
+                    if placementError == "assembly failed" then
+                        record.failedAssemblies = record.failedAssemblies or {}
+                        record.failedAssemblies[variant] = prototype
+                        record.failedAssemblyGenerations = record.failedAssemblyGenerations or {}
+                        record.failedAssemblyGenerations[variant] = transition.metadata and transition.metadata.generation
+                        record.prototypeDirty = true
+                        queue:Remove(record)
+                    end
                 end
-                -- If the technical root has not streamed in yet, defer the
-                -- swap. Never drop a visible LOD to an empty clone.
+                -- If the technical root or its proxy Parts have not streamed in,
+                -- defer the swap. Never drop a visible LOD to an empty clone.
                 if replacement or variant == "UNLOADED" then
                     if record.part then record.part:Destroy() end
                     record.part = replacement
                     record.visualCost = if replacement then targetCost else nil
                     record.actual = if replacement then variant else "UNLOADED"
+                    record.actualPrototype = if replacement then prototype else nil
+                    record.actualPrototypeGeneration = if replacement then (transition.metadata and transition.metadata.generation) else nil
+                    if replacement and record.failedAssemblies then
+                        record.failedAssemblies[variant] = nil
+                        if record.failedAssemblyGenerations then record.failedAssemblyGenerations[variant] = nil end
+                    end
+                    record.prototypeResolvedActual = record.actual
+                    record.prototypeActual = record.actual
                     changes += cost
                     queue:Remove(record)
                 end
@@ -329,15 +409,46 @@ function Streamer.Start()
         if houseAdapter and changes < MAX_CHANGES_PER_TICK then
             changes += houseAdapter:Step(MAX_CHANGES_PER_TICK - changes)
         end
-        if cache:GetAttribute("Ready") ~= true and os.clock() - lastWarning > 15 then
+        if prototypeCache:FolderReady() ~= true and os.clock() - lastWarning > 15 then
             lastWarning = os.clock()
             warn("[game1][LOD] template staging incomplete; never publish this build before visual validation")
         end
     end)
+    active = {heartbeatConnection = heartbeatConnection, visualAddedConnection = visualAddedConnection,
+        visualRemovedConnection = visualRemovedConnection, prototypeCache = prototypeCache,
+        prototypeChangedConnection = prototypeChangedConnection, houseAdapter = houseAdapter,
+        folder = folder, records = records, composites = composites, preview = preview}
     if manifest then
         print(("[game1][LOD] client visual streamer active | %d placements | snapshot %s")
             :format(#records, tostring(manifest.snapshotRevision)))
     end
+end
+
+
+function Streamer.Stop()
+    if not started then return end
+    started = false
+    local state = active
+    active = nil
+    if not state then return end
+    for _, connection in ipairs({state.heartbeatConnection, state.visualAddedConnection, state.visualRemovedConnection,
+        state.prototypeChangedConnection}) do
+        if connection then pcall(function() connection:Disconnect() end) end
+    end
+    if state.houseAdapter then state.houseAdapter:Destroy() end
+    if state.prototypeCache then state.prototypeCache:Destroy() end
+    if state.preview and state.preview.Destroy then state.preview:Destroy() end
+    for _, record in ipairs(state.records or {}) do
+        if record.part then record.part:Destroy(); record.part = nil end
+        record.actual = "UNLOADED"
+        record.actualPrototype = nil
+        record.actualPrototypeGeneration = nil
+    end
+    for _, record in ipairs(state.composites or {}) do
+        LocationCompositeVisual.SetEffects(record, true)
+    end
+    for part in pairs(visuals) do removeVisual(part) end
+    if state.folder then state.folder:Destroy() end
 end
 
 return table.freeze(Streamer)

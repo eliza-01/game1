@@ -11,6 +11,11 @@ M619: Runtime LOD этап 1 — StaticPlacementIndex (BVH по 3D snapshot pivo
 
 M620: Runtime LOD этап 2 — LodThresholdCache (запас до порогов ±h, смещение от последнего resolve, точные границы и смена камеры) и LodTransitionQueue (одна заявка на placement, отмена/замена, сортировка только при изменении приоритета). При неподвижной камере BVH и стабильные дистанции не пересчитываются; fallback/proxy/effects продолжают обслуживаться. Aging 8 ticks; тяжёлая просроченная Location-заявка может получить полный бюджет на чётном tick, нечётный сохраняет резерв House. Policy, интервал и визуальный контракт сохранены. Кэш готовности, порционная сборка, Real Estate и Studio/DEV/профиль открыты.
 
+M621: Runtime LOD этап 3 — LodPrototypeCache по Instance identity/generation/variant/contract: event-driven missing/incomplete/ready/invalid, bounded retry (2), поздний template folder/Ready, immutable assembly metadata/bounds, FULL component-name map. Location streamer больше не ждёт cache folder 30 с и не выключается при его позднем появлении; stale prototype generation rebuilds atomically, per-placement failedAssemblies остаётся generation-aware. House LOD1 uses shared cache, но spatial index / общая queue / budget Real Estate ещё не интегрированы. M619–M621 код и Lua-oracle проверки готовы; Studio/DEV/профиль открыты. [ТЗ Runtime LOD](workflows/RUNTIME_LOD_STREAMING_REFACTOR_SPEC_RU.md).
+
+
+
+
 **Решение владельца проекта от 27.11.2026:** закрытие всего цикла оптимизации M605 — высший текущий приоритет. Не начинать новые игровые механики и расширение контента до закрытия KBN-0035–0039. Исключение — исправления блокирующих дефектов и работа, необходимая для приёмки оптимизации; старые карточки не отменяются.
 
 Читать сначала [действующее ТЗ](spec/CURRENT_PROJECT_SPEC_RU.md#текущий-приоритет--performance-p0), [архитектурные ограничения](architecture/CURRENT_ARCHITECTURE_RU.md#текущий-приоритет--performance-p0) и [очередь Kanban](kanban/README.md#текущий-фокус--27112026--performance-review-m605). Порядок: [0035 Profiler](kanban/specs/KBN-0035.md) → [0036 Spatial Index](kanban/specs/KBN-0036.md) → [0037 Client](kanban/specs/KBN-0037.md) → [0038 Server](kanban/specs/KBN-0038.md) → [0039 Asset Pipeline](kanban/specs/KBN-0039.md). P1 у последней карточки — относительный порядок внутри обязательного цикла, не повод отложить её.

@@ -94,4 +94,10 @@ q:Attempted(o[1]); assert(q:Ordered(Cache.Distance)[1].record==b)
 a.actual='FULL'; a.desired='UNLOADED'; q:Set(a,'UNLOADED',nil)
 assert(q:Ordered(Cache.Distance)[1].record==a)
 q:Remove(a); q:Remove(b); assert(#q:Ordered(Cache.Distance)==0)
-print('M620: '..comparisons..' desired comparisons, '..samples..' samples; stationary, threshold and queue lifecycle passed')
+-- M621: same-variant prototype-generation refresh must enqueue a forced replacement.
+local forced=record(3,v(8,0,0),'full',0)
+forced.actual='FULL'; forced.desired='FULL'
+q:Begin(v(11,0,0)); q:Set(forced,'FULL',p1,{},true)
+o=q:Ordered(Cache.Distance); assert(#o==1 and o[1].record==forced and o[1].force)
+q:Set(forced,'FULL',p1,{},false); assert(#q:Ordered(Cache.Distance)==0,'non-forced same actual must cancel')
+print('M620/M621: '..comparisons..' desired comparisons, '..samples..' samples; stationary, threshold, queue and forced replacement lifecycle passed')

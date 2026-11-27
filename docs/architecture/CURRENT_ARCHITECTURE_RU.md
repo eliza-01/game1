@@ -14,6 +14,10 @@ M619: Runtime LOD этап 1 — StaticPlacementIndex (BVH по 3D snapshot pivo
 
 M620: Runtime LOD этап 2 — LodThresholdCache (запас до порогов ±h, смещение от последнего resolve, точные границы и смена камеры) и LodTransitionQueue (одна заявка на placement, отмена/замена, сортировка только при изменении приоритета). При неподвижной камере BVH и стабильные дистанции не пересчитываются; fallback/proxy/effects продолжают обслуживаться. Aging 8 ticks; тяжёлая просроченная Location-заявка может получить полный бюджет на чётном tick, нечётный сохраняет резерв House. Policy, интервал и визуальный контракт сохранены. Кэш готовности, порционная сборка, Real Estate и Studio/DEV/профиль открыты.
 
+M621: Runtime LOD этап 3 — shared LodPrototypeCache по Instance identity/generation/variant/contract, event-driven readiness missing/incomplete/ready/invalid, две bounded retries, late cache folder/Ready, frozen metadata/bounds и FULL component map. LocationWorldStreamer продолжает работу при отсутствующем/позднем template folder; stale generations обновляют visual атомарно. HouseVisualAdapter использует shared readiness cache для LOD1 и rebuild при замене шаблона, остаётся отдельным distance adapter. M619–M621 code/oracle checks готов; incremental assembly budget, common House queue/index и Studio/DEV/профиль открыты. [ТЗ](../workflows/RUNTIME_LOD_STREAMING_REFACTOR_SPEC_RU.md).
+
+
+
 M606a закрепляет обязательный цикл [KBN-0035–0039](../kanban/README.md#текущий-фокус--27112026--performance-review-m605). Это целевая архитектура оптимизации, не описание уже реализованных модулей. Новые механики отложены до приёмки цикла; исключения — блокирующие дефекты и необходимые для приёмки работы.
 
 - **Диагностика:** единый контракт агрегированных измерений client/server, scopes MicroProfiler, ограниченная память и очистка. OFF по умолчанию без диагностических циклов, постоянных аллокаций и RPC; доступ только через действующий Debug-контракт. CPU/GPU/frame time, RAM и сеть не смешивать.

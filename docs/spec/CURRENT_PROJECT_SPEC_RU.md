@@ -16,6 +16,10 @@ M619: Runtime LOD этап 1 — StaticPlacementIndex (BVH по 3D snapshot pivo
 
 M620: Runtime LOD этап 2 — LodThresholdCache (запас до порогов ±h, смещение от последнего resolve, точные границы и смена камеры) и LodTransitionQueue (одна заявка на placement, отмена/замена, сортировка только при изменении приоритета). При неподвижной камере BVH и стабильные дистанции не пересчитываются; fallback/proxy/effects продолжают обслуживаться. Aging 8 ticks; тяжёлая просроченная Location-заявка может получить полный бюджет на чётном tick, нечётный сохраняет резерв House. Policy, интервал и визуальный контракт сохранены. Кэш готовности, порционная сборка, Real Estate и Studio/DEV/профиль открыты.
 
+M621: Runtime LOD этап 3 — LodPrototypeCache keyed by Instance identity, generation, variant and component contract. Event-driven missing/incomplete/ready/invalid; bounded retry 2; cache-folder/Ready late arrival; frozen immutable assembly metadata/bounds; FULL component map. Location no longer waits 30s for the template folder or disables visual streaming when it is late. Stale generations rebuild atomically; HouseVisualAdapter shares readiness cache for LOD1 replacements. M619–M621 code and Lua-oracle tests pass; incremental budget, House spatial/queue integration and Studio/DEV/profile acceptance remain open. [Runtime LOD ТЗ](../workflows/RUNTIME_LOD_STREAMING_REFACTOR_SPEC_RU.md).
+
+
+
 Решение владельца 27.11.2026 (M606a): весь цикл оптимизации из [Kanban KBN-0035–0039](../kanban/README.md#текущий-фокус--27112026--performance-review-m605) обязателен до возобновления новых механик и расширения контента. Допускаются исправления блокирующих дефектов и работы, необходимые для приёмки. Старые задачи сохраняются; приоритет внутри цикла не исключает ни одну карточку.
 
 | Порядок | Обязательный результат | Спецификация |

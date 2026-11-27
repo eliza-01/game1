@@ -21,13 +21,16 @@ function Queue:Remove(record)
     end
 end
 
-function Queue:Set(record, variant, prototype)
-    if not variant or variant == record.actual then self:Remove(record); return end
+function Queue:Set(record, variant, prototype, metadata, force)
+    force = force == true
+    if not variant or (variant == record.actual and not force) then self:Remove(record); return end
     local entry = self.entries[record]
     if entry and entry.desired == record.desired and entry.variant == variant
-        and entry.prototype == prototype and entry.actual == record.actual then return end
+        and entry.prototype == prototype and entry.metadata == metadata
+        and entry.actual == record.actual and entry.force == force then return end
     self.entries[record] = {record=record, desired=record.desired, actual=record.actual,
-        variant=variant, prototype=prototype, queuedAt=self.tick, aged=false}
+        variant=variant, prototype=prototype, metadata=metadata, force=force,
+        queuedAt=self.tick, aged=false}
     self.dirty = true
 end
 

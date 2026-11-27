@@ -23,8 +23,8 @@ class LodTransitionQueueM620(unittest.TestCase):
         for needle in ('queue:Begin(cameraPosition, cameraChanged)',
                        'candidates:Collect(cameraPosition, cameraChanged)',
                        'LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)',
-                       'record.part:IsDescendantOf(Workspace)', 'not available(record, prototype, variant)',
-                       'queue:Remove(record); continue', 'queue:Set(record, variant, prototype)',
+                       'record.part:IsDescendantOf(Workspace)', 'not available(record, status, prototype, metadata, variant)',
+                       'queue:Remove(record)', 'continue', 'queue:Set(record, variant, prototype, metadata, force)',
                        'queue:Ordered(LodThresholdCache.Distance)', 'queue:Attempted(transition)',
                        'record.actual = if replacement then variant else "UNLOADED"',
                        'queue:Remove(record)', 'ipairs(composites)', 'houseAdapter:Step('):

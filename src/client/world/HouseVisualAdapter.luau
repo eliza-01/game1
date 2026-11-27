@@ -20,6 +20,7 @@ type Visual = {
     spec: any, desired: string?, part: MeshPart?, lodPart: MeshPart?,
     templateName: string, fetching: boolean,
     generation: number, retryAt: number, proxy: BasePart?,
+    lodPrototype: Instance?, lodGeneration: number?, prototypeDirty: boolean,
     worldFrame: CFrame, worldSize: Vector3,
 }
 type House = {
@@ -41,10 +42,12 @@ local function resolvePath(start: Instance, path: {string}): Instance?
     return node
 end
 
-function Adapter.new(houses: any, cache: Instance, hysteresis: number)
+function Adapter.new(houses: any, prototypeCache: any, hysteresis: number)
     local self = setmetatable({}, Adapter)
-    self.cache = cache
+    self.prototypeCache = prototypeCache
     self.hysteresis = hysteresis
+    self.destroyed = false
+    self.templateDependents = {}
     self.folder = Instance.new("Folder")
     self.folder.Name = "Game1HouseClientVisuals"
     self.folder.Parent = Workspace
@@ -63,6 +66,7 @@ function Adapter.new(houses: any, cache: Instance, hysteresis: number)
             table.insert(entries, {spec = spec, desired = nil, part = nil,
                 lodPart = nil, templateName = "__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId),
                 fetching = false, generation = 0, retryAt = 0, proxy = nil,
+                lodPrototype = nil, lodGeneration = nil, prototypeDirty = true,
                 worldFrame = worldFrame,
                 worldSize = Vector3.new(table.unpack(spec.size)) * row.scale})
         end
@@ -73,6 +77,21 @@ function Adapter.new(houses: any, cache: Instance, hysteresis: number)
             state = "UNLOADED", visual = entries,
             distance = math.huge, root = nil,
         })
+        for _, visual in ipairs(entries) do
+            local dependents = self.templateDependents[visual.templateName]
+            if not dependents then
+                dependents = {}
+                self.templateDependents[visual.templateName] = dependents
+            end
+            table.insert(dependents, visual)
+        end
+    end
+    if prototypeCache and prototypeCache.ConnectChanged then
+        self.cacheChangedConnection = prototypeCache:ConnectChanged(function(name)
+            for _, visual in ipairs(self.templateDependents[name] or {}) do
+                visual.prototypeDirty = true
+            end
+        end)
     end
     return self
 end
@@ -134,7 +153,7 @@ function Adapter:_removeVisual(visual: Visual): boolean
 end
 
 function Adapter:_startVisual(house: House, visual: Visual)
-    if self.pending >= MAX_PENDING or visual.fetching then return false end
+    if self.destroyed or self.pending >= MAX_PENDING or visual.fetching then return false end
     if os.clock() < visual.retryAt then return false end
     -- Static visuals can be created from immutable authored CFrames even if
     -- Roblox's own Instance Streaming has not yet replicated distant proxies.
@@ -182,6 +201,10 @@ function Adapter:_startVisual(house: House, visual: Visual)
         end
         visual.fetching = false
         self.pending -= 1
+        if self.destroyed then
+            if part then part:Destroy() end
+            return
+        end
         if part and visual.desired == "FULL"
             and visual.generation == ticket
             and (not visual.spec.moving or (proxy ~= nil and proxy:IsDescendantOf(Workspace))) then
@@ -205,6 +228,7 @@ end
 -- The existing LocationWorldStreamer grants this adapter its shared budget.
 -- Every part transitions independently; no group-wide render gate.
 function Adapter:Step(budget: number): number
+    if self.destroyed then return 0 end
     local operations = 0
     table.sort(self.records, function(a: House, b: House)
         return a.distance < b.distance
@@ -221,41 +245,53 @@ function Adapter:Step(budget: number): number
             if desired ~= "LOD1" and visual.lodPart then
                 visual.lodPart:Destroy()
                 visual.lodPart = nil
+                visual.lodPrototype = nil
+                visual.lodGeneration = nil
                 operations += 1
             end
             -- Never show FULL and LOD together, including under low budget.
             if operations < budget and desired == "LOD1"
-                and not visual.part and not visual.fetching and not visual.lodPart then
-                local prototype = self.cache:FindFirstChild(visual.templateName)
-                if prototype and prototype:IsA("MeshPart") then
-                    local lod = prototype:Clone()
-                    lod.Name = visual.spec.name .. "__LOD1"
-                    lod.Anchored = true
-                    lod.CanCollide = false
-                    lod.CanTouch = false
-                    lod.CanQuery = false
-                    lod.Size = visual.worldSize
-                    lod.CFrame = visual.worldFrame
-                    local ok = Appearance.Apply(lod, {
-                        mode = visual.spec.mode, material = visual.spec.material,
-                        color = visual.spec.color, textureId = visual.spec.textureId,
-                        alpha = visual.spec.alpha,
-                    })
-                    if ok then
-                        local proxy = self:_proxy(house, visual)
-                        if proxy and visual.spec.mode ~= "atlas" then
-                            lod.Color = proxy.Color
-                            lod.Material = proxy.Material
+                and not visual.part and not visual.fetching
+                and (not visual.lodPart or visual.prototypeDirty) then
+                visual.prototypeDirty = false
+                local status, prototype, metadata = self.prototypeCache:Resolve(visual.templateName, "LOD1")
+                if status == "ready" and prototype and prototype:IsA("MeshPart") then
+                    local rebuild = not visual.lodPart or visual.lodPrototype ~= prototype
+                        or visual.lodGeneration ~= metadata.generation
+                    if rebuild then
+                        local lod = prototype:Clone()
+                        lod.Name = visual.spec.name .. "__LOD1"
+                        lod.Anchored = true
+                        lod.CanCollide = false
+                        lod.CanTouch = false
+                        lod.CanQuery = false
+                        lod.Size = visual.worldSize
+                        lod.CFrame = visual.worldFrame
+                        local ok = Appearance.Apply(lod, {
+                            mode = visual.spec.mode, material = visual.spec.material,
+                            color = visual.spec.color, textureId = visual.spec.textureId,
+                            alpha = visual.spec.alpha,
+                        })
+                        if ok then
+                            local proxy = self:_proxy(house, visual)
+                            if proxy and visual.spec.mode ~= "atlas" then
+                                lod.Color = proxy.Color
+                                lod.Material = proxy.Material
+                            end
+                            if visual.spec.moving and proxy then
+                                lod.CFrame = proxy.CFrame
+                            end
+                            lod.Parent = self.folder
+                            local previous = visual.lodPart
+                            visual.lodPart = lod
+                            visual.lodPrototype = prototype
+                            visual.lodGeneration = metadata.generation
+                            if previous then previous:Destroy() end
+                            if visual.spec.moving and proxy then DoorRaycast.Bind(proxy, lod) end
+                            operations += 1
+                        else
+                            lod:Destroy()
                         end
-                        if visual.spec.moving and proxy then
-                            lod.CFrame = proxy.CFrame
-                        end
-                        lod.Parent = self.folder
-                        visual.lodPart = lod
-                        if visual.spec.moving and proxy then DoorRaycast.Bind(proxy, lod) end
-                        operations += 1
-                    else
-                        lod:Destroy()
                     end
                 end
             end
@@ -286,6 +322,7 @@ function Adapter:Step(budget: number): number
 end
 
 function Adapter:FollowMoving()
+    if self.destroyed then return end
     -- No independent RenderStepped or Heartbeat subscription. Only the few
     -- nearby animated door visuals need a transform while their server proxies move.
     for _, house: House in ipairs(self.records) do
@@ -296,6 +333,25 @@ function Adapter:FollowMoving()
             end
         end
     end
+end
+
+function Adapter:Destroy()
+    if self.destroyed then return end
+    self.destroyed = true
+    if self.cacheChangedConnection then
+        pcall(function() self.cacheChangedConnection:Disconnect() end)
+        self.cacheChangedConnection = nil
+    end
+    for _, house in ipairs(self.records) do
+        for _, visual in ipairs(house.visual) do
+            visual.generation += 1
+            if visual.part then visual.part:Destroy(); visual.part = nil end
+            if visual.lodPart then visual.lodPart:Destroy(); visual.lodPart = nil end
+            visual.lodPrototype = nil
+            visual.lodGeneration = nil
+        end
+    end
+    if self.folder then self.folder:Destroy(); self.folder = nil end
 end
 
 return table.freeze(Adapter)

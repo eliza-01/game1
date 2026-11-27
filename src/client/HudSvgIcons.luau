@@ -1,15 +1,16 @@
 --!strict
 -- Actual rasterized SVG artwork. Shared per client, allocated on first use only.
 local AssetService = game:GetService("AssetService")
-local Data = require(script.Parent:WaitForChild("HouseInteractionIconData"))
+local Data = require(script.Parent:WaitForChild("world"):WaitForChild("HouseInteractionIconData"))
+local MobileData = require(script.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileActionIconData"))
 local Icons = {}
 -- Optional published PNG IDs (when Mesh/Image APIs are disabled for the Experience).
 local published: {[string]: string} = {} -- e.g. LockClosed = "rbxassetid://123"
 local cache: {[string]: any} = {}
-local fallback = {LockClosed = "🔒", LockOpen = "🔓", DoorClosed = "🚪", DoorOpen = "↪"}
+local fallback = {LockClosed = "🔒", LockOpen = "🔓", DoorClosed = "🚪", DoorOpen = "↪", Attack = "⚔", Jump = "↑", Aim = "⊙"}
 local function imageFor(state: string): any?
     if cache[state] ~= nil then return cache[state] or nil end
-    local encoded = (Data :: any)[state]
+    local encoded = (Data :: any)[state] or (MobileData :: any)[state]
     if not encoded then return nil end
     local image: EditableImage? = nil
     local ok, result = pcall(function()
@@ -36,7 +37,7 @@ local function imageFor(state: string): any?
     end)
     if not ok then
         if image then image:Destroy() end
-        warn("[game1][house-icons] SVG image unavailable: " .. tostring(result))
+        warn("[game1][hud-icons] SVG image unavailable: " .. tostring(result))
     end
     cache[state] = if ok then {content = result, image = image} else false
     return cache[state] or nil
@@ -49,6 +50,8 @@ function Icons.Apply(button: TextButton, state: string)
         local icon = Instance.new("ImageLabel")
         icon.Name = "InteractionStateIcon"
         icon.BackgroundTransparency = 1
+        icon.Active = false
+        icon.ZIndex = button.ZIndex + 1
         icon.AnchorPoint = Vector2.new(0.5, 0.5)
         icon.Position = UDim2.fromScale(0.5, 0.5)
         icon.Size = UDim2.fromScale(0.88, 0.88)
@@ -59,6 +62,7 @@ function Icons.Apply(button: TextButton, state: string)
         -- No words and no fake geometry when the platform denies image creation.
         button.Text = (fallback :: any)[state] or ""
         button.TextSize = 26
+        button.TextColor3 = Color3.fromRGB(244,246,249)
     end
 end
 return table.freeze(Icons)

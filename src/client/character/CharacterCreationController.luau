@@ -16,6 +16,9 @@ local Catalog = require(Shared:WaitForChild("character"):WaitForChild("Character
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 local CameraController = require(script.Parent:WaitForChild("CameraController"))
 local Mounts = require(script.Parent:WaitForChild("BoneMountedAttachmentController"))
+local AnimationRoot = script.Parent:WaitForChild("animation")
+local AnimationController = require(AnimationRoot:WaitForChild("CharacterAnimationController"))
+local WorldAnimations = require(AnimationRoot:WaitForChild("WorldAnimationPreloader"))
 local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
 local Preview = require(script.Parent:WaitForChild("CharacterCreationPreviewController"))
 local Request = require(script.Parent:WaitForChild("CharacterCreationRequest"))
@@ -795,12 +798,26 @@ function Controller.Start()
                         if current() then
                             local ok, loaded = pcall(MeshPreloader.PreloadModel, model, current, function(progress: number)
                                 if not current() then return end
-                                worldProgress = progress
+                                worldProgress = progress * 0.65
                                 Panel.SetSubmitting(controls, true, Language.Translate("creation.entering_world"), worldProgress)
                             end)
                             if current() and CameraController.ClearCreationView() then
                                 if not ok or not loaded then warn("[game1][character-creation] world preload incomplete; continue with engine streaming") end
-                                break
+                                worldProgress = math.max(worldProgress or 0, 0.65)
+                                Panel.SetSubmitting(controls, true, Language.Translate("creation.entering_world"), worldProgress)
+                                local deadline = os.clock() + 12
+                                local playerReady = AnimationController.WaitForPrewarm(model, current, deadline)
+                                local worldReady = WorldAnimations.Wait(current, deadline, function(progress)
+                                    if not current() then return end
+                                    worldProgress = 0.80 + progress * 0.20
+                                    Panel.SetSubmitting(controls, true, Language.Translate("creation.entering_world"), worldProgress)
+                                end)
+                                if current() and CameraController.ClearCreationView() then
+                                    if not playerReady or not worldReady then
+                                        warn("[game1][character-creation] animation preload incomplete; continue with on-demand playback")
+                                    end
+                                    break
+                                end
                             end
                         end
                     end

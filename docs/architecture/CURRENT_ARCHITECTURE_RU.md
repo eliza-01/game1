@@ -4,6 +4,10 @@
 **Источник инженерных ограничений:** [`AGENTS.md`](../../AGENTS.md).
 **Историческое обоснование:** [аудит 14 октября](../ARCHITECTURE_AUDIT_2026-10-14_RU.md). Его старые размеры файлов и список «следующих этапов» не актуальны.
 
+## M605 · HUD / Animation readiness
+
+`HudButtonTheme` — общая подложка Wallet и touch controls; `HudSvgIcons` — единый кэш SVG raster payload для House и Mobile (перенесён из HouseInteractionStateIcons). `MobileLayout` сохраняет масштаб CoreUISafeInsets, мобильные combat/weapon слои имеют общий физический правый DeviceSafeInsets край. `WorldAnimationPreloader` — один клиентский content fetch без per-actor Animator, `CharacterAnimationController.WaitForPrewarm` наблюдает существующий cache job, `CharacterCreationController` владеет curtain и отменой. Death оставляет серверный track owner и terminal hold, а клиентский compositor освобождает sampler до записи позы.
+
 ## M602 · Camera-relative backpedal
 
 `MovementController` — единый владелец world-space travel и reversed gait для PC и touch. Удалена root-relative/RMB ветка; `cameraRelativeDirection` использует текущую камеру, `cameraForwardDirection` задаёт facing при backpedal, существующие explicit facing locks сохраняют приоритет. Новых контроллеров и RPC нет.
@@ -178,4 +182,4 @@ IDs). Ошибка MySQL блокирует audit-sensitive publish/delete/Sync,
 
 ## M600 · House interaction presentation
 
-HouseSocketService реплицирует состояния и проверяет действие/дистанцию. HouseSocketPromptController использует прежний 10 Hz цикл; DoorInteractionRaycast связывает runtime proxy с визуальным мешем через HouseVisualAdapter. Вне USE-зоны луч не запускается. HouseInteractionStateIcons кэширует растеризованные SVG на клиенте. NpcDisplayNameFormatter работает только на границе UI.
+HouseSocketService реплицирует состояния и проверяет действие/дистанцию. HouseSocketPromptController использует прежний 10 Hz цикл; DoorInteractionRaycast связывает runtime proxy с визуальным мешем через HouseVisualAdapter. Вне USE-зоны луч не запускается. HudSvgIcons кэширует растеризованные SVG на клиенте. NpcDisplayNameFormatter работает только на границе UI.

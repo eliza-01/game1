@@ -40,7 +40,7 @@ class CharacterUiPadlockM492(unittest.TestCase):
         self.assertLess(camera, preload)
         self.assertLess(preload, hide)
         self.assertIn('worldProgress = nil', sync)
-        self.assertIn('worldProgress = progress', sync)
+        self.assertIn('worldProgress = progress * 0.65', sync)
         self.assertIn('player.Character == model', sync)
         self.assertIn('Panel.SetSubmitting(controls, true, Language.Translate("creation.entering_world"), worldProgress)', sync)
         self.assertIn('elseif next(bootstrapPending) then', controller)

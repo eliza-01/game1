@@ -4,13 +4,14 @@ local Players=game:GetService("Players")
 local Input=game:GetService("UserInputService")
 local TextService=game:GetService("TextService")
 local Layout=require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
+local Theme=require(script.Parent.Parent:WaitForChild("HudButtonTheme"))
 local View={}
 function View.Start()
     local player=Players.LocalPlayer
     local gui=Instance.new("ScreenGui"); gui.Name="Game1Wallet"; gui.ResetOnSpawn=false; gui.DisplayOrder=20; gui.Enabled=false
     gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets; gui.Parent=player:WaitForChild("PlayerGui")
     local plate=Instance.new("Frame"); plate.Name="Gold"; plate.AnchorPoint=Vector2.new(0,1); plate.Size=UDim2.fromOffset(116,32)
-    plate.BackgroundColor3=Color3.fromRGB(24,26,31); plate.BackgroundTransparency=.18; plate.BorderSizePixel=0; plate.Active=false
+    Theme.Apply(plate); plate.Active=false
     plate:SetAttribute("WorldInputPassthrough",true); plate.Parent=gui
     local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,8); corner.Parent=plate
     local coin=Instance.new("Frame"); coin.Size=UDim2.fromOffset(20,20); coin.Position=UDim2.fromOffset(8,6); coin.BackgroundColor3=Color3.fromRGB(230,168,48); coin.BorderSizePixel=0; coin.Parent=plate

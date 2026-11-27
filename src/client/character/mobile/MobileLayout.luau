@@ -6,35 +6,39 @@ function Layout.Resolve(width, height)
     -- One scale for the whole cluster: preserve the reference proportions.
     -- The width cap keeps the floating stick and action cluster independent.
     local short = math.max(1, math.min(width, height))
-    local attack = math.max(1, math.floor(math.min(short * .25, width / 3.65, 120)))
+    local attack = math.max(1, math.floor(math.min(short * .25, width / 4.1, 120)))
     local secondary = math.max(1, math.floor(attack * .46))
     local skill = secondary
     local stick = math.max(1, math.floor(attack * 1.06))
     local margin = math.floor(attack * .12)
     local gap = math.max(1, math.floor(attack * .12))
-    local attackRight = math.floor(attack * .22)
+    local attackRight = 2
     local bottom = math.floor(attack * .07)
     local weapon = math.max(1, math.floor(attack * .37))
     local weaponMargin = 2 -- device-safe top/right edge; independent of scale
     local weaponGap = math.max(1, math.floor(attack * .06))
     local attackBox = {size = attack, x = attackRight, y = bottom}
-    local jumpBox = {size = secondary, x = attackRight + attack + gap, y = bottom}
-    local aimBox = {size = secondary, x = jumpBox.x + secondary + gap, y = bottom}
     -- Right/bottom-relative polar coordinates, starting on the inner left.
     -- The arc is centred on Attack, not on the screen or on a separate row.
     local cx, cy = attackRight + attack/2, bottom + attack/2
-    local arcRadius = attack * .98
+    local arcRadius = attack * 1.28
+    local lastAngle = math.acos((skill - attack) / (2 * arcRadius))
+    local firstAngle = math.rad(10)
     local skills = {}
     local maxTop = attackBox.y + attack
-    local maxLeft = aimBox.x + secondary
-    for i, degrees in ipairs({15, 50, 85, 117}) do
-        local angle = math.rad(degrees)
+    local maxLeft = attackBox.x + attack
+    for i = 1, 4 do
+        local angle = firstAngle + (lastAngle - firstAngle) * (i-1) / 3
         local x = math.floor(cx + arcRadius * math.cos(angle) - skill/2 + .5)
         local y = math.floor(cy + arcRadius * math.sin(angle) - skill/2 + .5)
+        if i == 4 then x = attackRight end
         skills[i] = {size = skill, x = x, y = y}
         maxTop = math.max(maxTop, y + skill)
         maxLeft = math.max(maxLeft, x + skill)
     end
+    local jumpBox = {size = secondary, x = skills[1].x, y = bottom}
+    local aimBox = {size = secondary, x = jumpBox.x + secondary + gap, y = bottom}
+    maxLeft = math.max(maxLeft, aimBox.x + secondary)
     return {
         stick = stick,
         radius = stick * 0.58,

@@ -1,10 +1,10 @@
 --!strict
 -- Asset-free black gear on a white circular launcher.
 local View = {}
-function View.Decorate(button: TextButton)
+function View.Decorate(button: TextButton, touch: boolean?)
     button.Text = ""
-    local black = Color3.fromRGB(0, 0, 0)
-    local white = Color3.fromRGB(255, 255, 255)
+    local black = if touch then Color3.fromRGB(235,239,243) else Color3.fromRGB(0, 0, 0)
+    local white = if touch then button.BackgroundColor3 else Color3.fromRGB(255, 255, 255)
     local function piece(name: string, x: number, y: number, w: number, h: number, color: Color3, rotation: number, rounded: boolean)
         local frame = Instance.new("Frame")
         frame.Name = name

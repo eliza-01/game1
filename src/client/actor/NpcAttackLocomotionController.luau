@@ -142,6 +142,13 @@ local function step(dt: number)
             unbind(entry.model)
             continue
         end
+        if entry.model:GetAttribute("LifeState") ~= "Alive" then
+            if entry.sampler then composed -= 1 end
+            entry.weight = 0
+            release(entry)
+            active[entry] = nil
+            continue
+        end
         local wants = entry.model:GetAttribute("NpcAttackPursuitActive") == true
             and entry.model:GetAttribute("LifeState") == "Alive"
             and (entry.root.Position - camera.CFrame.Position).Magnitude <= Config.MaxDistance

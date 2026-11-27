@@ -152,14 +152,14 @@ function NpcAnimationService.Create(entity: Model, visual: Model, profile: any?)
         dying = true
         deathStartedAt = os.clock()
         attacking = false
-        idle:Stop()
-        stopCombatTracks()
-        Tracks.Stop(currentAttack)
-        currentAttack = nil
         -- Do not disarm, detach or drop equipment at death.
         entity:SetAttribute("NpcAnimationState", "death")
         entity:SetAttribute("DeathAnimationStartedAt", deathStartedAt)
         if death then DeathAnimationPolicy.Start(death, AnimationSpeedScaling.ResolveForAnimation(entity, "death", deathClip and deathClip.row and deathClip.row.animationId) / 100) end
+        idle:Stop()
+        stopCombatTracks()
+        Tracks.Stop(currentAttack)
+        currentAttack = nil
     end
 
     local function step(delta: number): boolean

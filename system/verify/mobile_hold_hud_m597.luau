@@ -76,13 +76,13 @@ for _,size in ipairs({{568,240},{640,180},{640,200},{640,250},{740,300},{844,340
     assert(math.abs(l.stick/a.size-1.06)<=1/a.size)
     assert(math.abs(l.weapon.size/a.size-.37)<=1/a.size)
     assert(l.weapon.margin==2)
-    assert(a.x<=a.size*.22 and a.y<=a.size*.07)
+    assert(a.x==2 and a.y<=a.size*.07 and l.skills[4].x==a.x and l.jump.x==l.skills[1].x)
     local angle=-math.huge
     for _,skill in ipairs(l.skills) do
         assert(skill.size==l.jump.size)
         local dx=skill.x+skill.size/2-a.x-a.size/2
         local dy=skill.y+skill.size/2-a.y-a.size/2
-        assert(math.abs(math.sqrt(dx*dx+dy*dy)-a.size*.98)<=1)
+        assert(math.abs(math.sqrt(dx*dx+dy*dy)-a.size*1.28)<=1)
         local nextAngle=math.acos(dx/math.sqrt(dx*dx+dy*dy))
         assert(nextAngle>angle and dy>0)
         angle=nextAngle

@@ -72,9 +72,6 @@ function MonsterDeathLifecycle.new(callbacks: any): any
         model:SetAttribute("MonsterIdleVariant", nil)
         model:SetAttribute("DeathAnimationStartedAt", os.clock())
         model:SetAttribute("DeathTerminalPoseHeld", false)
-        stopWanderMovement(entry)
-        stopIdleState(entry)
-        stopTrack(entry.combatIdleTrack)
         if entry.navigationRoot and entry.navigationRoot.Parent then
             entry.navigationRoot.AssemblyLinearVelocity = Vector3.zero
             entry.navigationRoot.AssemblyAngularVelocity = Vector3.zero
@@ -82,12 +79,16 @@ function MonsterDeathLifecycle.new(callbacks: any): any
         end
 
         local track = entry.deathTrack
-        if not track then
+        if track then
+            model:SetAttribute("AnimationPlaybackSpeedPercent", AnimationSpeedScaling.ResolveForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
+            DeathAnimationPolicy.Start(track, AnimationSpeedScaling.ResolveScaleForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
+        else
             warn("[game1][monster-spawn] required death animation track is missing; monster remains Dying")
-            return
         end
-        model:SetAttribute("AnimationPlaybackSpeedPercent", AnimationSpeedScaling.ResolveForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
-        DeathAnimationPolicy.Start(track, AnimationSpeedScaling.ResolveScaleForAnimation(model, "death", track.Animation and track.Animation.AnimationId))
+        -- Start the high-priority pose before fading outgoing presentation.
+        stopWanderMovement(entry)
+        stopIdleState(entry)
+        stopTrack(entry.combatIdleTrack)
     end
 
 

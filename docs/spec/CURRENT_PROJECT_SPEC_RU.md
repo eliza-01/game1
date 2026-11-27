@@ -6,6 +6,11 @@
 **Важное различие:** «реализовано в исходниках» не означает «проверено в Roblox Studio Play / production».
 **История:** [исходное ТЗ Milestone 1](../history/milestone-1/PROJECT_SPEC_MILESTONE_1_RU.md) описывает запуск проекта, **не** текущее требование к единственному разделу Characters.
 
+## M605 · HUD и прогрев анимаций при входе
+
+- M604 включён в M605: Lock над Door, правая граница Attack / Skill 4 / weapon grid — DeviceSafeInsets − 2 px, Jump под Skill 1. Общий фон Wallet, SVG Attack/Jump/Aim через прежний RGBA pipeline. Пропорции сохранены, дуга расширена для независимых hit targets.
+- Клиент при старте однократно загружает опубликованные клипы NPC/Monster по уникальным ID, по 16 за запрос. Существующий world-entry curtain ожидает также текущий кеш AnimationTrackCache персонажа. Лимит дополнительного ожидания 12 с, отмена по смене персонажа/epoch. Без Character Creation preload фоновый. Death запускается до fade старых треков и отключает client lower-body compositor немедленно; terminal pose policy не меняется. [Приёмка](../workflows/M605_HUD_ANIMATION_PREWARM_RU.md).
+
 ## M602 · Движение назад
 
 - PC S/Down и отрицательная Y ось touch используют Walk/Backward и направление относительно текущей камеры, независимо от yaw персонажа, ПКМ и атаки. Touch сохраняет аналоговую силу и диагонали; PC сохраняет одноосный S вне live aim. Боевые locks остаются в силе. [Приёмка](../workflows/M602_CAMERA_BACKPEDAL_RU.md).

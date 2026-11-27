@@ -28,6 +28,7 @@ local started = false
 local character: Model? = nil
 local animator: Animator? = nil
 local cache = nil
+local warmResult = nil
 local currentLoop = nil
 local currentLoopClipId = ""
 -- Per-spawn airborne playback; movement owns the physical jump state.
@@ -75,6 +76,7 @@ local function clearCharacter()
 		cache:Destroy()
 	end
 	cache = nil
+    warmResult = nil
 	character = nil
 	animator = nil
 	currentLoop = nil
@@ -571,6 +573,7 @@ local function bindCharacter(newCharacter: Model)
         task.spawn(function()
             local result = boundCache:Prewarm(descriptors, 4)
             if character ~= newCharacter or cache ~= boundCache then return end
+            warmResult = result
             print(("[game1][animation] prewarm %d/%d ready in %.3fs")
                 :format(result.ready, result.total, result.elapsed))
         end)
@@ -807,6 +810,19 @@ end
 
 function CharacterAnimationController.Refresh()
 	refreshLoop()
+end
+
+-- The creation curtain observes the existing per-character cache job.
+-- Never create a second cache or block respawn indefinitely.
+function CharacterAnimationController.WaitForPrewarm(model: Model, current: () -> boolean, deadline: number): boolean
+    while current() and os.clock() < deadline do
+        if character == model and warmResult then
+            return warmResult.total > 0 and warmResult.failed == 0
+        end
+        if character == model and not animator then return false end
+        RunService.Heartbeat:Wait()
+    end
+    return false
 end
 
 function CharacterAnimationController.Start()

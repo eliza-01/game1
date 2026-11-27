@@ -40,6 +40,7 @@ print(("[game1][client] %s v%s · runtime %s")
 
 MovementController.Start()
 CharacterAnimationController.Start()
+require(AnimationRoot:WaitForChild("WorldAnimationPreloader")).Start()
 require(AnimationRoot:WaitForChild("FaceAnimationController")).Start()
 BoneMountedAttachmentController.Start()
 WeaponSelectionController.Start()

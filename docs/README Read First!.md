@@ -8,6 +8,8 @@
 
 **M601 · Оружие:** [верхний правый угол и Database binding Newbie Slayer](workflows/M601_WEAPON_CORNER_RU.md).
 
+**M605 · HUD и прогрев:** [контракт и проверка](workflows/M605_HUD_ANIMATION_PREWARM_RU.md).
+
 **M600 · Дом и NPC:** [иконки замка/двери, наведение, имена NPC](workflows/M600_HOUSE_INTERACTION_ICONS_RU.md).
 
 **M597–M599 · Управление и HUD:** [удержание, мобильные кнопки, оружие](workflows/M597_MOBILE_HOLD_HUD_RU.md).

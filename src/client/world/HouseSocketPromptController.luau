@@ -22,7 +22,8 @@ local ElevatorFloor = require(Shared:WaitForChild("world"):WaitForChild("HouseEl
 local Aim = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketAimPolicy"))
 local Occlusion = require(script.Parent:WaitForChild("HouseSocketAimOcclusion"))
 local DoorRaycast = require(script.Parent:WaitForChild("DoorInteractionRaycast"))
-local Icons = require(script.Parent:WaitForChild("HouseInteractionStateIcons"))
+local Theme = require(script.Parent.Parent:WaitForChild("HudButtonTheme"))
+local Icons = require(script.Parent.Parent:WaitForChild("HudSvgIcons"))
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local player = Players.LocalPlayer
 local Controller = {}
@@ -147,6 +148,14 @@ local function availableActions(socket: Attachment, selected: ProximityPrompt): 
             and (not isDoorAim(prompt) or prompt == selected)
             and ElevatorFloor.AllowsPrompt(prompt, root) then
             table.insert(actions, prompt)
+        end
+    end
+    -- Stable partition: lock precedes door; other E/F actions keep authored order.
+    if #actions == 2 then
+        local first = actions[1]:GetAttribute("Game1InteractionIcon")
+        local second = actions[2]:GetAttribute("Game1InteractionIcon")
+        if (first == "DoorOpen" or first == "DoorClosed") and (second == "LockOpen" or second == "LockClosed") then
+            actions[1], actions[2] = actions[2], actions[1]
         end
     end
     return actions
@@ -322,6 +331,7 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
         action.Position = UDim2.fromOffset(6, y)
         action.Size = UDim2.new(1, -12, 0, rowHeight - 6)
         action.BackgroundColor3 = Color3.fromRGB(37, 51, 62)
+        if touch then Theme.Apply(action) end
         action.TextColor3 = Color3.fromRGB(244, 246, 249)
         action.Font = Enum.Font.GothamSemibold
         action.TextSize = cfg.fontPx

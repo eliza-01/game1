@@ -2,6 +2,7 @@
 -- One first-run language picker and an always-available change-language control.
 -- UI selection is local and immediate; server persists a validated preference.
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local State = require(script.Parent:WaitForChild("LanguageState"))
 local FullScreenLayer = require(script.Parent.Parent:WaitForChild("FullScreenLayer"))
@@ -11,6 +12,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Options = require(Shared:WaitForChild("GameOptions"))
 local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local HudCornerLayout = require(script.Parent.Parent:WaitForChild("HudCornerLayout"))
+local Theme = require(script.Parent.Parent:WaitForChild("HudButtonTheme"))
 local LauncherView = require(script.Parent:WaitForChild("SettingsLauncherView"))
 local ActionRegistry = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileActionRegistry"))
 local Controller = {}
@@ -65,7 +67,8 @@ function Controller.Start()
     launcher.BorderSizePixel = 0
     launcher.Parent = gui
     corner(launcher, HudCornerLayout.SettingsSize / 2)
-    LauncherView.Decorate(launcher)
+    if UserInputService.TouchEnabled then Theme.Apply(launcher) end
+    LauncherView.Decorate(launcher, UserInputService.TouchEnabled)
 
     local shade = Instance.new("Frame")
     shade.Name = "ModalBackdrop"

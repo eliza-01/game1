@@ -3,11 +3,12 @@
 local GuiService = game:GetService("GuiService")
 local Layout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
 local ActionRegistry = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileActionRegistry"))
+local Theme = require(script.Parent.Parent:WaitForChild("HudButtonTheme"))
 local Slots = {}
 local TYPES = {"dagger", "sword", "bigsword", "bow"}
 local function line(parent: GuiObject, x: number, y: number, w: number, h: number, angle: number)
     local piece = Instance.new("Frame")
-    piece.BackgroundColor3 = Color3.fromRGB(20, 35, 25)
+    piece.BackgroundColor3 = Color3.fromRGB(225, 232, 236)
     piece.BorderSizePixel = 0
     piece.AnchorPoint = Vector2.new(0.5, 0.5)
     piece.Position = UDim2.fromScale(x, y)
@@ -23,8 +24,12 @@ function Slots.Create(gui: ScreenGui, choose: (string) -> ())
         button.AnchorPoint = Vector2.new(1, 0)
         button.Text = ""
         button.BorderSizePixel = 0
-        button.BackgroundColor3 = Color3.fromRGB(169, 222, 46)
-        button.BackgroundTransparency = 0.18
+        Theme.Apply(button)
+        local outline = Instance.new("UIStroke")
+        outline.Color = Color3.fromRGB(255, 218, 116)
+        outline.Thickness = 2
+        outline.Transparency = 1
+        outline.Parent = button
         button.Parent = gui
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 7)
@@ -59,7 +64,8 @@ function Slots.Create(gui: ScreenGui, choose: (string) -> ())
     end
     function result.SetSelected(kind: any)
         for key, button in pairs(buttons) do
-            button.BackgroundTransparency = if key == kind then 0 else 0.32
+            local outline = button:FindFirstChildOfClass("UIStroke")
+            if outline then outline.Transparency = if key == kind then 0 else 1 end
         end
     end
     function result.SetVisible(visible: boolean)

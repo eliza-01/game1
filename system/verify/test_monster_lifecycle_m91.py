@@ -65,8 +65,8 @@ class MonsterLifecycleM91Tests(unittest.TestCase):
         ordered = [
             'model:SetAttribute("DeathAnimationStartedAt", os.clock())',
             'model:SetAttribute("DeathTerminalPoseHeld", false)',
-            'stopWanderMovement(entry)',
             'DeathAnimationPolicy.Start(track,',
+            'stopWanderMovement(entry)',
         ]
         self.assertEqual(list(map(death.index, ordered)), sorted(map(death.index, ordered)))
         for required in (

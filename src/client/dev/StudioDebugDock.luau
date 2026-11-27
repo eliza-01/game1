@@ -1,6 +1,7 @@
 -- Shared Studio-only debug toolbar coordinates. ScreenGui keeps the Roblox Core UI inset.
 local Workspace = game:GetService("Workspace")
 local Input = game:GetService("UserInputService")
+local Theme = require(script.Parent.Parent:WaitForChild("HudButtonTheme"))
 local HudCornerLayout = require(script.Parent.Parent:WaitForChild("HudCornerLayout"))
 local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
 
@@ -79,7 +80,8 @@ function StudioDebugDock.Bind(id: string, launcher: TextButton, panel: GuiObject
     end
     local function paint()
         local open = panel.Visible and screen.Enabled
-        launcher.BackgroundColor3 = if open then SELECTED else CLOSED
+        if Input.TouchEnabled then Theme.Apply(launcher)
+        else launcher.BackgroundColor3 = if open then SELECTED else CLOSED end
         paintIcon(if open then ACCENT else TEXT)
     end
     screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)

@@ -240,6 +240,13 @@ local function step(deltaTime: number)
 		local cameraDelta = entry.root.Position - camera.CFrame.Position
 		local distanceSquared = cameraDelta:Dot(cameraDelta)
 		local alive = tostring(model:GetAttribute("LifeState")) == "Alive"
+        -- Death owns the whole rig immediately; never blend running legs into Death.
+        if not alive then
+            entry.weight = 0
+            releaseSampler(entry)
+            setEntryActive(entry, false)
+            continue
+        end
 		local pursuitActive = model:GetAttribute("MonsterAttackPursuitActive") == true and alive
 		local combatActive = model:GetAttribute("MonsterCombatActive") == true and alive
 		-- Combat activates the same existing PreSimulation loop during Chase as

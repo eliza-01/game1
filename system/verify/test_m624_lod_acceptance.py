@@ -24,7 +24,7 @@ class LodAcceptanceM624(unittest.TestCase):
         for token in ('diagnostics = LodDiagnostics.new()', 'runtimeWork.diagnostics = diagnostics',
                       'queue.diagnostics = diagnostics', 'houseAdapter.requests.diagnostics = diagnostics',
                       'diagnostics:Add("distanceResolves")', 'diagnostics:Add("workDistanceChecks")',
-                      'diagnostics:Add("compositeVisits", #composites)', 'diagnostics:Frame(dt, stats, os.clock()-captureStart)',
+                      'diagnostics:Frame(dt, stats, os.clock()-captureStart)',
                       'if not active or not active.manifest then return false'):
             self.assertIn(token, streamer)
         capture = read('src/client/world/LodDiagnostics.luau')

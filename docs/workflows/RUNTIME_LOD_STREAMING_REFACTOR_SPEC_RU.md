@@ -2,7 +2,7 @@
 
 **Карточка:** KBN-0037 (клиентская производительность), связанные KBN-0007 / KBN-0017.
 **Рабочая база:** диагностический срез M613 от 27.11.2026 + подтверждённая последовательность M614–M623; M624 — диагностика и подготовка приёмки. Патчи M619–M624 code/oracle checked в восстановленной sandbox-копии, Roblox Studio/DEV/Mobile и профильная приёмка не выполнены.
-**Статус:** этапы 0–5 реализованы в Runtime; этап 6 IN_PROGRESS. Диагностика и сценарии приёмки готовы; Preview scheduling, event-driven effects и реальная приёмка ещё открыты. В этапе 1 выбрано дерево 3D influence bounds (BVH) вместо сетки.
+**Статус:** этапы 0–5 реализованы в Runtime; этап 6 IN_PROGRESS. M625: event-driven composite effects реализованы; порционный Studio Preview отложен владельцем как необязательный. Реальная приёмка открыта. В этапе 1 выбрано дерево 3D influence bounds (BVH) вместо сетки.
 
 ## 1. Цель
 
@@ -146,3 +146,7 @@ Engine-independent Lua oracle: 1/8/32/64 parts static/composite, budget counters
 M624: opt-in Runtime LOD diagnostics (authorized Studio/DEV debug dock, PC/mobile), bounded capture with heartbeat/callback elapsed, queue/desired→actual latency, local candidates, sorts/cache/async/work counters, peaks and client memory at boundaries; no telemetry or new scheduler. Studio Preview teardown now disconnects Workspace subscriptions, restores authored visibility and destroys local folder. Authoring assembly remains synchronous; composite/tagged passes are measured, not eliminated. Actual Studio/DEV/PC/Mobile, two-client and A/B acceptance NOT_RUN; T03/A03/A06 remain open. See docs/workflows/M624_RUNTIME_LOD_ACCEPTANCE_RU.md.
 
 [Инструкция приёмки и чтения отчёта](M624_RUNTIME_LOD_ACCEPTANCE_RU.md).
+
+## M625 · Event-driven Composite Effects
+
+M625: `LocationCompositeEffects` replaces the periodic global composite pass with shared manifest-path prefix subscriptions (`ChildAdded/Removed`) and scoped root `DescendantAdded/Removing`. Initial discovery once per resident root; actual LOD commit/native detach controls cached effects, not desired. Hidden authored Enabled state is restored on show, stream-out and Stop; late descendants and replacement roots are handled. Compiled paths are static (runtime rename unsupported). Observable external Enabled=true while hidden is suppressed and retained; false writes indistinguishable from the local false cannot be observed without an authoritative separate state, so dynamic server-controlled effects are not newly opted in. No new Heartbeat/remotes/manifest changes; doors, rotors, House effects and tagged visual pass unchanged. Owner deferred incremental Studio Preview as optional tooling. Real Studio/DEV/physical Mobile and A/B acceptance remain NOT_RUN; T03/A03/A06 open.

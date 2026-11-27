@@ -29,7 +29,7 @@ class LodTransitionQueueM620(unittest.TestCase):
                        'record.part:IsDescendantOf(Workspace)', 'not available(record, status, prototype, metadata, variant)',
                        'queue:Remove(record)', 'continue', 'queue:Set(record, variant, prototype, metadata, force)',
                        'queue:Ordered(function(record, position)', 'runtimeWork:Step(callbacks)',
-                       'queue:Remove(record)', 'ipairs(composites)', 'houseAdapter:Observe('):
+                       'queue:Remove(record)', 'houseAdapter:Observe('):
             self.assertIn(needle, tick)
         self.assertNotIn('local transitions = {}', tick)
         self.assertNotIn('if not cameraChanged then return', tick)

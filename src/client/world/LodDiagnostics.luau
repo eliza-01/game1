@@ -13,7 +13,8 @@ function Capture:Start(cacheStats)
     self.startedAt = self.clock()
     self.counts = {}
     for _, key in ipairs({"observations", "spatialQueries", "candidateVisits", "distanceResolves", "workDistanceChecks",
-        "localSorts", "compositeVisits", "buildUnits", "cleanupUnits", "commitUnits", "commits", "buildCommits",
+        "localSorts", "compositePathEvents", "compositeRootChanges", "compositeDiscoveryVisits",
+        "compositeEffectEvents", "compositeEffectVisits", "compositeEffectWrites", "buildUnits", "cleanupUnits", "commitUnits", "commits", "buildCommits",
         "unloadCommits", "cancelledJobs", "staleJobCancels", "retryableAttempts", "failedAttempts", "meshClones", "weldCreates", "weldBindings",
         "taggedVisualVisits", "asyncStarts", "asyncFailures", "asyncDiscards"}) do
         self.counts[key] = 0

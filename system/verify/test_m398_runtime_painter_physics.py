@@ -119,9 +119,9 @@ class PainterRuntime(unittest.TestCase):
 
     def test_single_distance_owner_controls_client_effects(self):
         client=(ROOT/'src/client/world/LocationWorldStreamer.luau').read_text()
-        adapter=(ROOT/'src/client/world/LocationCompositeVisual.luau').read_text()
-        self.assertIn('LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")',client)
-        self.assertIn('function Adapter.SetEffects(record: any, active: boolean)',adapter)
+        adapter=(ROOT/'src/client/world/LocationCompositeEffects.luau').read_text()
+        self.assertIn('compositeEffects:ActualChanged(record)',client)
+        self.assertIn('function Effects:ActualChanged(record)',adapter)
         self.assertNotIn('RunService.Heartbeat',adapter)
         for effect in ('Light','Fire','Smoke','Sparkles','ParticleEmitter','Beam','Trail'):
             self.assertIn(f'IsA("{effect}")',adapter)

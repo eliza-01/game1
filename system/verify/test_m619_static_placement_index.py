@@ -36,7 +36,7 @@ class StaticPlacementIndexM619(unittest.TestCase):
         self.assertNotIn('table.sort(records', source)
         for needle in ('candidates:Collect(cameraPosition, cameraChanged)', 'LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)',
                        'queue:Ordered(function(record, position)', 'candidates:Retain(localRecords)',
-                       'ipairs(composites)', 'LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")',
+                       'compositeEffects:ActualChanged(record)',
                        'record.part:IsDescendantOf(Workspace)', 'houseAdapter:Observe(record, previousDesired, queue)'):
             self.assertIn(needle, tick)
         self.assertEqual(source.count('RunService.Heartbeat:Connect'), 1)

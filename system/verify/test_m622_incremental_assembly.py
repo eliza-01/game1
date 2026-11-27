@@ -47,7 +47,7 @@ class IncrementalAssemblyM622(unittest.TestCase):
         self.assertLess(streamer.index('replacement.Parent = job.root or folder'),
                         streamer.index('work:Retire(record.part)'))
         self.assertIn('record.actual = if replacement then variant else "UNLOADED"', streamer)
-        self.assertIn('LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")', streamer)
+        self.assertIn('compositeEffects:ActualChanged(record)', streamer)
 
     def test_preview_reuses_job_builder(self):
         assembly = source('LocationLodAssembly.luau')

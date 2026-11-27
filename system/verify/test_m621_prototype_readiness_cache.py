@@ -45,7 +45,7 @@ class PrototypeReadinessCacheM621(unittest.TestCase):
         self.assertIn('actualPrototypeGeneration', source)
         self.assertIn('record.failedAssemblyGenerations[variant] = transition.metadata and transition.metadata.generation', source)
         self.assertIn('queue:Remove(record)', source)
-        self.assertIn('LocationCompositeVisual.SetEffects(record, true)', source)
+        self.assertIn('state.compositeEffects:Destroy()', source)
         self.assertIn('function Streamer.Stop()', source)
 
     def test_assembly_and_composite_consumers_reuse_metadata(self):

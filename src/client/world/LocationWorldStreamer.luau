@@ -10,6 +10,7 @@ local Registry = require(World:WaitForChild("LocationAssetRegistry"))
 local Contract = require(World:WaitForChild("LocationRuntimeManifestContract"))
 local Policy = require(World:WaitForChild("LocationLodDistancePolicy"))
 local HouseVisualAdapter = require(script.Parent:WaitForChild("HouseVisualAdapter"))
+local LocationCompositeEffects = require(script.Parent:WaitForChild("LocationCompositeEffects"))
 local LocationCompositeVisual = require(script.Parent:WaitForChild("LocationCompositeVisual"))
 local LodAssembly = require(script.Parent:WaitForChild("LocationLodAssembly"))
 local StaticPlacementIndex = require(script.Parent:WaitForChild("StaticPlacementIndex"))
@@ -217,6 +218,7 @@ function Streamer.Start()
             end
         end)
     end
+    local compositeEffects = if manifest then LocationCompositeEffects.new(Workspace, composites, diagnostics) else nil
     local houseAdapter = nil
     if manifest and manifest.houses then
         houseAdapter = HouseVisualAdapter.new(manifest.houses, prototypeCache, manifest.hysteresis, records)
@@ -320,7 +322,7 @@ function Streamer.Start()
         record.prototypeResolvedActual = record.actual
         record.prototypeActual = record.actual
         queue:Remove(record)
-        if record.components then LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED") end
+        if record.components then compositeEffects:ActualChanged(record) end
         return true
     end
     local function sampleWork(dt, stats, captureStart)
@@ -369,7 +371,6 @@ function Streamer.Start()
             diagnostics:Add("candidateVisits", #localRecords)
             diagnostics:Peak("localCandidates", #localRecords)
         end
-        local deferredEffects = {}
         for _, record in ipairs(localRecords) do
             local previousDesired = record.desired
             local resolved = LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)
@@ -391,6 +392,7 @@ function Streamer.Start()
                 if record.part.Parent then record.part.Parent = nil end
                 record.detached = true
                 record.actual = "UNLOADED"
+                if record.components then compositeEffects:ActualChanged(record) end
                 record.actualPrototype = nil
                 record.actualPrototypeGeneration = nil
                 record.prototypeDirty = true
@@ -429,7 +431,6 @@ function Streamer.Start()
                         end
                     end
                     if not prototype then
-                        if record.part and not record.detached and record.components then deferredEffects[record] = true end
                         if record.part and not record.detached then
                             record.prototypeDirty = retryPrototypes
                             queue:Remove(record)
@@ -452,15 +453,6 @@ function Streamer.Start()
         end))
         local workStats = runtimeWork:Step(callbacks)
         candidates:Retain(localRecords)
-        -- Keep the existing effect lifecycle for every composite, including
-        -- distant roots that may stream in late. Do not tie effect visibility
-        -- to candidate membership. Event-driven invalidation is a later phase.
-        if diagnostics.enabled then diagnostics:Add("compositeVisits", #composites) end
-        for _, record in ipairs(composites) do
-            if not deferredEffects[record] then
-                LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")
-            end
-        end
         if prototypeCache:FolderReady() ~= true and os.clock() - lastWarning > 15 then
             lastWarning = os.clock()
             warn("[game1][LOD] template staging incomplete; never publish this build before visual validation")
@@ -470,7 +462,7 @@ function Streamer.Start()
     active = {heartbeatConnection = heartbeatConnection, visualAddedConnection = visualAddedConnection,
         visualRemovedConnection = visualRemovedConnection, prototypeCache = prototypeCache,
         prototypeChangedConnection = prototypeChangedConnection, houseAdapter = houseAdapter,
-        folder = folder, records = records, composites = composites, preview = preview, runtimeWork = runtimeWork,
+        folder = folder, records = records, compositeEffects = compositeEffects, preview = preview, runtimeWork = runtimeWork,
         diagnostics = diagnostics, queue = queue, candidates = candidates, manifest = manifest}
     if manifest then
         print(("[game1][LOD] client visual streamer active | %d placements | snapshot %s")
@@ -532,9 +524,7 @@ function Streamer.Stop()
         record.actualPrototype = nil
         record.actualPrototypeGeneration = nil
     end
-    for _, record in ipairs(state.composites or {}) do
-        LocationCompositeVisual.SetEffects(record, true)
-    end
+    if state.compositeEffects then state.compositeEffects:Destroy() end
     for part in pairs(visuals) do removeVisual(part) end
     if state.folder then state.folder:Destroy() end
 end

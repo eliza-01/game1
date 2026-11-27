@@ -1,6 +1,7 @@
 -- Shared static Location LOD placement for Studio and compiled Runtime.
 -- Only local visual clones; no physics, sockets, animation or scheduler ownership.
 local Assembly = {}
+local Job = require(script.Parent:WaitForChild("LodAssemblyJob"))
 
 function Assembly.Count(prototype)
     if prototype:IsA("MeshPart") then return 1 end
@@ -18,7 +19,7 @@ function Assembly.Count(prototype)
 end
 
 -- Bounds in a shared oriented frame, including rotated individual meshes.
-local function bounds(frame, parts)
+local function bounds(frame, parts, job)
     local low = Vector3.new(math.huge, math.huge, math.huge)
     local high = -low
     for _, part in ipairs(parts) do
@@ -33,6 +34,7 @@ local function bounds(frame, parts)
                 end
             end
         end
+        if job then job:Unit() end
     end
     return low, high
 end
@@ -102,16 +104,15 @@ function Assembly.BuildMetadata(prototype)
         sourceBase = sourceBase, parts = parts}, "ready"
 end
 
-function Assembly.Create(prototype, targetFrame, targetParts, applyAppearance, metadata)
+function Assembly.Prepare(prototype, targetFrame, targetParts, applyAppearance, metadata)
     metadata = metadata or Assembly.BuildMetadata(prototype)
     if not metadata or metadata.prototype ~= prototype
         or (metadata.kind ~= "model" and metadata.kind ~= "meshpart")
         or metadata.count < 1 or metadata.count > 64 or #targetParts == 0 then
         return nil, "invalid assembly input"
     end
-    local bundle = Instance.new("Model")
-    local ok, reason = pcall(function()
-        local targetLow, targetHigh = bounds(targetFrame, targetParts)
+    return Job.new(function(job)
+        local targetLow, targetHigh = bounds(targetFrame, targetParts, job)
         local targetSize = targetHigh - targetLow
         local sourceSize = metadata.sourceSize
         local scale = if sourceSize.Y >= sourceSize.X and sourceSize.Y >= sourceSize.Z
@@ -119,10 +120,13 @@ function Assembly.Create(prototype, targetFrame, targetParts, applyAppearance, m
             then targetSize.X/sourceSize.X else targetSize.Z/sourceSize.Z
         assert(scale >= 0.001 and scale <= 1000, "invalid assembly scale")
         local targetBase = base(targetLow, targetHigh)
+        local bundle = job:Own(Instance.new("Model"))
+        job.bundle = bundle
+        job:Unit()
         for _, descriptor in ipairs(metadata.parts) do
             local source = descriptor.source
-            local copy = source:Clone()
-            copy.Parent = bundle
+            local copy = job:Own(source:Clone())
+            job:Unit()
             copy.Name = descriptor.sourceName
             copy.Size = descriptor.size * scale
             copy.CFrame = targetFrame * CFrame.new(targetBase + (descriptor.relative.Position-metadata.sourceBase)*scale)
@@ -133,14 +137,34 @@ function Assembly.Create(prototype, targetFrame, targetParts, applyAppearance, m
             copy.CanQuery = false
             copy.LocalTransparencyModifier = 0
             applyAppearance(copy)
+            job:Unit()
+            copy.Parent = bundle
+            job:Unit()
         end
         bundle.WorldPivot = targetFrame
     end)
-    if not ok then
-        bundle:Destroy()
-        return nil, reason
-    end
-    return bundle
+end
+
+function Assembly.PrepareSingle(prototype, record, applyAppearance)
+    return Job.new(function(job)
+        local copy = job:Own(prototype:Clone())
+        job.bundle = copy
+        job:Unit()
+        copy.Name = Assembly.SourceName(prototype)
+        copy.Anchored = true
+        copy.CanCollide = false
+        copy.CanTouch = false
+        copy.CanQuery = false
+        copy.Size = record.size
+        copy.CFrame = record.cframe
+        applyAppearance(copy)
+    end)
+end
+
+function Assembly.Create(prototype, targetFrame, targetParts, applyAppearance, metadata)
+    local job, reason = Assembly.Prepare(prototype, targetFrame, targetParts, applyAppearance, metadata)
+    if not job then return nil, reason end
+    return job:Finish()
 end
 
 return table.freeze(Assembly)

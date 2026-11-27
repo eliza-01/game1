@@ -16,12 +16,13 @@ local LocationLodCandidates = require(script.Parent:WaitForChild("LocationLodCan
 local LodThresholdCache = require(script.Parent:WaitForChild("LodThresholdCache"))
 local LodTransitionQueue = require(script.Parent:WaitForChild("LodTransitionQueue"))
 local LodPrototypeCache = require(script.Parent:WaitForChild("LodPrototypeCache"))
+local LodRuntimeWork = require(script.Parent:WaitForChild("LodRuntimeWork"))
 local Appearance = require(World:WaitForChild("RuntimeVisualAppearance"))
 local Streamer = {}
 local started = false
 local active = nil
 local TICK = 0.25
-local MAX_CHANGES_PER_TICK = 8 -- max clone/destroy actions per tick; per-client
+local MAX_CHANGES_PER_TICK = 8 -- legacy House/Studio preview budget; Location uses per-frame work units
 local VISUAL_TAG = "Game1DistanceVisual"
 local VISUAL_INTERVAL = 1 -- one update/second; piggybacks on the existing LOD Heartbeat
 
@@ -132,16 +133,6 @@ local function available(record, status, candidate, metadata, level)
 end
 
 
-local function work(transition)
-    local record, variant, prototype, metadata = transition.record, transition.variant,
-        transition.prototype, transition.metadata
-    local useAssembly = prototype and variant ~= "FULL"
-        and (record.components ~= nil or prototype:IsA("Model"))
-    local targetCost = if useAssembly then (metadata and metadata.count or 0)
-        elseif variant == "FULL" and record.components then #record.components else 1
-    return math.min(MAX_CHANGES_PER_TICK, math.max(1, targetCost, record.visualCost or 1)), useAssembly, targetCost
-end
-
 function Streamer.Start()
     if started then return end
     started = true
@@ -173,6 +164,7 @@ function Streamer.Start()
     local queue = nil
     local prototypeCache = nil
     local prototypeChangedConnection = nil
+    local runtimeWork = LodRuntimeWork.new()
     if manifest then
         folder = Instance.new("Folder")
         folder.Name = Contract.VisualFolder
@@ -214,7 +206,10 @@ function Streamer.Start()
             end
         end
         prototypeChangedConnection = prototypeCache:ConnectChanged(function(name)
-            for record in pairs(dependentsByName[name] or {}) do record.prototypeDirty = true end
+            for record in pairs(dependentsByName[name] or {}) do
+                record.prototypeDirty = true
+                record.prototypeEpoch = (record.prototypeEpoch or 0) + 1
+            end
         end)
     end
     local houseAdapter = nil
@@ -232,21 +227,103 @@ function Streamer.Start()
     local visualElapsed = VISUAL_INTERVAL -- first distance test immediately
     local lastWarning = 0
     local lastCamera = nil
+    local cameraPosition = nil
+    local callbacks = {}
+    function callbacks.valid(transition, job)
+        local record = transition.record
+        if queue.entries[record] ~= transition or transition.desired ~= record.desired
+            or transition.actual ~= record.actual or (transition.attemptTick == queue.tick and not job) then return false end
+        -- Recheck active work against the current camera, even between observations.
+        if Policy.Resolve((cameraPosition - record.pivot).Magnitude, record.desired,
+            record.distances, record.mode) ~= transition.desired then return false end
+        if transition.prototype then
+            local cacheFolder = prototypeCache:Folder()
+            if not cacheFolder or transition.prototype.Parent ~= cacheFolder then return false end
+        end
+        if transition.epoch ~= (record.prototypeEpoch or 0) then return false end
+        if job and job.root and not LocationCompositeVisual.RootAlive(job, record) then return false end
+        return true
+    end
+    function callbacks.prepare(transition)
+        queue:Attempted(transition)
+        transition.attemptTick = queue.tick
+        local record, variant, prototype = transition.record, transition.variant, transition.prototype
+        local asset = Registry.assets[record.slug]
+        local job, reason
+        if variant ~= "FULL" and (record.components or prototype:IsA("Model")) then
+            job, reason = LodAssembly.Prepare(prototype, record.pivotFrame, record.fullBounds, function(mesh)
+                paint(mesh, asset, true)
+            end, transition.metadata)
+        elseif prototype:IsA("MeshPart") then
+            job = LodAssembly.PrepareSingle(prototype, record, function(mesh)
+                paint(mesh, asset, variant ~= "FULL")
+            end)
+        elseif variant == "FULL" and record.components then
+            job, reason = LocationCompositeVisual.Prepare(prototype, record, paint, asset, transition.metadata)
+        end
+        return job, reason, reason == "root unavailable" or reason == "component unavailable"
+    end
+    function callbacks.failed(transition, reason, retryable)
+        local record, variant, prototype = transition.record, transition.variant, transition.prototype
+        transition.attemptTick = queue.tick
+        if retryable then return end
+        record.failedAssemblies = record.failedAssemblies or {}
+        record.failedAssemblies[variant] = prototype
+        record.failedAssemblyGenerations = record.failedAssemblyGenerations or {}
+        record.failedAssemblyGenerations[variant] = transition.metadata and transition.metadata.generation
+        record.prototypeDirty = true
+        queue:Remove(record)
+        warn("[game1][LOD] assembly placement failed: " .. record.slug .. " " .. tostring(reason))
+    end
+    function callbacks.commit(transition, job, work)
+        local record, variant, prototype = transition.record, transition.variant, transition.prototype
+        local replacement = job and job.bundle
+        if replacement then
+            local ok, bound = pcall(function()
+                if job.root and not LocationCompositeVisual.BindForCommit(job, record) then return false end
+                if not job.root then replacement.Name = record.slug .. "__" .. record.id end
+                replacement.Parent = job.root or folder
+                return true
+            end)
+            if not ok then return false, bound, false end
+            if not bound then return false, "component unavailable at commit", true end
+            job:Release()
+        end
+        -- No yield between publishing the new bundle and detaching the old one.
+        -- Only local visual bundles enter retirement, never the technical root.
+        if record.part then work:Retire(record.part) end
+        record.part = replacement
+        record.detached = nil
+        record.actual = if replacement then variant else "UNLOADED"
+        record.actualPrototype = if replacement then prototype else nil
+        record.actualPrototypeGeneration = if replacement then transition.metadata.generation else nil
+        if replacement and record.failedAssemblies then
+            record.failedAssemblies[variant] = nil
+            if record.failedAssemblyGenerations then record.failedAssemblyGenerations[variant] = nil end
+        end
+        record.prototypeResolvedActual = record.actual
+        record.prototypeActual = record.actual
+        queue:Remove(record)
+        if record.components then LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED") end
+        return true
+    end
     local heartbeatConnection = RunService.Heartbeat:Connect(function(dt)
         if houseAdapter then houseAdapter:FollowMoving() end
         elapsed += dt
         visualElapsed += dt
-        if elapsed < TICK and visualElapsed < VISUAL_INTERVAL then return end
         local camera = Workspace.CurrentCamera
-        if not camera then return end
-        local cameraPosition = camera.CFrame.Position
+        if not camera then runtimeWork:Cancel(); runtimeWork:Cleanup(runtimeWork.CleanupBudget); return end
+        cameraPosition = camera.CFrame.Position
         if visualElapsed >= VISUAL_INTERVAL then
             visualElapsed = 0
             if preview then preview:Resolve(cameraPosition) end
             sampleVisuals(cameraPosition, preview)
             if houseAdapter then houseAdapter:Resolve(cameraPosition) end
         end
-        if elapsed < TICK then return end
+        if elapsed < TICK then
+            if manifest then runtimeWork:Step(callbacks) end
+            return
+        end
         elapsed = 0
         if preview then
             preview:FollowMoving()
@@ -264,8 +341,10 @@ function Streamer.Start()
             if record.desired ~= previousDesired then record.prototypeDirty = true end
             -- Roblox native streaming can independently remove the parent
             -- technical Model. Recover when that root later streams back in.
-            if record.part and not record.part:IsDescendantOf(Workspace) then
-                record.part = nil
+            if record.part and not record.detached and not record.part:IsDescendantOf(Workspace) then
+                -- Retain ownership until the bounded retirement path disposes it.
+                if record.part.Parent then record.part.Parent = nil end
+                record.detached = true
                 record.actual = "UNLOADED"
                 record.actualPrototype = nil
                 record.actualPrototypeGeneration = nil
@@ -305,8 +384,8 @@ function Streamer.Start()
                         end
                     end
                     if not prototype then
-                        if record.part and record.components then deferredEffects[record] = true end
-                        if record.part then
+                        if record.part and not record.detached and record.components then deferredEffects[record] = true end
+                        if record.part and not record.detached then
                             record.prototypeDirty = retryPrototypes
                             queue:Remove(record)
                             continue
@@ -314,89 +393,17 @@ function Streamer.Start()
                         variant = "UNLOADED"
                     end
                 end
-                local force = variant == record.actual and record.part ~= nil and prototype ~= nil
+                local force = (variant == "UNLOADED" and record.detached == true)
+                    or (variant == record.actual and record.part ~= nil and prototype ~= nil
                     and (record.actualPrototype ~= prototype
-                        or record.actualPrototypeGeneration ~= metadata.generation)
+                        or record.actualPrototypeGeneration ~= metadata.generation))
                 record.prototypeDirty = retryPrototypes
                 queue:Set(record, variant, prototype, metadata, force)
+                if queue.entries[record] then queue.entries[record].epoch = record.prototypeEpoch or 0 end
             end
         end
-        local transitions = queue:Ordered(LodThresholdCache.Distance)
-        -- Preserve the shared house reservation except for an aged large
-        -- transition that could never fit in the Location half of the budget.
-        -- Houses still get the remainder; failed attempts relinquish aging.
-        local first = transitions[1]
-        local reserveLocation = first and first.aged and queue.tick % 2 == 0
-            and work(first) > MAX_CHANGES_PER_TICK // 2
-        local changes = if houseAdapter and not reserveLocation then houseAdapter:Step(MAX_CHANGES_PER_TICK // 2) else 0
-        for _, transition in ipairs(transitions) do
-            local record, variant, prototype = transition.record, transition.variant, transition.prototype
-            local cost, useAssembly, targetCost = work(transition)
-            if (variant ~= record.actual or transition.force) and changes + cost <= MAX_CHANGES_PER_TICK then
-                queue:Attempted(transition)
-                local replacement = nil
-                local placementError = nil
-                if useAssembly then
-                    replacement, placementError = LodAssembly.Create(prototype, record.pivotFrame, record.fullBounds, function(mesh)
-                        paint(mesh, Registry.assets[record.slug], true)
-                    end, transition.metadata)
-                    if placementError then
-                        record.failedAssemblies = record.failedAssemblies or {}
-                        record.failedAssemblies[variant] = prototype
-                        record.failedAssemblyGenerations = record.failedAssemblyGenerations or {}
-                        record.failedAssemblyGenerations[variant] = transition.metadata and transition.metadata.generation
-                        record.prototypeDirty = true
-                        queue:Remove(record)
-                        warn("[game1][LOD] assembly placement failed: " .. record.slug .. " " .. tostring(placementError))
-                    end
-                    if replacement then
-                        replacement.Name = record.slug .. "__" .. record.id
-                        replacement.Parent = folder
-                    end
-                elseif prototype and prototype:IsA("MeshPart") then
-                    replacement = prototype:Clone()
-                    replacement.Name = LodAssembly.SourceName(prototype)
-                    replacement.Anchored = true
-                    replacement.CanCollide = false
-                    replacement.CanTouch = false
-                    replacement.CanQuery = false
-                    replacement.Size = record.size
-                    replacement.CFrame = record.cframe
-                    paint(replacement, Registry.assets[record.slug], variant ~= "FULL")
-                    replacement.Name = record.slug .. "__" .. record.id
-                    replacement.Parent = folder
-                elseif variant == "FULL" and record.components and prototype and prototype:IsA("Model") then
-                    replacement, placementError = LocationCompositeVisual.Create(prototype, record, paint,
-                        Registry.assets[record.slug], transition.metadata)
-                    if placementError == "assembly failed" then
-                        record.failedAssemblies = record.failedAssemblies or {}
-                        record.failedAssemblies[variant] = prototype
-                        record.failedAssemblyGenerations = record.failedAssemblyGenerations or {}
-                        record.failedAssemblyGenerations[variant] = transition.metadata and transition.metadata.generation
-                        record.prototypeDirty = true
-                        queue:Remove(record)
-                    end
-                end
-                -- If the technical root or its proxy Parts have not streamed in,
-                -- defer the swap. Never drop a visible LOD to an empty clone.
-                if replacement or variant == "UNLOADED" then
-                    if record.part then record.part:Destroy() end
-                    record.part = replacement
-                    record.visualCost = if replacement then targetCost else nil
-                    record.actual = if replacement then variant else "UNLOADED"
-                    record.actualPrototype = if replacement then prototype else nil
-                    record.actualPrototypeGeneration = if replacement then (transition.metadata and transition.metadata.generation) else nil
-                    if replacement and record.failedAssemblies then
-                        record.failedAssemblies[variant] = nil
-                        if record.failedAssemblyGenerations then record.failedAssemblyGenerations[variant] = nil end
-                    end
-                    record.prototypeResolvedActual = record.actual
-                    record.prototypeActual = record.actual
-                    changes += cost
-                    queue:Remove(record)
-                end
-            end
-        end
+        runtimeWork:Begin(queue:Ordered(LodThresholdCache.Distance))
+        runtimeWork:Step(callbacks)
         candidates:Retain(localRecords)
         -- Keep the existing effect lifecycle for every composite, including
         -- distant roots that may stream in late. Do not tie effect visibility
@@ -406,9 +413,7 @@ function Streamer.Start()
                 LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")
             end
         end
-        if houseAdapter and changes < MAX_CHANGES_PER_TICK then
-            changes += houseAdapter:Step(MAX_CHANGES_PER_TICK - changes)
-        end
+        if houseAdapter then houseAdapter:Step(MAX_CHANGES_PER_TICK) end
         if prototypeCache:FolderReady() ~= true and os.clock() - lastWarning > 15 then
             lastWarning = os.clock()
             warn("[game1][LOD] template staging incomplete; never publish this build before visual validation")
@@ -417,7 +422,7 @@ function Streamer.Start()
     active = {heartbeatConnection = heartbeatConnection, visualAddedConnection = visualAddedConnection,
         visualRemovedConnection = visualRemovedConnection, prototypeCache = prototypeCache,
         prototypeChangedConnection = prototypeChangedConnection, houseAdapter = houseAdapter,
-        folder = folder, records = records, composites = composites, preview = preview}
+        folder = folder, records = records, composites = composites, preview = preview, runtimeWork = runtimeWork}
     if manifest then
         print(("[game1][LOD] client visual streamer active | %d placements | snapshot %s")
             :format(#records, tostring(manifest.snapshotRevision)))
@@ -435,6 +440,7 @@ function Streamer.Stop()
         state.prototypeChangedConnection}) do
         if connection then pcall(function() connection:Disconnect() end) end
     end
+    if state.runtimeWork then state.runtimeWork:Destroy() end
     if state.houseAdapter then state.houseAdapter:Destroy() end
     if state.prototypeCache then state.prototypeCache:Destroy() end
     if state.preview and state.preview.Destroy then state.preview:Destroy() end

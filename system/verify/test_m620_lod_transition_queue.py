@@ -19,22 +19,24 @@ class LodTransitionQueueM620(unittest.TestCase):
         subprocess.run([lua, 'system/verify/lod_transition_queue_m620.lua'], cwd=ROOT, check=True, timeout=30)
 
     def test_streamer_reconciles_pending_even_when_stationary(self):
-        tick = read('src/client/world/LocationWorldStreamer.luau').split('RunService.Heartbeat:Connect', 1)[1]
+        source = read('src/client/world/LocationWorldStreamer.luau')
+        tick = source.split('RunService.Heartbeat:Connect', 1)[1]
+        self.assertIn('queue:Attempted(transition)', source)
+        self.assertIn('record.actual = if replacement then variant else "UNLOADED"', source)
         for needle in ('queue:Begin(cameraPosition, cameraChanged)',
                        'candidates:Collect(cameraPosition, cameraChanged)',
                        'LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)',
                        'record.part:IsDescendantOf(Workspace)', 'not available(record, status, prototype, metadata, variant)',
                        'queue:Remove(record)', 'continue', 'queue:Set(record, variant, prototype, metadata, force)',
-                       'queue:Ordered(LodThresholdCache.Distance)', 'queue:Attempted(transition)',
-                       'record.actual = if replacement then variant else "UNLOADED"',
+                       'queue:Ordered(LodThresholdCache.Distance)', 'runtimeWork:Step(callbacks)',
                        'queue:Remove(record)', 'ipairs(composites)', 'houseAdapter:Step('):
             self.assertIn(needle, tick)
         self.assertNotIn('local transitions = {}', tick)
         self.assertNotIn('if not cameraChanged then return', tick)
         self.assertLess(tick.index('queue:Begin'), tick.index('queue:Set'))
         self.assertLess(tick.index('queue:Set'), tick.index('queue:Ordered'))
-        self.assertIn('queue.tick % 2 == 0', tick)  # regular house reserve on alternating ticks
-        self.assertIn('changes + cost <= MAX_CHANGES_PER_TICK', tick)
+        self.assertIn('runtimeWork:Begin(queue:Ordered(LodThresholdCache.Distance))', tick)
+        self.assertIn('runtimeWork:Step(callbacks)', tick)
 
     def test_pure_helpers_no_new_runtime_ownership(self):
         for name in ('LodThresholdCache', 'LodTransitionQueue'):

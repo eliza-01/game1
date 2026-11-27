@@ -5,6 +5,7 @@
 -- Recreated visual meshes are welded to their original Part proxies.
 local Workspace = game:GetService("Workspace")
 local Adapter = {}
+local Job = require(script.Parent:WaitForChild("LodAssemblyJob"))
 
 local function rootFor(path: {string}): Model?
     local current: Instance = Workspace
@@ -52,25 +53,24 @@ function Adapter.SetEffects(record: any, active: boolean)
     record.effectState = active
 end
 
-function Adapter.Create(prototype: Model, record: any, paint: any, asset: any, metadata: any?): (Folder?, string?)
+function Adapter.Prepare(prototype: Model, record: any, paint: any, asset: any, metadata: any): (any?, string?)
     local root = rootFor(record.modelPath)
-    if not root then return nil, "root unavailable" end -- Roblox's own streaming may defer the technical root
-    local confirmed = {}
-    for _, spec in ipairs(record.components) do
-        local proxy = root:FindFirstChild(spec.name, true)
-        local source = if metadata and metadata.childrenByName
-            then metadata.childrenByName[spec.name] else prototype:FindFirstChild(spec.name)
-        if not proxy or not proxy:IsA("Part") or not source or not source:IsA("MeshPart") then
-            return nil, "component unavailable" -- never draw a detached or visually incomplete rig
-        end
-        table.insert(confirmed, {proxy = proxy, source = source})
-    end
-    local bundle = Instance.new("Folder")
-    bundle.Name = "__Game1RuntimeVisuals"
-    local ok, problem = pcall(function()
-        for index, entry in ipairs(confirmed) do
-            local proxy: Part = entry.proxy
-            local part: MeshPart = entry.source:Clone()
+    if not root then return nil, "root unavailable" end
+    local job = Job.new(function(work)
+        local bundle = work:Own(Instance.new("Folder"))
+        bundle.Name = "__Game1RuntimeVisuals"
+        work.bundle = bundle
+        work:Unit()
+        for _, spec in ipairs(record.components) do
+            local proxy = root:FindFirstChild(spec.name, true)
+            local source = metadata.childrenByName[spec.name]
+            if not proxy or not proxy:IsA("Part") or not source or not source:IsA("MeshPart") then
+                work.retryable = true
+                error("component unavailable")
+            end
+            work:Unit()
+            local part = work:Own(source:Clone())
+            work:Unit()
             part.Size = proxy.Size
             part.CFrame = proxy.CFrame
             part.Anchored = false
@@ -78,25 +78,43 @@ function Adapter.Create(prototype: Model, record: any, paint: any, asset: any, m
             part.CanTouch = false
             part.CanQuery = false
             paint(part, asset)
+            work:Unit()
             part.Parent = bundle
-            -- The server's original carrier, joints and Bone animation drive
-            -- proxy CFrames; the client does not create a second skeleton.
-            local joint = Instance.new("Weld")
+            work:Unit()
+            local joint = work:Own(Instance.new("Weld"))
             joint.Name = "Game1VisualProxyWeld"
             joint.C0 = CFrame.identity
             joint.C1 = CFrame.identity
-            joint.Part0 = proxy
             joint.Part1 = part
             joint.Parent = part
+            -- Part0 remains unset until atomic commit, so staging never joins
+            -- a server-owned assembly or changes the active physical rig.
+            work.links[#work.links+1] = {proxy=proxy, part=part, joint=joint, name=spec.name}
+            work:Unit()
         end
     end)
-    if not ok then
-        warn("[game1][LOD] composite visual assembly failed: " .. tostring(problem))
-        bundle:Destroy()
-        return nil, "assembly failed"
+    job.root = root
+    job.links = {}
+    return job, nil
+end
+
+function Adapter.RootAlive(job: any, record: any): boolean
+    return rootFor(record.modelPath) == job.root
+end
+
+-- Validate every link before mutating anything. This is an explicitly reserved
+-- non-yielding commit batch (at most 64 proxy validations and 64 bindings).
+function Adapter.BindForCommit(job: any, record: any): boolean
+    if not Adapter.RootAlive(job, record) then return false end
+    for _, entry in ipairs(job.links) do
+        if job.root:FindFirstChild(entry.name, true) ~= entry.proxy then return false end
     end
-    bundle.Parent = root -- same root as the original server-owned rig_carrier
-    return bundle, "ready"
+    for _, entry in ipairs(job.links) do
+        entry.part.Size = entry.proxy.Size
+        entry.part.CFrame = entry.proxy.CFrame
+        entry.joint.Part0 = entry.proxy
+    end
+    return true
 end
 
 return table.freeze(Adapter)

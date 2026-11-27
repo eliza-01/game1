@@ -11981,15 +11981,15 @@
       "model_published_sha256": "5a490975f97f35165a1ae448c616c07dcd44b49bbe080fc99b11f9173e85fb67",
       "model_moderation_state": "Approved",
       "destructible": false,
-      "revision": 7,
+      "revision": 9,
       "created_at": 1792462062.488145,
-      "updated_at": 1795185652.9101434,
+      "updated_at": 1795818350.9063742,
       "published_at": 1794451034.3347821,
       "surface_material": "metal",
       "alpha_enabled": 0,
       "appearance_mode": "material",
-      "visual_material": "CrackedLava",
-      "visual_color": "#939393",
+      "visual_material": "Slate",
+      "visual_color": "#353F53",
       "lod1": {
         "kind": "lod1",
         "revision": 0,
@@ -12145,7 +12145,7 @@
       "meshOptions": {
         "lantern_02": {
           "collisionFidelity": "Box",
-          "doubleSided": false,
+          "doubleSided": true,
           "glass": false,
           "noCollide": true
         }
@@ -12212,8 +12212,8 @@
       "collisionBlueprintSha256": "97c832b4b281bd7230995cc9147848625984db00322a1806480b7eb154f101ab",
       "surfaceMaterial": "metal",
       "appearanceMode": "material",
-      "visualMaterial": "CrackedLava",
-      "visualColor": "#939393",
+      "visualMaterial": "Slate",
+      "visualColor": "#353F53",
       "alphaEnabled": false,
       "materialDefinition": {
         "id": "metal",
@@ -12231,7 +12231,7 @@
       "atlasVariantId": 0,
       "atlasFamily": "lantern_02",
       "atlasResolution": "32x64",
-      "bindingRevision": 7,
+      "bindingRevision": 9,
       "studioSyncStatus": "synced",
       "atlasVariants": [],
       "textureUsesAlpha": null,

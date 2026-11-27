@@ -139,7 +139,7 @@ class CompositeRuntime(unittest.TestCase):
         client=(ROOT/'src/client/world/LocationWorldStreamer.luau').read_text()
         adapter=(ROOT/'src/client/world/LocationCompositeVisual.luau').read_text()
         server=(ROOT/'src/server/world/LocationLodTemplateService.luau').read_text()
-        self.assertIn('LocationCompositeVisual.Create',client)
+        self.assertIn('LocationCompositeVisual.Prepare',client)
         self.assertNotIn('RunService.Heartbeat',adapter)
         self.assertNotIn('RenderStepped',adapter)
         self.assertIn('Game1VisualProxyWeld',adapter)

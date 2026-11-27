@@ -41,7 +41,7 @@ class PrototypeReadinessCacheM621(unittest.TestCase):
         self.assertNotIn('WaitForChild(Contract.TemplateFolder, 30)', source)
         self.assertNotIn('cache:FindFirstChild(record.slug', source)
         self.assertIn('transition.metadata', source)
-        self.assertIn('transition.force', source)
+        self.assertIn('queue:Set(record, variant, prototype, metadata, force)', source)
         self.assertIn('actualPrototypeGeneration', source)
         self.assertIn('record.failedAssemblyGenerations[variant] = transition.metadata and transition.metadata.generation', source)
         self.assertIn('queue:Remove(record)', source)

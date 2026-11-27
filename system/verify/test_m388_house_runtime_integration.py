@@ -188,12 +188,13 @@ class HouseRuntimeIntegration(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'texture'):
             inspect(tree,inputs)
 
-    def test_one_shared_client_scheduler_and_one_global_budget(self):
+    def test_one_shared_client_scheduler_and_reserved_house_budget(self):
         client=(ROOT/'src/client/world/LocationWorldStreamer.luau').read_text(encoding='utf-8')
         helper=(ROOT/'src/client/world/HouseVisualAdapter.luau').read_text(encoding='utf-8')
         self.assertIn('houseAdapter:Resolve(cameraPosition)',client)
-        self.assertIn('houseAdapter:Step(MAX_CHANGES_PER_TICK // 2)',client)
-        self.assertIn('houseAdapter:Step(MAX_CHANGES_PER_TICK - changes)',client)
+        self.assertIn('houseAdapter:Step(MAX_CHANGES_PER_TICK)',client)
+        self.assertIn('runtimeWork:Step(callbacks)',client)
+        self.assertEqual(client.count('RunService.Heartbeat:Connect'), 1)
         self.assertNotIn('RunService.Heartbeat',helper)
         self.assertNotIn('RenderStepped:Connect',helper)
         self.assertIn('MAX_PENDING = 4',helper)

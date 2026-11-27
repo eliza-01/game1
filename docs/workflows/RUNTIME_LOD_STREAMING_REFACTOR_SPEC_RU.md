@@ -1,7 +1,7 @@
 # Eyesland / Game1 — ТЗ: Runtime LOD Streaming
 
 **Карточка:** KBN-0037 (клиентская производительность), связанные KBN-0007 / KBN-0017.
-**Рабочая база:** диагностический срез M613 от 27.11.2026 + подтверждённая последовательность M614–M620; M621 — текущая реализация. Патчи M619–M621 code-complete в восстановленной sandbox-копии, Roblox Studio/DEV/Mobile и профильная приёмка не выполнены.
+**Рабочая база:** диагностический срез M613 от 27.11.2026 + подтверждённая последовательность M614–M621; M622 — текущая реализация Runtime Location. Патчи M619–M622 code/oracle checked в восстановленной sandbox-копии, Roblox Studio/DEV/Mobile и профильная приёмка не выполнены.
 **Статус:** этапы 0–3 реализованы: Static Placement Index, LOD Transition Queue, Prototype Readiness Cache. В этапе 1 выбрано дерево 3D influence bounds (BVH) вместо сетки: произвольные радиусы и разреженная карта без обхода пустых ячеек. Следующие этапы — Incremental Assembly & Work Budget и Real Estate Integration.
 
 ## 1. Цель
@@ -100,7 +100,7 @@
 1. M619: эталонные тесты + Static Placement Index.
 2. M620: LodThresholdCache + LodTransitionQueue.
 3. M621: Prototype Readiness Cache + immutable assembly metadata / bounds.
-4. Next: Incremental Assembly & Real Work Budget (разбить при необходимости, если затронуты разные сборщики).
+4. M622: Incremental Assembly & Real Work Budget — Runtime Location (static/multipart/composite FULL); общий House budget и порционный Studio Preview остаются открыты.
 5. Next: Real Estate Integration.
 6. Integration & Acceptance — исправления по фактическим результатам, не закрывать задачу заранее.
 
@@ -125,3 +125,14 @@ Lua oracle: 129212 сравнений desired, 2356 samples; стационар�
 Cache хранит frozen metadata: source MeshPart refs, relative transforms, count, published pivot, source bounds/base и FULL component map. `LocationLodAssembly.BuildMetadata` считает bounds один раз на prototype generation; `Assembly.Create` использует metadata. `LocationCompositeVisual.Create` использует FULL component map. Cache folder не блокирует streamer через WaitForChild(30): runtime продолжает manifest reconciliation, поздняя папка/Ready/children wake dependent records. Replacement generation форсирует атомарную замену старого visual. Placement-local `failedAssemblies` хранит prototype и generation; ошибка одной сборки снимает очередь этой заявки и переводит её к fallback, не инвалидируя shared prototype. `Streamer.Stop` очищает cache/queue ownership, connections, локальные визуалы и восстанавливает composite effects. House LOD1 использует shared cache и rebuild при stale prototype, но общий House index/queue/budget остаётся этапом 5.
 
 **Checks:** M621 readiness/cache oracle passed: late folder, missing/incomplete/ready/invalid, component contract, bounded retries, replacement generation, metadata memoization, event cleanup. M619 and M620 profile tests passed. `validate_luau.py` passed. Roblox Studio, published DEV PC, physical phone, collision/navigation two-client and performance profile remain NOT_RUN. T03/A03 remains open.
+
+
+## M622 · Этап 4 — Incremental Assembly & Real Work Budget (Runtime Location)
+
+M622: Runtime Location stage 4 — `LodAssemblyJob` / `LodRuntimeWork`: detached incremental assembly (single mesh, multipart LOD, composite FULL); 12 build + 8 cleanup operation groups/frame, separate atomic commit reservation up to 132 groups, 16 queue checks/category/frame, one active job (≤64 visual meshes), at most two retired bundles. Commit revalidates proxy identity/current CFrames, preserves previous visual until swap and keeps effects tied to actual. Desired/prototype generation/root changes cancel staging; cleanup is incremental. Old Location cost clamp removed. House keeps independent 8/tick reservation pending stage 5; Studio Preview multipart drains the same job synchronously. Counts are not a hard CPU deadline; native streaming, effect traversal and Studio/DEV/Mobile profiling remain acceptance items. T03/A03 open.
+
+Сборка: `Prepare` создаёт job; `Advance` выполняет ограниченное число операций, включая вклад каждого target mesh в bounds, clone, configure/appearance, staging parent и weld. `BindForCommit` подтверждает все proxy до изменения CFrames и установки Part0; до commit weld не соединён с серверным proxy. `Release` передаёт готовый bundle placement; при отмене ownership list включает даже ещё не прикреплённые clones. Cleanup удаляет отдельные staged instances / retired direct meshes, не серверный root. Смена camera проверяется перед продолжением jobs даже между наблюдениями; очередь сохраняет поколение readiness. Независимые unload/build/cleanup lanes, большой atomic commit получает резерв при необходимости.
+
+Начальные лимиты — группы операций, не гарантия миллисекунд и не оптимальные значения PC/Mobile; `Clone`, `Destroy`, `Parent`, поиск proxy и batch commit неделимы. Эффекты и native-stream-out reconciliation не входят в build/cleanup счётчик. House adapter пока выполняется в observation tick; его async и единый бюджет относятся к этапу 5. Studio Authoring использует тот же multipart builder через `Finish`, но пока не распределяет работу по кадрам.
+
+Engine-independent Lua oracle: 1/8/32/64 parts static/composite, budget counters, swap, desired/generation cancellation, failed staging, proxy mismatch, concurrent unload and cleanup. Реальные Roblox meshes/welds, physics, PC/mobile и MicroProfiler NOT_RUN.

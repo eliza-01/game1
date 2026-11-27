@@ -13,6 +13,8 @@ M620: Runtime LOD этап 2 — LodThresholdCache (запас до порого
 
 M621: Runtime LOD этап 3 — LodPrototypeCache по Instance identity/generation/variant/contract: event-driven missing/incomplete/ready/invalid, bounded retry (2), поздний template folder/Ready, immutable assembly metadata/bounds, FULL component-name map. Location streamer больше не ждёт cache folder 30 с и не выключается при его позднем появлении; stale prototype generation rebuilds atomically, per-placement failedAssemblies остаётся generation-aware. House LOD1 uses shared cache, но spatial index / общая queue / budget Real Estate ещё не интегрированы. M619–M621 код и Lua-oracle проверки готовы; Studio/DEV/профиль открыты. [ТЗ Runtime LOD](workflows/RUNTIME_LOD_STREAMING_REFACTOR_SPEC_RU.md).
 
+M622: Runtime Location stage 4 — `LodAssemblyJob` / `LodRuntimeWork`: detached incremental assembly (single mesh, multipart LOD, composite FULL); 12 build + 8 cleanup operation groups/frame, separate atomic commit reservation up to 132 groups, 16 queue checks/category/frame, one active job (≤64 visual meshes), at most two retired bundles. Commit revalidates proxy identity/current CFrames, preserves previous visual until swap and keeps effects tied to actual. Desired/prototype generation/root changes cancel staging; cleanup is incremental. Old Location cost clamp removed. House keeps independent 8/tick reservation pending stage 5; Studio Preview multipart drains the same job synchronously. Counts are not a hard CPU deadline; native streaming, effect traversal and Studio/DEV/Mobile profiling remain acceptance items. T03/A03 open.
+
 
 
 

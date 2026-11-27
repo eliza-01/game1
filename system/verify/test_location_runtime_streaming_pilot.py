@@ -22,9 +22,9 @@ class RuntimeStreamingPilot(unittest.TestCase):
         self.assertIn('policy.Resolve(distance, previous, record.distances, record.mode)', threshold)
         self.assertIn('(position - record.pivot).Magnitude', threshold)
         for expected in ('LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)',
-                         'MAX_CHANGES_PER_TICK = 8', 'CanCollide = false',
-                         'CanQuery = false', 'CanTouch = false',
-                         'record.cframe', 'record.size',
+                         'MAX_CHANGES_PER_TICK = 8', 'LodAssembly.PrepareSingle',
+                         'runtimeWork:Step(callbacks)', 'work:Retire(record.part)',
+                         'record.fullBounds', 'record.size',
                          'record.part:Destroy()', 'RunService.Heartbeat'):
             self.assertIn(expected, client)
         self.assertIn('Policy.WithHysteresis', policy)

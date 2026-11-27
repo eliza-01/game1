@@ -27,7 +27,7 @@ class BlockedWaitCombat(unittest.TestCase):
         ai=(BASE/'MonsterAIService.luau').read_text()
         self.assertIn('Skills.MarkAttacked(agent.model)\n        Navigation.NotifyDamage(agent,attacker)',ai)
         self.assertLess(ai.index('Navigation.NotifyDamage(agent,attacker)'),ai.index('local targetRoot = rootOf(attacker)'))
-        self.assertIn('elseif action == "BeginAttack" then\n            stopNavigation(agent)',ai)
+        self.assertIn('elseif action == "BeginAttack" then\n        stopNavigation(agent)',ai)
         dispatch=(BASE/'MonsterNavigationDispatch.luau').read_text()
         self.assertIn('state.target==attacker and not agent.returning then Blocked.NotifyDamage(state)',dispatch)
         nav=(BASE/'MonsterExperimentalNavigation.luau').read_text()

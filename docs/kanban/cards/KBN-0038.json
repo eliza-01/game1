@@ -8,14 +8,14 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0038.md",
-  "specSha256": "0eb377be7df6cf1db9add8b22e82cd7764126fd27bb24f7995375b5b161e7ba3",
+  "specSha256": "6f7853b5bc258fc4ea6ce275d6946a31b1438064eaf952d30979d1f2bb5c080b",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036",
     "KBN-0037"
   ],
-  "revision": 2,
-  "updatedAt": "2026-11-27T20:20:00+00:00",
+  "revision": 3,
+  "updatedAt": "2026-11-27T20:30:00+00:00",
   "tasks": [
     {
       "id": "KBN-0038-T01",
@@ -54,7 +54,7 @@
       "id": "KBN-0038-A02",
       "title": "Агро, атака, урон, преследование, home leash, blocked wait и возврат работают при смене AI LOD",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M615: общий scheduler, фиксированная частота, Lua queue test 1000 agents, parity тел решений M614; AI LOD, Studio/DEV NOT_RUN."
     },
     {
       "id": "KBN-0038-A03",

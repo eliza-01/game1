@@ -62,13 +62,13 @@ def check_actor_runtime_contracts(
             report_error(f"M104 chase navigation contract missing {required}")
     if "PathfindingService" in monster_ai_m23:
         report_error("M104: MonsterAIService must delegate Pathfinding to MonsterChaseNavigation")
-    for required in ['require(script.Parent:WaitForChild("MonsterAgentLifecycle"))', 'Lifecycle.Start(runAgent, random)', 'Lifecycle.Release(agent)']:
+    for required in ['require(script.Parent:WaitForChild("MonsterAgentLifecycle"))', 'Lifecycle.Start(stepAgent, random, THINK_INTERVAL)', 'local function stepAgent(']:
         if required not in monster_ai_m23:
             report_error(f"M105: MonsterAIService must delegate lifecycle: {required}")
     for required in ['pending[model] = true', 'model:GetAttributeChangedSignal("LifeState")', 'model.Destroying:Connect(',
                      'model.AncestryChanged:Connect(', 'Navigation.Initialize(agent)', 'Presentation.Initialize(agent, runRow, random',
                      'CombatState.ClearTarget(agent)', 'Navigation.ClearPath(agent)', 'connection:Disconnect()',
-                     'xpcall(runAgent, debug.traceback, agent)']:
+                     'Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent)', 'Scheduler.Remove(agent)']:
         if required not in monster_agent_lifecycle_m105:
             report_error(f"M105: MonsterAgentLifecycle contract missing {required}")
     if 'if not agent.active then return end' not in monster_chase_navigation_m104:

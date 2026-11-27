@@ -63,7 +63,7 @@ class MonsterRespawnSpawnFxTests(unittest.TestCase):
         self.assertIn('entry.spawnPresentation:Cancel()', spawner)
         self.assertLess(spawner.index('MonsterSpawnPresentation.Prepare('), spawner.index('EntityHitboxService.Attach('))
         self.assertLess(spawner.index('spawnPresentation:Start('), spawner.index('wanderController:Start(state, model, entry)'))
-        self.assertIn('if agent.model:GetAttribute("MonsterSpawning") == true then\n            continue', ai)
+        self.assertIn('if agent.model:GetAttribute("MonsterSpawning") == true then\n        return', ai)
         for forbidden in ('MonsterRegistry', 'MonsterSpawnerService', 'DeathLifecycle', 'MonsterAIService', 'Instance.new('):
             self.assertNotIn(forbidden, fx)
 

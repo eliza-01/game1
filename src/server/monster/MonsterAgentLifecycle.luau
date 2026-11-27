@@ -1,6 +1,7 @@
 -- Owns Monster AI agent discovery, initialization, per-model signals and teardown.
 -- Attack decisions, target policy, chase, and authored attack pursuit stay outside.
 local Workspace = game:GetService("Workspace")
+local Scheduler = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAIScheduler"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
 local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
@@ -23,6 +24,7 @@ local function releaseAgent(agent: any)
     if agents[model] ~= agent then return end
     agents[model] = nil
     agent.active = false
+    Scheduler.Remove(agent)
     HomeRecall.Cancel(agent)
     Special.Cancel(agent)
     Retreat.Clear(agent)
@@ -54,7 +56,7 @@ local function stopOnDeath(agent: any)
     model:SetAttribute("MonsterCombatActive", false)
 end
 
-local function registerModel(model: Model, random: Random, runAgent: (any) -> ())
+local function registerModel(model: Model, random: Random, stepAgent: (any) -> (), thinkInterval: number)
     if agents[model] or pending[model] then return end
     pending[model] = true
     task.spawn(function()
@@ -121,11 +123,7 @@ local function registerModel(model: Model, random: Random, runAgent: (any) -> ()
                     if not model:IsDescendantOf(Workspace) then releaseAgent(agent) end
                 end),
             }
-            task.spawn(function()
-                local ok, err = xpcall(runAgent, debug.traceback, agent)
-                releaseAgent(agent) -- Also release if the AI loop throws.
-                if not ok then warn("[game1][monster-ai] agent loop failed: " .. tostring(err)) end
-            end)
+            Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent)
         end, debug.traceback)
         pending[model] = nil
         if not ok then
@@ -149,11 +147,11 @@ local function unwatchFolder(folder: Folder)
     for _, agent in ipairs(toRelease) do releaseAgent(agent) end
 end
 
-local function watchFolder(folder: Folder, random: Random, runAgent: (any) -> ())
+local function watchFolder(folder: Folder, random: Random, stepAgent: (any) -> (), thinkInterval: number)
     if watchedFolders[folder] then return end
     watchedFolders[folder] = {
         folder.ChildAdded:Connect(function(child)
-            if child:IsA("Model") then task.defer(registerModel, child, random, runAgent) end
+            if child:IsA("Model") then task.defer(registerModel, child, random, stepAgent, thinkInterval) end
         end),
         folder.AncestryChanged:Connect(function()
             if folder.Parent ~= Workspace then unwatchFolder(folder) end
@@ -163,7 +161,7 @@ local function watchFolder(folder: Folder, random: Random, runAgent: (any) -> ()
         end),
     }
     for _, child in ipairs(folder:GetChildren()) do
-        if child:IsA("Model") then registerModel(child, random, runAgent) end
+        if child:IsA("Model") then registerModel(child, random, stepAgent, thinkInterval) end
     end
 end
 
@@ -171,18 +169,14 @@ function MonsterAgentLifecycle.Find(model: Model): any?
     return agents[model]
 end
 
-function MonsterAgentLifecycle.Release(agent: any)
-    releaseAgent(agent)
-end
-
-function MonsterAgentLifecycle.Start(runAgent: (any) -> (), random: Random)
+function MonsterAgentLifecycle.Start(stepAgent: (any) -> (), random: Random, thinkInterval: number)
     if started then return end
     started = true
     local folder = Workspace:FindFirstChild("Monsters")
-    if folder and folder:IsA("Folder") then watchFolder(folder, random, runAgent) end
+    if folder and folder:IsA("Folder") then watchFolder(folder, random, stepAgent, thinkInterval) end
     Workspace.ChildAdded:Connect(function(child)
         if child.Name == "Monsters" and child:IsA("Folder") then
-            watchFolder(child, random, runAgent)
+            watchFolder(child, random, stepAgent, thinkInterval)
         end
     end)
 end

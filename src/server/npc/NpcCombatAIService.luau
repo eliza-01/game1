@@ -18,6 +18,7 @@ local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):Wai
 local CombatFeedbackService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("CombatFeedbackService"))
 local CombatStateService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("CombatStateService"))
 local HostilePursuitRegistry = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HostilePursuitRegistry"))
+local Scheduler = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAIScheduler"))
 local Navigator = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorChaseNavigator"))
 local Queries = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCombatTargeting"))
 local Tracks = require(script.Parent:WaitForChild("NpcAnimationTracks"))
@@ -33,6 +34,7 @@ local agents: {[Model]: any} = {}
 local started = false
 local rng = Random.new()
 local TICK_SECONDS = 0.1
+local decisionEpoch = 0
 -- Roblox resolves AnimationTrack.Length asynchronously for freshly loaded clips.
 local CLIP_LENGTH_RESOLVE_TIMEOUT = 3
 local VERTICAL_TOLERANCE = 5
@@ -338,7 +340,7 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
 end
 
 local function tickAgent(agent: any, now: number)
-    if not agent.model.Parent or agent.model:GetAttribute("LifeState") ~= "Alive" then return end
+    if not agent.active or not agent.model.Parent or agent.model:GetAttribute("LifeState") ~= "Alive" then return end
     -- Crossing the authored boundary despawns this incarnation and creates one
     -- fresh NPC at the exact registered pose (population owner performs reset).
     if HomeLeash.Outside(agent.home.Position, agent.root.Position, agent.homeRadius) then
@@ -463,12 +465,15 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
         model:SetAttribute("NpcAttackPursuitAnimationId", tostring(row.assetId or tostring(row.animationId):match("(%d+)$") or ""))
     end
     pinAtRest(agent, true)
+    local delay = TICK_SECONDS - (os.clock() - decisionEpoch) % TICK_SECONDS
+    Scheduler.Register(agent, TICK_SECONDS, delay, tickAgent, nil, true)
 end
 
 function NpcCombatAIService.Unbind(model: Model)
     local agent = agents[model]
     if not agent then return end
     agent.active = false
+    Scheduler.Remove(agent)
     HostilePursuitRegistry.Clear(model)
     agent.recovery:Cancel()
     agent.serial += 1
@@ -482,9 +487,9 @@ end
 function NpcCombatAIService.Start()
     if started then return end
     started = true
+    decisionEpoch = os.clock()
     DamageSignals.Event:Connect(onDamage)
-    local elapsed = 0
-    RunService.Heartbeat:Connect(function(dt)
+    RunService.Heartbeat:Connect(function()
         -- Monster-style movement during an attack is independent from the
         -- slower AI decision cadence and never restarts the animation track.
         for _, agent in pairs(agents) do
@@ -519,13 +524,6 @@ function NpcCombatAIService.Start()
                     end
                 end
             end
-        end
-        elapsed += dt
-        if elapsed < TICK_SECONDS then return end
-        elapsed %= TICK_SECONDS
-        local now = os.clock()
-        for _, agent in pairs(agents) do
-            if agent.active then tickAgent(agent, now) end
         end
     end)
 end

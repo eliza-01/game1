@@ -98,8 +98,9 @@ class MonsterAiM102Contracts(unittest.TestCase):
         self.assertNotIn('ActorChaseNavigator', self.ai)
 
     def test_death_destruction_and_loop_end_clear_pursuit(self):
-        run_end = self.ai.split('local function runAgent(', 1)[1].split('function MonsterAIService.Start()', 1)[0]
-        self.assertIn('Lifecycle.Release(agent)', run_end)
+        run_end = self.ai.split('local function stepAgent(', 1)[1].split('function MonsterAIService.Start()', 1)[0]
+        self.assertIn('leaveCombat(agent)\n        return false', run_end)
+        self.assertIn('Scheduler.Remove(agent)', self.lifecycle)
         death = self.lifecycle.split('local function stopOnDeath(', 1)[1].split('local function registerModel(', 1)[0]
         destroy = self.lifecycle.split('local function releaseAgent(', 1)[1].split('local function stopOnDeath(', 1)[0]
         self.assertIn('CombatState.ClearTarget(agent)', death)

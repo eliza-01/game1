@@ -176,91 +176,86 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
     end
 end
 
-local function runAgent(agent: any)
-    task.wait(random:NextNumber(0, THINK_INTERVAL))
-    while agent.active and agent.model.Parent do
-        task.wait(THINK_INTERVAL)
-        if not agent.active or not agent.model.Parent then break end
-        if tostring(agent.model:GetAttribute("LifeState") or "") ~= "Alive" then
-            leaveCombat(agent)
-            break
-        end
-        -- The rig can be temporarily anchored below terrain during spawn reveal.
-        if agent.model:GetAttribute("MonsterSpawning") == true then
-            continue
-        end
-        if not aggressive(agent) and not agent.retaliating and not agent.returning then
-            if agent.target or agent.model:GetAttribute("MonsterCombatActive") == true then leaveCombat(agent) end
-            continue
-        end
-        local now = os.clock()
-        if agent.returning then
-            updateReturn(agent)
-            continue
-        end
-        updateTarget(agent, now)
-        -- updateTarget can start Return when the player dies or respawns.
-        -- Do not fall through to NoTarget/leaveCombat and strand the monster.
-        if agent.returning then
-            updateReturn(agent)
-            continue
-        end
-        local target = agent.target
-        if target then
-            if agent.lastDamageAt <= 0 then agent.lastDamageAt = now end
-            local targetRoot = rootOf(target)
-            if DeathChase.UsesHomeLeash(agent.model) then
-                local reason: string? = nil
-                if not DeathChase.AllowsPursuitPosition(agent, agent.root.Position) then reason = "MonsterOutsideHomeLeash"
-                elseif targetRoot and not DeathChase.AllowsPursuitPosition(agent, targetRoot.Position) then reason = "TargetOutsideHomeLeash"
-                elseif not Navigation.IsBlockedRetreating(agent) and HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds()) then reason = "NoDamageTimeout" end
-                if reason then
-                    beginReturn(agent, reason)
-                    updateReturn(agent)
-                    continue
-                end
-            elseif not DeathChase.AllowsPursuitPosition(agent, agent.root.Position) then
-                beginReturn(agent, "MonsterOutsideDeathChaseTerritory")
-                updateReturn(agent)
-                continue
-            end
-        end
+local function stepAgent(agent: any)
+    if not agent.active or not agent.model.Parent then return false end
+    if tostring(agent.model:GetAttribute("LifeState") or "") ~= "Alive" then
+        leaveCombat(agent)
+        return false
+    end
+    -- The rig can be temporarily anchored below terrain during spawn reveal.
+    if agent.model:GetAttribute("MonsterSpawning") == true then
+        return
+    end
+    if not aggressive(agent) and not agent.retaliating and not agent.returning then
+        if agent.target or agent.model:GetAttribute("MonsterCombatActive") == true then leaveCombat(agent) end
+        return
+    end
+    local now = os.clock()
+    if agent.returning then
+        updateReturn(agent)
+        return
+    end
+    updateTarget(agent, now)
+    -- updateTarget can start Return when the player dies or respawns.
+    -- Do not fall through to NoTarget/leaveCombat and strand the monster.
+    if agent.returning then
+        updateReturn(agent)
+        return
+    end
+    local target = agent.target
+    if target then
+        if agent.lastDamageAt <= 0 then agent.lastDamageAt = now end
         local targetRoot = rootOf(target)
-        local distance = if targetRoot then horizontalDistance(agent.root.Position, targetRoot.Position) else 0
-        if not agent.attacking and targetRoot and Retreat.Step(agent, targetRoot, now) then
-            setState(agent, "Retreat")
-            continue
-        end
-        if target and not agent.attacking and Special.TryBegin(agent,target) then continue end
-        local action = CombatState.Decide(agent.attacking, targetRoot ~= nil, distance, attackRadius(agent))
-        if action == "BeginAttack" and (Navigation.Enabled(agent) or not Retreat.IsRanged(agent.model)) and not TargetPolicy.CanBeginTargetedCast(agent,target) then
-            action = "Chase"
-        end
-        if targetRoot and Trace.Enabled(agent) then
-            Trace.Changed(agent,"AI_ACTION",action,"distance="..tostring(distance),"target="..tostring(target),"mode="..tostring(agent.model:GetAttribute("MonsterRecoveryMode")))
-        end
-        if action == "AttackActive" then
-            -- Active-attack movement is owned by maintainAttackPursuit().
-            -- The slower AI decision loop must not issue competing MoveTo calls.
-            setState(agent, "Attack")
-        elseif action == "BeginAttack" then
-            stopNavigation(agent)
-            Presentation.PlayCombatIdle(agent)
-            AttackExecutor.Begin(agent, target, AttackMovement, random)
-        elseif action == "Chase" then
-            setState(agent, "Chase")
-            if not Navigation.Enabled(agent) or agent.attackPursuitActive then AttackExecutor.ClearPursuit(agent) end
-            if navigateTo(agent, targetRoot.Position, runSpeedStuds(agent)) == "StuckTimeout" then
-                beginReturn(agent, "StuckTimeout")
+        if DeathChase.UsesHomeLeash(agent.model) then
+            local reason: string? = nil
+            if not DeathChase.AllowsPursuitPosition(agent, agent.root.Position) then reason = "MonsterOutsideHomeLeash"
+            elseif targetRoot and not DeathChase.AllowsPursuitPosition(agent, targetRoot.Position) then reason = "TargetOutsideHomeLeash"
+            elseif not Navigation.IsBlockedRetreating(agent) and HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds()) then reason = "NoDamageTimeout" end
+            if reason then
+                beginReturn(agent, reason)
                 updateReturn(agent)
-            else
-                presentNavigation(agent)
+                return
             end
-        elseif agent.model:GetAttribute("MonsterCombatActive") == true then
-            leaveCombat(agent)
+        elseif not DeathChase.AllowsPursuitPosition(agent, agent.root.Position) then
+            beginReturn(agent, "MonsterOutsideDeathChaseTerritory")
+            updateReturn(agent)
+            return
         end
     end
-    Lifecycle.Release(agent)
+    local targetRoot = rootOf(target)
+    local distance = if targetRoot then horizontalDistance(agent.root.Position, targetRoot.Position) else 0
+    if not agent.attacking and targetRoot and Retreat.Step(agent, targetRoot, now) then
+        setState(agent, "Retreat")
+        return
+    end
+    if target and not agent.attacking and Special.TryBegin(agent,target) then return end
+    local action = CombatState.Decide(agent.attacking, targetRoot ~= nil, distance, attackRadius(agent))
+    if action == "BeginAttack" and (Navigation.Enabled(agent) or not Retreat.IsRanged(agent.model)) and not TargetPolicy.CanBeginTargetedCast(agent,target) then
+        action = "Chase"
+    end
+    if targetRoot and Trace.Enabled(agent) then
+        Trace.Changed(agent,"AI_ACTION",action,"distance="..tostring(distance),"target="..tostring(target),"mode="..tostring(agent.model:GetAttribute("MonsterRecoveryMode")))
+    end
+    if action == "AttackActive" then
+        -- Active-attack movement is owned by maintainAttackPursuit().
+        -- The slower AI decision loop must not issue competing MoveTo calls.
+        setState(agent, "Attack")
+    elseif action == "BeginAttack" then
+        stopNavigation(agent)
+        Presentation.PlayCombatIdle(agent)
+        AttackExecutor.Begin(agent, target, AttackMovement, random)
+    elseif action == "Chase" then
+        setState(agent, "Chase")
+        if not Navigation.Enabled(agent) or agent.attackPursuitActive then AttackExecutor.ClearPursuit(agent) end
+        if navigateTo(agent, targetRoot.Position, runSpeedStuds(agent)) == "StuckTimeout" then
+            beginReturn(agent, "StuckTimeout")
+            updateReturn(agent)
+        else
+            presentNavigation(agent)
+        end
+    elseif agent.model:GetAttribute("MonsterCombatActive") == true then
+        leaveCombat(agent)
+    end
 end
 
 -- Confirmed damage in either direction refreshes combat activity.
@@ -280,7 +275,7 @@ function MonsterAIService.Start()
     HomeRecall.Start()
     DamageSignals.Event:Connect(onDamaged)
     DamageSignals.Event:Connect(onDamageDealt)
-    Lifecycle.Start(runAgent, random)
+    Lifecycle.Start(stepAgent, random, THINK_INTERVAL)
     print("[game1][monster-ai] RobloxLineage aggro/chase/attack-pursuit runtime ready")
 end
 

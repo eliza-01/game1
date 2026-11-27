@@ -23,7 +23,7 @@ class MeleeObstacleRecovery(unittest.TestCase):
         ai = (BASE / 'MonsterAIService.luau').read_text()
         self.assertIn('Navigation.Enabled(agent) or not Retreat.IsRanged(agent.model)', ai)
         self.assertIn('((not Navigation.Enabled(agent) and Retreat.IsRanged(agent.model)) or TargetPolicy.CanBeginTargetedCast(agent,attacker))', ai)
-        self.assertIn('not TargetPolicy.CanBeginTargetedCast(agent,target) then\n            action = "Chase"', ai)
+        self.assertIn('not TargetPolicy.CanBeginTargetedCast(agent,target) then\n        action = "Chase"', ai)
         executor = (BASE / 'MonsterAttackExecutor.luau').read_text()
         self.assertIn('clear = TargetPolicy.MeleeObstacleClear(agent, target)', executor)
         self.assertIn('nextObstacleCheck = now + .2', executor)

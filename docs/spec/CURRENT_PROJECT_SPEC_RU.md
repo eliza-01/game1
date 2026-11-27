@@ -6,6 +6,10 @@
 **Важное различие:** «реализовано в исходниках» не означает «проверено в Roblox Studio Play / production».
 **История:** [исходное ТЗ Milestone 1](../history/milestone-1/PROJECT_SPEC_MILESTONE_1_RU.md) описывает запуск проекта, **не** текущее требование к единственному разделу Characters.
 
+## M602 · Движение назад
+
+- PC S/Down и отрицательная Y ось touch используют Walk/Backward и направление относительно текущей камеры, независимо от yaw персонажа, ПКМ и атаки. Touch сохраняет аналоговую силу и диагонали; PC сохраняет одноосный S вне live aim. Боевые locks остаются в силе. [Приёмка](../workflows/M602_CAMERA_BACKPEDAL_RU.md).
+
 ## M601 · Оружейные слоты и Newbie Slayer
 
 - Mobile: блок 2×2 на DeviceSafeInsets, 2 px сверху/справа; размер по CoreUISafeInsets сохраняет 37% Attack. `newbie_slayer_01` → `weapon_003` в Database (bigsword первого уровня), без изменения характеристик. При пустой категории лог и обновление каталога на следующий тап. [Приёмка](../workflows/M601_WEAPON_CORNER_RU.md).

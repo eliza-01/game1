@@ -36,6 +36,7 @@ ITEMS = [
                  'M597: удержание ЛКМ/Attack повторяет атаку по timeline, Jump повторяется после приземления. Action touches поворачивают камеру; отдельный свободный палец имеет приоритет. Зелёная кнопка — toggle автоатаки, оранжевые — резерв skills.',
                  'M598: MobileLayout задаёт общий масштаб: Attack у нижнего правого угла, Jump/Auto/Skills около 46% его диаметра; 4 Skills по дуге вокруг Attack, weapon slots около 37% вверху справа. Context/info dock учитывает реальные границы. HudCornerLayout резервирует 44 px для Settings, Debug сдвинут вправо и не занимает weapon grid. WalletHud подгоняет ширину по Gold.',
                  'M599: Touch Debug — только GP (Studio), UI presentation, HP и CD; оружейные слоты экипируют тип напрямую через DEV RPC без окна каталога. Desktop без изменений.',
+                 'M602: S/Down и нижняя половина touch-стика включают Walk/Backward относительно текущего yaw камеры без ПКМ и без атаки; analog strength/diagonals на touch сохранены. Боевые facing/movement locks сохраняют приоритет.',
                  'M601: weapon grid 2 px от верхнего/правого края DeviceSafeInsets, размер рассчитывается по CoreUISafeInsets (37% Attack). Newbie Slayer 01 связан с Database weapon_003 (bigsword LVL 1); пустая категория диагностируется и повторно запрашивает каталог при следующем выборе.',
                  'Управление на PC и Touch не должно требовать Studio Debug или Control Center при публикации.',
              ]},

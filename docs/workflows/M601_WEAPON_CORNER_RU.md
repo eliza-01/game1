@@ -10,3 +10,7 @@
 2. Выбрать bigsword на PC и touch. Проверить атрибут EquippedWeaponSlug и реальную модель. Сменить на sword и обратно.
 3. В эмуляторе и на телефоне проверить верх/право: 2 px от device safe area, сохранение размера при смене ориентации, отсутствие пересечения Roblox UI и debug.
 4. Для опубликованного DEV пересобрать Runtime и опубликовать. Фактическая проверка модели, анимаций и touch в Studio/DEV остаётся открытой.
+
+## M603 · Исправление Rect
+
+В Studio M602 обнаружено падение `MobileWeaponSlots.Layout`: у Rect из `GuiService:GetInsetArea` нет свойства Size. Размер вычисляется как `area.Max - area.Min`. Геометрия, DeviceSafeInsets и отступ 2 px сохранены. Приёмка: touch Play без ошибки Rect; четыре кнопки в углу, переключение типов.

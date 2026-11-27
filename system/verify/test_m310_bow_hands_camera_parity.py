@@ -23,8 +23,8 @@ class HandsBowCameraParity(unittest.TestCase):
         self.assertNotIn("bowEquipped", movement)
         self.assertNotIn('GetAttribute("AnimationWeaponSet")', movement)
         self.assertIn("controllerManager.FacingDirection = moveDirection", movement)
-        self.assertIn("backwardActive and backwardRelativeDirection", movement)
-        self.assertIn("backwardCameraSteering", movement)
+        self.assertIn("moveDirection = cameraRelativeDirection(axis)", movement)
+        self.assertNotIn("backwardCameraSteering", movement)
 
     def test_melee_facing_is_preserved_bow_capture_is_isolated(self):
         attack = src("src/client/combat/AttackController.luau")

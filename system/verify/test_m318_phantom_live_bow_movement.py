@@ -32,7 +32,7 @@ def step_root_yaw(current: float, aim: float, dt: float, moving=False,
 
 
 def backward_mode(y: float, is_touch: bool, live_bow: bool) -> bool:
-    return y < -0.001 and (not is_touch or live_bow)
+    return y < -0.001
 
 
 class MonsterPhantom(unittest.TestCase):
@@ -75,7 +75,7 @@ class LiveBowAim(unittest.TestCase):
         self.assertIn('movementController.UpdateAimFacingCompensation(target - root.Position)', attack)
         self.assertIn('attackDuration, AttackConfig.TorsoYawLimit, true', attack)
         self.assertIn('aimFacingLive = live == true', movement)
-        self.assertIn('if liveAttackAim then', movement)
+        self.assertIn('if liveAttackAim and moveDirection.Magnitude > 0.001 then', movement)
         self.assertNotIn('if not aimFacingLive then\n\t\t\tclearAimFacingCompensation()', movement)
         self.assertIn('finishPresentation(sequence)', attack)
         self.assertIn('local origin, direction = aimPoseController.GetAimRay()', attack)
@@ -108,17 +108,17 @@ class LiveBowAim(unittest.TestCase):
             slow = step_root_yaw(slow, math.radians(160), 1/30)
         self.assertAlmostEqual(fast, slow, delta=0.02)
 
-    def test_down_stick_backpedals_only_during_live_bow(self):
+    def test_down_stick_backpedals_with_or_without_live_bow(self):
         for y in (-1, -0.8, -0.3):
             self.assertTrue(backward_mode(y, False, False))  # keyboard S
-            self.assertFalse(backward_mode(y, True, False))  # legacy touch free-running
+            self.assertTrue(backward_mode(y, True, False))   # touch outside combat
             self.assertTrue(backward_mode(y, True, True))   # touch bow attack
         for y in (0, 0.6, 1):
             self.assertFalse(backward_mode(y, True, True))
         movement = read('src/client/character/MovementController.luau')
         self.assertIn('local backwardActive = backwardLocomotion(axis)', movement)
         self.assertIn('local nextDirectionMode = backwardActive and "Backward" or "Forward"', movement)
-        self.assertIn('if liveAttackAim then\n\t\t\tmoveDirection = cameraRelativeDirection(axis)', movement)
+        self.assertIn('moveDirection = cameraRelativeDirection(axis)', movement)
         self.assertLess(movement.index('if liveAttackAim and moveDirection.Magnitude > 0.001 then'), movement.index('elseif aimFacingActive and not aimFacingLive and aimFacingTargetDirection'))
         self.assertIn('controllerManager.FacingDirection = lowerBodyFacing', movement)
         self.assertIn('if moving then return end', movement)

@@ -47,7 +47,8 @@ function Slots.Create(gui: ScreenGui, choose: (string) -> ())
     function result.Layout()
         -- Anchor in DeviceSafeInsets but measure using the combat HUD's
         -- CoreUISafeInsets rectangle, so the 37% Attack proportion is unchanged.
-        local size = GuiService:GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets).Size
+        local area = GuiService:GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets)
+        local size = area.Max - area.Min
         local box = Layout.Resolve(size.X, size.Y).weapon
         for i, kind in ipairs(TYPES) do
             local button = buttons[kind]

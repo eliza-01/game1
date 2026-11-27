@@ -84,7 +84,7 @@ class BowMovementM319(unittest.TestCase):
 
     def test_no_new_bow_damage_or_camera_writer(self):
         movement = source('src/client/character/MovementController.luau')
-        self.assertIn('if liveAttackAim then\n\t\t\tmoveDirection = cameraRelativeDirection(axis)', movement)
+        self.assertIn('moveDirection = cameraRelativeDirection(axis)', movement)
         self.assertIn('local backwardActive = backwardLocomotion(axis)', movement)
         attack = source('src/client/combat/AttackController.luau')
         self.assertEqual(attack.count('bowAimRemote:FireServer({'), 1)

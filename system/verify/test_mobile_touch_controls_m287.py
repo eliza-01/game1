@@ -46,12 +46,13 @@ class MobileTouchControlsM287(unittest.TestCase):
         self.assertIn('gui.ResetOnSpawn = false', VIEW)
         self.assertIn('GetPropertyChangedSignal("AbsoluteSize")', TOUCH)
 
-    def test_touch_backwards_is_camera_relative_not_keyboard_backpedal(self):
+    def test_touch_backwards_is_camera_relative_with_shared_backpedal(self):
         self.assertIn('if touchMovementActive then\n\t\treturn touchAxis', MOVEMENT)
-        self.assertIn('not touchMovementActive or (aimFacingActive and aimFacingLive)', MOVEMENT)
-        self.assertIn('backwardActive and backwardRelativeDirection(axis, backwardCameraSteering) or cameraRelativeDirection(axis)', MOVEMENT)
-        self.assertIn('if liveAttackAim then', MOVEMENT)
+        self.assertIn('return axis.Y < -0.001', MOVEMENT)
+        self.assertIn('local backwardActive = backwardLocomotion(axis)', MOVEMENT)
         self.assertIn('moveDirection = cameraRelativeDirection(axis)', MOVEMENT)
+        self.assertNotIn('backwardRelativeDirection', MOVEMENT)
+        self.assertNotIn('backwardCameraSteering', MOVEMENT)
 
     def test_jump_and_attack_share_desktop_rules(self):
         self.assertIn('MovementController.RequestJump()', MOVEMENT)

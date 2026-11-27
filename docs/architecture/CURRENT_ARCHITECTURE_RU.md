@@ -4,6 +4,10 @@
 **Источник инженерных ограничений:** [`AGENTS.md`](../../AGENTS.md).
 **Историческое обоснование:** [аудит 14 октября](../ARCHITECTURE_AUDIT_2026-10-14_RU.md). Его старые размеры файлов и список «следующих этапов» не актуальны.
 
+## M602 · Camera-relative backpedal
+
+`MovementController` — единый владелец world-space travel и reversed gait для PC и touch. Удалена root-relative/RMB ветка; `cameraRelativeDirection` использует текущую камеру, `cameraForwardDirection` задаёт facing при backpedal, существующие explicit facing locks сохраняют приоритет. Новых контроллеров и RPC нет.
+
 ## M601 · Weapon corner / binding
 
 `WeaponSelectionController` отделяет мобильный DeviceSafeInsets от desktop. `MobileWeaponSlots` измеряет CoreUISafeInsets через GuiService и использует общий MobileLayout; остальные HUD не перемещаются. Database JSON остаётся источником binding, BalanceRegistry — его проекцией. `WeaponEquipService` и серверная авторизация не меняются.

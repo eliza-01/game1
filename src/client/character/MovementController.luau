@@ -275,19 +275,9 @@ local function walkModifierDown(): boolean
 		or UserInputService:IsKeyDown(CharacterConfig.InputBindings.WalkModifier[2])
 end
 
-local function isBackwardAxis(axis: Vector2): boolean
-	-- S / Down selects backpedal, but only while no touch locomotion is
-	-- active or a live bow/melee attack explicitly owns the facing direction.
-	return axis.Y < -0.001
-end
-
 local function backwardLocomotion(axis: Vector2): boolean
-	return isBackwardAxis(axis) and
-		(not touchMovementActive or (aimFacingActive and aimFacingLive))
-end
-
-local function rightMouseDown(): boolean
-	return UserInputService:IsMouseButtonPressed(CharacterConfig.InputBindings.CameraOrbit[1])
+	-- Keyboard and touch select the same reversed gait from camera-space input.
+	return axis.Y < -0.001
 end
 
 local function cameraForwardDirection(): Vector3
@@ -302,30 +292,6 @@ local function cameraForwardDirection(): Vector3
 		return Vector3.zero
 	end
 	return forwardFlat.Unit
-end
-
-local function backwardRelativeDirection(_axis: Vector2, cameraSteering: boolean): Vector3
-	if cameraSteering then
-		-- RMB keeps camera-relative steering, but backpedal is constrained to one axis.
-		-- A/D never add a lateral component while S is held. Camera yaw still changes
-		-- the world-space backward trajectory naturally.
-		return cameraRelativeDirection(Vector2.new(0, -1))
-	end
-
-	-- Without RMB, preserve classic planted backpedal relative to the character's
-	-- CURRENT facing. A/D are intentionally ignored while S is held.
-	local currentRoot = root
-	if not currentRoot then
-		return Vector3.zero
-	end
-
-	local look = currentRoot.CFrame.LookVector
-	local forwardFlat = Vector3.new(look.X, 0, look.Z)
-	if forwardFlat.Magnitude < 0.001 then
-		return Vector3.zero
-	end
-
-	return -forwardFlat.Unit
 end
 
 local function flatUnit(direction: Vector3): Vector3?
@@ -565,17 +531,15 @@ local function updateMovement(deltaTime: number)
 	-- travel vector, except S / downward stick where the legs backpedal.
 	local liveAttackAim = aimFacingActive and aimFacingLive
 	local backwardActive = backwardLocomotion(axis)
-	local backwardCameraSteering = backwardActive and (rightMouseDown() or liveAttackAim)
 	local movementLocked = now < movementLockUntil or character:GetAttribute("SkillMoveMultiplier") == 0
 	local moveDirection = Vector3.zero
 	if not movementLocked then
-		-- Both keyboard and analog movement keep diagonal input while attacking;
-		-- the existing one-axis backpedal rule applies outside active attacks.
-		if liveAttackAim then
-			moveDirection = cameraRelativeDirection(axis)
-		else
-			moveDirection = backwardActive and backwardRelativeDirection(axis, backwardCameraSteering) or cameraRelativeDirection(axis)
+		-- Preserve the desktop one-axis S/Down rule outside live attacks.
+		-- Touch retains analog strength and diagonals; neither path uses root yaw.
+		if backwardActive and not touchMovementActive and not liveAttackAim then
+			axis = Vector2.new(0, -1)
 		end
+		moveDirection = cameraRelativeDirection(axis)
 	end
 	controllerManager.MovingDirection = moveDirection
 	-- Derive the leg animation from THIS frame's input, not the previous
@@ -613,14 +577,13 @@ local function updateMovement(deltaTime: number)
 			if not backwardActive then
 				-- Moving players face travel, as they do with hands equipped.
 				controllerManager.FacingDirection = moveDirection
-			elseif backwardCameraSteering then
-				-- RMB + S backpedal: steer with camera while travelling backwards.
+			else
+				-- Backpedal faces camera-forward on both devices, even without RMB.
 				local cameraForward = cameraForwardDirection()
 				if cameraForward.Magnitude > 0.001 then
 					controllerManager.FacingDirection = cameraForward
 				end
 			end
-			-- Without RMB, backpedal preserves the current facing.
 		end
 	end
 	-- Live aim only rotates the stationary root; moving yaw belongs to travel.

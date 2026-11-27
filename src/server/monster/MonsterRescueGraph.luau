@@ -1,11 +1,13 @@
 local Config=require(script.Parent:WaitForChild("MonsterNavigationConfig"))
 -- Read-only authored navigation graph. Coordinates are ground/foot positions.
--- Only explicit coincident vertices connect; crossing lines on different floors do not.
+-- Authored vertices also split existing segments at explicit T-junctions.
+-- Geometric crossings without a vertex never create a connection.
 local Workspace = game:GetService("Workspace")
 local Graph = {}
 local nodes, edges = {}, {}
 local loaded = false
-local MAX_EDGES = 2048
+local MAX_EDGES = 2048 -- authored segments, before topology expansion
+local JUNCTION_EPSILON = 0.01
 
 local function key(p)
     return string.format("%d:%d:%d", math.round(p.X*100), math.round(p.Y*100), math.round(p.Z*100))
@@ -24,6 +26,7 @@ local function load()
         end
         return byKey[k]
     end
+    local raw = {}
     local routes = folder:GetChildren()
     table.sort(routes,function(a,b) return a.Name<b.Name end)
     for _, route in ipairs(routes) do
@@ -34,16 +37,47 @@ local function load()
             end
             table.sort(points,function(a,b) return tonumber(a.Name)<tonumber(b.Name) end)
             for i=2,#points do
-                if #edges>=MAX_EDGES then warn("[game1] Rescue route edge limit reached"); return end
+                if #raw>=MAX_EDGES then break end
                 local a,b = node(points[i-1].Value),node(points[i].Value)
                 local length = (b.position-a.position).Magnitude
-                if length>=0.01 then
-                    local edge={a=a,b=b,length=length}
-                    table.insert(edges,edge)
-                    table.insert(a.links,{node=b,length=length}); table.insert(b.links,{node=a,length=length})
+                if length>=0.01 then table.insert(raw,{a=a,b=b,length=length}) end
+            end
+        end
+        if #raw>=MAX_EDGES then warn("[game1] Rescue route authored edge limit reached"); break end
+    end
+    -- Build topology once at load, not during a monster's search. A junction
+    -- is an authored vertex lying on a segment in 3D, not a crossing in XZ.
+    -- Split only in memory: source route IDs/coordinates remain unchanged.
+    local linked={}
+    local function link(a,b)
+        if a==b then return end
+        if linked[a] and linked[a][b] then return end
+        local length=(b.position-a.position).Magnitude
+        if length<1e-6 then return end
+        linked[a]=linked[a] or {}; linked[b]=linked[b] or {}
+        linked[a][b]=true; linked[b][a]=true
+        table.insert(edges,{a=a,b=b,length=length})
+        table.insert(a.links,{node=b,length=length}); table.insert(b.links,{node=a,length=length})
+    end
+    local eps=JUNCTION_EPSILON
+    for _,segment in ipairs(raw) do
+        local a,b=segment.a.position,segment.b.position
+        local delta=b-a
+        local minX,maxX=math.min(a.X,b.X)-eps,math.max(a.X,b.X)+eps
+        local minY,maxY=math.min(a.Y,b.Y)-eps,math.max(a.Y,b.Y)+eps
+        local minZ,maxZ=math.min(a.Z,b.Z)-eps,math.max(a.Z,b.Z)+eps
+        local cuts={{node=segment.a,t=0},{node=segment.b,t=1}}
+        for _,n in ipairs(nodes) do
+            local p=n.position
+            if n~=segment.a and n~=segment.b and p.X>=minX and p.X<=maxX and p.Y>=minY and p.Y<=maxY and p.Z>=minZ and p.Z<=maxZ then
+                local t=(p-a):Dot(delta)/(segment.length*segment.length)
+                if t>0 and t<1 and (p-(a+delta*t)).Magnitude<=eps then
+                    table.insert(cuts,{node=n,t=t})
                 end
             end
         end
+        table.sort(cuts,function(x,y) return x.t<y.t end)
+        for i=2,#cuts do link(cuts[i-1].node,cuts[i].node) end
     end
 end
 

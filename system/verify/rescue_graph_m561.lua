@@ -120,3 +120,45 @@ s,t=v(0,0,0),v(100,8,1)
 p,stats=g.Find(s,t,function(a,b) return (b-s).Magnitude<.001 end,nil,function(a,b) assert(a.X<100,'disconnected exit queried');return a.X==1 and a.Y==8 end)
 assert(p and stats.exitChecks>8);close(p.points[#p.points].X,1)
 print('OK M574: remote exit, rejected entries/exits, endpoint fallback, reachable-only search')
+
+-- M577: a branch touches the middle of a long edge, without a vertex in
+-- the main route. Only the designated entry and exit are physically reachable.
+s,t=v(0,0,0),v(10,5,10)
+local function atStart(a,b) return (b-s).Magnitude<.001 end
+local function atGoal(a,b) return (a-t).Magnitude<.001 end
+g=loadGraph({route('main',{s,v(20,0,0)}),route('stairs',{v(10,0,0),t})})
+p=g.Find(s,t,atStart,nil,atGoal)
+assert(p);close(p.cost,10+math.sqrt(125));close(p.points[3].X,10)
+-- Two junctions on one segment: transfer from one branch to another.
+s,t=v(5,0,-6),v(15,0,8)
+g=loadGraph({route('main',{v(0,0,0),v(20,0,0)}),route('entry',{s,v(5,0,0)}),route('exit',{v(15,0,0),t})})
+p=g.Find(s,t,atStart,nil,atGoal)
+assert(p);close(p.cost,24)
+-- Different floors and crossing lines without an explicit junction never join.
+s,t=v(0,0,0),v(10,8,10)
+g=loadGraph({route('main',{s,v(20,0,0)}),route('upstairs',{v(10,8,0),t})})
+assert(g.Find(s,t,atStart,nil,atGoal)==nil)
+t=v(10,0,10)
+g=loadGraph({route('main',{s,v(20,0,0)}),route('cross',{v(10,0,-10),t})})
+assert(g.Find(s,t,atStart,nil,atGoal)==nil)
+-- A crossing with an explicit vertex joins in both directions.
+g=loadGraph({route('main',{s,v(20,0,0)}),route('cross',{v(10,0,-10),v(10,0,0),t})})
+p=g.Find(s,t,atStart,nil,atGoal);assert(p);close(p.cost,20)
+s,t=t,s
+p=g.Find(s,t,atStart,nil,atGoal);assert(p);close(p.cost,20)
+print('OK M577: T junction, multiple junctions, different floors, explicit crossing, bidirectional links')
+-- Execute the actual Studio snapping helper (pure Lua fragment) separately
+-- from Roblox UI. The plugin click handler stores its resulting Vector3.
+if arg[2] then
+    local f=assert(io.open(arg[2],'r')); local plugin=f:read('*a');f:close()
+    local source=assert(plugin:match('(local function snapPoint%b()%s.-)local function metadata'))
+    local snap=assert(load('local function read(route) return route.points end\n'..source..'\nreturn snapPoint'))()
+    local main={points={v(0,0,0),v(20,0,0)}}
+    local upper={points={v(0,8,0),v(20,8,0)}}
+    local q,owner=snap(v(8,0,.6),{main,upper}); assert(owner==main);close(q.X,8);close(q.Z,0)
+    q,owner=snap(v(8,.5,0),{main});assert(owner==nil);close(q.Y,.5)
+    q,owner=snap(v(8,8,.1),{main,upper});assert(owner==upper);close(q.Y,8)
+    q,owner=snap(v(8,0,.6),{main},main);assert(owner==nil);close(q.Z,.6)
+    q,owner=snap(v(8,0,1.1),{main});assert(owner==nil);close(q.Z,1.1)
+    print('OK M577 Studio snap: segment projection, floor, edited route exclusion, radius')
+end

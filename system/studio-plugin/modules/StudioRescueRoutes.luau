@@ -22,6 +22,31 @@ local function read(route)
     table.sort(values,function(a,b) return tonumber(a.Name)<tonumber(b.Name) end)
     local result={}; for _,v in ipairs(values) do table.insert(result,v.Value) end; return result
 end
+-- Snap a clicked ground position to an existing route in real 3D.
+-- Keep the old one-stud snap radius, but never snap to another floor.
+local function snapPoint(hit, saved, edited)
+    local best,p,owner=1,hit,nil
+    local function consider(q,route)
+        local d=(q-hit).Magnitude
+        if d<best and math.abs(q.Y-hit.Y)<=.25 then best=d; p=q; owner=route end
+    end
+    for _,route in ipairs(saved) do
+        if route~=edited then
+            local points=read(route)
+            for i,v in ipairs(points) do
+                consider(v,route)
+                if i>1 then
+                    local a=points[i-1]; local delta=v-a; local lengthSquared=delta:Dot(delta)
+                    if lengthSquared>1e-8 then
+                        local t=math.clamp((hit-a):Dot(delta)/lengthSquared,0,1)
+                        consider(a+delta*t,route)
+                    end
+                end
+            end
+        end
+    end
+    return p,owner
+end
 local function metadata(route)
     local name=route:GetAttribute("RouteDisplayName")
     local catalog=route:GetAttribute("RouteCatalog")
@@ -175,6 +200,7 @@ function Routes.new(plugin,toolbar)
         label(title,20,editor)
         local t=Instance.new("TextBox"); t.Size=UDim2.new(1,-6,0,29); t.BackgroundColor3=Color3.fromRGB(44,56,68); t.TextColor3=Color3.new(1,1,1); t.ClearTextOnFocus=false; t.Font=Enum.Font.Gotham; t.TextSize=12; place(t,editor); return t
     end
+    label("Click an existing line to connect · snap 1 stud / same height",36,editor)
     local nameBox=field("Route name")
     local catalogBox=field("Catalog · existing or new name")
     nameBox:GetPropertyChangedSignal("Text"):Connect(function() if draft then draft.name=nameBox.Text end end)
@@ -265,11 +291,11 @@ function Routes.new(plugin,toolbar)
         if busy or not draft or not drawing or not dock.Enabled or RunService:IsRunning() or not mouse.Target then return end
         local points=draft.points
         if #points>=256 then status.Text="Maximum 256 points per route"; return end
-        local hit=mouse.Hit.Position; local p=hit; local best=1
-        for _,r in ipairs(records(root(false))) do for _,v in ipairs(read(r)) do
-            local d=(v-hit).Magnitude; if d<best then best=d; p=v end
-        end end
-        if #points==0 or (points[#points]-p).Magnitude>.05 then table.insert(points,p); refreshPreview(); refreshControls(); draftStatus() end
+        local p,connected=snapPoint(mouse.Hit.Position,records(root(false)),draft.route)
+        if #points==0 or (points[#points]-p).Magnitude>.05 then
+            table.insert(points,p); refreshPreview(); refreshControls(); draftStatus()
+            if connected then local name,catalog=metadata(connected); status.Text="Junction · "..catalog.." / "..name.." · "..#points.." points" end
+        end
     end)
     plugin.Deactivation:Connect(function() drawing=false; if dock.Enabled then refreshControls(); draftStatus() end end)
     button.Click:Connect(function() dock.Enabled=not dock.Enabled end)

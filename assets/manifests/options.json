@@ -160,6 +160,10 @@
       "rescueRouteSpeedMultiplier": 1.5,
       "searchWidth": 60,
       "recheckSeconds": 1
+    },
+    "adaptiveLod": {
+      "enabled": false,
+      "dormantSeconds": 2
     }
   },
   "uiPresentation": {

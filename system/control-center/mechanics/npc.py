@@ -20,8 +20,9 @@ ITEMS = [
          'Серверная проверка цели и дистанции, общий навигатор и радиус от spawn.',
          ['NpcHomeRadiusStuds', 'NpcTargetUserId'], [
              {'title': 'Работает в исходниках', 'lines': [
-                 'M615: периодические решения NPC через общий ActorAIScheduler (0,1 с с сохранением общей фазы). Heartbeat движения во время атаки и обработка урона сохраняются. AI LOD не включён.',
+                 'M615: периодические решения NPC через общий ActorAIScheduler (0,1 с с сохранением общей фазы). Heartbeat движения во время атаки и обработка урона сохраняются. AI LOD опционален с M617.',
                  'M616: общий ActorCombatTargeting.ClosestPlayer использует XZ spatial index, но NPC остаются retaliation-only; новый автоматический Aggro не включён.',
+                 'M617: Options → AI Performance, OFF по умолчанию. Только закреплённый Idle NPC в позиции дома может снизить частоту до 0,3–2 с; InCombat, LifeState, Anchored и CFrame пробуждают его до 0,1 с. Home Leash, recovery, атака и Return сохраняют 0,1 с.',
                  'NpcCombatAIService обрабатывает ответный бой, навигацию, атаку, DamageService и возврат домой; policy общих акторов вынесены в actor-модули.',
                  'M614: серверные melee, bow и headshot выбирают кандидатов через GetPartBoundsInBox по существующим RootCollider; точные bone-local hitboxes и дистанция луча сохранены. Studio/DEV и нагрузочная приёмка открыты.',
                  'NPC leash задаётся для spawn-record; общий таймаут без успешного урона берётся из GameOptions.HostileNoDamageReturnSeconds().',
@@ -30,7 +31,7 @@ ITEMS = [
                  'Агрессия, target, Return, attack progress и lastDamageAt не записываются в постоянный player/world store — при рестарте пересоздаются.',
                  'Нужна игровая проверка при прерывании атаки, новом уроне во время Return, переходах через Terrain/этажи и многопользовательской угрозе.',
              ]},
-         ], ['npc-ai', 'actor-ai-scheduler', 'actor-ai-queue', 'player-spatial-index', 'player-spatial-grid', 'actor-target-root', 'actor-home', 'actor-nav', 'damage-service', 'npc-policy', 'entity-hitbox', 'native-spatial-index']),
+         ], ['npc-ai', 'actor-ai-scheduler', 'actor-ai-queue', 'actor-activity-policy', 'player-spatial-index', 'player-spatial-grid', 'actor-target-root', 'actor-home', 'actor-nav', 'damage-service', 'npc-policy', 'entity-hitbox', 'native-spatial-index']),
     card('npc-visual-equipment', 'NPC · анимации, оружие, надголовный UI', 'Презентация',
          'Боевые решения и визуальная анимация разделены; предметы берутся из авторского loadout.',
          ['NpcEquipmentRegistry.loadouts', 'NpcAnimationRegistry.profiles'], [

@@ -2,6 +2,7 @@
 -- Attack decisions, target policy, chase, and authored attack pursuit stay outside.
 local Workspace = game:GetService("Workspace")
 local Scheduler = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAIScheduler"))
+local Activity = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorActivityPolicy"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
 local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
@@ -123,7 +124,16 @@ local function registerModel(model: Model, random: Random, stepAgent: (any) -> (
                     if not model:IsDescendantOf(Workspace) then releaseAgent(agent) end
                 end),
             }
-            Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent)
+            if Activity.Enabled then
+                -- Signals only change the deadline; existing damage handling
+                -- and state transitions remain the sole gameplay owners.
+                for _, attribute in ipairs({"MonsterCombatActive", "MonsterAggressive", "MonsterSpawning", "LifeState"}) do
+                    table.insert(agent.lifecycleConnections, model:GetAttributeChangedSignal(attribute):Connect(function()
+                        Scheduler.Wake(agent)
+                    end))
+                end
+            end
+            Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent, nil, if Activity.Enabled then Activity.MonsterDelay else nil)
         end, debug.traceback)
         pending[model] = nil
         if not ok then

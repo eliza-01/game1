@@ -265,7 +265,7 @@ MONSTER_NAV_FIELDS = {
 
 def normalize_monster_ai(change, base=None):
     import math
-    if not isinstance(change, dict) or set(change) - {'noDamageReturnSeconds', 'experimentalNavigation'}:
+    if not isinstance(change, dict) or set(change) - {'noDamageReturnSeconds', 'experimentalNavigation', 'adaptiveLod'}:
         raise ValueError('invalid monsterAi fields')
     result = deepcopy(base or {'noDamageReturnSeconds': 30})
     value = change.get('noDamageReturnSeconds', result['noDamageReturnSeconds'])
@@ -290,6 +290,17 @@ def normalize_monster_ai(change, base=None):
             raise ValueError(f'{name} must be {lo}..{hi}')
         out[name] = n
     result['experimentalNavigation'] = out
+    old_lod = result.get('adaptiveLod', {})
+    lod = change.get('adaptiveLod', {})
+    if not isinstance(lod, dict) or set(lod) - {'enabled', 'dormantSeconds'}:
+        raise ValueError('invalid adaptive AI LOD fields')
+    lod_enabled = lod.get('enabled', old_lod.get('enabled', False))
+    seconds = lod.get('dormantSeconds', old_lod.get('dormantSeconds', 2))
+    if type(lod_enabled) is not bool:
+        raise ValueError('adaptiveLod.enabled must be boolean')
+    if type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0.3 <= seconds <= 2:
+        raise ValueError('adaptiveLod.dormantSeconds must be 0.3..2')
+    result['adaptiveLod'] = {'enabled': lod_enabled, 'dormantSeconds': seconds}
     return result
 
 

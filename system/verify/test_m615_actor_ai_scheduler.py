@@ -35,7 +35,7 @@ class ActorAISchedulerM615(unittest.TestCase):
         ai = read('src/server/npc/NpcCombatAIService.luau')
         body = ai.split('local function tickAgent', 1)[1].split('function NpcCombatAIService.Bind', 1)[0]
         self.assertEqual(digest(body), 'a2af89fd9e79b3aab0f61d8e3c3e0b9124849e0ce0e398e59d424ad38e2cdc5e')
-        self.assertIn('Scheduler.Register(agent, TICK_SECONDS, delay, tickAgent, nil, true)', ai)
+        self.assertIn('Scheduler.Register(agent, TICK_SECONDS, delay, tickAgent, nil, true, if Activity.Enabled then Activity.NpcDelay else nil)', ai)
         self.assertIn('Scheduler.Remove(agent)', ai)
         self.assertEqual(ai.count('RunService.Heartbeat:Connect'), 1)
         self.assertIn('agent.pursuit:Step(targetRoot, agent.attackRadius, maxSpeed)', ai)
@@ -44,7 +44,7 @@ class ActorAISchedulerM615(unittest.TestCase):
     def test_single_owner_and_lifecycle(self):
         lifecycle = read('src/server/monster/MonsterAgentLifecycle.luau')
         self.assertIn('function MonsterAgentLifecycle.Start(stepAgent: (any) -> (), random: Random, thinkInterval: number)', lifecycle)
-        self.assertIn('Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent)', lifecycle)
+        self.assertIn('Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent, nil, if Activity.Enabled then Activity.MonsterDelay else nil)', lifecycle)
         self.assertIn('Scheduler.Remove(agent)', lifecycle)
         self.assertNotIn('runAgent', lifecycle)
         scheduler = read('src/server/actor/ActorAIScheduler.luau')

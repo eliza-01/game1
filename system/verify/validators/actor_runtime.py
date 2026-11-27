@@ -68,7 +68,7 @@ def check_actor_runtime_contracts(
     for required in ['pending[model] = true', 'model:GetAttributeChangedSignal("LifeState")', 'model.Destroying:Connect(',
                      'model.AncestryChanged:Connect(', 'Navigation.Initialize(agent)', 'Presentation.Initialize(agent, runRow, random',
                      'CombatState.ClearTarget(agent)', 'Navigation.ClearPath(agent)', 'connection:Disconnect()',
-                     'Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent)', 'Scheduler.Remove(agent)']:
+                     'Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent, nil, if Activity.Enabled then Activity.MonsterDelay else nil)', 'Scheduler.Remove(agent)']:
         if required not in monster_agent_lifecycle_m105:
             report_error(f"M105: MonsterAgentLifecycle contract missing {required}")
     if 'if not agent.active then return end' not in monster_chase_navigation_m104:

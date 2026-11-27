@@ -307,6 +307,10 @@ return table.freeze({
 			searchWidth = 60,
 			recheckSeconds = 1,
 		}),
+		adaptiveLod = table.freeze({
+			enabled = false,
+			dormantSeconds = 2,
+		}),
 	}),
 	playerJump = table.freeze({
 		heightMultiplier = 2,

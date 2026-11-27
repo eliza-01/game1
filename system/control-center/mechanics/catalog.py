@@ -72,6 +72,7 @@ SOURCES = {
     'monster-client-attack': ('src/client/monster/MonsterAttackLocomotionController.luau', 'Monster · клиентская анимация'),
     'entity-hitbox': ('src/server/combat/EntityHitboxService.luau', 'Hitbox · авторитет сервера'),
     'actor-ai-scheduler': ('src/server/actor/ActorAIScheduler.luau', 'Actor · AI scheduler'),
+    'actor-activity-policy': ('src/server/actor/ActorActivityPolicy.luau', 'Actor · adaptive cadence'),
     'player-spatial-index': ('src/server/actor/PlayerSpatialIndex.luau', 'Actor · player spatial index'),
     'player-spatial-grid': ('src/server/actor/PlayerSpatialGrid.luau', 'Actor · horizontal spatial grid'),
     'actor-target-root': ('src/server/actor/ActorTargetRoot.luau', 'Actor · combat target root'),

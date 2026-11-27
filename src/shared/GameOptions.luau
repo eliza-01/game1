@@ -103,6 +103,14 @@ function GameOptions.HostileNoDamageReturnSeconds(): number
     return math.clamp(finite((Registry.monsterAi or {}).noDamageReturnSeconds, 30), 1, 3600)
 end
 
+function GameOptions.AdaptiveAISettings()
+    local source = (Registry.monsterAi or {}).adaptiveLod or {}
+    return table.freeze({
+        enabled = source.enabled == true,
+        dormantSeconds = math.clamp(finite(source.dormantSeconds, 2), 0.3, 2),
+    })
+end
+
 function GameOptions.ExperimentalMonsterNavigation()
     local source = (Registry.monsterAi or {}).experimentalNavigation or {}
     return table.freeze({

@@ -8,14 +8,14 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0038.md",
-  "specSha256": "f991cea6edbfa1cbf674b3900fcd5bfc8853f788312587d9f9d4ca7764d77758",
+  "specSha256": "7557e02d4fa55abb34fd97ca07fafc680fb0cf6f2a396e4a963545237ca90008",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036",
     "KBN-0037"
   ],
-  "revision": 4,
-  "updatedAt": "2026-11-27T20:35:00+00:00",
+  "revision": 5,
+  "updatedAt": "2026-11-27T20:42:00+00:00",
   "tasks": [
     {
       "id": "KBN-0038-T01",
@@ -54,7 +54,7 @@
       "id": "KBN-0038-A02",
       "title": "Агро, атака, урон, преследование, home leash, blocked wait и возврат работают при смене AI LOD",
       "status": "NOT_RUN",
-      "evidence": "M615: общий scheduler, фиксированная частота, Lua queue test 1000 agents, parity тел решений M614; AI LOD, Studio/DEV NOT_RUN. M616: локальная XZ-выборка, 1200 Lua сравнений, parity target policy M615; AI LOD/Studio/DEV NOT_RUN."
+      "evidence": "M615: общий scheduler, фиксированная частота, Lua queue test 1000 agents, parity тел решений M614; AI LOD, Studio/DEV NOT_RUN. M616: локальная XZ-выборка, 1200 Lua сравнений, parity target policy M615; AI LOD/Studio/DEV NOT_RUN. M617: opt-in cadence, Lua policy/queue and Options migration; active decision parity, aggressive scan deadline, passive/anchored NPC wake. Studio/DEV/CPU NOT_RUN."
     },
     {
       "id": "KBN-0038-A03",

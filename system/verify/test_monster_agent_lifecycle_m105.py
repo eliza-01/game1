@@ -41,7 +41,7 @@ class MonsterAgentLifecycleM105(unittest.TestCase):
         self.assertLess(self.lifecycle.index('Navigation.Initialize(agent)'),
                         self.lifecycle.index('agents[model] = agent'))
         self.assertLess(self.lifecycle.index('agents[model] = agent'),
-                        self.lifecycle.index('Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent)'))
+                        self.lifecycle.index('Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent, nil, if Activity.Enabled then Activity.MonsterDelay else nil)'))
 
     def test_lifecycle_registers_and_disconnects_model_signals(self):
         for signal in ('GetAttributeChangedSignal("LifeState")', 'model.Destroying:Connect(',
@@ -50,7 +50,7 @@ class MonsterAgentLifecycleM105(unittest.TestCase):
         self.assertIn('agent.lifecycleConnections = {', self.lifecycle)
         self.assertIn('connection:Disconnect()', self.lifecycle)
         self.assertIn('agent.lifecycleConnections = nil', self.lifecycle)
-        self.assertIn('Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent)', self.lifecycle)
+        self.assertIn('Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent, nil, if Activity.Enabled then Activity.MonsterDelay else nil)', self.lifecycle)
         self.assertIn('if agent then releaseAgent(agent) end', self.lifecycle)
 
     def test_death_cancels_delayed_hit_and_navigation(self):

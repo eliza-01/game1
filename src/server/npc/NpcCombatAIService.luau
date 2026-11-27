@@ -18,6 +18,7 @@ local HitEffectService = require(script.Parent.Parent:WaitForChild("combat"):Wai
 local CombatFeedbackService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("CombatFeedbackService"))
 local CombatStateService = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("CombatStateService"))
 local HostilePursuitRegistry = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("HostilePursuitRegistry"))
+local Activity = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorActivityPolicy"))
 local Scheduler = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAIScheduler"))
 local Navigator = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorChaseNavigator"))
 local Queries = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCombatTargeting"))
@@ -466,7 +467,16 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
     end
     pinAtRest(agent, true)
     local delay = TICK_SECONDS - (os.clock() - decisionEpoch) % TICK_SECONDS
-    Scheduler.Register(agent, TICK_SECONDS, delay, tickAgent, nil, true)
+    if Activity.Enabled then
+        local function wake() Scheduler.Wake(agent) end
+        agent.activityConnections = {
+            model:GetAttributeChangedSignal("InCombat"):Connect(wake),
+            model:GetAttributeChangedSignal("LifeState"):Connect(wake),
+            root:GetPropertyChangedSignal("Anchored"):Connect(wake),
+            root:GetPropertyChangedSignal("CFrame"):Connect(wake),
+        }
+    end
+    Scheduler.Register(agent, TICK_SECONDS, delay, tickAgent, nil, true, if Activity.Enabled then Activity.NpcDelay else nil)
 end
 
 function NpcCombatAIService.Unbind(model: Model)
@@ -474,6 +484,8 @@ function NpcCombatAIService.Unbind(model: Model)
     if not agent then return end
     agent.active = false
     Scheduler.Remove(agent)
+    for _, connection in ipairs(agent.activityConnections or {}) do connection:Disconnect() end
+    agent.activityConnections = nil
     HostilePursuitRegistry.Clear(model)
     agent.recovery:Cancel()
     agent.serial += 1

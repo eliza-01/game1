@@ -54,10 +54,10 @@ function Queue:_enqueue(entry, due)
     up(heap, entry.index)
 end
 
-function Queue:Register(key, interval, delay, step, onStop, phaseLocked)
+function Queue:Register(key, interval, delay, step, onStop, phaseLocked, cadence)
     assert(interval > 0 and delay > 0, "positive AI cadence required")
     if self.entries[key] then return false end
-    local entry = {key = key, interval = interval, step = step, onStop = onStop, phaseLocked = phaseLocked}
+    local entry = {key = key, interval = interval, step = step, onStop = onStop, phaseLocked = phaseLocked, cadence = cadence}
     self.entries[key] = entry
     self:_enqueue(entry, self.clock() + delay)
     return true
@@ -68,6 +68,18 @@ function Queue:Remove(key)
     if not entry then return end
     self.entries[key] = nil
     unlink(self.heap, entry)
+end
+
+-- Only shorten a deferred deadline. Active agents keep the original cadence;
+-- a running/yielding step is never dispatched a second time.
+function Queue:Wake(key)
+    local entry = self.entries[key]
+    if not entry or not entry.index or not entry.deferred then return end
+    local due = self.clock() + entry.interval
+    if entry.due <= due then return end
+    unlink(self.heap, entry)
+    entry.deferred = false
+    self:_enqueue(entry, due)
 end
 
 local function run(self, entry)
@@ -87,8 +99,16 @@ local function run(self, entry)
     -- Completion-based cadence matches the old monster wait loop. No catch-up
     -- bursts or concurrent periodic decisions after a slow/yielding step.
     local finishedAt = self.clock()
-    local nextDue = finishedAt + entry.interval
-    if entry.phaseLocked then
+    local delay = entry.interval
+    if ok and entry.cadence then
+        local valid, proposed = xpcall(entry.cadence, debug.traceback, entry.key, finishedAt, entry.interval)
+        if valid and type(proposed) == "number" and proposed >= entry.interval and proposed < math.huge then
+            delay = proposed
+        elseif not valid then self.report(proposed) end
+    end
+    entry.deferred = delay > entry.interval
+    local nextDue = finishedAt + delay
+    if entry.phaseLocked and not entry.deferred then
         -- NPC previously carried the fractional Heartbeat remainder forward.
         -- Keep its nominal phase without replaying missed decision ticks.
         nextDue = entry.due + entry.interval

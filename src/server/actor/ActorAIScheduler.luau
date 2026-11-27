@@ -10,8 +10,8 @@ end)
 local ActorAIScheduler = {}
 local connection
 
-function ActorAIScheduler.Register(agent, interval, delay, step, onStop, phaseLocked)
-    local registered = queue:Register(agent, interval, delay, step, onStop, phaseLocked)
+function ActorAIScheduler.Register(agent, interval, delay, step, onStop, phaseLocked, cadence)
+    local registered = queue:Register(agent, interval, delay, step, onStop, phaseLocked, cadence)
     if not connection then
         connection = RunService.Heartbeat:Connect(function()
             PlayerSpatialIndex.BeginBatch()
@@ -21,6 +21,10 @@ function ActorAIScheduler.Register(agent, interval, delay, step, onStop, phaseLo
         end)
     end
     return registered
+end
+
+function ActorAIScheduler.Wake(agent)
+    queue:Wake(agent)
 end
 
 function ActorAIScheduler.Remove(agent)

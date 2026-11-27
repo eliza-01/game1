@@ -492,6 +492,12 @@
 <label>Search width · studs<input id="option-nav-searchWidth" type="number" min="10" max="120" value="60"></label>
 <label>Direct recheck · sec<input id="option-nav-recheckSeconds" type="number" min="0.5" max="3" step="0.1" value="1"></label>
 </div><div class="actions"><button id="option-nav-save" class="primary" type="button">Save navigation options</button></div></div></details>
+<details class="game1-option-section" data-option-section="ai-performance"><summary><span class="game1-option-icon" aria-hidden="true">⚙</span><span><strong>AI Performance</strong></span></summary>
+<div class="panel character-card"><small class="hint">Active AI: 0.1 sec · aggressive idle: existing 0.3 sec scan deadline · dormant: passive monsters and anchored NPCs at home. Opt in after Studio acceptance.</small>
+<div class="character-grid">
+<label>Adaptive AI LOD <input id="option-ai-lod-enabled" type="checkbox"></label>
+<label>Dormant safety check · sec<input id="option-ai-lod-seconds" type="number" min="0.3" max="2" step="0.1" value="2"></label>
+</div><div class="actions"><button id="option-ai-lod-save" class="primary" type="button">Save AI performance</button></div></div></details>
 <details class="game1-option-section" data-option-section="movement" ><summary><span class="game1-option-icon" aria-hidden="true">🦘</span><span><strong>Movement</strong><small>Прыжок и приземление</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>character movement · shared gameplay</span><h3>Jump &amp; landing</h3></div></div>
@@ -1287,7 +1293,7 @@
 <script src="skill-editor.js?v=557"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=595"></script>
+<script src="options.js?v=617"></script>
 <script src="character-creation-options.js?v=505"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>

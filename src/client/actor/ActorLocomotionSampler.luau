@@ -30,6 +30,9 @@ local function prepareProxy(visual: Model): (Model?, Animator?, string?)
 			object.CastShadow = false
 			object.Transparency = 1
 			object.LocalTransparencyModifier = 1
+		elseif object:IsA("RigidConstraint") then
+			-- Hidden samplers must not constrain an external live rig.
+			object:Destroy()
 		elseif object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then
 			object.Enabled = false
 		elseif object:IsA("Script") or object:IsA("LocalScript") then
@@ -82,8 +85,6 @@ function ActorLocomotionSampler.new(visual: Model, animationId: string, playback
 		proxy = proxy,
 		track = track,
 		bones = ActorSkeletonMap.BuildBonePathMap(proxy),
-		users = 0,
-		lastUsedAt = os.clock(),
 		lastAnchorAt = 0,
 		phase = 0,
 		phasePending = false,
@@ -142,10 +143,6 @@ function ActorLocomotionSampler:IsReady(): boolean
 		self.phasePending = false
 	end
 	return ready
-end
-
-function ActorLocomotionSampler:Touch()
-	self.lastUsedAt = os.clock()
 end
 
 function ActorLocomotionSampler:AnchorNear(cameraCFrame: CFrame, now: number, interval: number)

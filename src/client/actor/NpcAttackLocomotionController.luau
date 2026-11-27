@@ -6,15 +6,13 @@ local Workspace = game:GetService("Workspace")
 local Config = require(script.Parent:WaitForChild("ActorAnimationCompositionConfig"))
 local Skeleton = require(script.Parent:WaitForChild("ActorSkeletonMap"))
 local Sampler = require(script.Parent:WaitForChild("ActorLocomotionSampler"))
+local Pool = require(script.Parent:WaitForChild("ActorSamplerPool"))
 local LowerBodyPose = require(script.Parent:WaitForChild("ActorLowerBodyPose"))
 
 local Controller = {}
 local started = false
 local entries = {}
 local active = {}
-local recycled = {}
-local serial = 0
-local lastCleanup = 0
 local warned = {}
 
 local function warnOnce(key: string, message: string)
@@ -25,10 +23,9 @@ end
 
 local function release(entry)
     if not entry.sampler then return end
-    entry.sampler.users = math.max(0, entry.sampler.users - 1)
-    entry.sampler:Touch()
-    entry.sampler:Suspend()
+    local sampler = entry.sampler
     entry.sampler = nil
+    Pool:Release(sampler)
 end
 
 local function unbind(model: Model)
@@ -42,35 +39,31 @@ end
 
 local function acquire(entry): boolean
     if entry.sampler then return true end
-    if os.clock() < (entry.retrySamplerAt or 0) then return false end
+    if entry.acquiring or os.clock() < (entry.retrySamplerAt or 0) then return false end
     local animationId = tostring(entry.model:GetAttribute("NpcAttackPursuitAnimationId") or "")
     if not animationId:match("^%d+$") or animationId == "0" then return false end
-    local key = tostring(entry.model:GetAttribute("NpcSlug")) .. "|" .. animationId
-    local sampler
-    for _, candidate in pairs(recycled) do
-        if candidate.baseKey == key and candidate.users == 0 then
-            sampler = candidate
-            break
-        end
-    end
+    local key = "npc|" .. tostring(entry.model:GetAttribute("NpcSlug")) .. "|" .. animationId
     local phase = tonumber(entry.model:GetAttribute("NpcAttackPursuitPhase")) or 0
     local speed = tonumber(entry.model:GetAttribute("NpcAttackPursuitPlaybackSpeed")) or 1
+    entry.acquiring = true
+    local sampler, err = Pool:Acquire(key, function()
+        return Sampler.new(entry.visual, animationId, speed, phase)
+    end, speed, phase)
+    entry.acquiring = false
     if not sampler then
-        local created, err = Sampler.new(entry.visual, animationId, speed, phase)
-        if not created then
+        if err ~= "budget" then
             warnOnce(key, tostring(err or "cannot sample locomotion"))
             entry.retrySamplerAt = os.clock() + 2
-            return false
         end
-        sampler = created
-        sampler.baseKey = key
-        serial += 1
-        recycled[key .. "#" .. tostring(serial)] = sampler
-    else
-        sampler:Resume(speed, phase)
+        return false
     end
-    sampler.users = 1
-    sampler:Touch()
+    if entries[entry.model] ~= entry or not entry.model.Parent
+        or not entry.root.Parent or not entry.visual.Parent
+        or entry.model:GetAttribute("LifeState") ~= "Alive"
+        or entry.model:GetAttribute("NpcAttackPursuitActive") ~= true then
+        Pool:Release(sampler)
+        return false
+    end
     entry.sampler = sampler
     return true
 end
@@ -100,6 +93,9 @@ local function bind(model: Model)
         end
     end))
     table.insert(entry.connections, model.Destroying:Connect(function() unbind(model) end))
+    table.insert(entry.connections, model.AncestryChanged:Connect(function()
+        if not model:IsDescendantOf(Workspace) then unbind(model) end
+    end))
     if model:GetAttribute("NpcAttackPursuitActive") == true then active[entry] = true end
 end
 
@@ -130,20 +126,12 @@ end
 local function step(dt: number)
     local camera = Workspace.CurrentCamera
     if not camera then return end
-    -- Count all existing leases before issuing new ones: iteration order
-    -- must not let early entries exceed the budget while later leases exist.
-    local composed = 0
-    for entry in pairs(active) do
-        if entry.sampler then composed += 1 end
-    end
     for entry in pairs(active) do
         if not entry.model.Parent or not entry.root.Parent or not entry.visual.Parent then
-            if entry.sampler then composed -= 1 end
             unbind(entry.model)
             continue
         end
         if entry.model:GetAttribute("LifeState") ~= "Alive" then
-            if entry.sampler then composed -= 1 end
             entry.weight = 0
             release(entry)
             active[entry] = nil
@@ -152,8 +140,8 @@ local function step(dt: number)
         local wants = entry.model:GetAttribute("NpcAttackPursuitActive") == true
             and entry.model:GetAttribute("LifeState") == "Alive"
             and (entry.root.Position - camera.CFrame.Position).Magnitude <= Config.MaxDistance
-        if wants and not entry.sampler and composed < Config.MaxComposedActors then
-            if acquire(entry) then composed += 1 end
+        if wants and not entry.sampler then
+            acquire(entry)
         end
         local sampler = entry.sampler
         if sampler then
@@ -175,7 +163,6 @@ local function step(dt: number)
             if entry.weight < 0.01 and not wants then
                 entry.weight = 0
                 release(entry)
-                composed -= 1
                 -- Keep distant pursuit entries eligible when the camera returns;
                 -- the server attribute may remain true without another event.
                 if entry.model:GetAttribute("NpcAttackPursuitActive") ~= true
@@ -186,16 +173,7 @@ local function step(dt: number)
             active[entry] = nil
         end
     end
-    local now = os.clock()
-    if now - lastCleanup >= 2 then
-        lastCleanup = now
-        for key, sampler in pairs(recycled) do
-            if sampler.users == 0 and now - sampler.lastUsedAt >= Config.SamplerIdleTtlSeconds then
-                sampler:Destroy()
-                recycled[key] = nil
-            end
-        end
-    end
+    Pool:Cleanup(os.clock())
 end
 
 function Controller.Start()

@@ -1,8 +1,7 @@
 -- Roblox Studio: StarterPlayer.StarterPlayerScripts.game1Client.MonsterAnimation.ActorAnimationCompositionConfig (ModuleScript)
 -- Client-only limits for monster upper-body-over-locomotion composition.
 local Config = {
-	MaxComposedMonsters = 32, -- legacy name for shared actor budget
-	MaxComposedActors = 32,
+	MaxComposedActors = 32, -- shared resident limit, including idle and pending samplers
 	MaxDistance = 140,
 	EntryBlendSeconds = 0.10,
 	ExitBlendSeconds = 0.08,

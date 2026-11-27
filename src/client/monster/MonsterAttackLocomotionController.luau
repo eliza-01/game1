@@ -1,22 +1,20 @@
 -- Roblox Studio: StarterPlayer.StarterPlayerScripts.game1Client.MonsterAnimation.MonsterAttackLocomotionController (ModuleScript)
 -- Keeps monster legs in authored Run while the server-owned attack continues on the upper body.
--- Samplers are pooled by rig/run identity but leased exclusively so nearby monsters keep independent phases.
+-- The shared actor pool enforces one resident budget across NPCs and monsters.
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(script.Parent:WaitForChild("MonsterAnimationCompositionConfig"))
 local MonsterSkeletonMap = require(script.Parent:WaitForChild("MonsterSkeletonMap"))
 local MonsterLocomotionSampler = require(script.Parent:WaitForChild("MonsterLocomotionSampler"))
+local Pool = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorSamplerPool"))
 local ActorLowerBodyPose = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorLowerBodyPose"))
 
 local Controller = {}
 local started = false
 local entries = {}
 local activeEntries = {}
-local samplers = {}
-local samplerSerial = 0
 local warned = {}
-local lastCleanupAt = 0
 
 local function warnOnce(key: string, message: string)
 	if warned[key] then
@@ -79,55 +77,41 @@ local function releaseSampler(entry)
 	if not sampler then
 		return
 	end
-	sampler.users = math.max(0, sampler.users - 1)
-	sampler:Touch()
-	sampler:Suspend()
 	entry.sampler = nil
-	entry.samplerKey = nil
+	Pool:Release(sampler)
 end
 
 local function acquireSampler(entry): boolean
-	if entry.sampler then
-		return true
-	end
+	if entry.sampler then return true end
+	if entry.acquiring or os.clock() < (entry.retrySamplerAt or 0) then return false end
 	local runId = tostring(entry.model:GetAttribute("MonsterRunAnimationId") or "")
 	if not string.match(runId, "^%d+$") or runId == "0" then
 		entry.disabled = true
-		setEntryActive(entry, false)
 		return false
 	end
-	local baseKey = samplerBaseKey(entry.model)
-	local sampler = nil
-	local cacheKey = nil
-	for key, candidate in samplers do
-		if candidate.baseKey == baseKey and candidate.users <= 0 then
-			sampler = candidate
-			cacheKey = key
-			break
-		end
-	end
+	local baseKey = "monster|" .. samplerBaseKey(entry.model)
 	local phase = tonumber(entry.model:GetAttribute("MonsterAnimationPhase")) or 0
+	local speed = tonumber(entry.model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1
+	entry.acquiring = true
+	local sampler, err = Pool:Acquire(baseKey, function()
+		return MonsterLocomotionSampler.new(entry.visual, runId, speed, phase)
+	end, speed, phase)
+	entry.acquiring = false
 	if not sampler then
-		local playbackSpeed = tonumber(entry.model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1
-		local created, errorMessage = MonsterLocomotionSampler.new(entry.visual, runId, playbackSpeed, phase)
-		if not created then
-			warnOnce(baseKey, errorMessage or "could not create monster locomotion sampler")
-			entry.disabled = true
-			setEntryActive(entry, false)
-			return false
+		if err ~= "budget" then
+			warnOnce(baseKey, err or "could not create monster locomotion sampler")
+			entry.retrySamplerAt = os.clock() + 2
 		end
-		sampler = created
-		sampler.baseKey = baseKey
-		samplerSerial += 1
-		cacheKey = baseKey .. "#" .. tostring(samplerSerial)
-		samplers[cacheKey] = sampler
-	else
-		sampler:Resume(tonumber(entry.model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1, phase)
+		return false
 	end
-	sampler.users = 1
-	sampler:Touch()
+	if entries[entry.model] ~= entry or not entry.model.Parent
+		or not entry.root.Parent or not entry.visual.Parent
+		or entry.model:GetAttribute("LifeState") ~= "Alive"
+		or entry.model:GetAttribute("MonsterAttackPursuitActive") ~= true then
+		Pool:Release(sampler)
+		return false
+	end
 	entry.sampler = sampler
-	entry.samplerKey = cacheKey
 	return true
 end
 
@@ -171,13 +155,12 @@ local function bindMonster(model: Model)
 			rootMotionBones = resolveRootMotionBones(visual),
 			weight = 0,
 			sampler = nil,
-			samplerKey = nil,
 			connections = {},
 			disabled = false,
 		}
 		entries[model] = entry
 		local function refreshActive()
-			setEntryActive(entry, model:GetAttribute("MonsterCombatActive") == true
+			setEntryActive(entry, entry.sampler ~= nil or model:GetAttribute("MonsterCombatActive") == true
 				or model:GetAttribute("MonsterAttackPursuitActive") == true)
 		end
 		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitActive"):Connect(refreshActive))
@@ -192,6 +175,9 @@ local function bindMonster(model: Model)
 		end))
 		table.insert(entry.connections, model.Destroying:Connect(function()
 			unbind(model)
+		end))
+		table.insert(entry.connections, model.AncestryChanged:Connect(function()
+			if not model:IsDescendantOf(Workspace) then unbind(model) end
 		end))
 		refreshActive()
 	end)
@@ -210,26 +196,12 @@ local function bindFolder(folder: Folder)
 	end)
 end
 
-local function cleanupSamplers(now: number)
-	if now - lastCleanupAt < 1 then
-		return
-	end
-	lastCleanupAt = now
-	for key, sampler in samplers do
-		if sampler.users <= 0 and now - sampler.lastUsedAt >= Config.SamplerIdleTtlSeconds then
-			sampler:Destroy()
-			samplers[key] = nil
-		end
-	end
-end
-
 local function step(deltaTime: number)
 	local camera = Workspace.CurrentCamera
 	if not camera then
 		return
 	end
 	local now = os.clock()
-	local activeCount = 0
 	local maxDistanceSquared = Config.MaxDistance * Config.MaxDistance
 	for entry in activeEntries do
 		local model = entry.model
@@ -255,12 +227,10 @@ local function step(deltaTime: number)
 			suppressCombatRootTranslation(entry)
 		end
 		local wantsComposition = pursuitActive and distanceSquared <= maxDistanceSquared
-		if wantsComposition and not entry.sampler and not entry.disabled
-			and activeCount < Config.MaxComposedMonsters then
+		if wantsComposition and not entry.sampler and not entry.disabled then
 			acquireSampler(entry)
 		end
 		if entry.sampler then
-			activeCount += 1
 			entry.sampler:AnchorNear(camera.CFrame, now, Config.SamplerAnchorInterval)
 			local targetWeight = if wantsComposition then 1 else 0
 			local duration = if targetWeight > entry.weight then Config.EntryBlendSeconds else Config.ExitBlendSeconds
@@ -286,7 +256,7 @@ local function step(deltaTime: number)
 			setEntryActive(entry, false)
 		end
 	end
-	cleanupSamplers(now)
+	Pool:Cleanup(now)
 end
 
 function Controller.Start()
@@ -305,7 +275,7 @@ function Controller.Start()
 	end)
 	RunService.PreSimulation:Connect(step)
 	print(("[game1][MONSTER_ANIM] attack locomotion composition ready · max %d · radius %d"):format(
-		Config.MaxComposedMonsters,
+		Config.MaxComposedActors,
 		Config.MaxDistance
 	))
 end

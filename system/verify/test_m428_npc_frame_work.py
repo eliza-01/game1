@@ -35,16 +35,20 @@ class NpcFrameWorkM428(unittest.TestCase):
         self.assertIn('(self.proxy:GetPivot().Position - position).Magnitude >= 8', sampler)
         for path in ('src/client/actor/NpcAttackLocomotionController.luau', 'src/client/monster/MonsterAttackLocomotionController.luau'):
             source = read(path)
-            self.assertIn('sampler:Suspend()', source)
-            self.assertIn('sampler:Resume(', source)
-            self.assertIn('SamplerIdleTtlSeconds', source)
+            self.assertIn('Pool:Acquire(', source)
+            self.assertIn('Pool:Release(', source)
+            self.assertIn('Pool:Cleanup(', source)
+        pool = read('src/client/actor/SamplerPool.luau')
+        self.assertIn('pcall(sampler.Suspend, sampler)', pool)
+        self.assertIn('pcall(matching.Resume, matching, speed, phase)', pool)
 
     def test_npc_budget_counts_existing_leases_and_failed_loads_back_off(self):
         source = read('src/client/actor/NpcAttackLocomotionController.luau')
         step = source.split('local function step(', 1)[1].split('function Controller.Start()', 1)[0]
-        self.assertLess(step.index('if entry.sampler then composed += 1 end'), step.index('composed < Config.MaxComposedActors'))
-        self.assertIn('if acquire(entry) then composed += 1 end', step)
-        self.assertIn('composed -= 1', step)
+        pool = read('src/client/actor/SamplerPool.luau')
+        self.assertLess(pool.index('self.resident >= self.limit'), pool.index('pcall(factory)'))
+        self.assertIn('acquire(entry)', step)
+        self.assertIn('Pool:Release(sampler)', source)
         self.assertIn('os.clock() < (entry.retrySamplerAt or 0)', source)
         self.assertIn('entry.retrySamplerAt = os.clock() + 2', source)
         self.assertNotIn('elseif not wants then\n            active[entry] = nil', step)

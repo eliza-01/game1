@@ -32,7 +32,7 @@ ITEMS = [
          'Боевые решения и визуальная анимация разделены; предметы берутся из авторского loadout.',
          ['NpcEquipmentRegistry.loadouts', 'NpcAnimationRegistry.profiles'], [
              {'title': 'Работает в исходниках', 'lines': [
-                 'NpcAnimationService владеет animation tracks, NpcEquipmentService монтирует оружие через общий WeaponEquipService.',
+                 'NpcAnimationService владеет animation tracks, NpcEquipmentService монтирует оружие через общий WeaponEquipService. M613: общий пул NPC/Monster ограничен 32 экземплярами, включая idle и резерв загрузки; lifecycle и повторное использование централизованы.',
                  'NpcOverheadController отображает имя и условный HP в радиусах Options. HealthBarView удаляет цифры только из отображаемого имени NPC; slug, имя Instance, база и уровень не изменяются.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [

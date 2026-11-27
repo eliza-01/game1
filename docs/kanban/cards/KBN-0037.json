@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "34e8971a02a4fd0d13673ae3db7c7b08a772b7ff4190abbabdfd5daf1f9e50b3",
+  "specSha256": "157476b5f8bfd14ec38edacbe6c5bcd09549afc55fa790b7aa7993bf7fa443bf",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 6,
-  "updatedAt": "2026-11-27T18:20:00+00:00",
+  "revision": 7,
+  "updatedAt": "2026-11-27T19:24:00+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -57,7 +57,7 @@
       "id": "KBN-0037-A01",
       "title": "Общий лимит sampler никогда не превышен; смерть/DeathIdle, атака и locomotion без restpose регрессий",
       "status": "NOT_RUN",
-      "evidence": "M612: восстановлена репликация принятого клипа через snapshot и общий composer; Studio/DEV и общий бюджет NOT_RUN."
+      "evidence": "M612: восстановлена репликация принятого клипа через snapshot и общий composer; Studio/DEV и общий бюджет NOT_RUN. M613: общий лимит resident NPC/Monster и lifecycle реализованы; runtime-приёмка, player sampler и приоритеты открыты."
     },
     {
       "id": "KBN-0037-A02",

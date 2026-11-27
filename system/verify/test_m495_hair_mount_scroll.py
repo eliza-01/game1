@@ -8,26 +8,18 @@ def source(path):
 
 
 class HairMountScrollM495(unittest.TestCase):
-    def test_offsets_are_captured_before_first_mount(self):
-        builder = source('src/server/character/CharacterAssemblyBuilder.luau')
-        self.assertLess(builder.index('BoneModelMount.CaptureHairOffsets(group, anchor)'),
-                        builder.index('BoneModelMount.Place(group, anchor,'))
-        mount = source('src/shared/rig/BoneModelMount.luau')
-        self.assertIn('frame:ToObjectSpace(piece.CFrame)', mount)
-        self.assertIn('socketFrame * (piece:GetAttribute("Game1HairGripOffset") :: CFrame)', mount)
-        self.assertLess(mount.index('if not BoneModelMount.HairReady(model) then return false end'),
-                        mount.index('piece.CFrame = target'))
-        self.assertIn('return found == count', mount)
-        self.assertIn('local delta = socketFrame * gripFrame:Inverse()', mount)  # unchanged weapon path
+    def test_compound_welds_preserve_authored_offsets(self):
+        mount = source('src/shared/rig/RigidEquipmentMount.luau')
+        self.assertLess(mount.index('StaticMount.Place(model, grip,'), mount.index('Instance.new("WeldConstraint")'))
+        self.assertIn('weld.Part0 = root', mount)
+        self.assertIn('weld.Part1 = part', mount)
+        self.assertIn('return count == expected', mount)
 
     def test_hair_uses_carrier_and_primary_grip(self):
-        mount = source('src/shared/rig/BoneModelMount.luau')
-        follower = source('src/client/character/BoneMountedAttachmentController.luau')
+        mount = source('src/shared/rig/RigidEquipmentMount.luau')
         self.assertIn('local carrier = imported:FindFirstChild("rig_carrier")', mount)
-        self.assertIn('carrier:FindFirstChild(boneName, true)', mount)
-        self.assertIn('then BoneModelMount.FindHairBone(character, name)', follower)
-        self.assertIn('root and root:FindFirstChild(gripName)', follower)
-        self.assertIn('not state.bone:IsDescendantOf(character)', follower)
+        self.assertIn('local root = hair.PrimaryPart', mount)
+        self.assertIn('joint.Attachment0 ~= socket or joint.Attachment1 ~= grip', mount)
 
     def test_preview_replication_and_world_entry_gates(self):
         service = source('src/server/character/CharacterCreationPreviewService.luau')
@@ -36,12 +28,12 @@ class HairMountScrollM495(unittest.TestCase):
         preview = source('src/client/character/CharacterCreationPreviewController.luau')
         self.assertLess(preview.index('while not templateReady(template) do'), preview.index('template:Clone()'))
         self.assertIn('if not templateReady(instance) then instance:Destroy(); return false end', preview)
-        self.assertLess(preview.index('if not Mounts.UpdateCharacter(instance) then'),
+        self.assertLess(preview.index('if not Mounts.HairAssemblyReady(instance) then'),
                         preview.index('for part, transparency in pairs(visibility)'))
         controller = source('src/client/character/CharacterCreationController.luau')
         self.assertLess(controller.index('while current() and not Mounts.HairAssemblyReady(model)'),
                         controller.index('pcall(MeshPreloader.PreloadModel, model, current'))
-        self.assertIn('world hair replication incomplete; follower will retry', controller)
+        self.assertIn('world hair constraint replication incomplete', controller)
 
     def test_manual_canvas_and_material_cells(self):
         panel = source('src/client/character/CharacterCreationPanel.luau')

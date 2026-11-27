@@ -8,9 +8,26 @@ local AttackConfig = require(CombatShared:WaitForChild("AttackConfig"))
 local AimPoseController = require(script.Parent.Parent.Parent:WaitForChild("combat"):WaitForChild("AimPoseController"))
 local CharacterUpperBodyRig = require(script.Parent:WaitForChild("CharacterUpperBodyRig"))
 
-local AttackUpperBodyComposer = {}
-
+-- One scheduler for local and observer instances; no scan of inactive players.
+local activeComposers = {}
 local started = false
+local function holdSourceTerminalPose(dt: number)
+    for _, callbacks in pairs(activeComposers) do callbacks.hold(dt) end
+end
+local function step(dt: number)
+    for _, callbacks in pairs(activeComposers) do callbacks.step(dt) end
+end
+local function startScheduler()
+    if started then return end
+    started = true
+    RunService.PreAnimation:Connect(holdSourceTerminalPose)
+    RunService.PreSimulation:Connect(step)
+end
+
+local function newComposer(ownsLocalAim: boolean)
+local AttackUpperBodyComposer = {}
+local holdPose: (number) -> ()
+local composePose: (number) -> ()
 local active = false
 local activeCharacter: Model? = nil
 local targetBridge: Bone? = nil
@@ -63,7 +80,8 @@ local function smoothstep(alpha: number): number
 end
 
 local function destroyProxy()
-	AimPoseController.SetPoseDrivenExternally(false)
+	activeComposers[AttackUpperBodyComposer] = nil
+	if ownsLocalAim then AimPoseController.SetPoseDrivenExternally(false) end
 	upperPairs = {}
 	targetBridge = nil
 	targetHost = nil
@@ -113,11 +131,15 @@ local function prepareProxy(visual: Model): (Model?, Animator?, string?)
 			object.Transform = CFrame.identity
 		elseif object:IsA("BasePart") then
 			object.Anchored = true
+			object.CastShadow = false
 			object.CanCollide = false
 			object.CanTouch = false
 			object.CanQuery = false
 			object.Transparency = 1
 			object.LocalTransparencyModifier = 1
+		elseif object:IsA("RigidConstraint") then
+			-- A private animation sampler must never constrain a real character.
+			object:Destroy()
 		elseif object:IsA("Decal") or object:IsA("Texture") then
 			object.Transparency = 1
 		elseif object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then
@@ -268,7 +290,7 @@ function AttackUpperBodyComposer.Begin(
 		track:Play(0, 0, 0)
 	end)
 	local deadline = os.clock() + math.max(0.1, tonumber(AttackConfig.UpperBodyAttackTrackReadySeconds) or 1)
-	while track.Length <= 0.01 and os.clock() < deadline do
+	while track.Length <= 0.01 and os.clock() < deadline and (not stillValid or stillValid()) do
 		RunService.Heartbeat:Wait()
 	end
 	if track.Length <= 0.01 then
@@ -291,7 +313,7 @@ function AttackUpperBodyComposer.Begin(
 	destroyProxy()
 	active = true
 	activeCharacter = character
-	AimPoseController.SetPoseDrivenExternally(true)
+	if ownsLocalAim then AimPoseController.SetPoseDrivenExternally(true) end
 	targetBridge = bridge
 	targetHost = host
 	sourceProxy = proxy
@@ -318,18 +340,36 @@ function AttackUpperBodyComposer.Begin(
 	pcall(function()
 		track.TimePosition = 0
 	end)
+	activeComposers[AttackUpperBodyComposer] = { hold = holdPose, step = composePose }
+	startScheduler()
 	return track, nil, sourcePlaybackSpeed
+end
+
+-- Observer catch-up: seek exactly once on accepted start or bounce; no per-frame network correction.
+function AttackUpperBodyComposer.SeekPhase(phase: number, speed: number): boolean
+	if not active or not sourceTrack then return false end
+	sourceTrack.TimePosition = math.clamp(phase, 0, 0.9999) * sourceTrack.Length
+	return AttackUpperBodyComposer.SetPlaybackSpeed(speed)
 end
 
 function AttackUpperBodyComposer.End()
 	destroyProxy()
 end
 
-local function holdSourceTerminalPose(deltaTime: number)
+holdPose = function(deltaTime: number)
 	local track = sourceTrack
-	if not active or not track or sourcePoseFrozen or sourcePlaybackSpeed <= 0 then
-		return
-	end
+	if not active or not track or sourcePoseFrozen then return end
+    if sourcePlaybackSpeed <= 0 then
+        -- Observer reverse playback must not auto-stop at the first frame.
+        -- The local player's bounce still owns its existing timeline.
+        if not ownsLocalAim and sourcePlaybackSpeed < 0
+            and track.TimePosition <= math.max(1/240, deltaTime * -sourcePlaybackSpeed * 1.25) then
+            track.TimePosition = 0
+            track:AdjustSpeed(0)
+            sourcePoseFrozen = true
+        end
+        return
+    end
 	local length = tonumber(track.Length) or 0
 	if length <= 0.05 then
 		return
@@ -346,7 +386,7 @@ local function holdSourceTerminalPose(deltaTime: number)
 	end
 end
 
-local function step(deltaTime: number)
+composePose = function(deltaTime: number)
 	if not active then
 		return
 	end
@@ -402,7 +442,7 @@ local function step(deltaTime: number)
 
 	-- Final owner for this frame, matching RobloxLineage: aim is applied only
 	-- after locomotion + source attack + bridge compensation are complete.
-	AimPoseController.StepAfterExternalPose(deltaTime)
+	if ownsLocalAim then AimPoseController.StepAfterExternalPose(deltaTime) end
 
 	if exitComplete then
 		destroyProxy()
@@ -410,12 +450,14 @@ local function step(deltaTime: number)
 end
 
 function AttackUpperBodyComposer.Start()
-	if started then
-		return
-	end
-	started = true
-	RunService.PreAnimation:Connect(holdSourceTerminalPose)
-	RunService.PreSimulation:Connect(step)
+    startScheduler()
 end
 
 return AttackUpperBodyComposer
+end
+
+local localComposer = newComposer(true)
+function localComposer.NewObserver()
+    return newComposer(false)
+end
+return localComposer

@@ -15005,22 +15005,24 @@ function StudioTimelinePreview.new(services)
         return preview
     end
 
-    local hairFollower = nil
     local function refreshTimelineAccessories(preview: Model)
-        -- The same BoneMountedAttachmentController that positions rigid models in Play,
-        -- called once per scrubbed pose instead of starting a render loop.
-        if hairFollower == nil then
-            local scripts = game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts")
-            local client = scripts and scripts:FindFirstChild("Game1Client")
-            local character = client and client:FindFirstChild("character")
-            local source = character and character:FindFirstChild("BoneMountedAttachmentController")
-            if source and source:IsA("ModuleScript") then
-                hairFollower = require(source)
-            else
-                return -- The preview remains usable without optional pivot hair.
+        -- A Viewport WorldModel does not simulate equipment physics. Apply the
+        -- exact native joint equation once per explicitly sampled editor pose.
+        for _, joint in preview:GetDescendants() do
+            if joint:IsA("RigidConstraint") and joint.Name == "Game1RigidEquipmentJoint" then
+                local endpoint, grip = joint.Attachment0, joint.Attachment1
+                local root = grip and grip.Parent
+                local item = root and root:FindFirstAncestorWhichIsA("Model")
+                while item and item:GetAttribute("Game1RigidEquipment") ~= true do
+                    item = item:FindFirstAncestorWhichIsA("Model")
+                end
+                if endpoint and grip and item and item:IsA("Model") then
+                    local frame = if endpoint:IsA("Bone") then endpoint.TransformedWorldCFrame else endpoint.WorldCFrame
+                    local delta = frame * grip.WorldCFrame:Inverse()
+                    item:PivotTo(delta * item:GetPivot())
+                end
             end
         end
-        if hairFollower.UpdateCharacter then hairFollower.UpdateCharacter(preview) end
     end
 
     -- AnimationClipProvider can transiently return an empty KeyframeSequence for a

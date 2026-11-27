@@ -15,7 +15,8 @@ local EyeColors = require(Shared:WaitForChild("character"):WaitForChild("Charact
 local Catalog = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationAppearanceRegistry"))
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 local CameraController = require(script.Parent:WaitForChild("CameraController"))
-local Mounts = require(script.Parent:WaitForChild("BoneMountedAttachmentController"))
+local Mounts = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+    :WaitForChild("rig"):WaitForChild("RigidEquipmentMount"))
 local AnimationRoot = script.Parent:WaitForChild("animation")
 local AnimationController = require(AnimationRoot:WaitForChild("CharacterAnimationController"))
 local WorldAnimations = require(AnimationRoot:WaitForChild("WorldAnimationPreloader"))
@@ -792,7 +793,7 @@ function Controller.Start()
                                 RunService.Heartbeat:Wait()
                             end
                             if current() and not Mounts.HairAssemblyReady(model) then
-                                warn("[game1][character-creation] world hair replication incomplete; follower will retry")
+                                warn("[game1][character-creation] world hair constraint replication incomplete")
                             end
                         end
                         if current() then

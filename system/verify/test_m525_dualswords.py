@@ -57,4 +57,4 @@ class Dualswords(unittest.TestCase):
         self.assertIn('local left = weapon:Clone()',equip)
         self.assertIn('row.requiredLevel',equip)
         self.assertIn('LEFT_EQUIPPED_NAME',equip)
-        self.assertIn('EquippedWeaponLeft',read('src/client/character/BoneMountedAttachmentController.luau'))
+        self.assertIn('RigidMount.Attach(left, leftGrip, leftBone, "weapon")',equip)

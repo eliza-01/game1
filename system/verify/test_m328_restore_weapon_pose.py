@@ -12,15 +12,15 @@ def source(path):
 class PreviousWeaponPoseContract(unittest.TestCase):
     def test_pose_samples_equipped_weapon_not_local_clone(self):
         attack = source("src/client/combat/AttackController.luau")
-        self.assertIn("WeaponAttackVolume.ReadEquippedWeaponBox(character)", attack)
+        self.assertIn("RigidMount.GetBowReleaseOrigin(character)", attack)
         self.assertNotIn("WeaponAttachmentController.ReadEquippedWeaponBox(character)", attack)
-        weapon = source("src/client/character/BoneMountedAttachmentController.luau")
-        self.assertIn("BoneModelMount.Place(model, state.grip", weapon)
+        weapon = source("src/shared/rig/RigidEquipmentMount.luau")
+        self.assertIn("joint.Attachment0 = socket", weapon)
         self.assertNotIn("RuntimeBoneVisual", weapon)
 
     def test_hair_uses_original_mount(self):
-        mount = source("src/client/character/BoneMountedAttachmentController.luau")
-        self.assertIn('updateMount(character, hair, "hair")', mount)
+        mount = source("src/shared/rig/RigidEquipmentMount.luau")
+        self.assertIn('function Mount.HairAssemblyReady', mount)
         self.assertNotIn("RuntimeBoneVisual", mount)
 
     def test_volume_debug_is_not_gameplay_and_only_updates_when_visible(self):

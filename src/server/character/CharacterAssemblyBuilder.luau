@@ -12,6 +12,9 @@ local HAIR_GRIP_NAME = "CharacterMount"
 local BoneModelMount = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
     :WaitForChild("rig"):WaitForChild("BoneModelMount"))
 
+local RigidMount = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+    :WaitForChild("rig"):WaitForChild("RigidEquipmentMount"))
+
 local function meshFromAsset(asset: Model, expectedName: string): MeshPart
     local meshes = {}
     for _, object in asset:GetDescendants() do
@@ -141,18 +144,12 @@ function Builder.Build(recipe: any, loadAsset: (number) -> Model?): Model
                         assert(#part.used_bones == 0 and next(incoming) == nil, "rigid hair must not contain skin bones")
                         anchor = createCanonicalHairGrip(mesh)
                         local group = assert(hairGroup, "rigid hair must have a component Model")
-                        -- Identical anchored Model mount as equipped weapons. No
-                        -- physics welds between the rigid hair pieces.
                         mesh:SetAttribute("Game1HairAttachment", true)
                         mesh:SetAttribute("HairTargetBoneName", target.Name)
-                        mesh:SetAttribute("HairAttachmentMode", "bone-model-mount")
-                        BoneModelMount.CaptureHairOffsets(group, anchor)
+                        mesh:SetAttribute("HairAttachmentMode", "rigid-constraint")
+                        group:SetAttribute("Game1HairPieceCount", #group:GetChildren())
                         wrapper:SetAttribute("Game1AssemblyHairPieceCount", group:GetAttribute("Game1HairPieceCount"))
-                        assert(BoneModelMount.Place(group, anchor, BoneModelMount.SocketFrame(target, "hair")),
-                            "incomplete hair compound: " .. part.id)
-                        for _, piece in group:GetChildren() do
-                            if piece:IsA("BasePart") then piece.Anchored = true end
-                        end
+                        RigidMount.Attach(group, anchor, target, "hair")
                         runtimeHairGrip = true
                     else
                         -- Skinned accessory rig uses its authored socket Bone.

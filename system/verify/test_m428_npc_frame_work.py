@@ -18,10 +18,11 @@ class NpcFrameWorkM428(unittest.TestCase):
         src = read('src/shared/rig/BoneModelMount.luau')
         body = src.split('function BoneModelMount.Place(', 1)[1].split('function BoneModelMount.CreateGrip(', 1)[0]
         self.assertIn('local gripFrame = grip.WorldCFrame', body)
-        self.assertIn('socketFrame:ToObjectSpace(gripFrame)', body)
+        self.assertIn('aligned(gripFrame, socketFrame)', body)
+        self.assertIn('target:ToObjectSpace(actual)', src)
         for component in ('errorFrame.Position.Magnitude', 'errorFrame.LookVector:Dot', 'errorFrame.UpVector:Dot'):
-            self.assertIn(component, body)
-        self.assertLess(body.index('return\n'), body.index('model:PivotTo('))
+            self.assertIn(component, src)
+        self.assertLess(body.index('then return true end'), body.index('model:PivotTo('))
         self.assertIn('local delta = socketFrame * gripFrame:Inverse()', body)
         self.assertEqual(body.count('model:PivotTo('), 1)
 

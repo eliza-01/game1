@@ -14,7 +14,7 @@ class MaleGPWeapons(unittest.TestCase):
         self.assertLess(service.index('GP currently requires human_male'),service.index('Loadout.Set(player, selection)',service.index('local function enter')))
     def test_exact_models_and_no_dual_attack_substitution(self):
         equip=read('src/server/weapon/WeaponEquipService.luau')
-        for token in ('TestPolicy.IsMaleTest(character)', '"newbie_slayer_01" else "newbie_sword_01"', 'row.weaponType == expected', 'findByStudioPath', 'if isDual then "dualswords" else attackMovement.animationSet', 'local left = weapon:Clone()', 'BoneModelMount.SocketFrame(leftBone, "weapon")', 'if isDual and not dualReady and not testId then'):
+        for token in ('TestPolicy.IsMaleTest(character)', '"newbie_slayer_01" else "newbie_sword_01"', 'row.weaponType == expected', 'findByStudioPath', 'if isDual then "dualswords" else attackMovement.animationSet', 'local left = weapon:Clone()', 'RigidMount.Attach(left, leftGrip, leftBone, "weapon")', 'if isDual and not dualReady and not testId then'):
             self.assertIn(token,equip)
         self.assertNotIn('if dualReady then "dualswords" else "1hs"',equip)
         self.assertNotIn('WeaponEquipService.TestModel("sword")',equip)

@@ -28,6 +28,7 @@ local AttackDamageResolver = require(script.Parent:WaitForChild("AttackDamageRes
 local CombatFeedbackService = require(script.Parent:WaitForChild("CombatFeedbackService"))
 local AttackFeedbackTargeting = require(script.Parent:WaitForChild("AttackFeedbackTargeting"))
 local AttackSessionStore = require(script.Parent:WaitForChild("AttackSessionStore"))
+local AttackPresentation = require(script.Parent:WaitForChild("AttackPresentationState"))
 local HostilePursuitRegistry = require(script.Parent:WaitForChild("HostilePursuitRegistry"))
 local WeaponBounceService = require(script.Parent:WaitForChild("WeaponBounceService"))
 
@@ -159,6 +160,7 @@ local function clearAttackState(
     end
 
     if character.Parent and tonumber(character:GetAttribute("AttackSerial")) == serial then
+        AttackPresentation.Clear(character)
         character:SetAttribute("AttackEndsAt", nil)
         character:SetAttribute("AttackHitEndAt", nil)
         character:SetAttribute("AttackClipId", nil)
@@ -204,6 +206,8 @@ triggerWeaponBounce = function(
     character:SetAttribute("AttackEndsAt", now + recoverySeconds)
     character:SetAttribute("AttackHitEndAt", nil)
     character:SetAttribute("LastAttackBounced", true)
+    local active = AttackSessionStore.Get(player)
+    if active then AttackPresentation.Bounce(character, active.presentation, WeaponBounceConfig.ReverseSpeedMultiplier, recoverySeconds) end
 
     WeaponBounceService.Publish(player, {
         clientAttackId = clientAttackId,
@@ -410,7 +414,7 @@ local function attack(player: Player, payload: any)
 
     local attackDuration = timing.duration
     local serial = (tonumber(character:GetAttribute("AttackSerial")) or 0) + 1
-    AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration)
+    local session = AttackSessionStore.Begin(player, character, serial, clientAttackId, now + attackDuration)
     if not isBow then
         local origin, direction = AttackAimGeometry.Normalize(root.Position, payload.aimOrigin, payload.aimDirection)
         AttackSessionStore.SetAim(player, character, serial, clientAttackId, origin, direction)
@@ -432,6 +436,8 @@ local function attack(player: Player, payload: any)
             return
         end
     end
+    -- Only after all server validation, including bow release registration.
+    session.presentation = if not fallback then AttackPresentation.Begin(character, serial, descriptor, attackDuration) else nil
     -- One attack session and one cooldown for the entire damage budget.
     if meleePlan then
         local totalDamage = tonumber(character:GetAttribute("Damage")) or 0

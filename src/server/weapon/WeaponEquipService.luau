@@ -56,6 +56,7 @@ local RIGHT_SOCKET_NAMES = { "weapon_grip_r", "Weapon_R_Bone", "weapon_r", "Weap
 local LEFT_SOCKET_NAMES = { "weapon_grip_l", "Weapon_L_Bone", "weapon_l", "Weapon_L", "WeaponL" }
 local WEAPON_GRIP_NAME = "Game1WeaponGrip"
 local BoneModelMount = require(Shared:WaitForChild("rig"):WaitForChild("BoneModelMount"))
+local RigidMount = require(Shared:WaitForChild("rig"):WaitForChild("RigidEquipmentMount"))
 
 local function findByStudioPath(studioPath: string): Instance?
     if string.sub(studioPath, 1, 14) ~= "ServerStorage." then
@@ -73,9 +74,8 @@ local function findByStudioPath(studioPath: string): Instance?
 end
 
 local function findCharacterBone(character: Model, names: { string }): Bone?
-    local visual = character:FindFirstChild("Visual") or character:FindFirstChild("ImportedRig") or character
     for _, name in ipairs(names) do
-        local found = visual:FindFirstChild(name, true)
+        local found = RigidMount.FindBone(character, name)
         if found and found:IsA("Bone") then
             return found
         end
@@ -144,7 +144,7 @@ local function prepareWeapon(model: Model)
         if descendant:IsA("Humanoid") or descendant:IsA("AnimationController") then
             descendant:Destroy()
         elseif descendant:IsA("BasePart") then
-            descendant.Anchored = true
+            descendant.Anchored = false
             descendant.CanCollide = false
             descendant.CanTouch = false
             descendant.CanQuery = false
@@ -246,20 +246,21 @@ function WeaponEquipService.Equip(character: Model, slugValue: any, testId: stri
     weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
     weapon:SetAttribute("MeleeArcAngle", meleeArcFor(row))
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
-    weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
-    BoneModelMount.Place(weapon, grip, BoneModelMount.SocketFrame(targetBone, "weapon"))
+    weapon:SetAttribute("WeaponAttachmentMode", "rigid-constraint")
     purgeLegacyWeaponBox(weapon)
-    weapon.Parent = character
     if isDual and leftBone then
         local left = weapon:Clone()
         left.Name = LEFT_EQUIPPED_NAME
         left:SetAttribute("WeaponTargetBoneName", leftBone.Name)
         left:SetAttribute("WeaponHand", "left")
         local leftGrip = left:FindFirstChild(WEAPON_GRIP_NAME, true)
-        if not leftGrip or not leftGrip:IsA("Attachment") then left:Destroy(); WeaponEquipService.Unequip(character); return false, "Dualswords left grip missing" end
-        BoneModelMount.Place(left, leftGrip, BoneModelMount.SocketFrame(leftBone, "weapon"))
+        if not leftGrip or not leftGrip:IsA("Attachment") then left:Destroy(); weapon:Destroy(); WeaponEquipService.Unequip(character); return false, "Dualswords left grip missing" end
+        RigidMount.Attach(left, leftGrip, leftBone, "weapon")
         left.Parent = character
     end
+
+    RigidMount.Attach(weapon, grip, targetBone, "weapon")
+    weapon.Parent = character
 
     character:SetAttribute("EquippedWeaponBalanceId", row.balanceId)
     character:SetAttribute("EquippedWeaponRequiredLevel", row.requiredLevel)
@@ -307,8 +308,8 @@ function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: stri
     weapon:SetAttribute("AttackRadius", attackRadiusFor(row))
     weapon:SetAttribute("MeleeArcAngle", meleeArcFor(row))
     weapon:SetAttribute("Game1WeaponGripRotation", nil)
-    weapon:SetAttribute("WeaponAttachmentMode", "runtime-canonical-grip-v2")
-    BoneModelMount.Place(weapon, grip, BoneModelMount.SocketFrame(bone, "weapon"))
+    weapon:SetAttribute("WeaponAttachmentMode", "rigid-constraint")
+    RigidMount.Attach(weapon, grip, bone, "weapon")
     purgeLegacyWeaponBox(weapon)
     weapon.Parent = actor
     return weapon, row, nil

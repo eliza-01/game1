@@ -53,7 +53,7 @@ class NpcCombatTests(unittest.TestCase):
     def test_no_new_weapon_attachment_or_volume_hit_path(self):
         ai = source("src/server/npc/NpcCombatAIService.luau")
         equip = source("src/server/npc/NpcEquipmentService.luau")
-        attach = source("src/client/character/BoneMountedAttachmentController.luau")
+        attach = source("src/shared/rig/RigidEquipmentMount.luau")
         self.assertIn('DamageService.Apply(agent.model, target', ai)
         self.assertIn('attackCanConnect(agent, target)', ai)
         self.assertIn('Queries.Visible(', ai)
@@ -61,7 +61,7 @@ class NpcCombatTests(unittest.TestCase):
         self.assertNotIn('WeaponEquipService', ai)
         self.assertNotIn('NpcWeaponDisarmed', ai)
         self.assertIn('WeaponEquipService.EquipVisual(', equip)
-        self.assertIn('updateMount(character, weapon, "weapon")', attach)
+        self.assertIn('joint.Attachment0 = socket', attach)
         self.assertNotIn('LocalTransparencyModifier', attach)
 
     def test_mobile_rig_preserves_authored_bones_and_death_equipment(self):

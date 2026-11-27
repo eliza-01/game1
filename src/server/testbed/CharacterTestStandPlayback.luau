@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("character")
 local Catalog = require(Shared:WaitForChild("CharacterStandAnimationCatalog"))
+local RigidMount = require(Shared.Parent:WaitForChild("rig"):WaitForChild("RigidEquipmentMount"))
 local Registry = require(Shared:WaitForChild("CharacterAnimationRegistry"))
 
 local Playback = {}
@@ -30,6 +31,13 @@ function Playback.Bind(stand: Model, prompt: ProximityPrompt): () -> ()
         prompt.Enabled = false
         warn("[game1][character-stand] stand has no Animator", profileId)
         return function() end
+    end
+    -- Edit-mode stands are fully anchored. Release only native equipment for
+    -- Studio Play; the mannequin and interaction anchor stay fixed.
+    for _, object in stand:GetDescendants() do
+        if object:IsA("BasePart") and RigidMount.IsEquipmentPart(object) then
+            object.Anchored = false
+        end
     end
     local index = 0
     local track: AnimationTrack? = nil

@@ -41,6 +41,7 @@ end
 function Debug.Start()
     if started or not PublishedDebugAccess.ClientAllowed() then return end
     started=true
+    require(script.Parent:WaitForChild("NetworkMotionOwnerCapture")).Start()
     local player=Players.LocalPlayer
     if not player then return end
     local gui=Instance.new("ScreenGui")
@@ -67,14 +68,14 @@ function Debug.Start()
     border.Color=COLORS.border
     border.Parent=panel
     local heading=Instance.new("TextLabel")
-    heading.Size=UDim2.fromOffset(265,32)
+    heading.Size=UDim2.fromOffset(160,32)
     heading.Position=UDim2.fromOffset(12,8)
     heading.BackgroundTransparency=1
     heading.TextColor3=COLORS.text
     heading.Font=Enum.Font.GothamSemibold
     heading.TextSize=13
     heading.TextXAlignment=Enum.TextXAlignment.Left
-    heading.Text="CAMERA DEBUG · LIVE TEST"
+    heading.Text="CAMERA DEBUG"
     heading.ZIndex=86
     heading.Parent=panel
     local close=button(panel,"×",30,28)
@@ -178,6 +179,7 @@ function Debug.Start()
         if playerGui:GetAttribute("Game1DebugPanelOpen") == "CD" then playerGui:SetAttribute("Game1DebugPanelOpen", "") end
     end)
     playerGui:GetAttributeChangedSignal("Game1DebugPanelOpen"):Connect(syncPanel)
+    require(script.Parent:WaitForChild("NetworkMotionDiagnosticView")).Mount(panel)
     StudioDebugDock.Bind("CD", opener, panel, 362)
     syncPanel()
 end

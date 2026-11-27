@@ -68,13 +68,13 @@ class CharacterCreationM482(unittest.TestCase):
             self.assertEqual(len(list(path.parent.glob('options.json.pre-m482-*.bak'))),1)
 
     def test_preview_hair_mount_is_reused_and_cleaned_up(self):
-        mount=(ROOT/'src/client/character/BoneMountedAttachmentController.luau').read_text()
+        mount=(ROOT/'src/shared/rig/RigidEquipmentMount.luau').read_text()
         preview=(ROOT/'src/client/character/CharacterCreationPreviewController.luau').read_text()
-        self.assertIn('RegisterPreview(model: Model)', mount)
-        self.assertIn('updateCharacter(preview)', mount)
-        self.assertIn('Mounts.RegisterPreview(instance)', preview)
-        self.assertIn('Mounts.UnregisterPreview(previous)', preview)
-        self.assertIn('Mounts.UnregisterPreview(model)', preview)
+        self.assertIn('function Mount.HairAssemblyReady', mount)
+        self.assertIn('Mounts.HairAssemblyReady(instance)', preview)
+        self.assertIn('not Mounts.IsEquipmentPart(object)', preview)
+        self.assertIn('previous:Destroy()', preview)
+        self.assertIn('model:Destroy()', preview)
         self.assertNotIn('RunService.RenderStepped:Connect', preview)
 
     def test_streaming_focus_is_server_owned_and_released(self):

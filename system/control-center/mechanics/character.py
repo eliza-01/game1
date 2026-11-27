@@ -51,7 +51,8 @@ ITEMS = [
          ['AttackService', 'BowHitscanService', 'WeaponEquipService'], [
              {'title': 'Работает в исходниках', 'lines': [
                  'AttackService/AttackDamageResolver подтверждают melee-контакт, DamageService применяет урон, BowHitscanService делает серверный мгновенный контакт.',
-                 'Выбранное оружие монтируется через BoneModelMount, а летящая/застрявшая стрела — клиентская визуализация, не второй серверный снаряд.',
+                 'M612: принятое сервером состояние атаки реплицируется наблюдателям; общий upper-body composer воспроизводит опубликованный клип поверх native locomotion. Studio/DEV-приёмка открыта.',
+                 'M609: выбранное оружие и NPC используют общий RigidEquipmentMount на родительской Bone с authored offset (один RigidConstraint на предмет), а летящая/застрявшая стрела — клиентская визуализация, не второй серверный снаряд.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
                  'WeaponSelectionService — playtest chooser: Studio или точный DEV Place ID из Options → Debug / TestPlace (включая compiled Runtime), при включённых галочках PC/Mobile; все допущенные тестировщики. Нет доказанной persistent ownership/inventory модели для выбранного предмета.',
@@ -74,7 +75,7 @@ ITEMS = [
          'Клиентские анимации, оборудование, полосы здоровья, UI-профили и уведомления ресурсов.',
          ['GameOptions.UiPresentationSettings', 'InformativeWindowDock'], [
              {'title': 'Работает в исходниках', 'lines': [
-                 'CharacterAnimationController и BoneMountedAttachmentController отвечают за клипы и следование креплений.',
+                 'CharacterAnimationController отвечает за клипы; M609: волосы и оружие используют RigidConstraint на родительской Bone с authored offset (владелец подтвердил Runtime и телефон), без клиентского follower. Полная регрессия и сравнительные замеры CPU/Physics ещё открыты.',
                  'M605: при входе в мир curtain ожидает текущий track cache и однократный клиентский preload опубликованных NPC/Monster клипов (общий лимит ожидания 12 с). При отключённом Character Creation прогрев фоновый. Death немедленно прекращает композицию нижней части тела.',
                  'InformativeWindowDock управляет сворачиванием информационных окон; FloatingResourceFeedback отображает +N/−N над головой.',
                  'Options → UI сохраняет desktop/mobile profile в manifest и генерируемый GameOptionsRegistry; Studio Debug остаётся локальным предпросмотром.',
@@ -84,5 +85,5 @@ ITEMS = [
                  'Визуальный +N/−N сам по себе не доказывает изменение серверного inventory; отсутствует общий authoritative ledger для ресурсов/награды.',
                  'Обязательно проверить в реальном Play и на телефоне: шевроны, ПКМ, safe area, respawn/head Bone, мультиклиент и LOD/Streaming.',
              ]},
-         ], ['character-animation', 'world-animation-preload', 'bone-client', 'info-dock', 'resource-feedback', 'ui-settings', 'health-ui']),
+         ], ['character-animation', 'world-animation-preload', 'bone-mount', 'info-dock', 'resource-feedback', 'ui-settings', 'health-ui']),
 ]

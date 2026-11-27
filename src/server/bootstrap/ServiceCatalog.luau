@@ -113,6 +113,9 @@ function ServiceCatalog.Build(root: Instance)
         {name = "HouseSocketDebugService", critical = false, dependsOn = {"HouseSocketService"}, start = function()
             if publishedDebugEnabled() then require(dev:WaitForChild("HouseSocketDebugService")).Start() end
         end},
+        {name = "NetworkMotionDiagnosticService", critical = false, dependsOn = {"PublishedDebugAccessService"}, start = function()
+            if publishedDebugEnabled() then require(dev:WaitForChild("NetworkMotionDiagnosticService")).Start() end
+        end},
         {name = "CameraDebugService", critical = false, start = function()
             if publishedDebugEnabled() then require(dev:WaitForChild("CameraDebugService")).Start() end
         end},

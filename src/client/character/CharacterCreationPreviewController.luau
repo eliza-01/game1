@@ -8,8 +8,8 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local FaceMaterials = require(Shared:WaitForChild("character"):WaitForChild("CharacterCreationMaterials"))
 local CharacterAnimationRegistry = require(Shared:WaitForChild("character"):WaitForChild("CharacterAnimationRegistry"))
 local StageVisibility = require(script.Parent:WaitForChild("CharacterCreationStageVisibility"))
-local BoneModelMount = require(Shared:WaitForChild("rig"):WaitForChild("BoneModelMount"))
-local Mounts = require(script.Parent:WaitForChild("BoneMountedAttachmentController"))
+local Mounts = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+    :WaitForChild("rig"):WaitForChild("RigidEquipmentMount"))
 local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
 local Turntable = require(script.Parent:WaitForChild("CharacterPreviewTurntable"))
 local Reactions = require(script.Parent:WaitForChild("CharacterCreationReactions"))
@@ -133,15 +133,7 @@ local function templateReady(template: Model): boolean
     if type(count) ~= "number" or count ~= #template:GetDescendants() or not template.PrimaryPart then return false end
     local imported = template:FindFirstChild("ImportedRig")
     if not imported or not imported:FindFirstChild("rig_carrier") then return false end
-    local expected = template:GetAttribute("Game1AssemblyHairPieceCount")
-    if type(expected) ~= "number" then return false end
-    local hair = imported:FindFirstChild("CharacterHairComponent")
-    if expected == 0 then return hair == nil end
-    if not hair or not hair:IsA("Model") or hair:GetAttribute("Game1HairPieceCount") ~= expected
-        or not BoneModelMount.HairReady(hair) then return false end
-    local root = hair.PrimaryPart
-    local name = root and root:GetAttribute("HairTargetBoneName")
-    return type(name) == "string" and BoneModelMount.FindHairBone(template, name) ~= nil
+    return Mounts.HairAssemblyReady(template)
 end
 
 function Controller.AwaitTemplate(templateName: string, isCurrent: (() -> boolean)?): Model?
@@ -189,7 +181,7 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
         if object:IsA("BasePart") then
             visibility[object] = object.LocalTransparencyModifier
             object.LocalTransparencyModifier = 1
-            object.Anchored = true
+            object.Anchored = not Mounts.IsEquipmentPart(object)
             object.CanCollide = false
             object.CanTouch = false
             object.CanQuery = false
@@ -207,13 +199,11 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
     end
     if not complete then warn("[game1][character-creation] texture preload incomplete; renderer will retry") end
     instance.Parent = self.folder
-    Mounts.RegisterPreview(instance)
     local track = playIdle(instance, archetype)
     local function current(): boolean
         return self.folder.Parent ~= nil and (not isCurrent or isCurrent())
     end
     local function discard(): boolean
-        Mounts.UnregisterPreview(instance)
         instance:Destroy()
         return false
     end
@@ -245,14 +235,17 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
     paint(instance, choice.colors or {})
     applyMaterials(instance, choice.materials or {})
     self.turntable:Place(archetype, instance, target)
-    if not Mounts.UpdateCharacter(instance) then
+    -- Keep the replacement hidden until the native joint has had a physics step.
+    RunService.PostSimulation:Wait()
+    if not current() then return discard() end
+    if not Mounts.HairAssemblyReady(instance) then
         warn("[game1][character-creation] hair mount not ready: " .. archetype)
         return discard()
     end
     local previous = self.models[archetype]
     self.models[archetype] = instance
     self.tracks[archetype] = track
-    if previous then self.reactions:Remove(previous); Mounts.UnregisterPreview(previous); previous:Destroy() end
+    if previous then self.reactions:Remove(previous); previous:Destroy() end
     for part, transparency in pairs(visibility) do part.LocalTransparencyModifier = transparency end
     return true
 end
@@ -261,7 +254,6 @@ function Controller:KeepOnly(archetype: string?)
     for id, model in pairs(self.models) do
         if id ~= archetype then
             self.reactions:Remove(model)
-            Mounts.UnregisterPreview(model)
             model:Destroy()
             self.models[id] = nil
             self.tracks[id] = nil
@@ -288,7 +280,6 @@ end
 function Controller:Destroy()
     self.reactions:Destroy()
     self.turntable:Destroy()
-    for _, model in pairs(self.models) do Mounts.UnregisterPreview(model) end
     self.folder:Destroy()
     StageVisibility.Restore(self.hidden)
     table.clear(self.models)

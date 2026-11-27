@@ -4,7 +4,6 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
-local Mounts = require(script.Parent:WaitForChild("BoneMountedAttachmentController"))
 
 local Turntable = {}
 Turntable.__index = Turntable
@@ -143,7 +142,6 @@ function Turntable.new(models: {[string]: Model}, enabled: () -> boolean, freeTa
             if model and model.Parent and rotation.angle ~= rotation.target then
                 rotation.angle = Turntable.Advance(rotation.angle, rotation.target, dt)
                 model:PivotTo(pose(rotation.base, rotation.angle))
-                Mounts.UpdateCharacter(model)
             end
         end
     end)

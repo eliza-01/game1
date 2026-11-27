@@ -7,6 +7,7 @@ local CharacterConfig = require(CharacterShared:WaitForChild("CharacterConfig"))
 local CharacterMovementConfig = require(CharacterShared:WaitForChild("CharacterMovementConfig"))
 
 local ActorCollisionPolicy = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCollisionPolicy"))
+local RigidMount = require(Shared:WaitForChild("rig"):WaitForChild("RigidEquipmentMount"))
 local CharacterRigService = {}
 
 local function getSpawnLocation(player: Player): SpawnLocation?
@@ -195,8 +196,7 @@ local function normalizeTemplate(template: Model): (Model, Model)
         if object:IsA("Humanoid") then
             object:Destroy()
         elseif object:IsA("BasePart") then
-            object.Anchored = object:GetAttribute("Game1HairAttachment") == true
-                or (object.Parent ~= nil and object.Parent:GetAttribute("Game1HairCompound") == true)
+            object.Anchored = false
             object.CanCollide = false
             object.CanTouch = false
             object.CanQuery = false
@@ -227,7 +227,7 @@ local function createBootstrapCompatibilityRoot(importedRig: Model): BasePart
     root.Parent = importedRig
 
     for _, object in importedRig:GetDescendants() do
-        if object:IsA("BasePart") and object ~= root then
+        if object:IsA("BasePart") and object ~= root and not RigidMount.IsEquipmentPart(object) then
             local weld = Instance.new("WeldConstraint")
             weld.Name = "BootstrapCompatibilityRootWeld"
             weld.Part0 = root

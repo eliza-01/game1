@@ -153,21 +153,21 @@ class HairImportTests(unittest.TestCase):
     def test_runtime_keeps_socket_mode_and_aligns_rigid_pivot(self):
         source = (ROOT.parent / 'src/server/character/CharacterAssemblyBuilder.luau').read_text()
         rig_service = (ROOT.parent / 'src/server/character/CharacterRigService.luau').read_text()
-        controller = (ROOT.parent / 'src/client/character/BoneMountedAttachmentController.luau').read_text()
+        controller = (ROOT.parent / 'src/shared/rig/RigidEquipmentMount.luau').read_text()
         mount = (ROOT.parent / 'src/shared/rig/BoneModelMount.luau').read_text()
         self.assertIn('BoneModelMount.CreateGrip(mesh, "CharacterMount", mesh:GetPivot().Position)', source)
-        self.assertIn('BoneModelMount.Place(group, anchor, BoneModelMount.SocketFrame(target, "hair"))', source)
+        self.assertIn('RigidMount.Attach(group, anchor, target, "hair")', source)
         self.assertNotIn('CharacterHairExtraWeld', source)
         self.assertIn('mesh:SetAttribute("Game1HairAttachment", true)', source)
-        self.assertIn('piece.Anchored = true', source)
+        self.assertIn('object.Anchored = false', controller)
         self.assertIn('mesh.CFrame:ToObjectSpace(target.WorldCFrame)', source)
         self.assertIn('local socket = assert(incoming[part.socket_bone]', source)
         self.assertIn('joint.Attachment0 = target', source)
         self.assertIn('joint.Attachment1 = anchor', source)
-        self.assertIn('RunService.RenderStepped:Connect(update)', controller)
-        self.assertIn('BoneModelMount.Place(model, state.grip, BoneModelMount.SocketFrame(state.bone, kind))', controller)
+        self.assertNotIn('RenderStepped', controller)
+        self.assertIn('joint.Attachment0 = socket', controller)
         self.assertIn('gripFrame:Inverse()', mount)
-        self.assertIn('object.Parent:GetAttribute("Game1HairCompound") == true', rig_service)
+        self.assertIn('not RigidMount.IsEquipmentPart(object)', rig_service)
 
 
 if __name__ == '__main__':

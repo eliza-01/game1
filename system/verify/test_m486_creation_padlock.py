@@ -24,7 +24,7 @@ class CreationPadlockM486(unittest.TestCase):
         self.assertLess(p.index('track.TimePosition ='), p.index('RunService.PreSimulation:Wait()'))
         self.assertLess(p.index('RunService.PreSimulation:Wait()'), p.index('previous:Destroy()'))
         self.assertLess(p.index('previous:Destroy()'), p.index('part.LocalTransparencyModifier = transparency'))
-        self.assertIn('Mounts.UpdateCharacter(instance)', p)
+        self.assertIn('Mounts.HairAssemblyReady(instance)', p)
         self.assertIn('if not current() then return discard() end', p)
 
     def test_single_submission_overlay_retry_and_authoritative_record(self):

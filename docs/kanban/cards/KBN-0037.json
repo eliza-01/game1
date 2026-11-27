@@ -3,18 +3,18 @@
   "id": "KBN-0037",
   "title": "Client Performance · sampler, attachments, LOD, UI",
   "domain": "Performance",
-  "status": "PROPOSED",
+  "status": "IN_PROGRESS",
   "priority": "P0",
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "1ea2856a4ecab30d0a0efb2e466262799bb2cfa214b963c62bac4cf13746196d",
+  "specSha256": "34e8971a02a4fd0d13673ae3db7c7b08a772b7ff4190abbabdfd5daf1f9e50b3",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-27T15:27:51+00:00",
+  "revision": 6,
+  "updatedAt": "2026-11-27T18:20:00+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -23,8 +23,8 @@
     },
     {
       "id": "KBN-0037-T02",
-      "title": "Ввести событийный registry креплений и Attachment LOD с частотами по дистанции",
-      "done": false
+      "title": "Завершить общий RigidConstraint без перепубликации ассетов (M609 parent socket frame)",
+      "done": true
     },
     {
       "id": "KBN-0037-T03",
@@ -45,6 +45,11 @@
       "id": "KBN-0037-T06",
       "title": "Сравнить результаты профилирования каждого изменения с baseline; проверить PC и телефон",
       "done": false
+    },
+    {
+      "id": "KBN-0037-T07",
+      "title": "M612: приёмка видимости удалённых атак и включение player attack sampler в общий бюджет",
+      "done": false
     }
   ],
   "acceptance": [
@@ -52,13 +57,13 @@
       "id": "KBN-0037-A01",
       "title": "Общий лимит sampler никогда не превышен; смерть/DeathIdle, атака и locomotion без restpose регрессий",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M612: восстановлена репликация принятого клипа через snapshot и общий composer; Studio/DEV и общий бюджет NOT_RUN."
     },
     {
       "id": "KBN-0037-A02",
-      "title": "Волосы и оружие не отрываются; дальние/невидимые крепления не выполняют полную работу каждый кадр",
+      "title": "Волосы и оружие не отрываются; нет Luau follower; сохранены orientation, смена предметов, NPC и preview; Physics/CPU проверены на устройстве",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M607/M608 FAIL. M609: владелец подтвердил «супер работает в рантайме и на телефоне». Функциональная приёмка T02 выполнена; полный сценарный отчёт и количественные Physics/CPU/frame-time замеры не предоставлены. A02 остаётся NOT_RUN до выполнения всего критерия."
     },
     {
       "id": "KBN-0037-A03",

@@ -18,6 +18,7 @@ export type Session = {
     lastAimDirection: Vector3?,
     attackFacingDirection: Vector3?,
     environmentBlocked: boolean,
+    presentation: any?,
 }
 
 local byPlayer: { [Player]: Session } = {}

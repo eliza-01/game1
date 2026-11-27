@@ -63,24 +63,24 @@ def check_weapon_registration(
             err(f"generated weapon registry missing {required}")
 
     weapon_equip_path = ROOT / "src/server/weapon/WeaponEquipService.luau"
-    weapon_attach_path = ROOT / "src/client/character/BoneMountedAttachmentController.luau"
+    weapon_attach_path = ROOT / "src/shared/rig/RigidEquipmentMount.luau"
     mount_path = ROOT / "src/shared/rig/BoneModelMount.luau"
     weapon_equip_text = weapon_equip_path.read_text(encoding="utf-8") if weapon_equip_path.is_file() else ""
     weapon_attach_text = weapon_attach_path.read_text(encoding="utf-8") if weapon_attach_path.is_file() else ""
     mount_text = mount_path.read_text(encoding="utf-8") if mount_path.is_file() else ""
-    for required in ["weapon_grip_r", "weapon_grip_l", "Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource", "Game1WeaponGrip", "runtime-canonical-grip-v2", "ensureCanonicalRuntimeGrip", "BoneModelMount.Place"]:
+    for required in ["weapon_grip_r", "weapon_grip_l", "Weapon_R_Bone", "weapon_r", "Weapon_L_Bone", "weapon_l", "AnimationWeaponSet", "statModifiers", "EquipStartup", "GetAvailable", "ListAvailable", "WeaponLoadoutSource", "Game1WeaponGrip", "rigid-constraint", "ensureCanonicalRuntimeGrip", "RigidMount.Attach"]:
         if required not in weapon_equip_text:
             err(f"weapon equip runtime missing {required}")
-    for required in ["Game1WeaponAttachment", "Game1WeaponGrip", "BoneModelMount.Place", "BoneModelMount.SocketFrame"]:
+    for required in ['Instance.new("RigidConstraint")', 'Instance.new("WeldConstraint")', "joint.Attachment0 = socket", "joint.Attachment1 = jointGrip", "GetBowReleaseOrigin"]:
         if required not in weapon_attach_text:
             err(f"unified attachment runtime missing {required}")
-    for required in ["parent.TransformedWorldCFrame * targetBone.CFrame", "model:PivotTo(delta * model:GetPivot())", "gripFrame:Inverse()"]:
+    for required in ["model:PivotTo(delta * model:GetPivot())", "gripFrame:Inverse()"]:
         if required not in mount_text:
             err(f"shared bone model mount missing {required}")
     if "WeaponEquipService.EquipStartup(character)" not in character_service_text:
         err("character spawn does not apply the startup weapon")
-    if "BoneMountedAttachmentController.Start()" not in client_init_text:
-        err("weapon attachment controller is not started by the client runtime")
+    if "BoneMountedAttachmentController" in client_init_text or "RenderStepped" in weapon_attach_text:
+        err("retired per-frame equipment follower must not run")
 
     stats_config_text = (ROOT / "src/shared/character/CharacterStatsConfig.luau").read_text(encoding="utf-8")
     stats_service_text = (ROOT / "src/server/character/CharacterStatsService.luau").read_text(encoding="utf-8")
@@ -138,8 +138,8 @@ def check_weapon_registration(
     for required in ["Game1WeaponGrip", "ensureWeaponGrip", "canonicalGripWorld", "referencePart.CFrame:ToObjectSpace"]:
         if required not in plugin_text:
             err(f"studio bridge canonical weapon grip is missing {required}")
-    for required in ["WEAPON_ROTATION", "CFrame.Angles(math.rad(-90), 0, 0)", "gripFrame:Inverse()"]:
-        if required not in mount_text:
+    for required in ["CFrame.Angles(math.rad(-90), 0, 0)", "grip.CFrame * offset:Inverse()"]:
+        if required not in weapon_attach_text:
             err(f"shared weapon mount must preserve canonical -90deg X basis and exact grip: {required}")
     if "CFrame.new(grip.WorldPosition)" in weapon_attach_text:
         err("client attachment must not rebuild a position-only grip frame every render step")

@@ -3,15 +3,15 @@
   "id": "KBN-0035",
   "title": "Performance Profiler · baseline и диагностика",
   "domain": "Performance",
-  "status": "READY",
+  "status": "IN_PROGRESS",
   "priority": "P0",
   "owner": "Owner + Codex",
   "favorite": true,
   "specPath": "docs/kanban/specs/KBN-0035.md",
-  "specSha256": "46f8c80f18e096c7455159af075dee7e71f110a469f5ea63831793540b7dd85f",
+  "specSha256": "321d431ffdfb4ce9c80d57c6d78aab63762cccb192755a83cecfb29452d9709c",
   "dependsOn": [],
-  "revision": 1,
-  "updatedAt": "2026-11-27T15:27:51+00:00",
+  "revision": 5,
+  "updatedAt": "2026-11-27T17:55:27+00:00",
   "tasks": [
     {
       "id": "KBN-0035-T01",
@@ -45,7 +45,7 @@
       "id": "KBN-0035-A02",
       "title": "Счётчики и длительности проверены на известных сценариях; ограничен объём хранения и вывода",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M610 screenshot: 57 Hz observer Position/Render 16.1 [13.0–19.0], Velocity 16.0 [16.0–16.0]; server 60 Hz Position 16.0 [14.5–17.7], Velocity 16.0 [16.0–16.0]. M611: target local capture + monotonic dt; field comparison pending; full profiler NOT_RUN."
     },
     {
       "id": "KBN-0035-A03",

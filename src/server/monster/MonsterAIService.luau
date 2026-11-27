@@ -152,7 +152,10 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
     end
     agent.returning = false
     agent.retaliating = true
-    if applied > 0 then Skills.MarkAttacked(agent.model) end
+    if applied > 0 then
+        Skills.MarkAttacked(agent.model)
+        Navigation.NotifyDamage(agent,attacker)
+    end
     if agent.model:GetAttribute("MonsterSpawning") == true or agent.attacking or Retreat.Waiting(agent) then return end
     local targetRoot = rootOf(attacker)
     if not targetRoot then return end

@@ -232,9 +232,9 @@ local function stepBlocked(agent,state,destination,speed,now)
             return RetreatGeometry.FindPoint(agent,position,target,desired,function(p) return allowed(agent,p) end)
         end
     end
-    local phase,point=Blocked.Step(state,agent.root.Position,destination,range,Config.blockedRetreatBuffer,now,movementSpeed(state,speed),findPoint)
+    local phase,point,wakeReason=Blocked.Step(state,agent.root.Position,destination,range,Config.blockedRetreatBuffer,now,movementSpeed(state,speed),findPoint)
     if phase=="Reengage" then
-        Trace.Event(agent,"BLOCKED_REENGAGE")
+        Trace.Event(agent,"BLOCKED_REENGAGE",wakeReason)
         clearPlan(agent,state,now); state.reengaging=true; state.stuckWatchdog=nil
         state.nextCheck=now; agent.lastDamageAt=now
         return false

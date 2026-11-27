@@ -8,10 +8,10 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0032.md",
-  "specSha256": "8897571cc8fe293b3dfdb753d4597a6eeb32a84e14c0091f8b03ee40fb4bc6fb",
+  "specSha256": "ad97e969d36c42fa1649327d7ab74239fde3d0ae29636f40a8fb416744c52129",
   "dependsOn": [],
-  "revision": 21,
-  "updatedAt": "2026-11-27T03:42:29+00:00",
+  "revision": 23,
+  "updatedAt": "2026-11-27T04:15:20+00:00",
   "tasks": [
     {
       "id": "KBN-0032-T01",
@@ -83,6 +83,12 @@
     {
       "id": "KBN-0032-A06",
       "title": "M593: измерить стартап графа, CPU, число Raycast/Blockcast/Overlap и кадры при 50/100/200 активных монстрах; зафиксировать одинаковые сценарии Legacy и Experimental",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0032-A07",
+      "title": "M594: BlockedWait внутри 40 studs; спуститься к монстру, подойти вплотную, проверить обычную атаку и LOS, урон/приближение будят один новый подход; неподвижная цель не вызывает повторный поиск (Studio и Runtime Draft)",
       "status": "NOT_RUN",
       "evidence": ""
     }

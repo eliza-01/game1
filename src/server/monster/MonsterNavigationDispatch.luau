@@ -14,6 +14,10 @@ end
 function Dispatch.IsBlockedRetreating(agent)
     return Blocked.IsRetreating(agent.recoveryNavigation)
 end
+function Dispatch.NotifyDamage(agent,attacker)
+    local state=agent.recoveryNavigation
+    if state and state.target==attacker and not agent.returning then Blocked.NotifyDamage(state) end
+end
 local inStudio=RunService:IsStudio()
 local compiledRuntime=game:GetService("ReplicatedStorage"):FindFirstChild("Game1LocationRuntimeManifest")~=nil
 local function enabledForServer()

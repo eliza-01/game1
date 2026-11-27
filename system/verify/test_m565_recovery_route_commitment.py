@@ -8,7 +8,7 @@ class RouteCommitment(unittest.TestCase):
         policy = (BASE / 'MonsterTargetPolicy.luau').read_text()
         self.assertIn('state.plan ~= nil or state.climb ~= nil or state.mode == "Retry"', policy)
         start = policy.split('local function canBeginTargetedCast',1)[1].split('local function attackStillConnects',1)[0]
-        self.assertIn('if isRecovering(agent) then return false end', start)
+        self.assertIn('if isRecovering(agent) and not Blocked.IsWaiting(agent.recoveryNavigation) then return false end', start)
         cast = (BASE / 'MonsterSkillCast.luau').read_text()
         self.assertLess(cast.index('if Target.IsRecovering(agent) then return false end'),cast.index('Navigation.StopNavigation(agent)'))
         nav = (BASE / 'MonsterExperimentalNavigation.luau').read_text()

@@ -1,6 +1,6 @@
-# Gameplay infrastructure · M570–M593
+# Gameplay infrastructure · M570–M594
 
-**Дата сверки Monster Navigation / Runtime:** 27.11.2026, M593 на базе `game1_diag_2026-11-27_06-32-10.zip` (M592). **Статус:** CURRENT SOURCE CONTRACT / STUDIO & RUNTIME VALIDATION OPEN. Остальные разделы сохраняют сверку M570/M571. См. [аудит M593](M593_MONSTER_RUNTIME_AUDIT_RU.md).
+**Дата сверки Monster Navigation / Runtime:** 27.11.2026, M594 на базе `game1_diag_2026-11-27_06-32-10.zip` (M592). **Статус:** CURRENT SOURCE CONTRACT / STUDIO & RUNTIME VALIDATION OPEN. Остальные разделы сохраняют сверку M570/M571. См. [аудит M593](M593_MONSTER_RUNTIME_AUDIT_RU.md).
 
 ## 1. Database и GP
 
@@ -33,7 +33,7 @@ Studio: обычные монстры, GP group и зоны 1–6; Legacy для
 | Collision | Тонкий слой поиска 0,2 × 60 × 40 studs на уровне головы; ограниченный обход через один или два угла. Не Wall Follow. |
 | RescueRoute | Доступный вход и выход по графу, сравнение полной длины с обходом/подъёмом. |
 | Recovery exit | Раз в 1 с луч от головы к пяткам цели +0,1; если свободен — горизонтальный луч до цели целиком (M574), а не только в радиусе атаки. Только оба свободны разрешают Direct. Эта же пара проверяет выходы Collision и Rescue Route. Не ждать первой точки или двух подтверждений. |
-| Retry / Blocked Pursuit M591 | Chase NoAccessiblePlan — отойти до дальности лука из Database (M592: максимум по лукам, сейчас 40 studs, независимо от экипировки) + 2 studs, ждать; если прохода для отступления нет, ждать в достигнутой точке. Таймеры стартуют в BlockedWait. При повторном входе цели в радиус — сблизиться с ×1,5 Run. Rescue Route также ×1,5 Run, подход/переходы включены. Options: blockedRetreatBuffer, blockedRetreatSpeedMultiplier, blockedReengageSpeedMultiplier, rescueRouteSpeedMultiplier. Return сохраняет Retry и watchdog. |
+| Retry / Blocked Pursuit M591 | Chase NoAccessiblePlan — отойти до дальности лука из Database (M592: максимум по лукам, сейчас 40 studs, независимо от экипировки) + 2 studs, ждать; если прохода для отступления нет, ждать в достигнутой точке. Таймеры стартуют в BlockedWait. При повторном входе в радиус лука, приближении внутри него на 1 stud по 3D либо уроне от цели — сблизиться с ×1,5 Run. M594: при доступной ближней атаке BlockedWait немедленно уступает бою, без отмены LOS/высоты/территории. Неподвижная цель не будит поиск. Rescue Route также ×1,5 Run, подход/переходы включены. Options: blockedRetreatBuffer, blockedRetreatSpeedMultiplier, blockedReengageSpeedMultiplier, rescueRouteSpeedMultiplier. Return сохраняет Retry и watchdog. |
 | StuckTimeout (M580) | Глобальный таймер без прогресса в Chase/Return: 1,05 с fade out, телепорт на собственный spawn, 1,05 с fade in. HP/ID сохраняются. Высокий столб бафа на обеих точках; неуязвимость на время перехода. |
 
 Terrain исключён из навигационных запросов, но сохраняет физику. Резервные Blockcast для щелей и двойной коридор удалены M566; остаются отдельные melee/Hit; прыжок сохраняет обычные физические коллизии. Атаки/спецкасты не прерывают recovery; активная анимация атаки не переписывается новым навигатором. Не добавлять новую систему вместо диагностики фактического сбоя.

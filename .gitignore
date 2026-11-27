@@ -11,3 +11,6 @@ __pycache__/
 # Local-only XML authoring export and isolated Runtime draft builds.
 place/game1_runtime_source.rbxlx
 .control-center/runtime-builds/
+
+
+game1_runtime_source.rbxlx

@@ -15,7 +15,7 @@ ITEMS = [
              ]},
          ], ['monster-spawner', 'monster-population', 'monster-death', 'monster-spawns', 'monster-registry']),
     card('monster-ai-pursuit', 'Монстры · aggro, pursuit, navigation, return', 'Сервер',
-         'M593 · Home Leash / Death Chase, обход препятствий, прыжок до 1 с, Rescue Routes и аварийный телепорт домой.',
+         'M594 · Home Leash / Death Chase, обход препятствий, прыжок до 1 с, Rescue Routes и аварийный телепорт домой.',
          ['MonsterAggressive', 'MonsterPursuitMode', 'MonsterNavigationBackend', 'MonsterRecoveryMode'], [
              {'title': 'Aggro и границы преследования', 'lines': [
                  'Home Leash: возврат при выходе за home radius от центра спавна или по таймеру без нанесения урона (по умолчанию 30 с, Options). Spawn radius задаёт появление/блуждание, не границу погони.',
@@ -46,9 +46,9 @@ ITEMS = [
              ]},
              {'title': 'Blocked Pursuit · отступление M591', 'lines': [
                  'При NoAccessiblePlan монстр отходит от цели до горизонтальной дальности лука из Database + blockedRetreatBuffer (2 studs). M592: максимум по всем лукам (сейчас 40 studs), ограниченный боевыми лимитами, независимо от наличия или экипировки лука у игрока. Отступление — короткие проверяемые физические шаги, с учётом Terrain и границ преследования. Если дальше отойти физически нельзя, ожидание начинается в достигнутой точке.',
-                 'BlockedRetreat: таймер застревания и Home Leash без урона не идут. BlockedWait: оба таймера начинают отсчёт заново, граф повторно не ищется. Если цель снова входит в радиус лука, монстр возобновляет сближение, заново проверяет доступность пути. Если ожидание началось внутри радиуса, повторное сближение требует выхода цели и нового входа в радиус, чтобы не создавать цикл.',
+                 'BlockedRetreat: таймер застревания и Home Leash без урона не идут. BlockedWait: оба таймера начинают отсчёт заново, граф повторно не ищется. M594: BlockedWait не блокирует обычную атаку: проверяются живая цель, территория, радиус, высота и препятствия, затем штатная остановка навигации и атака. Если удар невозможен, новый подход ×1,5 Run запускается при входе цели в радиус лука, уменьшении 3D-дистанции внутри радиуса минимум на 1 stud от наблюдавшегося максимума либо получении ненулевого урона от текущей цели. Неподвижная цель не запускает повторный поиск; активные Climb/Rescue Route/Retry/BlockedRetreat сохраняют владение движением.',
                  'Options → Monster Navigation: Blocked retreat buffer = 2 studs, Blocked retreat speed = ×1, Blocked reengage speed = ×1,5, Rescue Route speed = ×1,5 от обычной Run speed. Последний действует на подходе к входу, авторской линии, переходах и прыжках во время плана. Коэффициенты не перемножаются; Slow/Root/Stun применяются. Stuck return / No damage return остаются существующими настройками. Сохранение → Rojo Sync → перезапуск Play.',
-                 'MonsterBlockedPursuit — политика фаз/таймер ожидания; MonsterBlockedRetreatGeometry — физические шаги; MonsterNavigationSpeed — общий множитель движения/анимации. MONNAV: BLOCKED_WAIT, BLOCKED_REENGAGE, MODE BlockedRetreat/BlockedWait.',
+                 'MonsterBlockedPursuit — политика фаз/таймер ожидания; MonsterBlockedRetreatGeometry — физические шаги; MonsterNavigationSpeed — общий множитель движения/анимации. MONNAV: BLOCKED_WAIT, BLOCKED_REENGAGE (RangeEntered / TargetApproached / Damage), MODE BlockedRetreat/BlockedWait.',
              ]},
              {'title': 'StuckTimeout · аварийный возврат M580', 'lines': [
                  'Независимый watchdog прогресса в Chase/Return: текущий Options stuckReturnSeconds — 20 с; выборка раз в 1 с, повторные прыжки в прежнем вертикальном диапазоне не сбрасывают таймер. Это не таймер прыжка и не таймер без урона. M591: после NoAccessiblePlan при Chase таймер запускается только в BlockedWait.',

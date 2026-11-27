@@ -18,7 +18,7 @@ class MeleeObstacleRecovery(unittest.TestCase):
         self.assertIn('return withinAttackRange(agent, target) and hasLineOfSight(agent, target)', policy)
         self.assertIn('return hasLineOfSight(agent, target)', policy)
         self.assertIn('state.climb ~= nil', policy)
-        self.assertIn('if isRecovering(agent) then return false end', policy)
+        self.assertIn('if isRecovering(agent) and not Blocked.IsWaiting(agent.recoveryNavigation) then return false end', policy)
         self.assertIn('== "ranged" then return true', policy)
         ai = (BASE / 'MonsterAIService.luau').read_text()
         self.assertIn('Navigation.Enabled(agent) or not Retreat.IsRanged(agent.model)', ai)

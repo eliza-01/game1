@@ -5,38 +5,58 @@ local function distance(a,b) return horizontal(a-b).Magnitude end
 local ARRIVAL=1
 local PROGRESS=.25
 local STALL_SECONDS=2
+local REAPPROACH_DISTANCE=1 -- ignore small physics jitter; measured in 3D
 
 function Blocked.Begin(state)
     state.blockedPursuit={phase="Retreat"}
 end
 
-local function waitAt(b,d,range,now)
+local function waitAt(b,d,range,now,separation)
     b.phase="Wait"; b.waitAt=now; b.point=nil; b.armed=d>range
+    b.approachDistance=separation
     return "Wait"
 end
 
 function Blocked.Step(state,position,target,range,buffer,now,speed,findPoint)
     local b=state.blockedPursuit
     local d=distance(position,target)
+    local separation=(position-target).Magnitude
     if b.phase=="Wait" then
+        if b.damaged then b.damaged=nil; return "Reengage",nil,"Damage" end
         if d>range then b.armed=true end
-        if b.armed and d<=range then return "Reengage" end
+        b.approachDistance=math.max(b.approachDistance,separation)
+        if d<=range then
+            if b.armed then b.armed=false; return "Reengage",nil,"RangeEntered" end
+            if b.approachDistance-separation>=REAPPROACH_DISTANCE then
+                b.approachDistance=separation
+                return "Reengage",nil,"TargetApproached"
+            end
+        end
         return "Wait"
     end
-    if d>=range+buffer then return waitAt(b,d,range,now) end
+    if d>=range+buffer then return waitAt(b,d,range,now,separation) end
     if speed<=.01 then
         b.point=nil; b.progressAt=nil
         return "Retreat"
     end
     if b.point then
         if distance(position,b.anchor)>=PROGRESS then b.anchor=position; b.progressAt=now end
-        if now-b.progressAt>=STALL_SECONDS then return waitAt(b,d,range,now) end
+        if now-b.progressAt>=STALL_SECONDS then return waitAt(b,d,range,now,separation) end
         if distance(position,b.point)>ARRIVAL then return "Retreat",b.point end
     end
     local point=findPoint(position,target,range+buffer)
-    if not point then return waitAt(b,d,range,now) end
+    if not point then return waitAt(b,d,range,now,separation) end
     b.point=point; b.anchor=position; b.progressAt=now
     return "Retreat",point
+end
+
+function Blocked.IsWaiting(state)
+    return state~=nil and state.blockedPursuit~=nil and state.blockedPursuit.phase=="Wait"
+end
+
+-- One event-triggered re-evaluation, not a periodic graph retry.
+function Blocked.NotifyDamage(state)
+    if Blocked.IsWaiting(state) then state.blockedPursuit.damaged=true end
 end
 
 function Blocked.WaitSeconds(state,now)

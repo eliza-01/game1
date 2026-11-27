@@ -6,6 +6,7 @@ local Workspace = game:GetService("Workspace")
 local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
 local DeathChase = require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
 local Geometry = require(script.Parent:WaitForChild("MonsterRecoveryGeometry"))
+local Blocked = require(script.Parent:WaitForChild("MonsterBlockedPursuit"))
 local MonsterTargetPolicy = {}
 local VERTICAL_TOLERANCE = 5
 
@@ -111,7 +112,8 @@ end
 
 local function canBeginTargetedCast(agent: any, target: Model): boolean
     -- A selected recovery route owns movement until its verified exit.
-    if isRecovering(agent) then return false end
+    -- Stationary blocked waiting does not own combat: validate the live target.
+    if isRecovering(agent) and not Blocked.IsWaiting(agent.recoveryNavigation) then return false end
     return withinAttackRange(agent, target) and hasLineOfSight(agent, target)
 end
 

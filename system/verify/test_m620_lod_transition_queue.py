@@ -23,7 +23,7 @@ class LodTransitionQueueM620(unittest.TestCase):
         tick = source.split('RunService.Heartbeat:Connect', 1)[1]
         self.assertIn('queue:Attempted(transition)', source)
         self.assertIn('record.actual = if replacement then variant else "UNLOADED"', source)
-        for needle in ('queue:Begin(cameraPosition, cameraChanged)',
+        for needle in ('queue:Begin(priorityPosition, cameraChanged or priorityReset)',
                        'candidates:Collect(cameraPosition, cameraChanged)',
                        'LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)',
                        'record.part:IsDescendantOf(Workspace)', 'not available(record, status, prototype, metadata, variant)',
@@ -35,7 +35,7 @@ class LodTransitionQueueM620(unittest.TestCase):
         self.assertNotIn('if not cameraChanged then return', tick)
         self.assertLess(tick.index('queue:Begin'), tick.index('queue:Set'))
         self.assertLess(tick.index('queue:Set'), tick.index('queue:Ordered'))
-        self.assertIn('runtimeWork:Begin(queue:Ordered(function(record, position)', tick)
+        self.assertIn('runtimeWork:Begin(ordered,', tick)
         self.assertIn('runtimeWork:Step(callbacks)', tick)
 
     def test_pure_helpers_no_new_runtime_ownership(self):

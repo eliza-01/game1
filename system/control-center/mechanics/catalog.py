@@ -23,6 +23,7 @@ SOURCES = {
     'static-placement-index': ('src/client/world/StaticPlacementIndex.luau', 'LOD · immutable spatial index'),
     'location-lod-candidates': ('src/client/world/LocationLodCandidates.luau', 'LOD · локальные кандидаты и приоритет'),
     'lod-threshold-cache': ('src/client/world/LodThresholdCache.luau', 'LOD · пороговый кэш'),
+    'lod-load-priority': ('src/client/world/LodLoadPriority.luau', 'LOD · приоритет ближнего окружения'),
     'lod-transition-queue': ('src/client/world/LodTransitionQueue.luau', 'LOD · очередь переходов'),
     'lod-prototype-cache': ('src/client/world/LodPrototypeCache.luau', 'LOD · readiness cache прототипов'),
     'location-lod-assembly': ('src/client/world/LocationLodAssembly.luau', 'LOD · immutable geometry metadata / assembly'),

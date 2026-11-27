@@ -23,7 +23,7 @@ class IncrementalAssemblyM622(unittest.TestCase):
 
     def test_runtime_uses_jobs_not_synchronous_clone_loop(self):
         streamer = source('LocationWorldStreamer.luau')
-        self.assertIn('runtimeWork:Begin(queue:Ordered(function(record, position)', streamer)
+        self.assertIn('runtimeWork:Begin(ordered,', streamer)
         self.assertIn('runtimeWork:Step(callbacks)', streamer)
         self.assertIn('LodAssembly.PrepareSingle', streamer)
         self.assertIn('LodAssembly.Prepare(', streamer)

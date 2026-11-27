@@ -13,12 +13,15 @@ function Work.new()
 end
 
 -- Rebuild iteration cursors only at the distance observation, not per frame.
-function Work:Begin(entries)
+function Work:Begin(entries, allowBuild)
     self.unloads, self.builds = {}, {}
     self.unloadIndex, self.buildIndex = 1, 1
     for _, entry in ipairs(entries) do
-        local list = entry.variant == "UNLOADED" and self.unloads or self.builds
-        list[#list+1] = entry
+        if entry.variant == "UNLOADED" then
+            self.unloads[#self.unloads+1] = entry
+        elseif not allowBuild or allowBuild(entry) then
+            self.builds[#self.builds+1] = entry
+        end
     end
 end
 

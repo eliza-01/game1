@@ -75,6 +75,23 @@ function Requests:TakeOrStart(record, current)
     return nil
 end
 
+-- A teleport can leave all slots occupied by distant detached results. Free
+-- one ready result only under slot pressure, never pretend to cancel an
+-- in-flight engine call. The original concurrency ceiling still applies.
+function Requests:Full()
+    return self.count >= MAX_PENDING
+end
+
+function Requests:YieldReadyOutside(allowed)
+    if not self:Full() then return end
+    for record, slot in pairs(self.slots) do
+        if not slot.loading and not allowed(record) then
+            self:_release(record, slot)
+            return
+        end
+    end
+end
+
 function Requests:Backoff(record)
     record.retryAt = self.clock() + RETRY_SECONDS
 end

@@ -41,11 +41,12 @@ local function scenario(records, positions, budget)
             local variant=reference[r]
             if tick%7==1 and r.order%3==0 and variant~='UNLOADED' then variant=actual end
             if variant~=actual then
-                expected[#expected+1]={record=r,variant=variant,unload=reference[r]=='UNLOADED' and actual~='UNLOADED',distance=distance(camera,r.pivot)}
+                expected[#expected+1]={record=r,variant=variant,unload=reference[r]=='UNLOADED' and actual~='UNLOADED',cold=actual=='UNLOADED',distance=distance(camera,r.pivot)}
             end
         end
         table.sort(expected,function(a,b)
             if a.unload~=b.unload then return a.unload end
+            if a.cold~=b.cold then return a.cold end
             if a.distance~=b.distance then return a.distance<b.distance end
             return a.record.order<b.record.order
         end)
@@ -106,5 +107,5 @@ assert(#index:Query(v(1000000,0,10010))==1)
 local function t(order,d,desired,actual) return {record={order=order,distance=d,desired=desired,actual=actual}} end
 local a,b,c,d=t(3,1,'FULL','UNLOADED'),t(2,5,'FULL','UNLOADED'),t(1,5,'FULL','LOD1'),t(4,100,'UNLOADED','FULL')
 local sorted={a,b,c,d}; Candidates.SortTransitions(sorted)
-assert(sorted[1]==d and sorted[2]==a and sorted[3]==c and sorted[4]==b)
+assert(sorted[1]==d and sorted[2]==a and sorted[3]==b and sorted[4]==c)
 print('M619: '..queries..' camera samples; '..comparisons..' desired-state comparisons passed')

@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "2514d53b5bf19dc6f3b5bbd1e9659fbf39c5e0fa267f1c1bb2d08f8aaee1f1db",
+  "specSha256": "8d49d9cdeb5279740d34087c32ae99e2fbdd5c28096bdbf078e433f0e11dbf23",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 14,
-  "updatedAt": "2026-11-28T16:00:00+00:00",
+  "revision": 15,
+  "updatedAt": "2026-11-28T17:00:00+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -69,7 +69,7 @@
       "id": "KBN-0037-A03",
       "title": "Неподвижный игрок не вызывает глобальную пересортировку LOD; большие сборки бюджетируются; streaming/коллизии/телепорты работают",
       "status": "NOT_RUN",
-      "evidence": "M619–M623: shared static index/threshold queue/prototype cache, Location/House incremental jobs and retirement. Mixed bounds/index, async slots and mocked adapter lifecycle oracles cover atomic swaps, retry, proxy stream-out/in, appearance and raycast unbind. Budgeted Studio Preview scheduling, actual Studio/DEV Mobile, House5/two-client interactions, collisions/navigation and profiling NOT_RUN. M624: opt-in capture and manual acceptance matrix, Preview teardown fix. Preview scheduling, global composite/tagged visits, actual Studio/DEV and profiling remain open. M625: event-driven composite effect owner, shared path-prefix subscriptions, late descendants, actual/restore/teardown oracle; periodic composite pass removed. Incremental Studio Preview deferred by owner; tagged visual pass and actual Studio/DEV/PC/Mobile, two-client and profiling remain NOT_RUN."
+      "evidence": "M619–M623: shared static index/threshold queue/prototype cache, Location/House incremental jobs and retirement. Mixed bounds/index, async slots and mocked adapter lifecycle oracles cover atomic swaps, retry, proxy stream-out/in, appearance and raycast unbind. Budgeted Studio Preview scheduling, actual Studio/DEV Mobile, House5/two-client interactions, collisions/navigation and profiling NOT_RUN. M624: opt-in capture and manual acceptance matrix, Preview teardown fix. Preview scheduling, global composite/tagged visits, actual Studio/DEV and profiling remain open. M625: event-driven composite effect owner, shared path-prefix subscriptions, late descendants, actual/restore/teardown oracle; periodic composite pass removed. Incremental Studio Preview deferred by owner; tagged visual pass and actual Studio/DEV/PC/Mobile, two-client and profiling remain NOT_RUN. M625 owner smoke: published game works, no noticeable degradation; weak phone near fence gaps while far houses appeared. M626 near-first admission by player/surface band, stall escape, async slot pressure and teleport oracle; actual weak phone spawn check pending; stress/profiling deferred by owner."
     },
     {
       "id": "KBN-0037-A04",

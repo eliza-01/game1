@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local CollectionService = game:GetService("CollectionService")
 local Stats = game:GetService("Stats")
+local Players = game:GetService("Players")
 local World = ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world")
 local Registry = require(World:WaitForChild("LocationAssetRegistry"))
 local Contract = require(World:WaitForChild("LocationRuntimeManifestContract"))
@@ -19,6 +20,7 @@ local LodThresholdCache = require(script.Parent:WaitForChild("LodThresholdCache"
 local LodTransitionQueue = require(script.Parent:WaitForChild("LodTransitionQueue"))
 local LodPrototypeCache = require(script.Parent:WaitForChild("LodPrototypeCache"))
 local LodRuntimeWork = require(script.Parent:WaitForChild("LodRuntimeWork"))
+local LodLoadPriority = require(script.Parent:WaitForChild("LodLoadPriority"))
 local LodDiagnostics = require(script.Parent:WaitForChild("LodDiagnostics"))
 local Appearance = require(World:WaitForChild("RuntimeVisualAppearance"))
 local Streamer = {}
@@ -169,6 +171,7 @@ function Streamer.Start()
     local prototypeCache = nil
     local prototypeChangedConnection = nil
     local runtimeWork = LodRuntimeWork.new()
+    local loadPriority = LodLoadPriority.new(os.clock)
     local diagnostics = LodDiagnostics.new()
     runtimeWork.diagnostics = diagnostics
     if manifest then
@@ -232,16 +235,30 @@ function Streamer.Start()
             return if record then record.original else part.LocalTransparencyModifier
         end, paint)
     end
-    local elapsed = 0
+    local elapsed = if manifest then TICK else 0
     local visualElapsed = VISUAL_INTERVAL -- first distance test immediately
     local lastWarning = 0
     local lastCamera = nil
     local cameraPosition = nil
+    local lastPriorityPosition = nil
+    local lastPriorityRoot = nil
+    local player = Players.LocalPlayer
+    local function priorityAnchor(cameraPosition)
+        local stage = player:GetAttribute("CharacterCreationStatus")
+        local character = player.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        if (stage == nil or stage == "world") and root and root:IsA("BasePart") and root:IsDescendantOf(Workspace) then
+            return root.Position, root
+        end
+        -- Selection/creation camera has no gameplay character to prioritize.
+        return cameraPosition, nil
+    end
     local callbacks = {}
     function callbacks.valid(transition, job)
         local record = transition.record
         if queue.entries[record] ~= transition or transition.desired ~= record.desired
             or transition.actual ~= record.actual or (transition.attemptTick == queue.tick and not job) then return false end
+        if transition.variant ~= "UNLOADED" and not loadPriority:Allows(record) then return false end
         -- Recheck active work against the current camera, even between observations.
         if diagnostics.enabled then diagnostics:Add("workDistanceChecks") end
         if LodThresholdCache.ResolveAt(record, LodThresholdCache.Measure(record, cameraPosition, Policy),
@@ -345,12 +362,18 @@ function Streamer.Start()
             return
         end
         cameraPosition = camera.CFrame.Position
+        local priorityPosition, priorityRoot, priorityReset
+        if manifest then
+            priorityPosition, priorityRoot = priorityAnchor(cameraPosition)
+            priorityReset = lastPriorityRoot ~= priorityRoot or not lastPriorityPosition
+                or (priorityPosition - lastPriorityPosition).Magnitude >= LodLoadPriority.BandStuds * 2
+        end
         if visualElapsed >= VISUAL_INTERVAL then
             visualElapsed = 0
             if preview then preview:Resolve(cameraPosition) end
             sampleVisuals(cameraPosition, preview, diagnostics)
         end
-        if elapsed < TICK then
+        if elapsed < TICK and not (manifest and priorityReset) then
             if manifest then sampleWork(dt, runtimeWork:Step(callbacks), captureStart) end
             return
         end
@@ -362,7 +385,8 @@ function Streamer.Start()
         if not manifest then return end
         local cameraChanged = lastCamera ~= camera
         lastCamera = camera
-        queue:Begin(cameraPosition, cameraChanged)
+        lastPriorityRoot, lastPriorityPosition = priorityRoot, priorityPosition
+        queue:Begin(priorityPosition, cameraChanged or priorityReset)
         local reused = not cameraChanged and candidates.position == cameraPosition and candidates.localRecords ~= nil
         local localRecords = candidates:Collect(cameraPosition, cameraChanged)
         if diagnostics.enabled then
@@ -448,9 +472,19 @@ function Streamer.Start()
                 if queue.entries[record] then queue.entries[record].epoch = record.prototypeEpoch or 0 end
             end
         end
-        runtimeWork:Begin(queue:Ordered(function(record, position)
-            return LodThresholdCache.Distance(record, position, Policy)
-        end))
+        loadPriority:Observe(localRecords, priorityPosition, Policy.SurfaceDistance, priorityReset or cameraChanged)
+        if diagnostics.enabled then
+            if loadPriority.frontier ~= nil then diagnostics:Add("nearBandObservations") end
+            diagnostics:Peak("priorityBand", loadPriority.frontier or 0)
+        end
+        -- Missing geometry is sampled above even if no prototype is ready.
+        -- Sample the remaining queued upgrades/unloads without modifying the
+        -- camera's threshold-distance cache.
+        local ordered = queue:Ordered(function(record, position)
+            return loadPriority:Sample(record, position, Policy.SurfaceDistance)
+        end)
+        if houseAdapter then houseAdapter:YieldReadyOutside(ordered, loadPriority) end
+        runtimeWork:Begin(ordered, function(entry) return loadPriority:Allows(entry.record) end)
         local workStats = runtimeWork:Step(callbacks)
         candidates:Retain(localRecords)
         if prototypeCache:FolderReady() ~= true and os.clock() - lastWarning > 15 then

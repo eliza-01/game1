@@ -44,8 +44,8 @@ function Candidates:Retain(records)
     self.retained = retained
 end
 
--- Original unload-first and nearest-first priority. The old sort did not
--- specify ties; immutable manifest ordinal makes equal distances deterministic.
+-- Unloads remain independent. Nearest band and missing geometry precede
+-- quality upgrades; aging is confined to a band and load class.
 function Candidates.SortTransitions(transitions)
     if #transitions < 2 then return end
     table.sort(transitions, function(a, b)
@@ -53,10 +53,15 @@ function Candidates.SortTransitions(transitions)
         local aUnload = ar.desired == "UNLOADED" and ar.actual ~= "UNLOADED"
         local bUnload = br.desired == "UNLOADED" and br.actual ~= "UNLOADED"
         if aUnload ~= bUnload then return aUnload end
+        local ab, bb = ar.loadBand or 0, br.loadBand or 0
+        if ab ~= bb then return ab < bb end
+        local ac, bc = ar.actual == "UNLOADED", br.actual == "UNLOADED"
+        if ac ~= bc then return ac end
         if a.aged ~= b.aged then return a.aged == true end
         if a.aged and a.queuedAt ~= b.queuedAt then return a.queuedAt < b.queuedAt end
-        if ar.distance == br.distance then return ar.order < br.order end
-        return ar.distance < br.distance
+        local ad, bd = ar.loadDistance or ar.distance, br.loadDistance or br.distance
+        if ad == bd then return ar.order < br.order end
+        return ad < bd
     end)
 end
 

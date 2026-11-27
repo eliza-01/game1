@@ -16,10 +16,10 @@ function Capture:Start(cacheStats)
         "localSorts", "compositePathEvents", "compositeRootChanges", "compositeDiscoveryVisits",
         "compositeEffectEvents", "compositeEffectVisits", "compositeEffectWrites", "buildUnits", "cleanupUnits", "commitUnits", "commits", "buildCommits",
         "unloadCommits", "cancelledJobs", "staleJobCancels", "retryableAttempts", "failedAttempts", "meshClones", "weldCreates", "weldBindings",
-        "taggedVisualVisits", "asyncStarts", "asyncFailures", "asyncDiscards"}) do
+        "taggedVisualVisits", "nearBandObservations", "asyncStarts", "asyncFailures", "asyncDiscards"}) do
         self.counts[key] = 0
     end
-    self.peaks = {queueSize=0, queueAgeMs=0, localCandidates=0, pendingAsync=0, stagingInstances=0, retiredBundles=0, buildUnits=0, cleanupUnits=0, commitUnits=0}
+    self.peaks = {priorityBand=0, queueSize=0, queueAgeMs=0, localCandidates=0, pendingAsync=0, stagingInstances=0, retiredBundles=0, buildUnits=0, cleanupUnits=0, commitUnits=0}
     self.samples = {}
     self.cacheStart = cacheStats or {}
     self.frames = 0

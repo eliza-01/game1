@@ -192,6 +192,20 @@ function Adapter:Prepare(transition)
     return job
 end
 
+function Adapter:YieldReadyOutside(entries, priority)
+    if not self.requests:Full() then return end
+    for _, entry in ipairs(entries) do
+        local visual = entry.record
+        if visual.house and entry.variant == "FULL" and visual.actual == "UNLOADED"
+            and priority:Allows(visual) and not self.requests.slots[visual]
+            and os.clock() >= (visual.retryAt or 0)
+            and (not visual.spec.moving or self:_proxy(visual)) then
+            self.requests:YieldReadyOutside(function(record) return priority:Allows(record) end)
+            return
+        end
+    end
+end
+
 function Adapter:Failed(transition, reason, retryable)
     if retryable then return end
     if transition.variant == "LOD1" then transition.record.lodRetryAt = os.clock() + Requests.RetrySeconds

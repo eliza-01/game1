@@ -125,7 +125,7 @@ class HitboxDecompositionM99Tests(unittest.TestCase):
 
     def test_multi_target_and_studio_diagnostics_preserved(self):
         for token in (
-            'for entity, binding in pairs(bindings) do',
+            'for _, binding in ipairs(index:QueryBox(boxCFrame, boxSize)) do',
             'entity:GetAttribute("Damageable") == true',
             'excludedTargets[entity] ~= true',
             'table.insert(results, {',

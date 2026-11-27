@@ -47,7 +47,7 @@ class MonsterPhantom(unittest.TestCase):
         self.assertLess(start, detach)
         self.assertLess(detach, phantom)
         self.assertLess(phantom, animation)
-        self.assertIn('bindings[entity] = nil', hitbox)
+        self.assertIn('index:Remove(entity)', hitbox)
         self.assertIn('debugFolder:Destroy()', hitbox)
         self.assertIn('for _, descendant in ipairs(actor:GetDescendants()) do', policy)
         for flag in ('CanCollide', 'CanTouch', 'CanQuery'):

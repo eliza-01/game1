@@ -77,11 +77,12 @@ ITEMS = [
          ['MonsterAnimationRegistry', 'EntityHitboxService'], [
              {'title': 'Работает в исходниках', 'lines': [
                  'MonsterAttackExecutor исполняет атаку; общий DamageService и EntityHitboxService обрабатывают урон и боевые границы.',
+                 'M614: серверные melee, bow и headshot выбирают кандидатов через GetPartBoundsInBox по существующим RootCollider; точные bone-local hitboxes и дистанция луча сохранены. Studio/DEV и нагрузочная приёмка открыты.',
                  'MonsterAttackLocomotionController визуализирует анимации, MonsterDeathLifecycle ведёт смерть и освобождение слота. M613: общий пул NPC/Monster ограничен 32 экземплярами, включая idle и резерв загрузки; lifecycle и повторное использование централизованы.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
                  'Боевой результат не создаёт подтверждённого постоянного loot/XP/quest transaction; выдача наград требует отдельного серверного контракта.',
                  'Нужна Studio Play проверка сетевой синхронизации атак, headshot/OBB, анимационных переходов и повторного появления.',
              ]},
-         ], ['monster-attack', 'monster-client-attack', 'monster-death', 'damage-service', 'entity-hitbox']),
+         ], ['monster-attack', 'monster-client-attack', 'monster-death', 'damage-service', 'entity-hitbox', 'native-spatial-index']),
 ]

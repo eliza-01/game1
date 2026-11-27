@@ -3,17 +3,17 @@
   "id": "KBN-0036",
   "title": "Spatial Index · общая инфраструктура",
   "domain": "Performance",
-  "status": "PROPOSED",
+  "status": "IN_PROGRESS",
   "priority": "P0",
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0036.md",
-  "specSha256": "747a4a4db9599a23c52b98b1a0bff66a6791511d0df65dd553b656aa7e5a2b2d",
+  "specSha256": "a2d3937cfe9b54957aec00f06b4530ffda0c19eabf7c2d90ee1cbcbba2dc88f0",
   "dependsOn": [
     "KBN-0035"
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-27T15:27:51+00:00",
+  "revision": 2,
+  "updatedAt": "2026-11-27T20:20:00+00:00",
   "tasks": [
     {
       "id": "KBN-0036-T01",
@@ -41,7 +41,7 @@
       "id": "KBN-0036-A01",
       "title": "Нет пропущенных кандидатов относительно эталонного полного обхода; нет дублей и устаревших записей",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M614: 300 сравнений broadphase с полным перебором (Lua mock), lifecycle/teleport/large bounds. Native Studio/DEV и полная эквивалентность NOT_RUN."
     },
     {
       "id": "KBN-0036-A02",

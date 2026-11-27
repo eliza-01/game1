@@ -3,19 +3,19 @@
   "id": "KBN-0038",
   "title": "Server Performance · combat, AI, navigation",
   "domain": "Performance",
-  "status": "PROPOSED",
+  "status": "IN_PROGRESS",
   "priority": "P0",
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0038.md",
-  "specSha256": "15863d1925ddfb9ce47186f245468e39e13011e231da07a8df59a0fa180fe0d3",
+  "specSha256": "0eb377be7df6cf1db9add8b22e82cd7764126fd27bb24f7995375b5b161e7ba3",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036",
     "KBN-0037"
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-27T15:27:51+00:00",
+  "revision": 2,
+  "updatedAt": "2026-11-27T20:20:00+00:00",
   "tasks": [
     {
       "id": "KBN-0038-T01",
@@ -48,7 +48,7 @@
       "id": "KBN-0038-A01",
       "title": "Результаты melee, multi-hit, bow, headshot и препятствия эквивалентны базовой реализации; серверная авторизация не ослаблена",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M614: 300 сравнений broadphase с полным перебором (Lua mock), lifecycle/teleport/large bounds. Native Studio/DEV и полная эквивалентность NOT_RUN."
     },
     {
       "id": "KBN-0038-A02",

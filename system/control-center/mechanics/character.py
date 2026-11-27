@@ -51,6 +51,7 @@ ITEMS = [
          ['AttackService', 'BowHitscanService', 'WeaponEquipService'], [
              {'title': 'Работает в исходниках', 'lines': [
                  'AttackService/AttackDamageResolver подтверждают melee-контакт, DamageService применяет урон, BowHitscanService делает серверный мгновенный контакт.',
+                 'M614: серверные melee, bow и headshot выбирают кандидатов через GetPartBoundsInBox по существующим RootCollider; точные bone-local hitboxes и дистанция луча сохранены. Studio/DEV и нагрузочная приёмка открыты.',
                  'M612: принятое сервером состояние атаки реплицируется наблюдателям; общий upper-body composer воспроизводит опубликованный клип поверх native locomotion. Studio/DEV-приёмка открыта.',
                  'M609: выбранное оружие и NPC используют общий RigidEquipmentMount на родительской Bone с authored offset (один RigidConstraint на предмет), а летящая/застрявшая стрела — клиентская визуализация, не второй серверный снаряд.',
              ]},
@@ -58,7 +59,7 @@ ITEMS = [
                  'WeaponSelectionService — playtest chooser: Studio или точный DEV Place ID из Options → Debug / TestPlace (включая compiled Runtime), при включённых галочках PC/Mobile; все допущенные тестировщики. Нет доказанной persistent ownership/inventory модели для выбранного предмета.',
                  'Отдельно проверить урон при тесном контакте, прицеливание вверх/вниз, разные MeshPart, mobile auto-aim, lag/повторный Release и права игрока.',
              ]},
-         ], ['attack-service', 'bow-hitscan', 'damage-service', 'weapon-equip', 'weapon-select', 'bone-mount']),
+         ], ['attack-service', 'bow-hitscan', 'damage-service', 'weapon-equip', 'weapon-select', 'bone-mount', 'entity-hitbox', 'native-spatial-index']),
     card('character-death-respawn', 'Персонаж · HP, смерть, Return to Town', 'Сервер',
          'HP и LifeState контролирует сервер; после смерти персонаж ожидает Return to Town.',
          ['LifeState', 'ReturnToTownAvailable'], [

@@ -71,6 +71,7 @@ SOURCES = {
     'monster-attack': ('src/server/monster/MonsterAttackExecutor.luau', 'Monster · атака'),
     'monster-client-attack': ('src/client/monster/MonsterAttackLocomotionController.luau', 'Monster · клиентская анимация'),
     'entity-hitbox': ('src/server/combat/EntityHitboxService.luau', 'Hitbox · авторитет сервера'),
+    'native-spatial-index': ('src/shared/world/NativePartSpatialIndex.luau', 'Spatial Index · native broad phase'),
     'character-service': ('src/server/character/CharacterService.luau', 'Персонаж · жизненный цикл'),
     'character-creation-gateway': ('src/server/character/CharacterCreationGateway.luau', 'Создание и вход в мир'),
     'character-roster-gateway': ('src/server/character/CharacterRosterGateway.luau', 'Управление слотами'),

@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
 
@@ -13,7 +14,8 @@ local HitboxRuntimeFrames = require(script.Parent:WaitForChild("HitboxRuntimeFra
 local EntityHitboxService = {}
 local started = false
 local frameSerial = 0
-local bindings: { [Model]: any } = {}
+local NativePartSpatialIndex = require(Shared:WaitForChild("world"):WaitForChild("NativePartSpatialIndex"))
+local index = NativePartSpatialIndex.new(Workspace)
 
 local DEBUG_FOLDER_NAME = "CombatHitboxDebugData"
 
@@ -149,7 +151,7 @@ local function clearAttributes(entity: Model)
 end
 
 function EntityHitboxService.Detach(entity: Model)
-    bindings[entity] = nil
+    index:Remove(entity)
     CollectionService:RemoveTag(entity, "Game1CombatHitbox")
     local debugFolder = entity:FindFirstChild(DEBUG_FOLDER_NAME)
     if debugFolder then
@@ -231,7 +233,7 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
     end
 
     binding.mode = if geometryUnavailable then "root_bounds_fallback" else "precomputed_bone_boxes"
-    bindings[entity] = binding
+    index:Register(entity, root, definition.broadRadius, binding)
     CollectionService:AddTag(entity, "Game1CombatHitbox")
     local count = #binding.bodyBoxes + (if binding.headBox then 1 else 0)
     if geometryUnavailable then
@@ -268,7 +270,8 @@ function EntityHitboxService.QueryDamageablesInBox(
         end
     end
 
-    for entity, binding in pairs(bindings) do
+    for _, binding in ipairs(index:QueryBox(boxCFrame, boxSize)) do
+        local entity = binding.entity
         if entity ~= exclude
             and (not excludedTargets or excludedTargets[entity] ~= true)
             and entity.Parent ~= nil
@@ -297,7 +300,8 @@ function EntityHitboxService.QueryDamageablesInArc(
     reach: number, angle: number, minY: number, maxY: number, geometry: any
 ): {any}
     local results = {}
-    for entity, binding in pairs(bindings) do
+    for _, binding in ipairs(index:QueryRadius(origin, reach)) do
+        local entity = binding.entity
         if entity ~= exclude and entity.Parent and binding.visual.Parent
             and entity:GetAttribute("Damageable") == true then
             -- Squared distance is a conservative broadphase: no sqrt, no
@@ -347,7 +351,8 @@ function EntityHitboxService.RaycastAimRegions(
 
     local best = nil
     local bestDistance = math.huge
-    for entity, binding in pairs(bindings) do
+    for _, binding in ipairs(index:QueryRay(rayOrigin, direction, distanceLimit)) do
+        local entity = binding.entity
         if entity ~= exclude
             and entity.Parent ~= nil
             and binding.visual.Parent ~= nil

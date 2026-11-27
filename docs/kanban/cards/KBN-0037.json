@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0037",
+  "title": "Client Performance · sampler, attachments, LOD, UI",
+  "domain": "Performance",
+  "status": "PROPOSED",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "favorite": false,
+  "specPath": "docs/kanban/specs/KBN-0037.md",
+  "specSha256": "1ea2856a4ecab30d0a0efb2e466262799bb2cfa214b963c62bac4cf13746196d",
+  "dependsOn": [
+    "KBN-0035",
+    "KBN-0036"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-27T15:27:51+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0037-T01",
+      "title": "Исправить жёсткий общий бюджет sampler Monster/NPC, lifecycle и приоритеты PC/Mobile",
+      "done": false
+    },
+    {
+      "id": "KBN-0037-T02",
+      "title": "Ввести событийный registry креплений и Attachment LOD с частотами по дистанции",
+      "done": false
+    },
+    {
+      "id": "KBN-0037-T03",
+      "title": "Оптимизировать LocationWorldStreamer: локальная выборка, очередь порогов, кэш прототипов и реальный budget",
+      "done": false
+    },
+    {
+      "id": "KBN-0037-T04",
+      "title": "Индексировать сокеты; кэшировать дверные меши и исключить периодическое изменение CanQuery",
+      "done": false
+    },
+    {
+      "id": "KBN-0037-T05",
+      "title": "Реализовать пул Overhead UI и событийное обновление HP без потери текущих правил",
+      "done": false
+    },
+    {
+      "id": "KBN-0037-T06",
+      "title": "Сравнить результаты профилирования каждого изменения с baseline; проверить PC и телефон",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0037-A01",
+      "title": "Общий лимит sampler никогда не превышен; смерть/DeathIdle, атака и locomotion без restpose регрессий",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0037-A02",
+      "title": "Волосы и оружие не отрываются; дальние/невидимые крепления не выполняют полную работу каждый кадр",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0037-A03",
+      "title": "Неподвижный игрок не вызывает глобальную пересортировку LOD; большие сборки бюджетируются; streaming/коллизии/телепорты работают",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0037-A04",
+      "title": "Дверь, замок, сокеты и препятствия корректны в Authoring/Runtime и PC/Mobile; Raycast только в зоне; не меняется CanQuery на каждом запросе",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0037-A05",
+      "title": "Overhead пул ограничен и очищается; HP/имена/уровни/GP корректны; нет роста соединений после циклов streaming",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0037-A06",
+      "title": "Сравнение CPU/frame time, RAM и FPS на фиксированной сцене DEV и телефоне сохранено",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

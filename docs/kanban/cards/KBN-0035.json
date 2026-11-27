@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0035",
+  "title": "Performance Profiler · baseline и диагностика",
+  "domain": "Performance",
+  "status": "READY",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "favorite": true,
+  "specPath": "docs/kanban/specs/KBN-0035.md",
+  "specSha256": "46f8c80f18e096c7455159af075dee7e71f110a469f5ea63831793540b7dd85f",
+  "dependsOn": [],
+  "revision": 1,
+  "updatedAt": "2026-11-27T15:27:51+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0035-T01",
+      "title": "Спроектировать общий диагностический контракт и выключенный по умолчанию profiler с ограниченным буфером",
+      "done": false
+    },
+    {
+      "id": "KBN-0035-T02",
+      "title": "Добавить MicroProfiler scopes и агрегированные счётчики для combat, AI, animation, LOD, sockets, network и attachments",
+      "done": false
+    },
+    {
+      "id": "KBN-0035-T03",
+      "title": "Проверить накладные расходы включённой и выключенной диагностики; проверить cleanup",
+      "done": false
+    },
+    {
+      "id": "KBN-0035-T04",
+      "title": "Снять baseline Studio и DEV PC/физический Android, связать результаты с KBN-0003 и KBN-0010",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0035-A01",
+      "title": "OFF не создаёт диагностические циклы, сетевые события или постоянные аллокации; Debug авторизован",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0035-A02",
+      "title": "Счётчики и длительности проверены на известных сценариях; ограничен объём хранения и вывода",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0035-A03",
+      "title": "Есть воспроизводимый baseline реального DEV и телефона с версиями, сценой и настройками; CPU/GPU/память/сеть не смешаны",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

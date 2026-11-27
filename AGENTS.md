@@ -2,6 +2,12 @@
 
 **Scope:** These rules apply to every language and surface in this repository: Luau (server/client/shared), Python, JavaScript, SQL, PowerShell, Studio plugins, generated manifests and test/support tooling. They are not specific to Roblox Studio. This document is the in-repository source of truth for future changes. Treat these rules as review criteria, not an excuse for an unsafe wholesale rewrite.
 
+## Active project priority — Performance P0 (2026-11-27, M606a)
+
+The owner has made completion of KBN-0035 through KBN-0039 the highest current project priority. Read `docs/README Read First!.md`, the Performance P0 sections of the current specification and architecture, and the [Kanban queue](docs/kanban/README.md) before changing code. Resume the first incomplete task in dependency order: profiler/baseline → spatial index → client → server → asset pipeline. All five cards are mandatory; the last card's P1 is only relative sequencing. Defer new mechanics and content expansion until all five cards meet their acceptance criteria; exceptions are blocking defects and work needed for acceptance. Keep prior cards and evidence intact.
+
+Use small verified patches, shared infrastructure, measured before/after evidence, and explicit cleanup/budgets. Do not trade combat correctness, server authority, collision fidelity or visual correctness for unmeasured gains. CODE_COMPLETE is not DONE: record real Studio/DEV and physical mobile acceptance in Kanban; never turn static analysis into measured FPS/CPU claims. Current runtime baseline is M605; M606/M606a record planning only.
+
 ## Domain boundaries and ownership
 
 1. **One clear responsibility per module.** A service coordinates a use case, not rendering + persistence + networking + validation + simulation in a single implementation. Split by responsibility, not arbitrary line count. A module exposes a small named public interface; its internal data and helper functions remain private.

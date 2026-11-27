@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0039",
+  "title": "Asset Pipeline · hitboxes и приоритетный прогрев",
+  "domain": "Performance",
+  "status": "PROPOSED",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "favorite": false,
+  "specPath": "docs/kanban/specs/KBN-0039.md",
+  "specSha256": "277df79e32f02518213149941471ab0a4566d80c494556ff44dcab42ac781796",
+  "dependsOn": [
+    "KBN-0035",
+    "KBN-0038"
+  ],
+  "revision": 1,
+  "updatedAt": "2026-11-27T15:27:51+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0039-T01",
+      "title": "Спроектировать версионированный контракт готовых bone-local bounds и генератор Control Center",
+      "done": false
+    },
+    {
+      "id": "KBN-0039-T02",
+      "title": "Подготовить миграцию существующих опубликованных моделей и сравнить bounds с runtime oracle",
+      "done": false
+    },
+    {
+      "id": "KBN-0039-T03",
+      "title": "Перевести Runtime на готовые bounds, убрать ненужную исходную геометрию из долгоживущего кэша после миграции",
+      "done": false
+    },
+    {
+      "id": "KBN-0039-T04",
+      "title": "Ввести приоритетный прогрев уникальных клипов по области и общим лимитам загрузки",
+      "done": false
+    },
+    {
+      "id": "KBN-0039-T05",
+      "title": "Заменить прогрев сборок Character Creation на прогрев уникальных ресурсов с сохранением превью",
+      "done": false
+    },
+    {
+      "id": "KBN-0039-T06",
+      "title": "Измерить холодную/тёплую загрузку, RAM и первый бой на PC и телефоне",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0039-A01",
+      "title": "Готовые хитбоксы эквивалентны прежним для mesh/rig/scale; несовпадение ревизии диагностируется, миграция обратима",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0039-A02",
+      "title": "Обычный Runtime не требует расчёта EditableMesh после полной миграции; подтверждён выигрыш старта и памяти",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0039-A03",
+      "title": "Первый вход, создание/выбор персонажа и первый бой после входа проходят с исправной внешностью и анимациями, включая Death/DeathIdle",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0039-A04",
+      "title": "Есть воспроизводимое сравнение cold/warm loading и памяти; отказ загрузки не зависает и корректно диагностируется",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

@@ -20,7 +20,7 @@ class BlockedWaitCombat(unittest.TestCase):
         policy=policy.replace('return if root and root:IsA("BasePart") then root else rootOf(model)','return (root and root:IsA("BasePart")) and root or rootOf(model)')
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'policy.lua'; p.write_text(policy)
-            run=subprocess.run([lua,str(ROOT/'system/verify/blocked_wait_m594.lua'),str(BASE/'MonsterBlockedPursuit.luau'),str(p)],capture_output=True,text=True)
+            run=subprocess.run([lua,str(ROOT/'system/verify/blocked_wait_m594.lua'),str(BASE/'MonsterBlockedPursuit.luau'),str(p),str(ROOT/'src/server/actor/ActorTargetRoot.luau')],capture_output=True,text=True)
         self.assertEqual(run.returncode,0,run.stdout+run.stderr)
 
     def test_damage_wake_wiring_and_single_owner(self):

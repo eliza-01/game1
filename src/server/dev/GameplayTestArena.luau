@@ -1,5 +1,6 @@
 --!strict
 -- Geometry and temporary population; production rig/hitbox/AI pipeline remains authoritative.
+local PlayerSpatialIndex = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("PlayerSpatialIndex"))
 local Workspace = game:GetService("Workspace")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
 local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
@@ -148,6 +149,7 @@ end
 function Arena.Warp(character: Model, frame: CFrame, preserveBuffs: boolean?)
     SkillEffects.Clear(character,preserveBuffs)
     character:PivotTo(frame)
+    PlayerSpatialIndex.Invalidate()
     local manager = character:FindFirstChildWhichIsA("ControllerManager", true)
     if manager then manager.FacingDirection = frame.LookVector end
     local player = Players:GetPlayerFromCharacter(character)

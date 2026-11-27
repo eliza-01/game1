@@ -36,7 +36,7 @@ class MonsterAiM102Contracts(unittest.TestCase):
     def test_target_filter_and_tie_breaker_are_preserved(self):
         for token in ('target.Parent ~= nil', 'target:GetAttribute("Damageable") == true',
                       'target:GetAttribute("LifeState")', 'rootOf(target) ~= nil',
-                      'Players:GetPlayers()', 'closestDistance = aggroRadius(agent)',
+                      'PlayerSpatialIndex.Query(agent.root.Position, closestDistance)', 'closestDistance = aggroRadius(agent)',
                       'distance <= closestDistance', 'closest = character'):
             self.assertIn(token, self.targets)
         self.assertIn('local target = TargetPolicy.AcquireNearestTarget(agent)', self.ai)

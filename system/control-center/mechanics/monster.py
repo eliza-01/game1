@@ -21,6 +21,10 @@ ITEMS = [
                  'Monster и NPC используют общую очередь обновлений 0,1 с. Monster: первый шаг 0,1–0,2 с, затем интервал после завершения шага; Aggro scan 0,3 с. Получение урона и Heartbeat сопровождения атаки независимы.',
                  'Experimental Navigation, маршруты, прыжки, BlockedWait и возврат не изменены. AI LOD и лимиты ComputeAsync ещё не включены; требуется приёмка Studio/DEV.',
              ]},
+             {'title': 'Локальный Aggro · M616', 'lines': [
+                 'PlayerSpatialIndex: XZ-выборка по клеткам 32 studs, один ленивый снимок на пакет решений AI; точная дистанция, LifeState, Isolation, Death Chase и порядок равных дистанций остаются у MonsterTargetPolicy. Высота не ограничивает Aggro.',
+                 'RootCollider → HumanoidRootPart → PrimaryPart; CanQuery не требуется. Смена персонажа и серверные телепорты инвалидируют снимок; в следующем кадре он всегда новый. Интервал Aggro 0,3 с, атаки и навигация без изменений. Studio/DEV и нагрузочная приёмка открыты.',
+             ]},
              {'title': 'Aggro и границы преследования', 'lines': [
                  'Home Leash: возврат при выходе за home radius от центра спавна или по таймеру без нанесения урона (по умолчанию 30 с, Options). Spawn radius задаёт появление/блуждание, не границу погони.',
                  'Death Chase: home radius и таймер без урона отключены. При однозначной зоне Game1MonsterZone применяется её граница; без зоны или при неоднозначности погоня не ограничена. Потеря цели завершает погоню.',
@@ -70,7 +74,7 @@ ITEMS = [
                  'Приёмка KBN-0032 открыта: Studio Play, Runtime Draft с двумя клиентами, профиль Legacy/Experimental 50/100/200 активных монстров (CPU, Raycast, физика, время построения графа). Доступность опции Runtime не означает разрешение публикации.',
                  'M593: свободная проекция без сетки 20/4, отсев линий вне радиуса, ранний отсев далёких игроков при aggro. BlockedWait без новых поисков и повторных записей таймера. Граф строится только при активном backend; периодические диагностические записи скорости/лучей и точки плана только в Studio. GP/Test Debug Hub не запускается в опубликованной игре; compiled Draft в Studio загружает его только при Start in Hub; общие безопасные контракты остаются в коде.',
              ]},
-         ], ['monster-ai', 'actor-ai-scheduler', 'actor-ai-queue', 'actor-home', 'monster-target', 'monster-death-chase', 'monster-nav',
+         ], ['monster-ai', 'actor-ai-scheduler', 'actor-ai-queue', 'player-spatial-index', 'player-spatial-grid', 'actor-target-root', 'actor-home', 'monster-target', 'monster-death-chase', 'monster-nav',
              'monster-nav-dispatch', 'monster-nav-experimental', 'monster-nav-config', 'monster-nav-options',
              'monster-recovery-geometry', 'monster-climb', 'monster-rescue-graph', 'monster-rescue-topology', 'monster-rescue-segments', 'monster-rescue-routes',
              'monster-rescue-connections', 'monster-rescue-sampling', 'monster-rescue-entries', 'monster-rescue-exits', 'monster-rescue-paths', 'monster-rescue-queries', 'monster-stuck-watchdog', 'monster-blocked-pursuit', 'monster-blocked-retreat-geometry', 'monster-navigation-speed',

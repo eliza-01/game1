@@ -1,6 +1,7 @@
 -- Monster target acquisition and hit validation policy. No movement, state writes or attack timers.
 -- The combat AI owns when to scan and when to act on a selected target.
-local Players = game:GetService("Players")
+local PlayerSpatialIndex = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("PlayerSpatialIndex"))
+local ActorTargetRoot = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorTargetRoot"))
 local Workspace = game:GetService("Workspace")
 
 local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
@@ -24,11 +25,7 @@ local function horizontalDistance(left: Vector3, right: Vector3): number
     return horizontalDelta(left, right).Magnitude
 end
 
-local function rootOf(model: Model?): BasePart?
-    if not model then return nil end
-    local root = model:FindFirstChild("RootCollider") or model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-    return if root and root:IsA("BasePart") then root else nil
-end
+local rootOf = ActorTargetRoot.Get
 
 local function navigationRootOf(model: Model): BasePart?
     local root = model:FindFirstChild("HumanoidRootPart")
@@ -82,7 +79,7 @@ end
 local function acquireNearestTarget(agent: any): Model?
     local closest: Model? = nil
     local closestDistance = aggroRadius(agent)
-    for _, player in ipairs(Players:GetPlayers()) do
+    for _, player in ipairs(PlayerSpatialIndex.Query(agent.root.Position, closestDistance)) do
         local character = player.Character
         local targetRoot = rootOf(character)
         -- Reject distant actors before life/territory/isolation checks. The

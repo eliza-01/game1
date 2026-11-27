@@ -8,12 +8,12 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0036.md",
-  "specSha256": "a2d3937cfe9b54957aec00f06b4530ffda0c19eabf7c2d90ee1cbcbba2dc88f0",
+  "specSha256": "601ad856adbefbb450c05300bf334ba142b637cf464e2e1f5ffd315342d1b225",
   "dependsOn": [
     "KBN-0035"
   ],
-  "revision": 2,
-  "updatedAt": "2026-11-27T20:20:00+00:00",
+  "revision": 3,
+  "updatedAt": "2026-11-27T20:35:00+00:00",
   "tasks": [
     {
       "id": "KBN-0036-T01",
@@ -41,7 +41,7 @@
       "id": "KBN-0036-A01",
       "title": "Нет пропущенных кандидатов относительно эталонного полного обхода; нет дублей и устаревших записей",
       "status": "NOT_RUN",
-      "evidence": "M614: 300 сравнений broadphase с полным перебором (Lua mock), lifecycle/teleport/large bounds. Native Studio/DEV и полная эквивалентность NOT_RUN."
+      "evidence": "M614: 300 сравнений broadphase с полным перебором (Lua mock), lifecycle/teleport/large bounds. Native Studio/DEV и полная эквивалентность NOT_RUN. M616: 1200 Lua XZ target-equivalence queries; batch/warp/respawn/ties; Studio/DEV NOT_RUN."
     },
     {
       "id": "KBN-0036-A02",

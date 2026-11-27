@@ -21,9 +21,11 @@ B.Begin(s); B.NotifyDamage(s); assert(step(v(5,0,0),10)=='Wait'); assert(step(v(
 local obstacle,melee,allowed=false,true,true
 local world={Raycast=function() if obstacle then return {Instance={IsDescendantOf=function() return false end}} end end}
 game={GetService=function(_,name) if name=='Workspace' then return world end return {} end}
-local node={}; node.Parent=node; node.WaitForChild=function(_,name) if name=='dev' then return node end return name end
+local node={}; node.Parent=node; node.WaitForChild=function(_,name) if name=='dev' or name=='actor' then return node end return name end
 script={Parent=node}; Enum={RaycastFilterType={Exclude='Exclude'}}; RaycastParams={new=function() return {} end}
 require=function(name)
+    if name=='ActorTargetRoot' then return assert(loadfile(arg[3]))() end
+    if name=='PlayerSpatialIndex' then return {Query=function() return {} end} end
     if name=='MonsterBlockedPursuit' then return B end
     if name=='MonsterRecoveryGeometry' then return {MeleeClear=function() return melee end} end
     if name=='MonsterDeathChasePolicy' then return {AllowsPosition=function() return allowed end} end

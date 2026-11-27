@@ -1,3 +1,4 @@
+local PlayerSpatialIndex = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("PlayerSpatialIndex"))
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local InsertService = game:GetService("InsertService")
@@ -140,6 +141,7 @@ local function destroyPreviousCharacter(player: Player)
     if previous then
         EntityHitboxService.Detach(previous)
         player.Character = nil
+        PlayerSpatialIndex.Invalidate()
         previous:Destroy()
     end
 end
@@ -260,6 +262,7 @@ createCharacter = function(player: Player, requestedArchetypeId: string?, revive
     character.Parent = Workspace
     CharacterRigService.Finish(rig)
     player.Character = character
+    PlayerSpatialIndex.Invalidate()
     Progression.Attach(player, character)
     if appearance then creationSelections[player] = appearance end
     require(script.Parent:WaitForChild("FaceEmotionService")).Bind(character)

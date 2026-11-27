@@ -1,15 +1,12 @@
 -- Shared server combat queries for player-targeted world actors (monsters, NPCs).
 -- No player damage is trusted from client-provided target positions.
-local Players = game:GetService("Players")
+local PlayerSpatialIndex = require(script.Parent:WaitForChild("PlayerSpatialIndex"))
+local ActorTargetRoot = require(script.Parent:WaitForChild("ActorTargetRoot"))
 local Workspace = game:GetService("Workspace")
 
 local ActorCombatTargeting = {}
 
-function ActorCombatTargeting.Root(model: Model?): BasePart?
-    if not model then return nil end
-    local candidate = model:FindFirstChild("RootCollider") or model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-    return if candidate and candidate:IsA("BasePart") then candidate else nil
-end
+ActorCombatTargeting.Root = ActorTargetRoot.Get
 
 function ActorCombatTargeting.Valid(target: Model?): boolean
     return target ~= nil and target.Parent ~= nil
@@ -26,7 +23,7 @@ end
 function ActorCombatTargeting.ClosestPlayer(position: Vector3, radius: number): Model?
     local target: Model? = nil
     local best = radius
-    for _, player in ipairs(Players:GetPlayers()) do
+    for _, player in ipairs(PlayerSpatialIndex.Query(position, radius)) do
         local character = player.Character
         local root = ActorCombatTargeting.Root(character)
         if root and ActorCombatTargeting.Valid(character) then

@@ -1,6 +1,7 @@
 --!strict
 -- Server-owned floor transfers. Every destination must have an authored
 -- house_floor_NN_spawn_socket; elevator bones only expose controls.
+local PlayerSpatialIndex = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("PlayerSpatialIndex"))
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
@@ -46,6 +47,7 @@ function Elevator.Move(player: Player, sockets: {[string]: Attachment}, name: st
         else target.WorldCFrame, target:IsA("Bone"), Policy.SpawnClearance)
     if not targetFrame then return false, "Не удалось определить направление персонажа" end
     character:PivotTo(targetFrame)
+    PlayerSpatialIndex.Invalidate()
     local controller = character:FindFirstChildOfClass("ControllerManager")
     if controller then
         controller.MovingDirection = Vector3.zero

@@ -1,6 +1,7 @@
 --!strict
 -- Runtime registry of managed, placed homes and their *actual* imported
 -- spatial sockets. No fabricated socket positions, no per-frame Workspace scans.
+local PlayerSpatialIndex = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("PlayerSpatialIndex"))
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -413,6 +414,7 @@ function Service.TeleportDebug(player: Player, name: any): any
         return {ok = false, error = "Spawn socket has no horizontal forward direction: " .. name}
     end
     character:PivotTo(targetFrame)
+    PlayerSpatialIndex.Invalidate()
     local controller = character:FindFirstChildOfClass("ControllerManager")
     if controller then
         controller.MovingDirection = Vector3.zero

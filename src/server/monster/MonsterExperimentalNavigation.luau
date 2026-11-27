@@ -110,18 +110,18 @@ local function probeClimb(agent,state,foot,point,height,radius,ray,now,knownHead
 end
 -- Low obstacles are a movement primitive, not a route candidate. In particular,
 -- do not run Detour/Graph.Find or consult the failed-route cooldown here.
-local function beginLowClimb(agent,state,foot,point,height,radius,ray,now,landing,rise)
+local function beginLowClimb(agent,state,foot,point,height,radius,ray,now,landing,rise,speed)
     if not landing then
         -- A missing top sample must not send a stuck actor into path search.
-        -- Use a short, bounded lift in its movement direction. ClimbMotion
-        -- sweeps every displacement and caps the rise at body height.
+        -- Use a short forward target for the ordinary physical jump.
+        -- The target supplies direction, not an artificial lift height.
         local delta=horizontal(point-foot)
         if delta.Magnitude>.05 then
             rise=math.min(.25,height*.25)
             landing=foot+delta.Unit*math.min(delta.Magnitude,radius+.5)+UP*rise
         end
     end
-    if landing and allowed(agent,landing) and Climb.Begin(agent,state,landing,rise,ray,now) then
+    if landing and allowed(agent,landing) and Climb.Begin(agent,state,landing,rise,ray,now,speed) then
         state.planKind=state.plan and state.mode or "Direct"
         state.retryClimb=nil
         agent.model:SetAttribute("MonsterLastRecoveryEvent","LowClimbSelected")
@@ -132,7 +132,7 @@ local function beginLowClimb(agent,state,foot,point,height,radius,ray,now,landin
     waitRetry(agent,state,now,"LowClimbUnavailable")
     state.retryClimb=true
 end
-local function choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise)
+local function choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
     local function connect(a,b) return allowed(agent,b) and eligible(state,a,now) and eligible(state,b,now) and Geometry.Clear(agent,a,b,height,radius,ray) end
     local detour=Geometry.Detour(agent,foot,goal,height,radius,ray,Geometry.Overlap(ray),function(p) return allowed(agent,p) and eligible(state,p,now) end)
     local route,graphStats=Graph.Find(foot,goal,connect,function(p) return allowed(agent,p) and eligible(state,p,now) end,
@@ -152,7 +152,7 @@ local function choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,ri
     if landing then
         local localCost=horizontal(landing-foot).Magnitude+rise+(goal-landing).Magnitude
         if (not plan or Geometry.ClimbContinues(landing,goal,height,radius,ray)) and (not plan or localCost<=plan.cost) then
-            if Climb.Begin(agent,state,landing,rise,ray,now) then
+            if Climb.Begin(agent,state,landing,rise,ray,now,speed) then
                 agent.model:SetAttribute("MonsterLastRecoveryEvent","ClimbSelected")
                 state.retryClimb=nil; state.planKind="Direct"; mode(agent,state,"Climb")
                 agent.model:SetAttribute("MonsterRecoveryPoint",landing); return
@@ -215,9 +215,8 @@ function Navigation.NavigateTo(agent,destination,speed)
         Trace.Rate(agent,"BODY_GOAL",1,"root="..Trace.V(agent.root.Position),"foot="..Trace.V(foot),"height="..tostring(height),"rootSize="..Trace.V(agent.root.Size),"collider="..Trace.V(collider and collider.Position),"colliderSize="..Trace.V(collider and collider.Size),"goalFoot="..Trace.V(goal),"attackRadius="..tostring(attackRadius(agent)),"returning="..tostring(agent.returning))
     end
     if state.climb then
-        local ray=Geometry.Params(agent)
         if not allowed(agent,state.climb.landing) then waitRetry(agent,state,now,"ClimbOutsidePursuitBoundary"); return end
-        local result=Climb.Step(agent,state,speed,ray,now)
+        local result=Climb.Step(agent,state,speed,nil,now)
         Trace.Changed(agent,"CLIMB_STEP",result)
         if result=="Failed" then waitRetry(agent,state,now,"ClimbFailed")
         elseif result=="Done" then resetSample(agent,state,now); state.moveAt=0; state.nextCheck=now; mode(agent,state,state.plan and state.planKind or "Direct") end
@@ -233,7 +232,7 @@ function Navigation.NavigateTo(agent,destination,speed)
         if state.retryClimb then
             landing,rise,lower,head=probeClimb(agent,state,foot,goal,height,radius,ray,now)
             if not head and lower and lower.Distance<=radius+2 then
-                beginLowClimb(agent,state,foot,goal,height,radius,ray,now,landing,rise)
+                beginLowClimb(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
                 return
             end
         end
@@ -244,10 +243,10 @@ function Navigation.NavigateTo(agent,destination,speed)
         else
             if not state.retryClimb then landing,rise,lower,head=probeClimb(agent,state,foot,goal,height,radius,ray,now) end
             if not head and (state.retryClimb or (lower and lower.Distance<=radius+2)) then
-                beginLowClimb(agent,state,foot,goal,height,radius,ray,now,landing,rise)
+                beginLowClimb(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
                 return
             end
-            choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise)
+            choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
             if state.climb or not state.plan then return end
             state.planKind=state.mode
         end
@@ -297,7 +296,7 @@ function Navigation.NavigateTo(agent,destination,speed)
         if head then
             local distance=math.min(horizontal(goal-foot).Magnitude,reach)
             local landing,rise=probeClimb(agent,state,foot,goal,height,radius,ray,now,head,distance)
-            choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise)
+            choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
             if state.climb or not state.plan then return end
             state.planKind=state.mode; point=state.plan[1]
         end
@@ -319,17 +318,17 @@ function Navigation.NavigateTo(agent,destination,speed)
             local ray=Geometry.Params(agent)
             local landing,rise,_,head=probeClimb(agent,state,foot,point,height,radius,ray,now)
             if not head then
-                beginLowClimb(agent,state,foot,point,height,radius,ray,now,landing,rise)
+                beginLowClimb(agent,state,foot,point,height,radius,ray,now,landing,rise,speed)
                 return
             end
-            if state.plan and landing and Climb.Begin(agent,state,landing,rise,ray,now) then
+            if state.plan and landing and Climb.Begin(agent,state,landing,rise,ray,now,speed) then
                 state.planKind=state.mode
                 mode(agent,state,"Climb"); agent.model:SetAttribute("MonsterRecoveryPoint",landing); return
             end
             -- A failed route segment must not be selected forever. Retry after a
             -- bounded pause; ordinary local obstacles are handled above.
             if state.plan then waitRetry(agent,state,now,"RouteSegmentStuck"); return end
-            choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise)
+            choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
             if state.climb or not state.plan then return end
             state.planKind=state.mode; point=state.plan[1]
         end

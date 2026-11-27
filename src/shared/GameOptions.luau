@@ -105,7 +105,6 @@ function GameOptions.ExperimentalMonsterNavigation()
         sampleSeconds = math.clamp(finite(source.sampleSeconds, 1), .5, 3),
         stuckPercent = math.clamp(finite(source.stuckPercent, 50), 10, 90),
         stuckReturnSeconds = math.clamp(finite(source.stuckReturnSeconds, 30), 5, 300),
-        climbSpeed = math.clamp(finite(source.climbSpeed, 8), 2, 20),
         searchDistance = math.clamp(finite(source.searchDistance, 40), 10, 100),
         searchWidth = math.clamp(finite(source.searchWidth, 60), 10, 120),
         recheckSeconds = math.clamp(finite(source.recheckSeconds, 1), .5, 3),

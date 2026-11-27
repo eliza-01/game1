@@ -1,5 +1,5 @@
--- Execute the real climb controller against deterministic mocked movement.
--- This checks control/state, not Roblox physics.
+-- Execute the physical jump controller with mocked impulses and grounded state.
+-- No engine simulation: verifies takeoff vector, grounded gating and lifecycle.
 local mt={}
 local function v(x,y,z) return setmetatable({X=x,Y=y,Z=z},mt) end
 mt.__add=function(a,b) return v(a.X+b.X,a.Y+b.Y,a.Z+b.Z) end
@@ -11,60 +11,48 @@ mt.__index=function(a,k)
     if k=='Unit' then return a/a.Magnitude end
 end
 Vector3={new=v,yAxis=v(0,1,0),zero=v(0,0,0)}
-math.clamp=function(x,a,b) return math.max(a,math.min(x,b)) end
 table.freeze=function(t) return t end
-local casts=0
-local ceiling=false
-local wallHeight=4.5
-local world={Blockcast=function(_,cf,size,delta)
-    casts=casts+1
-    if delta.Y>0 and ceiling then return {Distance=.05} end
-    if delta.Z>0 and cf.Y<wallHeight then return {Distance=.05} end
-end}
-game={GetService=function() return world end}
-RaycastParams={new=function() return {} end}
-Enum={RaycastFilterType={Exclude='Exclude'}}
-local trace={Enabled=function() return false end,Event=function() end}
-local modules={MonsterNavigationConfig={climbSpeed=8},MonsterNavigationTrace=trace,
-    MonsterRecoveryGeometry={Horizontal=function(a) return v(a.X,0,a.Z) end,Body=function() return v(0,0,0),4.62 end}}
+local shared={WaitForChild=function(self,n) if n=='Game1Shared' or n=='character' then return self end return n end}
+game={GetService=function(_,n) assert(n=='ReplicatedStorage');return shared end}
+Enum={Material={Air='Air',Ground='Ground'},HumanoidStateType={Freefall='Freefall'}}
+local trace={Event=function() end}
+local modules={CharacterConfig={JumpVelocity=34,JumpGroundIgnoreTime=.18},GameOptions={PlayerJumpSettings=function() return {heightMultiplier=2} end},MonsterNavigationTrace=trace,
+    MonsterRecoveryGeometry={Horizontal=function(a) return v(a.X,0,a.Z) end}}
 script={Parent={WaitForChild=function(_,name) return name end}}
 require=function(name) return assert(modules[name],name) end
 local C=assert(loadfile(arg[1]))()
-local root=setmetatable({pos=v(0,1,0),Size=v(2,2,1),Parent=true,Anchored=false,CollisionGroup='NPC',SetNetworkOwner=function(self,owner) self.networkReset=true end},{
-    __index=function(t,k) if k=='Position' or k=='CFrame' then return t.pos end end,
-    __newindex=function(t,k,val) if k=='CFrame' then t.pos=val else rawset(t,k,val) end end})
-local stops=0
-local humanoid={Move=function(_,d) assert(d.Magnitude==0) end,MoveTo=function() stops=stops+1 end}
+local impulses=0
+local root={Position=v(0,1,0),Parent=true,Anchored=false,AssemblyMass=2,AssemblyLinearVelocity=v(3,-2,4)}
+function root:ApplyImpulse(impulse) impulses=impulses+1; self.AssemblyLinearVelocity=self.AssemblyLinearVelocity+impulse/self.AssemblyMass end
+local humanoid={FloorMaterial='Ground',MoveTo=function() end,Move=function(self,d) self.direction=d end,ChangeState=function(self,s) assert(s=='Freefall');self.FloorMaterial='Air' end}
 local life='Alive'
 local agent={root=root,humanoid=humanoid,model={GetAttribute=function() return life end}}
 local state={}
 local landing=v(0,3,3)
-assert(C.Begin(agent,state,landing,3,{},0))
-assert(root.Anchored and casts==0 and stops==1)
-assert(not C.Begin(agent,state,landing,3,{},0),'no duplicate climb')
-local c=state.climb
-local lastY=root.Position.Y
-for i=1,12 do
-    local r=C.Step(agent,state,10,{},i*.1)
-    assert(root.Position.Y>=lastY,'no gravity slide while climbing')
-    lastY=root.Position.Y
-    if r=='Done' then break end
-end
-assert(root.Position.Y>=wallHeight and root.Position.Y<=c.maxY)
-assert(root.Position.Z>=2.55,'crossed lip using bounded displacement')
-assert(state.climb==nil and not root.Anchored and root.networkReset,'release physical movement')
--- Low ceilings prevent displacement; timeout is based on new progress.
-root.pos=v(0,1,0);ceiling=true
-assert(C.Begin(agent,state,landing,3,{},20))
-for i=1,69 do assert(C.Step(agent,state,10,{},20+i*.1)=='Moving') end
-assert(root.Position.Y==1)
-assert(C.Step(agent,state,10,{},27.1)=='Failed')
-C.Stop(state); assert(not root.Anchored and state.climb==nil)
--- A high obstruction never becomes infinite levitation.
-root.pos=v(0,1,0);ceiling=false;wallHeight=100
-assert(C.Begin(agent,state,landing,3,{},30));c=state.climb
-for i=1,20 do assert(C.Step(agent,state,10,{},30+i*.1)=='Moving') end
-assert(root.Position.Y<=c.maxY+1e-6 and root.Position.Z==0)
--- Death owns anchoring after cleanup.
-life='Dying'; C.Stop(state); assert(root.Anchored and state.climb==nil)
-print('Kinematic climb: lift, lip, bounded height, ceiling, cleanup passed')
+assert(C.Begin(agent,state,landing,3,{},0,13))
+assert(not root.Anchored and impulses==1 and humanoid.WalkSpeed==13)
+assert(math.abs(root.AssemblyLinearVelocity.Y-34*math.sqrt(2))<1e-8)
+assert(root.AssemblyLinearVelocity.X==0 and root.AssemblyLinearVelocity.Z==13)
+assert(root.Position.Y==1,'no teleport or levitation')
+assert(not C.Begin(agent,state,landing,3,{},0,13),'no duplicate jump')
+-- A stale floor sensor in the first tick and an airborne slowdown cannot add impulses.
+humanoid.FloorMaterial='Ground'
+assert(C.Step(agent,state,6,{},.1)=='Moving')
+humanoid.FloorMaterial='Air'
+root.AssemblyLinearVelocity=v(0,-10,6)
+assert(C.Step(agent,state,6,{},.5)=='Moving' and humanoid.WalkSpeed==6 and impulses==1)
+humanoid.FloorMaterial='Ground'
+assert(C.Step(agent,state,6,{},.7)=='Done' and state.climb==nil)
+assert(not root.Anchored and root.AssemblyLinearVelocity.Y==-10)
+-- If already falling, wait for ground instead of jumping again in midair.
+humanoid.FloorMaterial='Air'
+assert(C.Begin(agent,state,landing,3,{},1,6) and impulses==1)
+assert(C.Step(agent,state,6,{},1.2)=='Moving' and impulses==1)
+humanoid.FloorMaterial='Ground'
+assert(C.Step(agent,state,6,{},1.3)=='Moving' and impulses==2)
+local before=root.AssemblyLinearVelocity
+C.Stop(state); assert(state.climb==nil and root.AssemblyLinearVelocity==before and humanoid.direction.Magnitude==0)
+-- Death owns the root; cleanup never changes anchoring or momentum.
+humanoid.FloorMaterial='Air';assert(C.Begin(agent,state,landing,3,{},2,6))
+root.Anchored=true;life='Dying';C.Stop(state);assert(root.Anchored and state.climb==nil)
+print('Ballistic jump: character height, forward velocity, ground gating, cleanup passed')

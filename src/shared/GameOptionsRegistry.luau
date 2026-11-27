@@ -297,7 +297,6 @@ return table.freeze({
 			sampleSeconds = 1,
 			stuckPercent = 50,
 			stuckReturnSeconds = 20,
-			climbSpeed = 8,
 			searchDistance = 40,
 			searchWidth = 60,
 			recheckSeconds = 1,

@@ -233,9 +233,9 @@ print('M575 retry timeout propagates to AI; returning is exempt')
 N.Clear(agent);agent.returning=true;root.Position=v(0,0,0);commands={};t=200
 high=false;isClear=true;expectedHeelY=.1
 local began=0
-local lastLanding,lastRise
-modules.MonsterClimbMotion.Begin=function(_,state,p,rise)
-    began=began+1;lastLanding=p;lastRise=rise;state.climb={landing=p};return true
+local lastLanding,lastRise,lastSpeed
+modules.MonsterClimbMotion.Begin=function(_,state,p,rise,_,_,speed)
+    began=began+1;lastLanding=p;lastRise=rise;lastSpeed=speed;state.climb={landing=p};return true
 end
 modules.MonsterClimbMotion.Step=function() return 'Done' end
 geom.Detour=function() error('low obstacle must not scan detour') end
@@ -243,9 +243,9 @@ modules.MonsterRescueGraph.Find=function() error('low obstacle must not search g
 geom.ProbeClimb=function() return landing,2,'Ray',nil,{Distance=.6} end
 N.NavigateTo(agent,target,10)
 t=201.1;N.NavigateTo(agent,target,10)
-assert(began==1 and attrs.MonsterRecoveryMode=='Climb' and lastLanding==landing and lastRise==2)
+assert(began==1 and attrs.MonsterRecoveryMode=='Climb' and lastLanding==landing and lastRise==2 and lastSpeed==10)
 assert(attrs.MonsterLastRecoveryEvent=='LowClimbSelected')
--- No top sample: bounded lift still starts without a route search.
+-- No top sample: physical jump still starts without a route search.
 N.Clear(agent);t=210;root.Position=v(0,0,0)
 geom.ProbeClimb=function() return nil,nil,'Ray',nil,{Distance=.6} end
 N.NavigateTo(agent,target,10);t=211.1;N.NavigateTo(agent,target,10)
@@ -264,4 +264,4 @@ geom.Detour=function() error('route low obstacle must not scan detour') end
 modules.MonsterRescueGraph.Find=function() error('route low obstacle must not search graph') end
 t=221.1;N.NavigateTo(agent,target,10)
 assert(began==3 and attrs.MonsterRecoveryMode=='Climb' and agent.recoveryNavigation.plan==route)
-print('M576 immediate low climb, bounded fallback, and retained route passed')
+print('M578 immediate low jump, forward speed, fallback and retained route passed')

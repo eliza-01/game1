@@ -1,1 +1,1 @@
-return table.freeze({ Version = "2026.11.27.577", SourceDigest = "game1-m577-rescue-route-junctions" })
+return table.freeze({ Version = "2026.11.27.578", SourceDigest = "game1-m578-character-height-monster-jump" })

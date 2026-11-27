@@ -27,7 +27,7 @@ class NavigationM561(unittest.TestCase):
     def test_options_merge_without_losing_return_timer(self):
         data=normalize_monster_ai({'experimentalNavigation':{'stuckPercent':40}}, {'noDamageReturnSeconds':88,'experimentalNavigation':{'climbSpeed':7}})
         self.assertEqual(data['noDamageReturnSeconds'],88)
-        self.assertEqual(data['experimentalNavigation']['climbSpeed'],7)
+        self.assertNotIn('climbSpeed',data['experimentalNavigation'])
         self.assertEqual(data['experimentalNavigation']['stuckPercent'],40)
         for value in (0,91,float('nan'),True):
             with self.assertRaises(ValueError): normalize_monster_ai({'experimentalNavigation':{'stuckPercent':value}})
@@ -69,8 +69,8 @@ class NavigationM561(unittest.TestCase):
         self.assertIn('Config.searchWidth,.2,Config.searchDistance',geometry)
         self.assertIn('head.Distance-lower.Distance',geometry)
         climb=read(base+'MonsterClimbMotion.luau')
-        self.assertIn('root.Anchored=true',climb)
-        self.assertIn('root.Anchored=false',climb)
+        self.assertIn('root:ApplyImpulse(',climb)
+        self.assertNotIn('root.Anchored=',climb)
         self.assertNotIn('CanCollide=',climb)
         self.assertNotIn('PivotTo(',climb)
         ai=read(base+'MonsterAIService.luau')

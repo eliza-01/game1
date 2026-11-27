@@ -253,7 +253,7 @@ def normalize_npc_overhead(change, base=None):
 MONSTER_NAV_FIELDS = {
     'sampleSeconds': (1, .5, 3), 'stuckPercent': (50, 10, 90),
     'stuckReturnSeconds': (30, 5, 300),
-    'climbSpeed': (8, 2, 20), 'searchDistance': (40, 10, 100),
+    'searchDistance': (40, 10, 100),
     'searchWidth': (60, 10, 120), 'recheckSeconds': (1, .5, 3),
 }
 
@@ -269,7 +269,8 @@ def normalize_monster_ai(change, base=None):
     result['noDamageReturnSeconds'] = float(value)
     config = result.get('experimentalNavigation', {})
     update = change.get('experimentalNavigation', {})
-    if not isinstance(update, dict) or set(update) - (set(MONSTER_NAV_FIELDS) | {'enabled'}):
+    # M578: discard the retired lift speed when reading older saved Options.
+    if not isinstance(update, dict) or set(update) - (set(MONSTER_NAV_FIELDS) | {'enabled', 'climbSpeed'}):
         raise ValueError('invalid experimental navigation fields')
     enabled = update.get('enabled', config.get('enabled', True))
     if type(enabled) is not bool:

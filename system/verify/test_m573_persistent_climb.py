@@ -1,4 +1,4 @@
-"""Kinematic lift control (supersedes M573 pulses), not an engine-physics acceptance test."""
+"""Ballistic jump control (supersedes M575 lift), not an engine-physics acceptance test."""
 import shutil
 import subprocess
 import unittest
@@ -17,14 +17,12 @@ class PersistentClimb(unittest.TestCase):
                                str(BASE/'MonsterClimbMotion.luau')], capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, proc.stdout+proc.stderr)
 
-    def test_no_jump_or_collision_override_and_retry_ownership(self):
+    def test_no_kinematic_or_collision_override_and_retry_ownership(self):
         climb = (BASE/'MonsterClimbMotion.luau').read_text()
         nav = (BASE/'MonsterExperimentalNavigation.luau').read_text()
-        self.assertIn('root.Anchored=true', climb)
-        self.assertIn('root.CFrame=root.CFrame+delta.Unit*allowed', climb)
-        self.assertNotIn('LinearVelocity")', climb)
-        self.assertEqual(climb.count('Workspace:Blockcast('), 1)
-        for forbidden in ('PivotTo(', 'CanCollide=', 'ChangeState(', 'JumpHeight=', 'task.spawn(', 'deadline='):
+        self.assertIn('root:ApplyImpulse(delta*root.AssemblyMass)', climb)
+        self.assertIn('agent.humanoid.WalkSpeed=speed', climb)
+        for forbidden in ('root.Anchored=', 'root.CFrame=', 'LinearVelocity")', 'Blockcast(', 'PivotTo(', 'CanCollide=', 'JumpHeight=', 'task.spawn(', 'deadline='):
             self.assertNotIn(forbidden, climb)
         self.assertIn('if result=="Failed" then waitRetry(agent,state,now,"ClimbFailed")', nav)
         self.assertIn('local failed=(state.climb and state.climb.landing)', nav)

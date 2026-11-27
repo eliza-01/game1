@@ -1,105 +1,78 @@
-local Config=require(script.Parent:WaitForChild("MonsterNavigationConfig"))
+local Shared=game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+local CharacterConfig=require(Shared:WaitForChild("character"):WaitForChild("CharacterConfig"))
+local JumpSettings=require(Shared:WaitForChild("GameOptions")).PlayerJumpSettings()
 local Trace=require(script.Parent:WaitForChild("MonsterNavigationTrace"))
-local Workspace=game:GetService("Workspace")
 local Geometry=require(script.Parent:WaitForChild("MonsterRecoveryGeometry"))
--- Kinematic lift only during a verified low-obstacle climb. No force, jump or
--- gravity compensation. The root remains collidable; every displacement is swept.
+-- One ordinary ballistic jump. The Humanoid keeps moving in the approach
+-- direction; world gravity and normal physical collision remain in charge.
 local Climb={}
 local UP=Vector3.yAxis
-local PROGRESS_STEP=.15
-local NO_PROGRESS_SECONDS=7
-local ARRIVAL_DISTANCE=.45
-local CLEARANCE=.05
-local MAX_STEP_TIME=.2
+local JUMP_VELOCITY=CharacterConfig.JumpVelocity*math.sqrt(JumpSettings.heightMultiplier)
 
-local function safetyParams(agent)
-    local ray=RaycastParams.new()
-    ray.FilterType=Enum.RaycastFilterType.Exclude
-    ray.FilterDescendantsInstances={agent.model}
-    ray.RespectCanCollide = true
-    ray.CollisionGroup=agent.root.CollisionGroup
-    return ray
+local function grounded(agent)
+    return agent.humanoid.FloorMaterial~=Enum.Material.Air
+end
+local function drive(agent,c,speed)
+    agent.humanoid.WalkSpeed=speed
+    agent.humanoid.AutoRotate=true
+    agent.humanoid:Move(c.direction,false)
+    agent.navigating=true
+end
+local function launch(agent,c,speed,now)
+    local root=agent.root
+    -- Same takeoff vertical speed as the character. Add only the velocity
+    -- difference, so an existing upward velocity cannot stack extra height.
+    local velocity=root.AssemblyLinearVelocity
+    local delta=c.direction*speed-Geometry.Horizontal(velocity)
+        +UP*math.max(0,JUMP_VELOCITY-velocity.Y)
+    c.launchedAt=now
+    -- The navigation rig disables native Humanoid jumping. Use the same
+    -- physical impulse as the character, not a second native jump impulse.
+    agent.humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+    root:ApplyImpulse(delta*root.AssemblyMass)
+    Trace.Event(agent,"CLIMB_JUMP","verticalSpeed="..tostring(JUMP_VELOCITY),"forwardSpeed="..tostring(speed))
 end
 
 function Climb.Stop(state)
     local c=state.climb
     if not c then return end
     state.climb=nil
-    local root=c.root
-    -- Death presentation owns its anchored root. Never release it on cleanup.
-    if root.Parent and c.model:GetAttribute("LifeState")=="Alive" then
-        root.Anchored=false
-        root.AssemblyLinearVelocity=Vector3.zero
-        root.AssemblyAngularVelocity=Vector3.zero
-        pcall(function() root:SetNetworkOwner(nil) end)
+    -- Do not anchor, reposition, or erase airborne vertical momentum.
+    if c.root.Parent and c.model:GetAttribute("LifeState")=="Alive" then
+        c.humanoid:Move(Vector3.zero,false)
     end
 end
 
-local function shift(c,delta)
-    local distance=delta.Magnitude
-    if distance<=.001 then return 0 end
-    local root=c.root
-    local hit=Workspace:Blockcast(root.CFrame,root.Size,delta,c.params)
-    local allowed=hit and math.max(0,math.min(distance,hit.Distance-CLEARANCE)) or distance
-    if allowed>.001 then root.CFrame=root.CFrame+delta.Unit*allowed end
-    return allowed
-end
-
-function Climb.Begin(agent,state,landing,rise,_params,now)
+function Climb.Begin(agent,state,landing,_rise,_params,now,speed)
     local root=agent.root
-    if state.climb or rise<=0 or root.Anchored then return false end
-    local _,height=Geometry.Body(agent)
-    -- Never turn a low-obstacle climb into unrestricted flight over high walls.
-    local maxRise=math.max(0,height-.05)
-    if rise>=height then return false end
-    local c={root=root,model=agent.model,params=safetyParams(agent),landing=landing,
-        targetY=root.Position.Y+math.min(rise+.12,maxRise),maxY=root.Position.Y+maxRise,
-        lastAt=now,bestY=root.Position.Y,bestDistance=Geometry.Horizontal(landing-root.Position).Magnitude,
-        progressAt=now,crossing=false}
+    if state.climb or root.Anchored or speed<=.01 then return false end
+    local delta=Geometry.Horizontal(landing-root.Position)
+    if delta.Magnitude<=.05 then return false end
+    local c={root=root,model=agent.model,humanoid=agent.humanoid,landing=landing,direction=delta.Unit}
     state.climb=c
-    agent.humanoid:Move(Vector3.zero,false)
+    -- Replace the old MoveTo command before taking off.
     agent.humanoid:MoveTo(root.Position)
-    root.AssemblyLinearVelocity=Vector3.zero
-    root.AssemblyAngularVelocity=Vector3.zero
-    root.Anchored=true
-    agent.navigating=true
-    Trace.Event(agent,"CLIMB_LEVITATE","targetY="..tostring(c.targetY),"maxY="..tostring(c.maxY))
+    drive(agent,c,speed)
+    if grounded(agent) then launch(agent,c,speed,now) end
     return true
 end
 
 function Climb.Step(agent,state,speed,_params,now)
     local c=state.climb
-    if not c then return "Failed" end
-    local root=c.root
-    local dt=math.clamp(now-c.lastAt,0,MAX_STEP_TIME); c.lastAt=now
-    local delta=Geometry.Horizontal(c.landing-root.Position)
-    local distance=delta.Magnitude
-    if distance<=ARRIVAL_DISTANCE and root.Position.Y>=c.targetY-CLEARANCE then
-        Climb.Stop(state); return "Done"
-    end
-    if root.Position.Y>=c.bestY+PROGRESS_STEP then c.bestY=root.Position.Y; c.progressAt=now end
-    if distance<=c.bestDistance-PROGRESS_STEP then c.bestDistance=distance; c.progressAt=now end
-    if now-c.progressAt>=NO_PROGRESS_SECONDS then
-        Trace.Event(agent,"CLIMB_STALLED","distance="..tostring(distance),"height="..tostring(root.Position.Y))
-        return "Failed"
-    end
-    -- Rise to the measured surface first. Once horizontal movement is possible,
-    -- hold that height instead of falling back between impulses. If the lip is
-    -- still blocking the physical root, add a little more height within the cap.
-    local lift=0
-    if root.Position.Y<c.targetY-CLEARANCE then
-        lift=math.min(c.targetY-root.Position.Y,Config.climbSpeed*dt)
-    elseif distance>ARRIVAL_DISTANCE then
-        local step=math.min(distance,speed*dt)
-        local moved=shift(c,delta.Unit*step)
-        if moved>.001 then
-            if not c.crossing then Trace.Event(agent,"CLIMB_CROSS","height="..tostring(root.Position.Y)); c.crossing=true end
-        elseif step>.001 then
-            lift=math.min(math.max(0,c.maxY-root.Position.Y),Config.climbSpeed*dt)
+    if not c or agent.root.Anchored or speed<=.01 then return "Failed" end
+    if c.launchedAt then
+        -- FloorMaterial can remain stale immediately after the impulse.
+        -- End only on landing, not on reaching the old estimated top point.
+        if now-c.launchedAt>=CharacterConfig.JumpGroundIgnoreTime and grounded(agent)
+            and agent.root.AssemblyLinearVelocity.Y<=0 then
+            Trace.Event(agent,"CLIMB_LAND")
+            Climb.Stop(state)
+            return "Done"
         end
+    elseif grounded(agent) then
+        launch(agent,c,speed,now)
     end
-    if lift>.001 then shift(c,UP*lift) end
-    agent.navigating=true
+    drive(agent,c,speed)
     return "Moving"
 end
 return table.freeze(Climb)

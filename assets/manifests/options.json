@@ -123,7 +123,7 @@
       "showPublishedControls": true
     },
     "startInHub": false,
-    "startedLanguage": true,
+    "startedLanguage": false,
     "startLocale": "ru-ru"
   },
   "worldStreaming": {
@@ -147,6 +147,7 @@
     "noDamageReturnSeconds": 30.0,
     "experimentalNavigation": {
       "enabled": true,
+      "runtimeEnabled": true,
       "sampleSeconds": 1,
       "stuckPercent": 50,
       "stuckReturnSeconds": 20,
@@ -290,7 +291,7 @@
     "maxActiveLeaves": 32
   },
   "characterCreation": {
-    "enabled": false,
+    "enabled": true,
     "useStudioAnchors": true,
     "transitionSeconds": 0.9,
     "faceTransitionSeconds": 0.65,

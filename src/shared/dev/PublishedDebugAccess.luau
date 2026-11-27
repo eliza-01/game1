@@ -12,6 +12,10 @@ end
 local AUTH_ATTRIBUTE = "Game1PublishedDebugAuthorized"
 local warnedAuthorization = false
 
+function Access.GameplayTestEnabled(): boolean
+    return RunService:IsStudio() and (not compiledRuntime() or Options.StartInGameplayHub())
+end
+
 function Access.ServerEnabled(): boolean
     return RunService:IsStudio()
         or (not compiledRuntime() and (Options.ShowPublishedDebugControls("desktop")

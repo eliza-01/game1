@@ -67,7 +67,7 @@ local function updateRing(ring,center,radius,aggressive)
 end
 
 function Controller.Start()
-    if started or not RunService:IsStudio() or not Access.ClientAllowed() then return end
+    if started or not RunService:IsStudio() or not Access.GameplayTestEnabled() or not Access.ClientAllowed() then return end
     started=true
     local gui=Instance.new("ScreenGui"); gui.Name="Game1GameplayAggroGui"; gui.ResetOnSpawn=false; gui.Parent=player:WaitForChild("PlayerGui")
     local launch=text(gui,"TextButton","AG",0,0,44,44)

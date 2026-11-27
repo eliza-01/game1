@@ -23,13 +23,13 @@ class MonsterMechanicsM583(unittest.TestCase):
         self.assertEqual(self.card['scope'], 'shared')
         cases = {
             'Aggro и границы преследования': ('Home Leash', 'Death Chase', '30 с'),
-            'Experimental Navigation · область действия': ('Только Studio', 'Legacy', '1,5 с'),
+            'Experimental Navigation · область действия': ('Enable in published Runtime', 'Legacy', 'override только для Studio', '1,5 с'),
             'Climb · физический прыжок M578/M580': ('1 секундой', 'Приземление', 'план сбрасывается'),
             'Rescue Routes · авторинг и вход M590': ('свободные начало и конец', 'Route connection height', 'по умолчанию 2 studs', 'Rojo Sync', 'без порога длины', '40 studs', '2 studs', '20 studs', '4 studs', 'ближайшая доступная 3D-проекция', 'единственный луч от пяток', 'FootBlocked'),
             'Rescue Routes · выбор выхода M582/M586': ('3D-дистанция', 'не превышает исходное', 'промежуточные точки', 'перепад высоты', '32 интервалов'),
             'StuckTimeout · аварийный возврат M580': ('20 с', '1,05 с', 'ID и HP', 'неуязвима'),
             'Диагностика Studio Play': ('MONNAV', 'GRAPH_SEARCH', 'HOME_RECALL_OUT'),
-            'Недостающее / проверка': ('Terrain', 'Studio Play', 'опубликованного runtime'),
+            'Недостающее / проверка': ('Terrain', 'Studio Play', 'Runtime Draft'),
         }
         for section, phrases in cases.items():
             for phrase in phrases:

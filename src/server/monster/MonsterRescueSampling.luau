@@ -43,17 +43,22 @@ local function coarse(line,start,radius,origin,goalArc)
 end
 local function find(ctx,line,try)
     local origin=Routes.Nearest(line,ctx.start)
-    local goal=Routes.Nearest(line,ctx.goal)
+    if origin.distance>ctx.radius+EPS then return nil end
     local function candidate(arc)
         local edge,t=at(line,arc)
         local range=Segments.Interval(edge,ctx.start,ctx.radius)
         if not range or t<range.lo-EPS or t>range.hi+EPS then return nil end
         return Segments.Candidate(edge,ctx.start,range,t,ctx.allowed,ctx.observe,"GRAPH_ENTRY")
     end
+    -- Common case: do not build a grid or project the target unless the
+    -- closest entry actually fails. The same candidate contract is used.
+    local first=candidate(origin.arc)
+    if first and try(first) then return first end
+    local goal=Routes.Nearest(line,ctx.goal)
     for _,arc in ipairs(coarse(line,ctx.start,ctx.radius,origin.arc,goal.arc)) do
-        local entry=candidate(arc)
+        local entry
+        if math.abs(arc-origin.arc)>EPS then entry=candidate(arc) end
         if entry and try(entry) then
-            if math.abs(arc-origin.arc)<=EPS then return entry end
             local best=entry
             local limit=math.min(COARSE_STEP,math.abs(goal.arc-arc))
             local refined=0

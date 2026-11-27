@@ -476,9 +476,10 @@
 </div>
 </details>
 <details class="game1-option-section" data-option-section="monster-navigation"><summary><span class="game1-option-icon" aria-hidden="true">🧭</span><span><strong>Monster Navigation · Experimental</strong></span></summary>
-<div class="panel character-card"><small class="hint">Studio only · ordinary monsters / GP. Terrain is excluded from obstacle casts. Place override in Rescue Routes toolbar has priority.</small>
+<div class="panel character-card"><small class="hint">Studio A/B · published Runtime requires a separate opt-in. Terrain is excluded from obstacle casts. Place override applies only in Studio; compiled Draft uses Runtime options unless overridden.</small>
 <div class="character-grid">
 <label>Experimental navigation <input id="option-nav-enabled" type="checkbox" checked></label>
+<label>Enable in published Runtime <input id="option-nav-runtime-enabled" type="checkbox" title="Opt in only after Studio and load acceptance; requires Experimental navigation ON, Rojo Sync and new Runtime build"></label>
 <label>Movement sample · sec<input id="option-nav-sampleSeconds" type="number" min="0.5" max="3" step="0.1" value="1"></label>
 <label>Stuck threshold · %<input id="option-nav-stuckPercent" type="number" min="10" max="90" value="50"></label>
 <label>Stuck return · sec<input id="option-nav-stuckReturnSeconds" type="number" min="5" max="300" value="30" title="Return home after no new movement progress, including Death Chase"></label>
@@ -680,9 +681,9 @@
 <details class="game1-option-section" data-option-section="debug"><summary><span class="game1-option-icon" aria-hidden="true">🛠️</span><span><strong>Debug / TestPlace</strong><small>Права и видимость кнопок</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>published TestPlace</span><h3>Debug and test controls</h3></div></div>
-  <small class="hint">Published TestPlace only; authorized developer accounts.</small>
+  <small class="hint">Published TestPlace only; authorized developer accounts. Compiled Runtime never starts debug tools. Hub auto-start applies only in Studio.</small>
   <label class="game1-published-debug-toggle"><input type="checkbox" id="option-published-debug-buttons">Show debug / test buttons in published TestPlace</label>
-  <label class="game1-published-debug-toggle"><input type="checkbox" id="option-start-in-hub">Start in Hub <small>· Studio Gameplay Test</small></label>
+  <label class="game1-published-debug-toggle"><input type="checkbox" id="option-start-in-hub">Start in Hub <small>· Studio Gameplay Test / opt-in in Runtime Draft</small></label>
   <label class="game1-published-debug-toggle"><input type="checkbox" id="option-started-language">Started language</label>
   <label>Start language <select id="option-start-locale"><option value="auto">Saved / device</option><option value="ru-ru">Русский</option><option value="en-us">English</option><option value="de-de">Deutsch</option><option value="zh-cn">简体中文</option><option value="it-it">Italiano</option><option value="es-es">Español</option><option value="fr-fr">Français</option><option value="pt-br">Português (Brasil)</option><option value="ja-jp">日本語</option><option value="ko-kr">한국어</option></select></label>
   <div class="actions"><button id="option-published-debug-save" class="primary" type="button">Save debug settings</button></div>
@@ -1285,7 +1286,7 @@
 <script src="skill-editor.js?v=557"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=591"></script>
+<script src="options.js?v=593"></script>
 <script src="character-creation-options.js?v=505"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>

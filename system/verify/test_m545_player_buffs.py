@@ -38,7 +38,7 @@ class PlayerBuffs(unittest.TestCase):
         for token in ['GameplayGuideActive','if guided then 0 else','Healing.TestRate(character, "GameplayTestRegen")','BuffGain_life','Healing.Restore(character, rate * elapsed)']:
             self.assertIn(token,regen)
         service=read('src/server/dev/GameplayTestService.luau')
-        for token in ['RunService:IsStudio() and Access.ServerAllowed(player)','actor~=s.player','(root.Position-part.Position).Magnitude>12','Buffer.Build(folder,s.layout','panelAction(actor,part,function(character)','Effects.Apply(character,character,definition,0,true)','Effects.Clear(character)','SetAttribute("GameplayGuideActive",true)','SetAttribute("GameplayGuideActive",nil)','else s.layout.hub,true)']:
+        for token in ['RunService:IsStudio() and Access.GameplayTestEnabled() and Access.ServerAllowed(player)','actor~=s.player','(root.Position-part.Position).Magnitude>12','Buffer.Build(folder,s.layout','panelAction(actor,part,function(character)','Effects.Apply(character,character,definition,0,true)','Effects.Clear(character)','SetAttribute("GameplayGuideActive",true)','SetAttribute("GameplayGuideActive",nil)','else s.layout.hub,true)']:
             self.assertIn(token,service)
         self.assertIn('if not Buffs.ByEffect[effect] then state[effect]=nil end',read('src/server/combat/SkillEffects.luau'))
         self.assertIn('SkillEffects.Clear(character,preserveBuffs)',read('src/server/dev/GameplayTestArena.luau'))

@@ -108,7 +108,7 @@ local function wrap(value: number, delta: number, maximum: number): number
 end
 
 function Controller.Start()
-    if started or not RunService:IsStudio() or not Access.ClientAllowed() then return end
+    if started or not RunService:IsStudio() or not Access.GameplayTestEnabled() or not Access.ClientAllowed() then return end
     started = true
     task.spawn(function()
         local player = Players.LocalPlayer

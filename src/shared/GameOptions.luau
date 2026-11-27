@@ -102,6 +102,7 @@ function GameOptions.ExperimentalMonsterNavigation()
     local source = (Registry.monsterAi or {}).experimentalNavigation or {}
     return table.freeze({
         enabled = source.enabled ~= false,
+        runtimeEnabled = source.runtimeEnabled == true,
         sampleSeconds = math.clamp(finite(source.sampleSeconds, 1), .5, 3),
         stuckPercent = math.clamp(finite(source.stuckPercent, 50), 10, 90),
         stuckReturnSeconds = math.clamp(finite(source.stuckReturnSeconds, 30), 5, 300),

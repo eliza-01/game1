@@ -15,7 +15,7 @@ ITEMS = [
              ]},
          ], ['monster-spawner', 'monster-population', 'monster-death', 'monster-spawns', 'monster-registry']),
     card('monster-ai-pursuit', 'Монстры · aggro, pursuit, navigation, return', 'Сервер',
-         'M592 · Home Leash / Death Chase, обход препятствий, прыжок до 1 с, Rescue Routes и аварийный телепорт домой.',
+         'M593 · Home Leash / Death Chase, обход препятствий, прыжок до 1 с, Rescue Routes и аварийный телепорт домой.',
          ['MonsterAggressive', 'MonsterPursuitMode', 'MonsterNavigationBackend', 'MonsterRecoveryMode'], [
              {'title': 'Aggro и границы преследования', 'lines': [
                  'Home Leash: возврат при выходе за home radius от центра спавна или по таймеру без нанесения урона (по умолчанию 30 с, Options). Spawn radius задаёт появление/блуждание, не границу погони.',
@@ -23,8 +23,8 @@ ITEMS = [
                  'Обычный Return выполняется пешком; полученный урон может снова запустить погоню. Настройки вида и индивидуальные overrides спавна доступны в Database → Spawn Zones.',
              ]},
              {'title': 'Experimental Navigation · область действия', 'lines': [
-                 'Только Studio: обычные монстры, GP group и зоны 1–6. Guided, Skilled, резервная калибровка и опубликованный runtime используют Legacy; NPC не затронуты.',
-                 'Options → Monster Navigation · Experimental (по умолчанию ON). Workspace.Game1ExperimentalMonsterNavigation — атрибут override: true/false принудительно выбирает режим в допустимых Studio-сценариях, nil наследует Options.',
+                 'Studio: обычные монстры, GP group и зоны 1–6; Guided, Skilled и резервная калибровка используют Legacy. M593: опубликованный Runtime может использовать Experimental для обычных монстров только при двух включённых настройках; по умолчанию Runtime использует Legacy. NPC не затронуты.',
+                 'Options → Monster Navigation: Experimental navigation (default ON) и Enable in published Runtime (default OFF). Workspace.Game1ExperimentalMonsterNavigation — override только для Studio, nil наследует Options; compiled Draft также учитывает Runtime opt-in. Для Runtime сохранить Options → Rojo Sync → сохранить исходный Place → Preflight и новый Runtime Draft. Database Rescue Routes — зеркало; нужен Workspace.Game1RescueRoutes в сохранённом Place.',
                  'Direct: горизонтальный луч от головы в пределах радиуса атаки; при препятствии — нижний луч и поиск альтернативы. Приоритет низкого препятствия при свободном верхнем луче; Stuck: выборка движения 1 с, порог 50% (настраиваемо).',
                  'Collision: локальный поиск одного или двух углов коллайдера. Rescue Route конкурирует с Collision/Climb по полной стоимости. Возврат в Direct — свободный луч от головы к пяткам цели + полный горизонтальный луч. Retry при Return/неудаче локального движения сохраняет паузу 1,5 с. NoAccessiblePlan при Chase: один расчёт, затем BlockedRetreat → BlockedWait, без повторного поиска до входа цели в радиус лука или смены контекста.',
              ]},
@@ -63,7 +63,8 @@ ITEMS = [
              {'title': 'Недостающее / проверка', 'lines': [
                  'Terrain исключён из навигационных лучей, но сохраняет физические коллизии. Авторские линии должны быть физически проходимыми; ограниченный Collision не гарантирует обход составных препятствий.',
                  'Threat, цель, фаза атаки, положение во время Return и таймеры живут только на одном сервере и не восстанавливаются.',
-                 'M591: требуется Studio Play проверка разных высот и точек старта, составных заборов, движущейся цели, прыжка/телепорта и профилирование 50/100/200 активных монстров. Experimental ещё не принят для опубликованного runtime.',
+                 'Приёмка KBN-0032 открыта: Studio Play, Runtime Draft с двумя клиентами, профиль Legacy/Experimental 50/100/200 активных монстров (CPU, Raycast, физика, время построения графа). Доступность опции Runtime не означает разрешение публикации.',
+                 'M593: свободная проекция без сетки 20/4, отсев линий вне радиуса, ранний отсев далёких игроков при aggro. BlockedWait без новых поисков и повторных записей таймера. Граф строится только при активном backend; периодические диагностические записи скорости/лучей и точки плана только в Studio. GP/Test Debug Hub не запускается в опубликованной игре; compiled Draft в Studio загружает его только при Start in Hub; общие безопасные контракты остаются в коде.',
              ]},
          ], ['monster-ai', 'actor-home', 'monster-target', 'monster-death-chase', 'monster-nav',
              'monster-nav-dispatch', 'monster-nav-experimental', 'monster-nav-config', 'monster-nav-options',

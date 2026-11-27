@@ -433,3 +433,22 @@ s,t=v(0,0,-2),v(38,3,5)
 assert(not loadGraph(separated,2).Find(s,t,entryOnly,nil,exitOnly,nil,function() return true end))
 assert(loadGraph(separated,4).Find(s,t,entryOnly,nil,exitOnly,nil,function() return true end))
 print('OK M590: configured height limit, zero, fractional and public graph propagation')
+
+-- M593: common path does not project the target or build the coarse grid.
+lines=topology({route('long',{v(0,0,0),v(20,0,0),v(40,0,0),v(60,0,0),v(80,0,0)})})
+local Routes=require('MonsterRescueRoutes')
+local Segments=require('MonsterRescueSegments')
+local Sampling=require('MonsterRescueSampling')
+local nearestCalls,intervalCalls,casts=0,0,0
+local nearest,interval=Routes.Nearest,Segments.Interval
+Routes.Nearest=function(...) nearestCalls=nearestCalls+1; return nearest(...) end
+Segments.Interval=function(...) intervalCalls=intervalCalls+1; return interval(...) end
+local context={start=v(13,0,-2),goal=v(60,0,0),radius=40,allowed=function() return true end}
+local found=Sampling.Find(context,lines.long,function() casts=casts+1; return true end)
+assert(found and nearestCalls==1 and intervalCalls==1 and casts==1)
+close(found.point.X,13)
+context.start=v(13,0,100)
+nearestCalls,intervalCalls,casts=0,0,0
+assert(not Sampling.Find(context,lines.long,function() casts=casts+1; return true end))
+assert(nearestCalls==1 and intervalCalls==0 and casts==0)
+print('OK M593: free projection fast path and out-of-radius early rejection')

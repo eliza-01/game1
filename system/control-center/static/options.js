@@ -43,6 +43,7 @@ function game1OptionsRender(){
   $('option-monster-return-time').value=String(data.monsterAi?.noDamageReturnSeconds??30);
   const nav=data.monsterAi?.experimentalNavigation||{};
   $('option-nav-enabled').checked=nav.enabled!==false;
+  $('option-nav-runtime-enabled').checked=nav.runtimeEnabled===true;
   for(const [k,v] of Object.entries(game1NavigationDefaults))$('option-nav-'+k).value=String(nav[k]??v);
   game1NpcOverheadRender();
   $('option-character-death-playback').value=String(life.deathPlaybackPercent??100);
@@ -118,7 +119,7 @@ $('option-world-streaming-copy').onclick=async()=>{
 };
 const game1NavigationDefaults={sampleSeconds:1,stuckPercent:50,stuckReturnSeconds:30,searchDistance:40,routeConnectionHeight:2,blockedRetreatBuffer:2,blockedRetreatSpeedMultiplier:1,blockedReengageSpeedMultiplier:1.5,rescueRouteSpeedMultiplier:1.5,searchWidth:60,recheckSeconds:1};
 $('option-nav-save').onclick=()=>{
-  const nav={enabled:$('option-nav-enabled').checked};
+  const nav={enabled:$('option-nav-enabled').checked,runtimeEnabled:$('option-nav-runtime-enabled').checked};
   for(const [k,v] of Object.entries(game1NavigationDefaults))nav[k]=game1OptionNumber('option-nav-'+k,v);
   game1OptionsSave({monsterAi:{experimentalNavigation:nav}},'navigation options saved · Rojo Sync required');
 };

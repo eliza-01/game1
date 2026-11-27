@@ -213,7 +213,7 @@ return table.freeze({
 		maxActiveLeaves = 32,
 	}),
 	characterCreation = table.freeze({
-		enabled = false,
+		enabled = true,
 		useStudioAnchors = true,
 		transitionSeconds = 0.9,
 		faceTransitionSeconds = 0.65,
@@ -294,6 +294,7 @@ return table.freeze({
 		noDamageReturnSeconds = 30,
 		experimentalNavigation = table.freeze({
 			enabled = true,
+			runtimeEnabled = true,
 			sampleSeconds = 1,
 			stuckPercent = 50,
 			stuckReturnSeconds = 20,
@@ -319,7 +320,7 @@ return table.freeze({
 			showPublishedControls = true,
 		}),
 		startInHub = false,
-		startedLanguage = true,
+		startedLanguage = false,
 		startLocale = "ru-ru",
 	}),
 	characterAnimations = table.freeze({

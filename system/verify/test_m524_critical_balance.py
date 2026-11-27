@@ -72,7 +72,7 @@ class CriticalBalance(unittest.TestCase):
         self.assertIn('CritChanceFlat=selection.critFlat', loadout)
         self.assertIn('CritMultiplier=selection.critMultiplier - Balance.Rules.critMultiplier', loadout)
         service = read('src/server/dev/GameplayTestService.luau')
-        self.assertIn('RunService:IsStudio() and Access.ServerAllowed(player)', service)
+        self.assertIn('RunService:IsStudio() and Access.GameplayTestEnabled() and Access.ServerAllowed(player)', service)
         self.assertIn('CharacterService.Respawn(s.player, s.archetype, s.normalFrame)', service)
         ui = read('src/client/dev/GameplayTestController.luau')
         for key in ('Crit buff · %','Crit bonus · pp','Crit damage · ×','Effective crit','critPercent=critPercent,critFlat=critFlat,critMultiplier=critMultiplier'):

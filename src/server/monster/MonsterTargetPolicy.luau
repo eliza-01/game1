@@ -84,9 +84,13 @@ local function acquireNearestTarget(agent: any): Model?
     for _, player in ipairs(Players:GetPlayers()) do
         local character = player.Character
         local targetRoot = rootOf(character)
-        if targetIsValid(character) and targetRoot and allowsTarget(agent, character) then
+        -- Reject distant actors before life/territory/isolation checks. The
+        -- selected target and equal-distance tie order remain unchanged.
+        if targetRoot then
             local distance = horizontalDistance(agent.root.Position, targetRoot.Position)
-            if distance <= closestDistance then closestDistance = distance; closest = character end
+            if distance <= closestDistance and targetIsValid(character) and allowsTarget(agent, character) then
+                closestDistance = distance; closest = character
+            end
         end
     end
     return closest

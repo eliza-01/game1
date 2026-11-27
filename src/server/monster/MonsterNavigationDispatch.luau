@@ -1,6 +1,6 @@
 local Trace=require(script.Parent:WaitForChild("MonsterNavigationTrace"))
 local Config=require(script.Parent:WaitForChild("MonsterNavigationConfig"))
--- A/B switch: legacy implementation remains intact and published servers keep it.
+-- A/B switch: Studio override, explicit opt-in on published servers.
 local RunService=game:GetService("RunService")
 local Workspace=game:GetService("Workspace")
 local Legacy=require(script.Parent:WaitForChild("MonsterChaseNavigation"))
@@ -14,15 +14,21 @@ end
 function Dispatch.IsBlockedRetreating(agent)
     return Blocked.IsRetreating(agent.recoveryNavigation)
 end
-function Dispatch.Enabled(agent)
-    if not RunService:IsStudio() then return false end
+local inStudio=RunService:IsStudio()
+local compiledRuntime=game:GetService("ReplicatedStorage"):FindFirstChild("Game1LocationRuntimeManifest")~=nil
+local function enabledForServer()
+    if not inStudio then return Config.enabled and Config.runtimeEnabled end
     local override=Workspace:GetAttribute("Game1ExperimentalMonsterNavigation")
-    if override==false or (override==nil and not Config.enabled) then return false end
+    if override~=nil then return override==true end
+    return Config.enabled and (not compiledRuntime or Config.runtimeEnabled)
+end
+function Dispatch.Enabled(agent)
+    if not enabledForServer() then return false end
     local kind=agent.model:GetAttribute("GameplayTestKind")
     return kind==nil or kind=="group" or (kind=="zone" and (tonumber(agent.model:GetAttribute("GameplayTestZone")) or 99)<=6)
 end
 function Dispatch.Prepare()
-    if RunService:IsStudio() then Experimental.Initialize() end
+    if enabledForServer() then Experimental.Initialize() end
 end
 Dispatch.Initialize=Legacy.Initialize
 Dispatch.RunSpeedStuds=Legacy.RunSpeedStuds

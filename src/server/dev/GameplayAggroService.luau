@@ -9,7 +9,7 @@ local Overrides = require(script.Parent:WaitForChild("GameplayAggroOverrides"))
 local Service = {}
 local started = false
 local function allowed(player)
-    return RunService:IsStudio() and Access.ServerAllowed(player) and player:GetAttribute("Game1GameplayTestActive") == true
+    return RunService:IsStudio() and Access.GameplayTestEnabled() and Access.ServerAllowed(player) and player:GetAttribute("Game1GameplayTestActive") == true
 end
 local species = {}
 for _, row in ipairs(Balance.Monsters) do
@@ -19,7 +19,7 @@ local function validRadius(value)
     return type(value)=="number" and value==value and value>=0 and value<=10000
 end
 function Service.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not RunService:IsStudio() or not Access.GameplayTestEnabled() then return end
     started = true
     local remotes = RS:WaitForChild("Game1Remotes")
     local remote = Instance.new("RemoteFunction")

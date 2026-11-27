@@ -1,6 +1,6 @@
-# Gameplay infrastructure · M570
+# Gameplay infrastructure · M570–M593
 
-**Дата сверки:** 27.11.2026. **База:** диагностический дамп M556 `game1_diag_2026-11-26_23-26-23.zip`, объединённый M559 и последовательность M560–M570. **Статус:** CURRENT SOURCE CONTRACT / STUDIO VALIDATION OPEN. M571 меняет только документацию. Установка M568 подтверждается конфликтом повторного применения; применение M569/M570 на машине владельца отдельно не подтверждено. Числа пользовательской Database могут отличаться от восстановленного среза.
+**Дата сверки Monster Navigation / Runtime:** 27.11.2026, M593 на базе `game1_diag_2026-11-27_06-32-10.zip` (M592). **Статус:** CURRENT SOURCE CONTRACT / STUDIO & RUNTIME VALIDATION OPEN. Остальные разделы сохраняют сверку M570/M571. См. [аудит M593](M593_MONSTER_RUNTIME_AUDIT_RU.md).
 
 ## 1. Database и GP
 
@@ -23,7 +23,7 @@ Home Leash: радиус от спавна + таймаут отсутствия
 
 ## 4. Experimental Navigation — M566/M569/M573/M574
 
-Только Studio: обычные монстры, GP group и зоны 1–6; старый навигатор для Guided/Skilled/резерва и опубликованной игры; NPC неизменны. `MonsterNavigationDispatch` выбирает backend. Options → Monster Navigation · Experimental: default ON. Workspace attribute `Game1ExperimentalMonsterNavigation` имеет приоритет над Options; nil наследует настройки. Это уже приводило к тестированию Legacy вместо эксперимента.
+Studio: обычные монстры, GP group и зоны 1–6; Legacy для Guided/Skilled/резерва. M593: `MonsterNavigationDispatch` разрешает Experimental вне Studio только при `enabled=true` и `runtimeEnabled=true` (новая настройка Enable in published Runtime, default OFF). NPC неизменны. Workspace attribute `Game1ExperimentalMonsterNavigation` имеет приоритет только в Studio; nil наследует Options; compiled Draft также учитывает runtimeEnabled. Граф не строится при выключенном backend. Runtime Draft требует свежих Rojo scripts и сохранённой папки Game1RescueRoutes; публикация до приёмки запрещена.
 
 | Состояние | Поведение |
 | --- | --- |

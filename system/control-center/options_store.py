@@ -275,12 +275,15 @@ def normalize_monster_ai(change, base=None):
     config = result.get('experimentalNavigation', {})
     update = change.get('experimentalNavigation', {})
     # M578: discard the retired lift speed when reading older saved Options.
-    if not isinstance(update, dict) or set(update) - (set(MONSTER_NAV_FIELDS) | {'enabled', 'climbSpeed'}):
+    if not isinstance(update, dict) or set(update) - (set(MONSTER_NAV_FIELDS) | {'enabled', 'runtimeEnabled', 'climbSpeed'}):
         raise ValueError('invalid experimental navigation fields')
     enabled = update.get('enabled', config.get('enabled', True))
     if type(enabled) is not bool:
         raise ValueError('experimentalNavigation.enabled must be boolean')
-    out = {'enabled': enabled}
+    runtime_enabled = update.get('runtimeEnabled', config.get('runtimeEnabled', False))
+    if type(runtime_enabled) is not bool:
+        raise ValueError('experimentalNavigation.runtimeEnabled must be boolean')
+    out = {'enabled': enabled, 'runtimeEnabled': runtime_enabled}
     for name, (default, lo, hi) in MONSTER_NAV_FIELDS.items():
         n = update.get(name, config.get(name, default))
         if type(n) not in (int,float) or not math.isfinite(n) or not lo <= n <= hi:

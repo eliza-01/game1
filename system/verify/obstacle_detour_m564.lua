@@ -34,7 +34,10 @@ function world:GetPartBoundsInBox(_,size)
     assert(size.Y==.2,'only head-level slab')
     return {wall}
 end
-game={GetService=function() return world end}
+game={GetService=function(_,name)
+    if name=="RunService" then return {IsStudio=function() return true end} end
+    return world
+end}
 script={Parent={WaitForChild=function() return 'config' end}}
 package.loaded.config={searchDistance=40,searchWidth=60}
 local trace={Enabled=function() return false end,Event=function() end,Ray=function() end,Bind=function() end,V=function() return "mock" end,Changed=function() end,Rate=function() end,RouteObserver=function() return nil end}

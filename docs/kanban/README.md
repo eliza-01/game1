@@ -6,7 +6,7 @@
 
 | Карточка | Статус | Следующая проверка / задача |
 | --- | --- | --- |
-| [KBN-0032 · Monster Navigation & Rescue Routes](specs/KBN-0032.md) | IN_PROGRESS | Физика, входы/выходы графа, MONNAV, замеры нагрузки, Studio A/B |
+| [KBN-0032 · Monster Navigation & Rescue Routes](specs/KBN-0032.md) | IN_PROGRESS | M593: 20/4, переходы, Blocked Pursuit, Runtime opt-in; Studio/Runtime A/B и нагрузочная приёмка открыты |
 | [KBN-0033 · Monster Spawn Authoring & Database](specs/KBN-0033.md) | IN_PROGRESS | Сквозная Studio/Database-приёмка, конфликт ревизии и runtime |
 | [KBN-0025 · Combat Analytics](specs/KBN-0025.md) | CODE_COMPLETE | Guided: 41 бой, реальные male clips, headshot и полный отчёт; без XP/Gold |
 | [KBN-0026 · Effects & Status System](specs/KBN-0026.md) | IN_PROGRESS | Общие эффекты, HUD, наблюдатели, серверные ограничения, правила повторного наложения |

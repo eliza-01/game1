@@ -51,7 +51,7 @@ class HubProgression(unittest.TestCase):
 
     def test_hub_policy_and_autostart(self):
         server=read('src/server/dev/GameplayTestService.luau')
-        for token in ('RunService:IsStudio() and Access.ServerAllowed(player)', 'not s.guide and #s.group == 0 and not s.groupStarting', 'PointToObjectSpace(root.Position)', 'math.abs(point.Z) <= half', 'math.abs(point.Y) < 12', 'if inHub then 3 else nil', 'Options.StartInGameplayHub()', 'autoAttempted[player] = true', 'Loadout.Stock(player, 1)', 'CombatHitboxCount', 'CharacterCreationStatus', 'busy[player]'):
+        for token in ('RunService:IsStudio() and Access.GameplayTestEnabled() and Access.ServerAllowed(player)', 'not s.guide and #s.group == 0 and not s.groupStarting', 'PointToObjectSpace(root.Position)', 'math.abs(point.Z) <= half', 'math.abs(point.Y) < 12', 'if inHub then 3 else nil', 'Options.StartInGameplayHub()', 'autoAttempted[player] = true', 'Loadout.Stock(player, 1)', 'CombatHitboxCount', 'CharacterCreationStatus', 'busy[player]'):
             self.assertIn(token,server)
         self.assertIn('not attackActive and nextMode == "Run"',read('src/client/character/MovementController.luau'))
         self.assertIn('not attackLowerBodyActive and character:GetAttribute("GameplayTestHubRunMultiplier") == 3',read('src/client/character/animation/CharacterAnimationController.luau'))

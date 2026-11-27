@@ -3,6 +3,17 @@
 -- Each require occurs inside Start, so a failed NPC module cannot suppress
 -- later independent debug remotes or monster lifecycle startup.
 local ServiceCatalog = {}
+local RunService = game:GetService("RunService")
+local function debugAccess()
+    return require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+        :WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
+end
+local function publishedDebugEnabled(): boolean
+    return debugAccess().ServerEnabled()
+end
+local function gameplayTestEnabled(): boolean
+    return RunService:IsStudio() and debugAccess().GameplayTestEnabled()
+end
 
 function ServiceCatalog.Build(root: Instance)
     local character = root:WaitForChild("character")
@@ -79,35 +90,37 @@ function ServiceCatalog.Build(root: Instance)
             require(npc:WaitForChild("NpcSpawnerService")).Start()
         end},
         {name = "PublishedDebugAccessService", critical = false, start = function()
-            require(dev:WaitForChild("PublishedDebugAccessService")).Start()
+            if publishedDebugEnabled() then require(dev:WaitForChild("PublishedDebugAccessService")).Start() end
         end},
         {name = "CustomScalingDebugService", critical = false, start = function()
-            require(dev:WaitForChild("CustomScalingDebugService")).Start()
+            if publishedDebugEnabled() then require(dev:WaitForChild("CustomScalingDebugService")).Start() end
         end},
         {name = "WeaponSelectionService", critical = false, dependsOn = {"CharacterService"}, start = function()
             require(root:WaitForChild("weapon"):WaitForChild("WeaponSelectionService")).Start()
         end},
         {name = "TestLoadoutService", critical = false, dependsOn = {"CharacterService", "AttackService"}, start = function()
-            local TestLoadoutService = require(dev:WaitForChild("TestLoadoutService"))
-            TestLoadoutService.Start()
+            if publishedDebugEnabled() then
+                local TestLoadoutService = require(dev:WaitForChild("TestLoadoutService"))
+                TestLoadoutService.Start()
+            end
         end},
         {name = "GameplayTestService", critical = false, dependsOn = {"CharacterService", "MonsterAIService", "PublishedDebugAccessService"}, start = function()
-            require(dev:WaitForChild("GameplayTestService")).Start()
+            if gameplayTestEnabled() then require(dev:WaitForChild("GameplayTestService")).Start() end
         end},
         {name = "GameplayAggroService", critical = false, dependsOn = {"GameplayTestService"}, start = function()
-            require(dev:WaitForChild("GameplayAggroService")).Start()
+            if gameplayTestEnabled() then require(dev:WaitForChild("GameplayAggroService")).Start() end
         end},
         {name = "HouseSocketDebugService", critical = false, dependsOn = {"HouseSocketService"}, start = function()
-            require(dev:WaitForChild("HouseSocketDebugService")).Start()
+            if publishedDebugEnabled() then require(dev:WaitForChild("HouseSocketDebugService")).Start() end
         end},
         {name = "CameraDebugService", critical = false, start = function()
-            require(dev:WaitForChild("CameraDebugService")).Start()
+            if publishedDebugEnabled() then require(dev:WaitForChild("CameraDebugService")).Start() end
         end},
         {name = "HealthUiDebugService", critical = false, start = function()
-            require(dev:WaitForChild("HealthUiDebugService")).Start()
+            if publishedDebugEnabled() then require(dev:WaitForChild("HealthUiDebugService")).Start() end
         end},
         {name = "UiPresentationDebugService", critical = false, start = function()
-            require(dev:WaitForChild("UiPresentationDebugService")).Start()
+            if publishedDebugEnabled() then require(dev:WaitForChild("UiPresentationDebugService")).Start() end
         end},
     }
 end

@@ -52,7 +52,7 @@ class MonsterTypes(unittest.TestCase):
         ai = read('src/server/monster/MonsterAIService.luau')
         attack = read('src/server/monster/MonsterAttackExecutor.luau')
         self.assertIn('Isolation.Allows(agent.model, target)', policy)
-        self.assertIn('targetRoot and allowsTarget(agent, character)', policy)
+        self.assertIn('distance <= closestDistance and targetIsValid(character) and allowsTarget(agent, character)', policy)
         self.assertIn('not allowsTarget(agent, target)', policy)
         self.assertIn('TargetPolicy.AllowsTarget(agent, agent.target)', ai)
         self.assertIn('not TargetPolicy.AllowsTarget(agent, attacker)', ai)

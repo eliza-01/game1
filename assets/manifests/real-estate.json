@@ -17259,13 +17259,13 @@
           "reuse": null
         },
         "walls_outside": {
-          "revision": 0,
-          "status": "NOT_REGISTERED",
-          "sourcePath": "",
-          "sourceSha256": "",
-          "publishedSha256": "",
-          "modelAssetId": "",
-          "moderationState": "",
+          "revision": 2,
+          "status": "PUBLISHED",
+          "sourcePath": "assets/source/real-estate/house_level5_01/lod/walls_outside/637edf88c992bf005c50781d0fcef3fd33fde24731374cf7e9cea9dfcee7d237/lod1.fbx",
+          "sourceSha256": "637edf88c992bf005c50781d0fcef3fd33fde24731374cf7e9cea9dfcee7d237",
+          "publishedSha256": "637edf88c992bf005c50781d0fcef3fd33fde24731374cf7e9cea9dfcee7d237",
+          "modelAssetId": "99390461403748",
+          "moderationState": "Approved",
           "reuse": null
         },
         "window_frames": {
@@ -17300,8 +17300,8 @@
         }
       },
       "runtimeProfile": {
-        "mode": "full",
-        "revision": 1
+        "mode": "lod1",
+        "revision": 2
       },
       "partStreaming": {
         "chimney": {

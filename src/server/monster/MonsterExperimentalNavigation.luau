@@ -10,6 +10,7 @@ local DeathChase=require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
 local Blocked=require(script.Parent:WaitForChild("MonsterBlockedPursuit"))
 local RetreatGeometry=require(script.Parent:WaitForChild("MonsterBlockedRetreatGeometry"))
 local Speed=require(script.Parent:WaitForChild("MonsterNavigationSpeed"))
+local diagnosticAttributes=game:GetService("RunService"):IsStudio()
 local Navigation={}
 Navigation.Initialize=Graph.Initialize
 local UP=Vector3.yAxis
@@ -117,9 +118,11 @@ local function probeClimb(agent,state,foot,point,height,radius,ray,now,knownHead
     local delta=horizontal(point-foot)
     if delta.Magnitude<=.05 then return nil end
     local landing,rise,probe,head,lower=Geometry.ProbeClimb(agent,foot,height,radius,delta.Unit,knownDistance or math.min(Config.searchDistance,math.max(radius+2,delta.Magnitude)),ray,knownHead)
-    agent.model:SetAttribute("MonsterRecoveryProbe",probe)
-    agent.model:SetAttribute("MonsterRecoveryHeadDistance",head and head.Distance or nil)
-    agent.model:SetAttribute("MonsterRecoveryFootDistance",lower and lower.Distance or nil)
+    if diagnosticAttributes then
+        agent.model:SetAttribute("MonsterRecoveryProbe",probe)
+        agent.model:SetAttribute("MonsterRecoveryHeadDistance",head and head.Distance or nil)
+        agent.model:SetAttribute("MonsterRecoveryFootDistance",lower and lower.Distance or nil)
+    end
     if Trace.Enabled(agent) then Trace.Event(agent,"CLIMB_CANDIDATE","landing="..Trace.V(landing),"rise="..tostring(rise),"probe="..tostring(probe)) end
     if landing and allowed(agent,landing) and (not head or eligible(state,landing,now)) then return landing,rise,lower,head end
     return nil,nil,lower,head
@@ -223,9 +226,13 @@ end
 local function stepBlocked(agent,state,destination,speed,now)
     local range=Config.bowRange
     local before=state.blockedPursuit.phase
-    local phase,point=Blocked.Step(state,agent.root.Position,destination,range,Config.blockedRetreatBuffer,now,movementSpeed(state,speed),function(position,target,desired)
-        return RetreatGeometry.FindPoint(agent,position,target,desired,function(p) return allowed(agent,p) end)
-    end)
+    local findPoint
+    if before~="Wait" then
+        findPoint=function(position,target,desired)
+            return RetreatGeometry.FindPoint(agent,position,target,desired,function(p) return allowed(agent,p) end)
+        end
+    end
+    local phase,point=Blocked.Step(state,agent.root.Position,destination,range,Config.blockedRetreatBuffer,now,movementSpeed(state,speed),findPoint)
     if phase=="Reengage" then
         Trace.Event(agent,"BLOCKED_REENGAGE")
         clearPlan(agent,state,now); state.reengaging=true; state.stuckWatchdog=nil
@@ -240,7 +247,9 @@ local function stepBlocked(agent,state,destination,speed,now)
         end
         mode(agent,state,"BlockedWait")
         local seconds=math.floor(Blocked.WaitSeconds(state,now))
-        agent.model:SetAttribute("MonsterRecoveryStuckSeconds",seconds)
+        if agent.model:GetAttribute("MonsterRecoveryStuckSeconds")~=seconds then
+            agent.model:SetAttribute("MonsterRecoveryStuckSeconds",seconds)
+        end
         if seconds>=Config.stuckReturnSeconds then
             Trace.Event(agent,"STUCK_TIMEOUT","seconds="..tostring(seconds),"mode="..state.mode)
             return true,"StuckTimeout"
@@ -393,8 +402,10 @@ function Navigation.NavigateTo(agent,destination,speed)
         for k,untilTime in pairs(state.failed) do if untilTime<=now then state.failed[k]=nil end end
         local actual=(agent.root.Position-state.position).Magnitude
         local elapsed=now-state.sampleAt
-        agent.model:SetAttribute("MonsterRecoveryActualSpeed",math.round(actual/elapsed*100)/100)
-        agent.model:SetAttribute("MonsterRecoveryExpectedSpeed",math.round(state.expected/elapsed*100)/100)
+        if diagnosticAttributes then
+            agent.model:SetAttribute("MonsterRecoveryActualSpeed",math.round(actual/elapsed*100)/100)
+            agent.model:SetAttribute("MonsterRecoveryExpectedSpeed",math.round(state.expected/elapsed*100)/100)
+        end
         local stuck=actual<state.expected*Config.stuckPercent/100 and (point-foot).Magnitude>1.25
         if Trace.Enabled(agent) then Trace.Event(agent,"SAMPLE",string.format("actual=%.2f expected=%.2f elapsed=%.2f stuck=%s",actual,state.expected,elapsed,tostring(stuck)),"point="..Trace.V(point)) end
         resetSample(agent,state,now)
@@ -417,8 +428,10 @@ function Navigation.NavigateTo(agent,destination,speed)
             state.planKind=state.mode; point=state.plan[1]
         end
     end
-    local debugPoint=if state.plan then point else nil
-    if agent.model:GetAttribute("MonsterRecoveryPoint")~=debugPoint then agent.model:SetAttribute("MonsterRecoveryPoint",debugPoint) end
+    if diagnosticAttributes then
+        local debugPoint=if state.plan then point else nil
+        if agent.model:GetAttribute("MonsterRecoveryPoint")~=debugPoint then agent.model:SetAttribute("MonsterRecoveryPoint",debugPoint) end
+    end
     move(agent,state,point+offset,movementSpeed(state,speed),now)
 end
 return table.freeze(Navigation)

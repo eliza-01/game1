@@ -5,6 +5,7 @@ local RS=game:GetService("ReplicatedStorage")
 local RunService=game:GetService("RunService")
 local Input=game:GetService("UserInputService")
 local Shared=RS:WaitForChild("Game1Shared")
+local Access=require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Buffs=require(Shared:WaitForChild("combat"):WaitForChild("BuffDefinitions"))
 local Config=require(Shared:WaitForChild("dev"):WaitForChild("GameplayBufferConfig"))
 local Icons=require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("BuffIconView"))
@@ -27,7 +28,7 @@ local function label(parent: Instance, text: string, size: number, position: UDi
     local l=Instance.new("TextLabel"); l.Text=text; l.Font=Enum.Font.GothamMedium; l.TextSize=size; l.TextColor3=Color3.fromRGB(235,238,244); l.BackgroundTransparency=1; l.Position=position; l.Size=dimensions; l.Parent=parent; return l
 end
 function Controller.Start()
-    if not RunService:IsStudio() then return end
+    if not RunService:IsStudio() or not Access.GameplayTestEnabled() then return end
     local remotes=RS:WaitForChild("Game1Remotes")
     local open=remotes:WaitForChild("GameplayBufferOpen",20)
     local remote=remotes:WaitForChild("GameplayTest",20)

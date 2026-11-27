@@ -39,18 +39,20 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 | Verification (M164–M171) | `system/verify/verify.py` → `system/verify/validators/` | Вынесены source-only, project layout, Monster registry/spawn, Actor runtime и Combat Contact/Headshot, Character, Animation, Weapon, Studio Debug, Death, Attack Timeline и Rojo/Animation Speed tooling, Location/Deco/Environment/Texture Sync (M169), Combat foundation/Hitbox/Studio Character Bridge/registered attack clips (M170). `verify.py` содержит только orchestration; M171 устранил пропуск ошибок M54/M55/M128 при расчёте exit code. R2 завершён |
 | House runtime | `HouseSocketContract`, `HouseElevatorPolicy`, `HouseSocketService`, `HouseDoorService`, `HousePadlockService`, клиентский Prompt, Studio debug | USE/AIM, модельный pivot двери, server authorization; детальнее в [ТЗ](../spec/CURRENT_PROJECT_SPEC_RU.md) |
 
-## M570 · навигация и авторинг (сверка 27.11.2026)
+## M593 · навигация и авторинг (сверка 27.11.2026)
 
 | Ответственность | Источник / модули | Граница |
 | --- | --- | --- |
 | Баланс и общие эффекты | `config/balance/gameplay.json` → `BalanceRegistry` → `Balance.Skill` | Database Main; Buffer и HUD не содержат независимых численных параметров |
 | Spawn Zones | `StudioMonsterSpawnAuthoring` / `game-balance.js` → `monster_spawn_store.py` → `assets/manifests/monster-spawns.json` → `MonsterSpawnRegistry` | Studio создаёт, перемещает, удаляет; браузер меняет параметры существующей записи через revision-guarded API; маркеры не источник runtime |
 | Pursuit policy | `MonsterDeathChasePolicy` → AI, experimental navigation, ranged retreat | Death Chase и Home Leash взаимоисключающие; territory optional; калибровка отдельно |
-| Navigation dispatch | `MonsterNavigationDispatch` → `MonsterExperimentalNavigation` либо `MonsterChaseNavigation` | Только Studio A/B; legacy и NPC сохранены; боевой таймлайн отдельно |
+| Navigation dispatch | `MonsterNavigationDispatch` → `MonsterExperimentalNavigation` либо `MonsterChaseNavigation` | Studio A/B; опубликованный Runtime opt-in (enabled + runtimeEnabled, default OFF); Legacy и NPC сохранены; боевой таймлайн отдельно |
 | Recovery geometry | `MonsterRecoveryGeometry` | Верхний/нижний луч, выход через пятки + основной луч, локальный обход и физический подъём; нет резервных sweep для щелей |
 | Blocked pursuit M591 | `MonsterExperimentalNavigation` → `MonsterBlockedPursuit`, `MonsterBlockedRetreatGeometry`, `MonsterNavigationSpeed`; `MonsterNavigationDispatch` → AI/Presentation | Отступление/ожидание после NoAccessiblePlan, один владелец движения, ожидание запускает таймеры, геометрия отдельно; Options → GameOptions → Config; множители движения/анимации без перемножения, M592: максимальная дальность лука из Balance.Weapons с боевыми ограничениями, независимо от экипировки цели. |
 | Rescue graph | `StudioRescueRoutes` → Place `Game1RescueRoutes` → `MonsterRescueGraph`; `rescue_route_store.py` → manifest | Place — источник координат графа; Database — зеркало; M590: Graph оркестрирует Topology → Routes → Entries → Paths → Exits; Connections — отдельные переходы только от свободных концов целой линии, с перепадом высоты ≤ Options routeConnectionHeight (2 studs по умолчанию), Sampling — 20/4 по длине линии; Segments — геометрия, Queries — per-search кэш и observer; Geometry — физика. Приоритет маршрута по цели, выхода внутри линии по высоте; каталог только метаданные |
 | Trace | `MonsterNavigationTrace` | Studio Server Output, опциональный фильтр; без дополнительных кастов |
+| Debug bootstrap | `ServiceCatalog` / `init.client` → `PublishedDebugAccess` | GP/AG/Buffer только Studio (compiled Draft только при Start in Hub), прочие debug только Studio или авторизованный TestPlace; опубликованный compiled Runtime исключён до require/start. Shared test contracts сохраняются. |
+| Search cost M593 | `MonsterRescueSampling`, `MonsterExperimentalNavigation` | Свободная проекция без сетки, отсев линий вне радиуса, ожидание без callback/повторной записи таймера; остальное под профилированием. |
 
 [Полный контракт и открытые проверки](../workflows/M570_GAMEPLAY_INFRASTRUCTURE_RU.md). Не объединять authoring, боевые решения, политику преследования и граф в один сервис. Производительность и физика эксперимента требуют измерений.
 
@@ -64,7 +66,7 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 | Награды | `ActorDamageSignals` → `CharacterProgressionService` | Сервер выбирает обычную ветку либо GP Reward; GP-событие никогда не проваливается в профиль |
 | Проекция | `CharacterProgressionView.Publish` → `CharacterStatsService.SetProgressionLevel` | Общая функция отображения XP/Gold/уровня и пересчёта HP; не writer профиля |
 | Hub | `GameplayTestService` → `GameplayTestHubRunMultiplier` → клиентское движение/анимация | Сервер определяет границы, клиент применяет ×3; не постоянный RunSpeed и не полная серверная проверка перемещения |
-| Авторинг | `OptionsStore` → `options.json` → `GameOptionsRegistry` | `debugUi.startInHub` — boolean, default false; Studio guard не зависит от названия секции Options |
+| Авторинг | `OptionsStore` → `options.json` → `GameOptionsRegistry` | `debugUi.startInHub` — boolean, default false; в обычном Studio ручной Hub доступен; в compiled Draft Studio GP/AG/Buffer только при Start in Hub |
 | Design | `KanbanStore` + KBN-0031, SVG UI | Продуктовый план и ссылки на иллюстрации, не источник runtime-спавнов; ревизии/SHA/история сохраняются |
 
 См. [M541 workflow](../workflows/M541_HUB_WORLD_PROGRESSION_RU.md). Исторические размеры модулей и карта архитектуры M189/M439 ниже не являются новым сквозным аудитом. Studio/Android-приёмка остаётся открытой.

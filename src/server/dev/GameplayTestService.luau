@@ -31,7 +31,7 @@ local function result(ok: boolean, message: string)
     return {ok=ok, message=message}
 end
 local function allowed(player: Player): boolean
-    return RunService:IsStudio() and Access.ServerAllowed(player)
+    return RunService:IsStudio() and Access.GameplayTestEnabled() and Access.ServerAllowed(player)
 end
 local function alive(player: Player): Model?
     local character = player.Character
@@ -421,7 +421,7 @@ local function dispatch(player: Player, action: any, request: any)
     return result(false, "Unknown action")
 end
 function Service.Start()
-    if started or not RunService:IsStudio() then return end
+    if started or not RunService:IsStudio() or not Access.GameplayTestEnabled() then return end
     started = true
     local remote = Instance.new("RemoteFunction")
     remote.Name = "GameplayTest"

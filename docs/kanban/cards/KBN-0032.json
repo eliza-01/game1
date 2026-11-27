@@ -8,10 +8,10 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0032.md",
-  "specSha256": "05e3293ac153ba70809c0efb8a1326103da157fc6ddc6b8b6122607f3df80b18",
+  "specSha256": "8897571cc8fe293b3dfdb753d4597a6eeb32a84e14c0091f8b03ee40fb4bc6fb",
   "dependsOn": [],
-  "revision": 16,
-  "updatedAt": "2026-11-26T23:51:07+00:00",
+  "revision": 21,
+  "updatedAt": "2026-11-27T03:42:29+00:00",
   "tasks": [
     {
       "id": "KBN-0032-T01",
@@ -42,6 +42,11 @@
       "id": "KBN-0032-T06",
       "title": "Снять сравнительный профиль Legacy/Experimental на 50/100/200 активных монстрах",
       "done": false
+    },
+    {
+      "id": "KBN-0032-T07",
+      "title": "M593: проверить Runtime Draft с Experimental ON/OFF и сохранёнными Rescue Routes, отсутствие GP/Debug Hub вне Studio",
+      "done": false
     }
   ],
   "acceptance": [
@@ -66,6 +71,18 @@
     {
       "id": "KBN-0032-A04",
       "title": "Замер CPU/кастов и физики, сравнение с Legacy; решение о production rollout",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0032-A05",
+      "title": "Runtime Draft: два клиента, Experimental ON/OFF, переходы и BlockedWait; GP/AG/Buffer и debug authorization отсутствуют при выключенном режиме",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0032-A06",
+      "title": "M593: измерить стартап графа, CPU, число Raycast/Blockcast/Overlap и кадры при 50/100/200 активных монстрах; зафиксировать одинаковые сценарии Legacy и Experimental",
       "status": "NOT_RUN",
       "evidence": ""
     }

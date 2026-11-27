@@ -28,7 +28,7 @@ class GameplayTest(unittest.TestCase):
         self.assertIn('Arena.Support(supports, point, 18)',arena)
     def test_cleanup_and_isolation(self):
         service=read('src/server/dev/GameplayTestService.luau')
-        self.assertIn('RunService:IsStudio() and Access.ServerAllowed(player)',service)
+        self.assertIn('RunService:IsStudio() and Access.GameplayTestEnabled() and Access.ServerAllowed(player)',service)
         self.assertIn('s.generation += 1',service)
         self.assertIn('character:GetAttribute("LifeState") == "Dying"',service)
         self.assertIn('Arena.Clear(s.group)',service)

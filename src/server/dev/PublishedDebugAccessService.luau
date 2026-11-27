@@ -25,7 +25,7 @@ local function authorize(player: Player)
 end
 
 function Service.Start()
-    if started then return end
+    if started or not Access.ServerEnabled() then return end
     started = true
     Players.PlayerAdded:Connect(authorize)
     for _, player in ipairs(Players:GetPlayers()) do task.spawn(authorize, player) end

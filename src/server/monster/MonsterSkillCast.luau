@@ -6,7 +6,7 @@ local Skills=require(script.Parent:WaitForChild("MonsterSkills"))
 local Effects=require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("SkillEffects"))
 local Report=require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayCombatReport"))
 local Target=require(script.Parent:WaitForChild("MonsterTargetPolicy"))
-local Navigation=require(script.Parent:WaitForChild("MonsterChaseNavigation"))
+local Navigation=require(script.Parent:WaitForChild("MonsterNavigationDispatch"))
 local CombatState=require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation=require(script.Parent:WaitForChild("MonsterCombatPresentation"))
 local CastVisual=require(script.Parent:WaitForChild("MonsterCastPresentation"))
@@ -21,6 +21,7 @@ function Cast.Cancel(agent: any)
 end
 function Cast.TryBegin(agent: any,target: Model): boolean
     if agent.model:GetAttribute("MonsterSkillCaster")~=true then return false end
+    if Target.IsRecovering(agent) then return false end
     if agent.attacking or os.clock()<agent.nextAttackAt or agent.retreatPending or not Target.IsValid(target) then return false end
     local skill,victim=Skills.Choose(agent.model,target,Target.CanBeginTargetedCast(agent,target))
     if not skill or not victim then return false end

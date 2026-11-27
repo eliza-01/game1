@@ -32,7 +32,7 @@ class TestRetaliation(unittest.TestCase):
 
     def test_lost_target_returns_home(self):
         ai = read('src/server/monster/MonsterAIService.luau')
-        self.assertIn('if agent.target then beginReturn(agent); return end', ai)
+        self.assertIn('beginReturn(agent, if targetIsValid(agent.target) then "TargetOutsideTerritoryOrIsolation" else "TargetLost")', ai)
         branch = ai.split('        updateTarget(agent, now)\n', 1)[1].split('        local target = agent.target', 1)[0]
         self.assertIn('if agent.returning then\n            updateReturn(agent)\n            continue\n', branch)
         self.assertIn('navigateTo(agent, home, runSpeedStuds(agent))', ai)

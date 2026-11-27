@@ -250,15 +250,37 @@ def normalize_npc_overhead(change, base=None):
     return result
 
 
+MONSTER_NAV_FIELDS = {
+    'sampleSeconds': (1, .5, 3), 'stuckPercent': (50, 10, 90),
+    'stuckReturnSeconds': (30, 5, 300),
+    'climbSpeed': (8, 2, 20), 'searchDistance': (40, 10, 100),
+    'searchWidth': (60, 10, 120), 'recheckSeconds': (1, .5, 3),
+}
+
+
 def normalize_monster_ai(change, base=None):
     import math
-    if not isinstance(change, dict) or set(change) - {'noDamageReturnSeconds'}:
-        raise ValueError('monsterAi only accepts noDamageReturnSeconds')
+    if not isinstance(change, dict) or set(change) - {'noDamageReturnSeconds', 'experimentalNavigation'}:
+        raise ValueError('invalid monsterAi fields')
     result = deepcopy(base or {'noDamageReturnSeconds': 30})
     value = change.get('noDamageReturnSeconds', result['noDamageReturnSeconds'])
     if type(value) not in (int, float) or not math.isfinite(value) or not 1 <= value <= 3600:
         raise ValueError('monster return delay must be 1..3600 seconds')
     result['noDamageReturnSeconds'] = float(value)
+    config = result.get('experimentalNavigation', {})
+    update = change.get('experimentalNavigation', {})
+    if not isinstance(update, dict) or set(update) - (set(MONSTER_NAV_FIELDS) | {'enabled'}):
+        raise ValueError('invalid experimental navigation fields')
+    enabled = update.get('enabled', config.get('enabled', True))
+    if type(enabled) is not bool:
+        raise ValueError('experimentalNavigation.enabled must be boolean')
+    out = {'enabled': enabled}
+    for name, (default, lo, hi) in MONSTER_NAV_FIELDS.items():
+        n = update.get(name, config.get(name, default))
+        if type(n) not in (int,float) or not math.isfinite(n) or not lo <= n <= hi:
+            raise ValueError(f'{name} must be {lo}..{hi}')
+        out[name] = n
+    result['experimentalNavigation'] = out
     return result
 
 
@@ -462,6 +484,10 @@ class OptionsStore:
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
+        normalized_monster_ai = normalize_monster_ai(payload['monsterAi'])
+        if normalized_monster_ai != payload['monsterAi']:
+            payload['monsterAi'] = normalized_monster_ai
+            changed = True
         normalized_debug = normalize_debug_ui(payload['debugUi'])
         if normalized_debug != payload['debugUi']:
             payload['debugUi'] = normalized_debug

@@ -2,10 +2,12 @@
 
 Рабочие документы: `cards/KBN-XXXX.json` + `specs/KBN-XXXX.md`. Постоянный ID карточки **не равен номеру будущего Git-патча**. Номера уже применённых патчей и их подробности сохраняются в `docs/workflows` как история; план не назначает номеров заранее.
 
-## Текущий фокус · 26.11.2026 · M541
+## Текущий фокус · 27.11.2026 · M570 / M571 docs
 
 | Карточка | Статус | Следующая проверка / задача |
 | --- | --- | --- |
+| [KBN-0032 · Monster Navigation & Rescue Routes](specs/KBN-0032.md) | IN_PROGRESS | Физика, входы/выходы графа, MONNAV, замеры нагрузки, Studio A/B |
+| [KBN-0033 · Monster Spawn Authoring & Database](specs/KBN-0033.md) | IN_PROGRESS | Сквозная Studio/Database-приёмка, конфликт ревизии и runtime |
 | [KBN-0025 · Combat Analytics](specs/KBN-0025.md) | CODE_COMPLETE | Guided: 41 бой, реальные male clips, headshot и полный отчёт; без XP/Gold |
 | [KBN-0026 · Effects & Status System](specs/KBN-0026.md) | IN_PROGRESS | Общие эффекты, HUD, наблюдатели, серверные ограничения, правила повторного наложения |
 | [KBN-0027 · Character Skills](specs/KBN-0027.md) | PROPOSED | Навыки без классов и правила оружия/грейда |
@@ -14,7 +16,7 @@
 | [KBN-0030 · Test Suite Cleanup](specs/KBN-0030.md) | PROPOSED | Полный исторический прогон, устранение старых предупреждений/ошибок |
 | [★ KBN-0031 · Design](specs/KBN-0031.md) | IN_PROGRESS | Шесть зон, 30 целей, бестиарий, хоррор второй зоны, 9–12 ч как цель; пройти серый прототип |
 
-[M541 · Hub & World Progression](../workflows/M541_HUB_WORLD_PROGRESSION_RU.md) — код тестовой прокачки, ×3 только Hub, Start in Hub, расстановка. Это не завершение KBN-0029 или Design. Карточки, SHA, ревизии, history и acceptance не меняются этой редакцией справочников.
+[M541 · Hub & World Progression](../workflows/M541_HUB_WORLD_PROGRESSION_RU.md) — код тестовой прокачки, ×3 только Hub, Start in Hub, расстановка. Это не завершение KBN-0029 или Design. M571: обновлены KBN-0026/0029/0031, добавлены KBN-0032/0033; SHA, ревизии и история синхронизированы. Новых PASS нет. [Текущий workflow M570](../workflows/M570_GAMEPLAY_INFRASTRUCTURE_RU.md).
 
 ## Новый фокус · 25.11.2026 · Balance (история)
 

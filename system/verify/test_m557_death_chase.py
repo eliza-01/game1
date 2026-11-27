@@ -28,7 +28,8 @@ class DeathChase(unittest.TestCase):
         for token in ('PointToObjectSpace(point)','math.abs(p.X) <= size.X/2','math.abs(p.Z) <= size.Z/2','CollectionService:GetTagged(TAG)','if frame ~= nil then return end','if not Policy.IsBound(model) then return true end','record.testKind ~= "zone"'):
             self.assertIn(token,p)
         ai=read('src/server/monster/MonsterAIService.luau')
-        self.assertIn('if not DeathChase.IsBound(agent.model) and (outsideHome',ai)
+        self.assertIn('if DeathChase.UsesHomeLeash(agent.model) then',ai)
+        self.assertIn('elseif HomeLeash.NoDamageTimeout(',ai)
         self.assertIn('TargetPolicy.AllowsTarget(agent, agent.target)',ai)
         self.assertIn('DeathChase.AllowsPosition(agent.model, root.Position)',read('src/server/monster/MonsterTargetPolicy.luau'))
         self.assertIn('not TargetPolicy.AllowsTarget(agent, target)',read('src/server/monster/MonsterAttackExecutor.luau'))

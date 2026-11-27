@@ -1,10 +1,10 @@
 -- Ranged recovery movement. The attack executor owns cadence; the AI loop owns
 -- calls to Step/Clear. No pathfinding, sideways fallback, damage or extra timers.
 local Workspace = game:GetService("Workspace")
-local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
+local Navigation = require(script.Parent:WaitForChild("MonsterNavigationDispatch"))
 local TargetPolicy = require(script.Parent:WaitForChild("MonsterTargetPolicy"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
-local HomeLeash = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorHomeLeash"))
+local DeathChase = require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
 local Retreat = {}
 local WINDOW = 0.4
 local MAX_DISTANCE = 4
@@ -40,10 +40,11 @@ local function destination(agent: any, targetRoot: BasePart, speed: number, rema
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = {agent.model}
     params.RespectCanCollide = true
+    params.CollisionGroup = agent.root.CollisionGroup
     local ground = Workspace:Raycast(position, Vector3.new(0, -12, 0), params)
     if not ground then return nil end
     for _, point in ipairs(Retreat.Candidates(position, targetRoot.Position, TargetPolicy.AttackRadius(agent), speed * remaining)) do
-        if HomeLeash.Outside(agent.spawnCenter, point, math.max(0, agent.homeRadius - STOP_DISTANCE)) then continue end
+        if not DeathChase.AllowsPursuitPosition(agent, point, STOP_DISTANCE) then continue end
         local delta = point - position
         if Workspace:Raycast(position, delta, params) then continue end
         local supported = true

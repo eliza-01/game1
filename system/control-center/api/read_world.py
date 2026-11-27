@@ -156,6 +156,13 @@ def route(parsed, sources, info):
         except Exception as error:
             return 400, {"error": str(error)}
 
+    if path == "/api/rescue-routes":
+        try:
+            from rescue_route_store import snapshot
+            return 200, snapshot(sources['options'].root)
+        except (ValueError, OSError) as error:
+            return 400, {"error": str(error)}
+
     if path == "/api/monster-spawns/catalog":
         try:
             return 200, sources["monster_spawns"].studio_catalog()

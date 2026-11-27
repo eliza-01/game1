@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0032",
+  "title": "Monster Navigation & Rescue Routes",
+  "domain": "Infrastructure",
+  "status": "IN_PROGRESS",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "favorite": false,
+  "specPath": "docs/kanban/specs/KBN-0032.md",
+  "specSha256": "05e3293ac153ba70809c0efb8a1326103da157fc6ddc6b8b6122607f3df80b18",
+  "dependsOn": [],
+  "revision": 16,
+  "updatedAt": "2026-11-26T23:51:07+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0032-T01",
+      "title": "Реализовать экспериментальные лучи, локальный обход, подъём и граф с приоритетом выхода",
+      "done": true
+    },
+    {
+      "id": "KBN-0032-T02",
+      "title": "Studio-каталог маршрутов: выделение, безопасное удаление, отмена и синхронизация",
+      "done": true
+    },
+    {
+      "id": "KBN-0032-T03",
+      "title": "Добавить MONNAV и A/B переключение, сохранить NPC и Legacy",
+      "done": true
+    },
+    {
+      "id": "KBN-0032-T04",
+      "title": "Проверить доступность маршрутов из разных точек и высот, уточнить ограниченный набор кандидатов по логам",
+      "done": false
+    },
+    {
+      "id": "KBN-0032-T05",
+      "title": "Проверить физику подъёма, бой, Root/Stun, Return и режимы преследования",
+      "done": false
+    },
+    {
+      "id": "KBN-0032-T06",
+      "title": "Снять сравнительный профиль Legacy/Experimental на 50/100/200 активных монстрах",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0032-A01",
+      "title": "Стена, забор, лестница и кольцевой маршрут: проход с нескольких стартовых точек, без ударов сквозь стену",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0032-A02",
+      "title": "Выбор выхода по высоте пяток, движение цели и корректный выход из маршрута; MONNAV evidence",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0032-A03",
+      "title": "Death Chase >30 с, выход из территории, Home Leash, смерть, Root/Stun, второй клиент",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0032-A04",
+      "title": "Замер CPU/кастов и физики, сравнение с Legacy; решение о production rollout",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

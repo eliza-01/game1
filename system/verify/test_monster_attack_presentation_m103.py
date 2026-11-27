@@ -38,7 +38,7 @@ class MonsterM103Tests(unittest.TestCase):
                       'local function navigateTo('):
             self.assertIn(token, self.navigation)
         self.assertIn('navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))', self.ai)
-        self.assertIn('require(script.Parent:WaitForChild("MonsterChaseNavigation"))', self.ai)
+        self.assertIn('require(script.Parent:WaitForChild("MonsterNavigationDispatch"))', self.ai)
         self.assertNotIn('PathfindingService', self.ai)
         self.assertIn('RunSpeedStuds = runSpeedStuds', self.ai)
         self.assertIn('StopNavigation = stopNavigation', self.ai)

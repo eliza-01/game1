@@ -23,7 +23,7 @@ class MonsterChaseNavigationM104(unittest.TestCase):
         cls.lifecycle = read("MonsterAgentLifecycle.luau")
 
     def test_navigator_is_only_owner_of_general_chase_path(self):
-        self.assertIn('require(script.Parent:WaitForChild("MonsterChaseNavigation"))', self.ai)
+        self.assertIn('require(script.Parent:WaitForChild("MonsterNavigationDispatch"))', self.ai)
         for method in ("StopNavigation", "RunSpeedStuds", "NavigateTo"):
             self.assertIn(f"Navigation.{method}", self.ai)
         self.assertIn("Navigation.ClearPath", self.lifecycle)

@@ -5,6 +5,7 @@ local Workspace = game:GetService("Workspace")
 
 local Isolation = require(script.Parent.Parent:WaitForChild("dev"):WaitForChild("GameplayTestIsolation"))
 local DeathChase = require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
+local Geometry = require(script.Parent:WaitForChild("MonsterRecoveryGeometry"))
 local MonsterTargetPolicy = {}
 local VERTICAL_TOLERANCE = 5
 
@@ -41,6 +42,12 @@ local function targetIsValid(target: Model?): boolean
         and rootOf(target) ~= nil
 end
 
+local function meleeObstacleClear(agent: any, target: Model): boolean
+    if agent.model:GetAttribute("MonsterCombatType") == "ranged" then return true end
+    local targetRoot = rootOf(target)
+    return targetRoot ~= nil and Geometry.MeleeClear(agent, targetRoot.Position)
+end
+
 local function hasLineOfSight(agent: any, target: Model): boolean
     local targetRoot = rootOf(target)
     if not targetRoot then return false end
@@ -52,7 +59,7 @@ local function hasLineOfSight(agent: any, target: Model): boolean
     params.IgnoreWater = false
     params.RespectCanCollide = false
     local result = Workspace:Raycast(origin, destination - origin, params)
-    return result == nil or result.Instance:IsDescendantOf(target)
+    return (result == nil or result.Instance:IsDescendantOf(target)) and meleeObstacleClear(agent, target)
 end
 
 local function aggressive(agent: any): boolean
@@ -93,7 +100,14 @@ local function withinAttackRange(agent: any, target: Model): boolean
     return true
 end
 
+local function isRecovering(agent: any): boolean
+    local state = agent.recoveryNavigation
+    return state ~= nil and (state.plan ~= nil or state.climb ~= nil or state.mode == "Retry")
+end
+
 local function canBeginTargetedCast(agent: any, target: Model): boolean
+    -- A selected recovery route owns movement until its verified exit.
+    if isRecovering(agent) then return false end
     return withinAttackRange(agent, target) and hasLineOfSight(agent, target)
 end
 
@@ -105,6 +119,8 @@ local function attackStillConnects(agent: any, target: Model): boolean
     return hasLineOfSight(agent, target)
 end
 
+MonsterTargetPolicy.IsRecovering = isRecovering
+MonsterTargetPolicy.MeleeObstacleClear = meleeObstacleClear
 MonsterTargetPolicy.CanBeginTargetedCast = canBeginTargetedCast
 MonsterTargetPolicy.AllowsTarget = allowsTarget
 MonsterTargetPolicy.RootOf = rootOf

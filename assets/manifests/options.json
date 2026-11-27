@@ -144,7 +144,17 @@
     }
   },
   "monsterAi": {
-    "noDamageReturnSeconds": 30
+    "noDamageReturnSeconds": 30.0,
+    "experimentalNavigation": {
+      "enabled": true,
+      "sampleSeconds": 1,
+      "stuckPercent": 50,
+      "stuckReturnSeconds": 20,
+      "climbSpeed": 8,
+      "searchDistance": 40,
+      "searchWidth": 60,
+      "recheckSeconds": 1
+    }
   },
   "uiPresentation": {
     "desktop": {

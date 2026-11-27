@@ -54,7 +54,7 @@ def check_actor_runtime_contracts(
     monster_state_m102 = (root / "src/server/monster/MonsterCombatState.luau").read_text(encoding="utf-8")
     monster_attack_m103 = (root / "src/server/monster/MonsterAttackExecutor.luau").read_text(encoding="utf-8")
     monster_presentation_m103 = (root / "src/server/monster/MonsterCombatPresentation.luau").read_text(encoding="utf-8")
-    for required in ['require(script.Parent:WaitForChild("MonsterChaseNavigation"))', "CombatState.Decide", 'AttackExecutor.Begin(agent, target, AttackMovement, random)', "MonsterAttackExecutor"]:
+    for required in ['require(script.Parent:WaitForChild("MonsterNavigationDispatch"))', "CombatState.Decide", 'AttackExecutor.Begin(agent, target, AttackMovement, random)', "MonsterAttackExecutor"]:
         if required not in monster_ai_m23:
             report_error(f"RobloxLineage monster AI coordinator missing {required}")
     for required in ["PathfindingService:CreatePath", "path:ComputeAsync", "path.Blocked:Connect", "issueDirectMove(agent, destination, speed)", "MonsterChaseNavigation.Initialize"]:

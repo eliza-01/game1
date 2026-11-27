@@ -66,7 +66,7 @@ function NpcRigFactory.Create(model: Model, surface: Vector3, yawDegrees: number
     root.CFrame = CFrame.new(surface + Vector3.new(0, 2.8, 0)) * CFrame.Angles(0, math.rad(yawDegrees), 0)
     root.Anchored = false
     root.Transparency = 1
-    ActorCollisionPolicy.Assign(root)
+    ActorCollisionPolicy.Assign(root, "NPC")
     root.CanQuery = false
     root.CanTouch = false
     root.Massless = false

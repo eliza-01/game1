@@ -45,7 +45,7 @@ class Handler(BaseHTTPRequestHandler):
         self.proxy()
 
     def proxy(self):
-        if self.path.split("?", 1)[0] == "/api/monster-spawns/studio-apply":
+        if self.path.split("?", 1)[0] in ("/api/monster-spawns/studio-apply", "/api/rescue-routes/studio-sync"):
             self.send_error(403, "Monster spawn zones are authored in Studio")
             return
         body = self.rfile.read(int(self.headers.get("Content-Length", "0"))) if self.command in ("POST", "PUT", "PATCH") else None

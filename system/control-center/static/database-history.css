@@ -55,3 +55,23 @@
 #balance-content th.monster-col-before{box-shadow:inset 3px 0 #55b9a7}
 #balance-content th.monster-col-after{box-shadow:inset -3px 0 #55b9a7}
 #balance-content th.monster-col-dragging{opacity:.5}
+
+/* Main / Spawn Zones: align with the other Database panels. */
+#database-view #balance-panel{padding:22px 24px;min-width:0}
+#balance-panel .section-title{margin-bottom:18px}
+#balance-tabs{gap:7px;margin-bottom:14px}
+#balance-tabs button{padding:7px 11px;border-radius:8px;font-size:12px}
+#balance-search{display:block;margin:0 0 14px}
+#balance-content .spawn-note{margin:0 0 14px;color:var(--muted);font-size:12px;line-height:1.5}
+#balance-content .spawn-zone-table{min-width:1080px;font-size:12px;border-top:1px solid var(--line)}
+#balance-content .spawn-zone-table th,#balance-content .spawn-zone-table td{padding:9px 7px;vertical-align:middle;white-space:nowrap}
+#balance-content .spawn-zone-table th{letter-spacing:.035em}
+#balance-content .spawn-zone-table tr{cursor:default}
+#balance-content .spawn-zone-table input,#balance-content .spawn-zone-table select{margin:0;padding:5px 7px;border-radius:6px;font-size:12px;min-height:30px}
+#balance-content .spawn-zone-table input[type=number]{width:70px;min-width:0}
+#balance-content .spawn-zone-table input[type=checkbox]{width:16px;height:16px;min-height:0;accent-color:var(--mint);vertical-align:middle}
+#balance-content .spawn-zone-table select{max-width:200px}
+#balance-content .spawn-zone-table input[hidden],#balance-content .spawn-zone-table span[hidden]{display:none}
+#balance-content .spawn-zone-table tr.spawn-dirty{box-shadow:inset 3px 0 var(--mint);background:#42d6b10d}
+#balance-status{margin-top:14px}
+@media(max-width:700px){#database-view #balance-panel{padding:15px 12px}}

@@ -292,6 +292,16 @@ return table.freeze({
 	}),
 	monsterAi = table.freeze({
 		noDamageReturnSeconds = 30,
+		experimentalNavigation = table.freeze({
+			enabled = true,
+			sampleSeconds = 1,
+			stuckPercent = 50,
+			stuckReturnSeconds = 20,
+			climbSpeed = 8,
+			searchDistance = 40,
+			searchWidth = 60,
+			recheckSeconds = 1,
+		}),
 	}),
 	playerJump = table.freeze({
 		heightMultiplier = 2,

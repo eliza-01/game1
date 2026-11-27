@@ -158,7 +158,7 @@ def check_monster_contracts(
     balance_ui = (root / "system/control-center/static/game-balance.js").read_text(encoding="utf-8")
     if (root / "system/control-center/static/monster-spawns.js").exists() or 'id="monster-spawn-register"' in ui:
         report_error("legacy browser monster spawn authoring must be removed")
-    for required in ['spawnZones', '/api/monster-spawns/catalog', 'Read-only registry']:
+    for required in ['spawnZones', '/api/monster-spawns/catalog', '/api/monster-spawns/database-update']:
         if required not in balance_ui:
             report_error(f"Database spawn registry missing {required}")
     for required in ['"/api/monster-spawns/catalog"', '"/api/monster-spawns/studio-apply"', 'MonsterSpawnStore']:

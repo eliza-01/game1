@@ -161,6 +161,11 @@ local spawnAuthoringOk, spawnAuthoringError = pcall(function()
 end)
 if not spawnAuthoringOk then warn("[game1 plugin] Monster Spawns: " .. tostring(spawnAuthoringError)) end
 
+local rescueOk,rescueError=pcall(function()
+    require(script.Parent.modules.StudioRescueRoutes).new(plugin,toolbar)
+end)
+if not rescueOk then warn("[game1 plugin] Rescue Routes: "..tostring(rescueError)) end
+
 local handleTimelineEditor = StudioTimelineEditorCommands({
     plugin = plugin,
     AssetService = AssetService,

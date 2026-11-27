@@ -49,7 +49,7 @@ class LevelUpM548(unittest.TestCase):
     def test_option_order_stable_and_local(self):
         html=read('system/control-center/static/index.html')
         sections=re.findall(r'class="game1-option-section" data-option-section="([^"]+)"',html)
-        self.assertEqual(len(sections),12);self.assertEqual(len(set(sections)),12)
+        self.assertEqual(len(sections),13);self.assertEqual(len(set(sections)),13)
         js=read('system/control-center/static/options.js').split('// M548',1)[1]
         for token in ('localStorage.getItem(key)','localStorage.setItem(key','parent.insertBefore','event.preventDefault()','event.stopPropagation()','...byKey.keys()'):
             self.assertIn(token,js)

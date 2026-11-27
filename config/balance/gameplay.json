@@ -745,7 +745,7 @@
       "aggroRadiusStuds": 52,
       "nameRu": "Жаба",
       "nameEn": "Toad",
-      "deathChase": false
+      "deathChase": true
     },
     {
       "id": "monster_002",
@@ -763,7 +763,7 @@
       "aggroRadiusStuds": 52,
       "nameRu": "Жаба",
       "nameEn": "Toad",
-      "deathChase": false
+      "deathChase": true
     },
     {
       "id": "monster_003",

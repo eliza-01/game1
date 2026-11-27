@@ -66,7 +66,7 @@ local function createNavigationRoot(character: Model, root: BasePart): BasePart
     navigationRoot.Transparency = 1
     navigationRoot.CastShadow = false
     navigationRoot.Anchored = false
-    ActorCollisionPolicy.Assign(navigationRoot)
+    ActorCollisionPolicy.Assign(navigationRoot, "Character")
     navigationRoot.CanTouch = false
     navigationRoot.CanQuery = false
     navigationRoot.Massless = false

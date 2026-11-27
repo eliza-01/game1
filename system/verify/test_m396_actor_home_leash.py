@@ -101,7 +101,11 @@ class M396Tests(unittest.TestCase):
         for ai in (monster,npc):
             self.assertIn('HomeLeash.NoDamageTimeout(',ai)
             self.assertIn('GameOptions.HostileNoDamageReturnSeconds()',ai)
-            self.assertIn('HomeLeash.Outside(',ai)
+            if ai == monster:
+                self.assertIn('DeathChase.AllowsPursuitPosition(',ai)
+                self.assertIn('HomeLeash.Outside(',src('src/server/monster/MonsterDeathChasePolicy.luau'))
+            else:
+                self.assertIn('HomeLeash.Outside(',ai)
             self.assertIn('lastDamageAt = os.clock()',ai)
             self.assertNotIn('pursuitRadius',ai)
         self.assertIn('if attempted <= 0 or killed', monster)

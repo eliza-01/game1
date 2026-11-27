@@ -41,7 +41,7 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
             'animationRoot.Name = "RootBone"',
             'animationRoot.CFrame = CFrame.identity',
             'bone.CFrame = animationRoot.CFrame:Inverse() * authoredMeshLocal',
-            'ActorCollisionPolicy.Assign(navigationRoot)',
+            'ActorCollisionPolicy.Assign(navigationRoot, "Monster")',
             'root.Name = "RootCollider"',
             'visualWeld.Part1 = visualRoot',
             'humanoid.HipHeight = NAVIGATION_HIP_HEIGHT',

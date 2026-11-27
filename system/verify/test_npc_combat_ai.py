@@ -71,7 +71,7 @@ class NpcCombatTests(unittest.TestCase):
         animation = source("src/server/npc/NpcAnimationService.luau")
         self.assertIn('root.Name = "HumanoidRootPart"', rig)
         self.assertIn('root.Anchored = false', rig)
-        self.assertIn('ActorCollisionPolicy.Assign(root)', rig)
+        self.assertIn('ActorCollisionPolicy.Assign(root, "NPC")', rig)
         self.assertIn('humanoid.HipHeight = 1.8', rig)
         self.assertNotIn('Instance.new("Bone")', rig)
         self.assertIn('NpcCombatAIService.Bind(entity, root, presentation, function()', spawner)

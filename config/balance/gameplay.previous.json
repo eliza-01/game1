@@ -17,13 +17,13 @@
       "level": 1,
       "hp": 100,
       "xpNext": 60,
-      "attackBonus": 0.0
+      "attackBonus": 0
     },
     {
       "level": 2,
       "hp": 120,
       "xpNext": 125,
-      "attackBonus": 1.0
+      "attackBonus": 1
     },
     {
       "level": 3,
@@ -744,7 +744,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 52,
       "nameRu": "Жаба",
-      "nameEn": "Toad"
+      "nameEn": "Toad",
+      "deathChase": false
     },
     {
       "id": "monster_002",
@@ -761,7 +762,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 52,
       "nameRu": "Жаба",
-      "nameEn": "Toad"
+      "nameEn": "Toad",
+      "deathChase": false
     },
     {
       "id": "monster_003",
@@ -778,7 +780,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 20,
       "nameRu": "Деревянный страж",
-      "nameEn": "Wooden Guardian"
+      "nameEn": "Wooden Guardian",
+      "deathChase": false
     },
     {
       "id": "monster_004",
@@ -795,7 +798,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 20,
       "nameRu": "Живое пугало",
-      "nameEn": "Living Scarecrow"
+      "nameEn": "Living Scarecrow",
+      "deathChase": false
     },
     {
       "id": "monster_005",
@@ -812,7 +816,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Волк",
-      "nameEn": "Wolf"
+      "nameEn": "Wolf",
+      "deathChase": false
     },
     {
       "id": "monster_006",
@@ -829,7 +834,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Зомби",
-      "nameEn": "Zombie"
+      "nameEn": "Zombie",
+      "deathChase": false
     },
     {
       "id": "monster_007",
@@ -846,7 +852,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Гигантский паук",
-      "nameEn": "Giant Spider"
+      "nameEn": "Giant Spider",
+      "deathChase": false
     },
     {
       "id": "monster_008",
@@ -863,7 +870,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Зомби",
-      "nameEn": "Zombie"
+      "nameEn": "Zombie",
+      "deathChase": false
     },
     {
       "id": "monster_009",
@@ -880,7 +888,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Медведь гризли",
-      "nameEn": "Grizzly"
+      "nameEn": "Grizzly",
+      "deathChase": false
     },
     {
       "id": "monster_010",
@@ -897,7 +906,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Скарабей",
-      "nameEn": "Scarab"
+      "nameEn": "Scarab",
+      "deathChase": false
     },
     {
       "id": "monster_011",
@@ -914,7 +924,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Гремлин",
-      "nameEn": "Gremlin"
+      "nameEn": "Gremlin",
+      "deathChase": false
     },
     {
       "id": "monster_012",
@@ -931,7 +942,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Каменный голем",
-      "nameEn": "Stone Golem"
+      "nameEn": "Stone Golem",
+      "deathChase": false
     },
     {
       "id": "monster_013",
@@ -948,7 +960,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Каменный голем",
-      "nameEn": "Stone Golem"
+      "nameEn": "Stone Golem",
+      "deathChase": false
     },
     {
       "id": "monster_014",
@@ -965,7 +978,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Большой голем",
-      "nameEn": "Greater Golem"
+      "nameEn": "Greater Golem",
+      "deathChase": false
     },
     {
       "id": "monster_015",
@@ -982,7 +996,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Тигр",
-      "nameEn": "Tiger"
+      "nameEn": "Tiger",
+      "deathChase": false
     },
     {
       "id": "monster_016",
@@ -999,7 +1014,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Тигр",
-      "nameEn": "Tiger"
+      "nameEn": "Tiger",
+      "deathChase": false
     },
     {
       "id": "monster_017",
@@ -1016,7 +1032,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Тигр",
-      "nameEn": "Tiger"
+      "nameEn": "Tiger",
+      "deathChase": false
     },
     {
       "id": "monster_018",
@@ -1033,7 +1050,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Тигр",
-      "nameEn": "Tiger"
+      "nameEn": "Tiger",
+      "deathChase": false
     },
     {
       "id": "monster_019",
@@ -1050,7 +1068,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Древень",
-      "nameEn": "Ancient Treant"
+      "nameEn": "Ancient Treant",
+      "deathChase": false
     },
     {
       "id": "monster_020",
@@ -1067,7 +1086,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Орк-воин",
-      "nameEn": "Orc Warrior"
+      "nameEn": "Orc Warrior",
+      "deathChase": false
     },
     {
       "id": "monster_021",
@@ -1084,7 +1104,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Орк-воин",
-      "nameEn": "Orc Warrior"
+      "nameEn": "Orc Warrior",
+      "deathChase": false
     },
     {
       "id": "monster_022",
@@ -1101,7 +1122,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Орк-воин",
-      "nameEn": "Orc Warrior"
+      "nameEn": "Orc Warrior",
+      "deathChase": false
     },
     {
       "id": "monster_023",
@@ -1118,7 +1140,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Орк-воин",
-      "nameEn": "Orc Warrior"
+      "nameEn": "Orc Warrior",
+      "deathChase": false
     },
     {
       "id": "monster_024",
@@ -1135,7 +1158,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Орк-воин",
-      "nameEn": "Orc Warrior"
+      "nameEn": "Orc Warrior",
+      "deathChase": false
     },
     {
       "id": "monster_025",
@@ -1152,7 +1176,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Малый дракон",
-      "nameEn": "Drake"
+      "nameEn": "Drake",
+      "deathChase": false
     },
     {
       "id": "monster_026",
@@ -1169,7 +1194,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Малый дракон",
-      "nameEn": "Drake"
+      "nameEn": "Drake",
+      "deathChase": false
     },
     {
       "id": "monster_027",
@@ -1186,7 +1212,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Малый дракон",
-      "nameEn": "Drake"
+      "nameEn": "Drake",
+      "deathChase": false
     },
     {
       "id": "monster_028",
@@ -1203,7 +1230,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Малый дракон",
-      "nameEn": "Drake"
+      "nameEn": "Drake",
+      "deathChase": false
     },
     {
       "id": "monster_029",
@@ -1220,7 +1248,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 24,
       "nameRu": "Малый дракон",
-      "nameEn": "Drake"
+      "nameEn": "Drake",
+      "deathChase": false
     },
     {
       "id": "monster_030",
@@ -1237,7 +1266,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Древний дракон",
-      "nameEn": "Wyrm"
+      "nameEn": "Wyrm",
+      "deathChase": false
     },
     {
       "id": "monster_031",
@@ -1254,7 +1284,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_032",
@@ -1271,7 +1302,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_033",
@@ -1288,7 +1320,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_034",
@@ -1305,7 +1338,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_035",
@@ -1322,7 +1356,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_036",
@@ -1339,7 +1374,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Мандрагора",
-      "nameEn": "Mandragora"
+      "nameEn": "Mandragora",
+      "deathChase": false
     },
     {
       "id": "monster_037",
@@ -1356,7 +1392,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Мандрагора",
-      "nameEn": "Mandragora"
+      "nameEn": "Mandragora",
+      "deathChase": false
     },
     {
       "id": "monster_038",
@@ -1373,7 +1410,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Мандрагора",
-      "nameEn": "Mandragora"
+      "nameEn": "Mandragora",
+      "deathChase": false
     },
     {
       "id": "monster_039",
@@ -1390,7 +1428,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Мандрагора",
-      "nameEn": "Mandragora"
+      "nameEn": "Mandragora",
+      "deathChase": false
     },
     {
       "id": "monster_040",
@@ -1407,7 +1446,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Скелет-лучник",
-      "nameEn": "Skeleton Archer"
+      "nameEn": "Skeleton Archer",
+      "deathChase": false
     },
     {
       "id": "monster_041",
@@ -1424,7 +1464,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Скелет-лучник",
-      "nameEn": "Skeleton Archer"
+      "nameEn": "Skeleton Archer",
+      "deathChase": false
     },
     {
       "id": "monster_042",
@@ -1441,7 +1482,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Скелет-лучник",
-      "nameEn": "Skeleton Archer"
+      "nameEn": "Skeleton Archer",
+      "deathChase": false
     },
     {
       "id": "monster_043",
@@ -1458,7 +1500,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Скелет-лучник",
-      "nameEn": "Skeleton Archer"
+      "nameEn": "Skeleton Archer",
+      "deathChase": false
     },
     {
       "id": "monster_044",
@@ -1475,7 +1518,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Ледяная парящая нежить",
-      "nameEn": "Ice Vale Master"
+      "nameEn": "Ice Vale Master",
+      "deathChase": false
     },
     {
       "id": "monster_045",
@@ -1492,7 +1536,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_046",
@@ -1509,7 +1554,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_047",
@@ -1526,7 +1572,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_048",
@@ -1543,7 +1590,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_049",
@@ -1560,7 +1608,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_050",
@@ -1577,7 +1626,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Споровик",
-      "nameEn": "Spore Spitter"
+      "nameEn": "Spore Spitter",
+      "deathChase": false
     },
     {
       "id": "monster_051",
@@ -1594,7 +1644,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Споровик",
-      "nameEn": "Spore Spitter"
+      "nameEn": "Spore Spitter",
+      "deathChase": false
     },
     {
       "id": "monster_052",
@@ -1611,7 +1662,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Споровик",
-      "nameEn": "Spore Spitter"
+      "nameEn": "Spore Spitter",
+      "deathChase": false
     },
     {
       "id": "monster_053",
@@ -1628,7 +1680,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Споровик",
-      "nameEn": "Spore Spitter"
+      "nameEn": "Spore Spitter",
+      "deathChase": false
     },
     {
       "id": "monster_054",
@@ -1645,7 +1698,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Споровик",
-      "nameEn": "Spore Spitter"
+      "nameEn": "Spore Spitter",
+      "deathChase": false
     },
     {
       "id": "monster_055",
@@ -1662,7 +1716,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Орк-лучник",
-      "nameEn": "Orc Archer"
+      "nameEn": "Orc Archer",
+      "deathChase": false
     },
     {
       "id": "monster_056",
@@ -1679,7 +1734,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Орк-лучник",
-      "nameEn": "Orc Archer"
+      "nameEn": "Orc Archer",
+      "deathChase": false
     },
     {
       "id": "monster_057",
@@ -1696,7 +1752,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Орк-лучник",
-      "nameEn": "Orc Archer"
+      "nameEn": "Orc Archer",
+      "deathChase": false
     },
     {
       "id": "monster_058",
@@ -1713,7 +1770,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Орк-шаман",
-      "nameEn": "Orc Shaman"
+      "nameEn": "Orc Shaman",
+      "deathChase": false
     },
     {
       "id": "monster_059",
@@ -1730,7 +1788,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Суккуб",
-      "nameEn": "Succubus"
+      "nameEn": "Succubus",
+      "deathChase": false
     },
     {
       "id": "monster_060",
@@ -1747,7 +1806,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Парящая голова",
-      "nameEn": "Magical Weaver"
+      "nameEn": "Magical Weaver",
+      "deathChase": false
     },
     {
       "id": "monster_061",
@@ -1764,7 +1824,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Парящая голова",
-      "nameEn": "Magical Weaver"
+      "nameEn": "Magical Weaver",
+      "deathChase": false
     },
     {
       "id": "monster_062",
@@ -1781,7 +1842,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Огненная парящая нежить",
-      "nameEn": "Fire Vale Master"
+      "nameEn": "Fire Vale Master",
+      "deathChase": false
     },
     {
       "id": "monster_063",
@@ -1798,7 +1860,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Парящая голова",
-      "nameEn": "Magical Weaver"
+      "nameEn": "Magical Weaver",
+      "deathChase": false
     },
     {
       "id": "monster_064",
@@ -1815,7 +1878,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "Огненная парящая нежить",
-      "nameEn": "Fire Vale Master"
+      "nameEn": "Fire Vale Master",
+      "deathChase": false
     },
     {
       "id": "monster_065",
@@ -1832,7 +1896,8 @@
       "aggressive": false,
       "aggroRadiusStuds": 24,
       "nameRu": "Парящая голова",
-      "nameEn": "Magical Weaver"
+      "nameEn": "Magical Weaver",
+      "deathChase": false
     },
     {
       "id": "monster_066",
@@ -1849,7 +1914,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_067",
@@ -1866,7 +1932,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_068",
@@ -1883,7 +1950,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_069",
@@ -1900,7 +1968,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     },
     {
       "id": "monster_070",
@@ -1917,7 +1986,8 @@
       "aggressive": true,
       "aggroRadiusStuds": 30,
       "nameRu": "",
-      "nameEn": ""
+      "nameEn": "",
+      "deathChase": false
     }
   ],
   "weaponBindings": {
@@ -2003,26 +2073,6 @@
       "tick": 0
     },
     {
-      "id": "skill_might",
-      "name": "Might",
-      "owner": "shared",
-      "effect": "might",
-      "duration": 6,
-      "cooldown": 24,
-      "power": 25,
-      "tick": 0
-    },
-    {
-      "id": "skill_haste",
-      "name": "Haste",
-      "owner": "shared",
-      "effect": "haste",
-      "duration": 6,
-      "cooldown": 24,
-      "power": 25,
-      "tick": 0
-    },
-    {
       "id": "skill_might_d",
       "name": "Might",
       "owner": "shared",
@@ -2049,7 +2099,7 @@
       "effect": "life",
       "duration": 600,
       "cooldown": 601,
-      "power": 2,
+      "power": 1,
       "tick": 0
     },
     {
@@ -2138,32 +2188,6 @@
           "skillId": "skill_silence",
           "downgrade": true,
           "trigger": "cast",
-          "hpBelow": 50
-        }
-      ]
-    },
-    {
-      "id": "skilled_might",
-      "level": 20,
-      "type": "melee",
-      "skills": [
-        {
-          "skillId": "skill_might",
-          "downgrade": true,
-          "trigger": "hpBelow",
-          "hpBelow": 50
-        }
-      ]
-    },
-    {
-      "id": "skilled_haste",
-      "level": 20,
-      "type": "melee",
-      "skills": [
-        {
-          "skillId": "skill_haste",
-          "downgrade": true,
-          "trigger": "hpBelow",
           "hpBelow": 50
         }
       ]

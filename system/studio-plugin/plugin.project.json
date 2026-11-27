@@ -217,6 +217,9 @@
       "StudioSkinnedMeshConnection": {
         "$path": "../../src/shared/rig/SkinnedMeshConnection.luau"
       },
+      "StudioRescueRoutes": {
+        "$path": "modules/StudioRescueRoutes.luau"
+      },
       "StudioMonsterSpawnAuthoring": {
         "$path": "modules/StudioMonsterSpawnAuthoring.luau"
       }

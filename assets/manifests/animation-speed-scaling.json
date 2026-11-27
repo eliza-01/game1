@@ -157,6 +157,11 @@
       "unitsPerPercent": 0.55
     },
     {
+      "assetId": "80922686042611",
+      "stat": "RunSpeed",
+      "unitsPerPercent": 0.8
+    },
+    {
       "assetId": "81941108455302",
       "stat": "RunSpeed",
       "unitsPerPercent": 0.8

@@ -3,18 +3,27 @@
 -- On death, the same policy makes the entire retained visual rig a phantom.
 local PhysicsService = game:GetService("PhysicsService")
 local ActorCollisionPolicy = {}
-local GROUP = "Game1ActorBodies"
+local CHARACTER_GROUP = "Game1ActorBodies"
+local NON_PLAYER_GROUP = "Game1NonPlayerBodies"
 local initialized = false
-function ActorCollisionPolicy.Assign(root: BasePart)
+function ActorCollisionPolicy.Assign(root: BasePart, kind: "Character" | "Monster" | "NPC")
     if not initialized then
-        initialized = true
-        if not PhysicsService:IsCollisionGroupRegistered(GROUP) then
-            PhysicsService:RegisterCollisionGroup(GROUP)
+        for _, group in ipairs({CHARACTER_GROUP, NON_PLAYER_GROUP}) do
+            if not PhysicsService:IsCollisionGroupRegistered(group) then
+                PhysicsService:RegisterCollisionGroup(group)
+            end
+            PhysicsService:CollisionGroupSetCollidable(group, "Default", true)
         end
-        PhysicsService:CollisionGroupSetCollidable(GROUP, GROUP, true)
-        PhysicsService:CollisionGroupSetCollidable(GROUP, "Default", true)
+        PhysicsService:CollisionGroupSetCollidable(CHARACTER_GROUP, CHARACTER_GROUP, true)
+        PhysicsService:CollisionGroupSetCollidable(CHARACTER_GROUP, NON_PLAYER_GROUP, true)
+        PhysicsService:CollisionGroupSetCollidable(NON_PLAYER_GROUP, NON_PLAYER_GROUP, false)
+        initialized = true
     end
-    root.CollisionGroup = GROUP
+    -- AI-controlled actors are mutually non-solid; players retain normal contact.
+    root.CollisionGroup = CHARACTER_GROUP
+    if kind == "Monster" or kind == "NPC" then
+        root.CollisionGroup = NON_PLAYER_GROUP
+    end
     root.CanCollide = true
 end
 

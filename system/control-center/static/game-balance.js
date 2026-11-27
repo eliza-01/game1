@@ -3,7 +3,7 @@
   let snapshot=null, tab='monsters', busy=false, dirty=false;
   const gradeNames=['Newbie','D','C','B','A','S','SS','SSS'];
   window.game1EquipmentGrade=level=>{const band=Math.max(0,Math.min(7,Math.floor(level/10)));return {name:gradeNames[band]+(level%10>=5?'+':''),required:Math.max(1,band*10)}};
-  const groups={monsters:'Monsters',skills:'Skills',weapons:'Weapons',levels:'Levels',rules:'Character',armor:'Armor',bindings:'Model bindings',spawnZones:'Spawn Zones'};
+  const groups={monsters:'Monsters',skills:'Skills',weapons:'Weapons',levels:'Levels',rules:'Character',armor:'Armor',bindings:'Model bindings',spawnZones:'Spawn Zones',rescueRoutes:'Rescue Routes'};
   const fields={levels:['level','hp','attackBonus','xpNext'],weapons:['id','type','level','damage','price','attackSpeedDelta','critChance','radius','arc','rarity','upgradePrice'],armor:['id','level','hp','price'],monsters:['id','nameEn','nameRu','type','level','hp','damage','critChance','xp','gold','attackRange','attackSpeed','runSpeed','aggroRadiusStuds','aggressive','deathChase']};
   const names={nameEn:'EN',nameRu:'RU',aggroRadiusStuds:'Aggro · studs',aggressive:'Aggressive',deathChase:'Death Chase',runSpeed:'RunSpeed · /10 studs/s',attackSpeed:'ASPD',attackRange:'Range · studs',level:'LVL',hp:'HP',attackBonus:'Level ATK bonus',xpNext:'XP → next',damage:'ATK bonus',price:'Price',attackSpeedDelta:'ASPD Δ',critChance:'Crit %',radius:'Radius',arc:'Arc °',rarity:'Rarity',upgradePrice:'Upgrade cost',xp:'XP',gold:'Gold',id:'ID',type:'Type'};
   const labels={weapon:'Оружие',armor:'Броня',monster:'Монстр'};
@@ -28,33 +28,84 @@
   function applySearch(){const q=$('balance-search').value.trim().toLocaleLowerCase();for(const tr of $('balance-content').querySelectorAll('tbody tr')){const values=[tr.textContent,...Array.from(tr.querySelectorAll('input,select'),el=>el.value),tr.dataset.identity||''];tr.hidden=!!q&&!values.join(' ').toLocaleLowerCase().includes(q)}}
   $('balance-search').oninput=applySearch;
   function speciesEdit(row,key,value,body){const group=row.nameEn? snapshot.balance.monsters.filter(r=>r.nameEn===row.nameEn):[row];for(const r of group){r[key]=value;const input=body.querySelector(`[data-row="${r.id}"][data-field="${key}"]`);if(input){if(key==='aggressive'||key==='deathChase')input.checked=value;else if(document.activeElement!==input)input.value=value??''}}change()}
-  let spawnLoadToken=0;
+  let spawnLoadToken=0, spawnData=null;
+  const spawnChanges=new Map();
+  const hasChanges=()=>dirty||spawnChanges.size>0;
+  function spawnChange(r,key,value,tr){
+    const entry=spawnChanges.get(r.spawnId)||{spawnId:r.spawnId,expectedUpdatedAtUtc:r.updatedAtUtc??null,changes:{}};
+    if(value===r[key])delete entry.changes[key];else entry.changes[key]=value;
+    if(Object.keys(entry.changes).length)spawnChanges.set(r.spawnId,entry);else spawnChanges.delete(r.spawnId);
+    tr.classList.toggle('spawn-dirty',spawnChanges.has(r.spawnId));
+    $('balance-save').disabled=busy||!hasChanges();status(hasChanges()?'Unsaved changes':'Ready');
+  }
+  function drawSpawnZones(){
+    if(!spawnData)return;
+    const content=$('balance-content');content.replaceChildren();
+    const note=node('p','Edit parameters here. Create, move or delete zones in Studio → Monster Spawns. Rojo Sync before Play.');note.className='spawn-note';content.append(note);
+    const body=table(['Monster · LVL','Place / map','Position · studs','Radius','Count','Aggressive','Aggro · studs','Pursuit mode','Home leash','Respawn · s','Enabled','Status']);
+    body.parentElement.className='spawn-zone-table';
+    const choices=spawnData.species.flatMap(g=>g.levels.map(l=>[l.id,`${g.nameEn||g.key} · Lv.${l.level} · ${l.type}`]));
+    for(const r of spawnData.records){
+      const tr=node('tr');tr.dataset.identity=r.spawnId;tr.title=r.spawnId;
+      const patch=spawnChanges.get(r.spawnId)?.changes||{}, draft={...r,...patch};
+      tr.classList.toggle('spawn-dirty',spawnChanges.has(r.spawnId));
+      const set=(key,value)=>{draft[key]=value;spawnChange(r,key,value,tr)};
+      const opts=r.balanceId?choices:[['',`${r.monsterName||r.monster?.name} · Lv.${r.level??'?'} · legacy`],...choices];
+      cell(tr,select(opts,draft.balanceId||'',v=>set('balanceId',v||r.balanceId)));
+      cell(tr,`${r.placeId} / ${r.mapKey}`);
+      const p=r.position||{};const pos=node('span',[p.x,p.y,p.z].map(v=>Number.isFinite(v)?Number(v.toFixed(2)):'—').join(', '));pos.title=`${p.x}, ${p.y}, ${p.z}`;cell(tr,pos);
+      const numeric=(key,min,max,step,label)=>{const el=node('input');el.type='number';el.min=min;el.max=max;el.step=step;el.value=draft[key]??'';el.setAttribute('aria-label',label);el.oninput=()=>set(key,el.value===''?null:Number(el.value));return el};
+      const check=(key,label)=>{const el=node('input');el.type='checkbox';el.checked=!!draft[key];el.setAttribute('aria-label',label);el.onchange=()=>set(key,el.checked);return el};
+      cell(tr,numeric('spawnRadius',0,10000,'any','Spawn radius'));cell(tr,numeric('maxAlive',1,1000,1,'Monster count'));
+      cell(tr,check('aggressive','Aggressive'));cell(tr,numeric('aggroRadiusStuds',0,10000,'any','Aggro radius'));
+      const leash=numeric('homeRadiusStuds',1,10000,'any','Home leash');const dash=node('span','—');
+      const mode=select([['home','Home Leash'],['death','Death Chase']],draft.deathChase?'death':'home',v=>{set('deathChase',v==='death');leash.hidden=draft.deathChase;dash.hidden=!draft.deathChase;leash.disabled=draft.deathChase});
+      leash.hidden=draft.deathChase;leash.disabled=draft.deathChase;dash.hidden=!draft.deathChase;cell(tr,mode);const holder=node('span');holder.append(leash,dash);cell(tr,holder);
+      cell(tr,numeric('respawnSeconds',0,86400,'any','Respawn seconds'));cell(tr,check('enabled','Enabled'));
+      const changedModel=draft.balanceId!==r.balanceId;const ready=node('span',!draft.enabled?'Disabled':changedModel?'Save to check':r.readiness?.ready?'Ready':'Model pending');ready.className='tag';cell(tr,ready);body.append(tr);
+    }
+    if(!spawnData.records.length)content.append(node('p','No saved zones.'));
+    applySearch();
+  }
   async function renderSpawnZones(){
+    if(spawnChanges.size&&spawnData){drawSpawnZones();return}
     const token=++spawnLoadToken;
     try{
       const data=await request('/api/monster-spawns/catalog');
-      if(token!==spawnLoadToken||tab!=='spawnZones')return;
+      if(token!==spawnLoadToken||tab!=='spawnZones'||busy||spawnChanges.size)return;
+      if($('balance-content').contains(document.activeElement))return;
+      const same=JSON.stringify(data)===JSON.stringify(spawnData);spawnData=data;
+      if((!same||!$('balance-content').querySelector('.spawn-zone-table'))&&!$('balance-content').contains(document.activeElement))drawSpawnZones();
+    }catch(e){if(token===spawnLoadToken&&tab==='spawnZones')status(e.message)}
+  }
+  let rescueLoadToken=0;
+  async function renderRescueRoutes(){
+    const token=++rescueLoadToken;
+    try{
+      const data=await request('/api/rescue-routes');
+      if(token!==rescueLoadToken||tab!=='rescueRoutes')return;
       $('balance-content').replaceChildren();
-      $('balance-content').append(node('p','Create, edit and delete zones in Studio → game1 → Monster Spawns. Read-only registry.'));
-      const body=table(['Monster','Level','Place / map','Position','Radius','Count','Aggro','Chase','Respawn s','Status']);
-      for(const r of data.records){const tr=node('tr');tr.dataset.identity=r.spawnId;
-        const p=r.position||{};
-        for(const v of [r.monsterName||r.monster?.name,r.level??'—',`${r.placeId} / ${r.mapKey}`,`${p.x}, ${p.y}, ${p.z}`,r.spawnRadius,r.maxAlive,`${r.aggressive?'Yes':'No'} · ${r.aggroRadiusStuds}`,r.deathChase?'Death Chase':`Home Leash · ${r.homeRadiusStuds}`,r.respawnSeconds,!r.enabled?'Disabled':r.readiness?.ready?'Ready':'Model pending'])cell(tr,String(v??'—'));
+      $('balance-content').append(node('p','Studio → game1 → Rescue Routes. Read-only mirror of last synchronized Place.'));
+      const body=table(['Place','Map ID','Catalog','Name','Route ID','Points','Length · studs']);
+      for(const [id,map] of Object.entries(data.maps||{}))for(const route of map.routes){
+        const tr=node('tr');tr.dataset.identity=route.id;
+        for(const value of [map.placeId,map.mapId||id,route.catalog||'Unsorted',route.name||route.id,route.id,route.points.length,route.lengthStuds])cell(tr,String(value));
         body.append(tr);
       }
-      if(!data.records.length)$('balance-content').append(node('p','No saved zones.'));
+      if(!body.rows.length)$('balance-content').append(node('p','No synchronized routes.'));
       applySearch();
-    }catch(e){if(token===spawnLoadToken&&tab==='spawnZones')$('balance-content').replaceChildren(node('p',e.message))}
+    }catch(e){if(token===rescueLoadToken&&tab==='rescueRoutes')$('balance-content').replaceChildren(node('p',e.message))}
   }
-  // Only the read-only spawn panel polls; unsaved balance edits are untouched.
-  setInterval(()=>{if(tab==='spawnZones'&&!$('database-view').hidden&&!$('balance-panel').hidden)renderSpawnZones()},3000);
+  // Poll only clean, unfocused zones; never replace an active editor.
+  setInterval(()=>{if($('database-view').hidden||$('balance-panel').hidden)return;if(tab==='spawnZones'&&!busy&&!spawnChanges.size&&!$('balance-content').contains(document.activeElement))renderSpawnZones();if(tab==='rescueRoutes')renderRescueRoutes()},3000);
   function render(){
-    $('balance-tabs').replaceChildren();$('balance-content').replaceChildren();$('balance-save').disabled=busy||!snapshot||!dirty;
+    $('balance-tabs').replaceChildren();$('balance-content').replaceChildren();$('balance-save').disabled=busy||!snapshot||!hasChanges();
     for(const [key,title] of Object.entries(groups)){const b=node('button',title);b.type='button';b.className=key===tab?'primary':'';b.onclick=()=>{tab=key;$('balance-search').value='';render()};$('balance-tabs').append(b)}
     $('balance-movement-disclosure').hidden=tab!=='weapons';
     if(!snapshot)return;
     queueMicrotask(applySearch);
-    if(tab==='spawnZones'){renderSpawnZones();return;}
+    if(tab==='spawnZones'){if(spawnData)drawSpawnZones();renderSpawnZones();return;}
+    if(tab==='rescueRoutes'){renderRescueRoutes();return;}
     if(tab==='skills'){window.game1RenderSkills($('balance-content'),snapshot,change,applySearch);return;}
     const d=snapshot.balance;
     if(tab==='rules'){
@@ -84,8 +135,23 @@
       body.append(tr);
     }
   }
-  async function load(force=false){if(busy)return;if(dirty&&!force){render();return}if(dirty&&!confirm('Discard unsaved balance changes?'))return;busy=true;status('Loading…');try{snapshot=await request('/api/balance');dirty=false;status('Ready')}catch(e){status(e.message)}finally{busy=false;render()}}
-  async function save(){if(busy||!snapshot||!dirty)return;busy=true;$('balance-save').disabled=true;const content=$('balance-content');content.inert=true;$('balance-tabs').inert=true;try{snapshot=await request('/api/balance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({balance:snapshot.balance,revision:snapshot.revision})});dirty=false;status('Saved · Rojo Sync required');}catch(e){status(e.message)}finally{busy=false;content.inert=false;$('balance-tabs').inert=false;render()}}
+  async function load(force=false){if(busy)return;if(hasChanges()&&!force){render();return}if(hasChanges()&&!confirm('Discard unsaved Database changes?'))return;busy=true;status('Loading…');try{snapshot=await request('/api/balance');dirty=false;spawnChanges.clear();spawnData=null;status('Ready')}catch(e){status(e.message)}finally{busy=false;render()}}
+  async function save(){
+    if(busy||!snapshot||!hasChanges())return;
+    busy=true;$('balance-save').disabled=true;const content=$('balance-content');content.inert=true;$('balance-tabs').inert=true;
+    let balanceSaved=false;
+    try{
+      if(dirty){snapshot=await request('/api/balance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({balance:snapshot.balance,revision:snapshot.revision})});dirty=false;balanceSaved=true}
+      if(spawnChanges.size){
+        const result=await request('/api/monster-spawns/database-update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({updates:[...spawnChanges.values()]})});
+        if(spawnData)for(const r of result.records){const i=spawnData.records.findIndex(v=>v.spawnId===r.spawnId);if(i>=0)spawnData.records[i]=r}
+        spawnChanges.clear();
+      }
+      status('Saved · Rojo Sync required');
+    }catch(e){status((balanceSaved?'Balance saved; spawn changes unsaved · ':'')+e.message)}
+    finally{busy=false;content.inert=false;$('balance-tabs').inert=false;render()}
+  }
+
   $('balance-reload').onclick=()=>load(true);$('balance-save').onclick=save;
   let logsLoading=false;
   async function loadLogs(){

@@ -27,7 +27,7 @@ class NpcFallingDownM422(unittest.TestCase):
                 self.rig,
             )
         self.assertIn("humanoid.HipHeight = 1.8", self.rig)
-        self.assertIn('ActorCollisionPolicy.Assign(root)', self.rig)
+        self.assertIn('ActorCollisionPolicy.Assign(root, "NPC")', self.rig)
         self.assertIn('root.CanQuery = false', self.rig)
         self.assertIn('root.CanTouch = false', self.rig)
 

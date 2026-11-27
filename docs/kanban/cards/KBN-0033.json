@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0033",
+  "title": "Monster Spawn Authoring & Database",
+  "domain": "Infrastructure",
+  "status": "IN_PROGRESS",
+  "priority": "P0",
+  "owner": "Owner + Codex",
+  "favorite": false,
+  "specPath": "docs/kanban/specs/KBN-0033.md",
+  "specSha256": "ed5fd7113f486b6e01af686047943b4558f1c1f5f33b66abc9a948ac3d492115",
+  "dependsOn": [],
+  "revision": 14,
+  "updatedAt": "2026-11-26T23:51:07+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0033-T01",
+      "title": "Перенести создание/перемещение/удаление зон в Studio, показать все виды в каталоге моделей",
+      "done": true
+    },
+    {
+      "id": "KBN-0033-T02",
+      "title": "Добавить взаимно исключающие режимы преследования и общий серверный контракт",
+      "done": true
+    },
+    {
+      "id": "KBN-0033-T03",
+      "title": "Добавить Database-редактирование и revision-guarded сохранение пачки",
+      "done": true
+    },
+    {
+      "id": "KBN-0033-T04",
+      "title": "Пройти сквозной workflow Studio → Database → Studio → Play с реальным Place",
+      "done": false
+    },
+    {
+      "id": "KBN-0033-T05",
+      "title": "Проверить пользовательские overrides, конфликт ревизии и сохранность существующих NPC/спавнов",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0033-A01",
+      "title": "Создать, изменить, отключить и удалить тестовую зону; согласованные manifest/registry/markers",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0033-A02",
+      "title": "Редактирование из двух интерфейсов: устаревший черновик отклонён, координаты и ID сохранены",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0033-A03",
+      "title": "Проверить оба режима преследования и незарегистрированный вид в реальном Studio Play",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

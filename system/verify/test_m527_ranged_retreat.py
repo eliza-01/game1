@@ -49,7 +49,7 @@ class RangedRetreat(unittest.TestCase):
         self.assertEqual(life.count('Retreat.Clear(agent)'), 2)
         self.assertIn('TargetPolicy.HorizontalDelta(target, position)', retreat)
         self.assertIn('reach - away.Magnitude - STOP_DISTANCE', retreat)
-        self.assertIn('HomeLeash.Outside', retreat)
+        self.assertIn('DeathChase.AllowsPursuitPosition', retreat)
         self.assertIn('Workspace:Raycast', retreat)
         self.assertNotIn('Navigation.NavigateTo', retreat)
         self.assertIn('agent.humanoid:MoveTo(point)', retreat)

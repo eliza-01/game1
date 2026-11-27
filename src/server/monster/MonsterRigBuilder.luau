@@ -119,7 +119,7 @@ local function createNavigationRig(runtimeModel: Model, visual: Model, visualRoo
     navigationRoot.Transparency = 1
     navigationRoot.CastShadow = false
     navigationRoot.Anchored = false
-    ActorCollisionPolicy.Assign(navigationRoot)
+    ActorCollisionPolicy.Assign(navigationRoot, "Monster")
     navigationRoot.CanTouch = false
     navigationRoot.CanQuery = false
     navigationRoot.Massless = false

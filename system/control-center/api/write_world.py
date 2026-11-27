@@ -70,6 +70,13 @@ def route(path, body, deps):
         except (ValueError, OSError, RuntimeError, KeyError) as error:
             return 400, {'error': str(error)}
 
+    if path == '/api/rescue-routes/studio-sync':
+        try:
+            from rescue_route_store import sync
+            return 200, sync(deps['options_store'].root, body())
+        except (ValueError, OSError, RuntimeError, KeyError) as error:
+            return 400, {'error': str(error)}
+
     if not path.startswith(('/api/texture-atlases', '/api/location-assets', '/api/npc-spawns', '/api/monster-spawns', '/api/options', '/api/locations', '/api/timelines',)):
         return None
 
@@ -538,6 +545,12 @@ def route(path, body, deps):
     if path in npc_spawn_actions:
         try:
             return out(200, npc_spawn_actions[path](body()))
+        except Exception as error:
+            return out(400, {"error": str(error)})
+
+    if path == "/api/monster-spawns/database-update":
+        try:
+            return out(200, monster_spawns.database_update(body()))
         except Exception as error:
             return out(400, {"error": str(error)})
 

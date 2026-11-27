@@ -163,8 +163,18 @@ function Authoring.new(services)
         numberField("Monsters in zone", "maxAlive", 1, 1, 1000, true)
         numberField("Aggro radius · studs", "aggroRadiusStuds", 5, 0, 10000, false)
         toggle("Aggressive", "aggressive")
-        button(if draft.deathChase then "Chase: Death Chase (territory)" else "Chase: Home Leash", function() draft.deathChase = not draft.deathChase; renderForm() end)
-        if not draft.deathChase then numberField("Home leash · studs", "homeRadiusStuds", 10, 1, 10000, false) end
+        label("Pursuit mode · choose one")
+        button((if draft.deathChase then "●  " else "○  ") .. "Death Chase", function()
+            draft.deathChase = true; renderForm()
+        end)
+        button((if not draft.deathChase then "●  " else "○  ") .. "Home Leash", function()
+            draft.deathChase = false; renderForm()
+        end)
+        if draft.deathChase then
+            label("No home radius or damage timeout. Territory boundary if authored.", 40)
+        else
+            numberField("Home Leash · studs", "homeRadiusStuds", 10, 1, 10000, false)
+        end
         numberField("Respawn · sec", "respawnSeconds", 1, 0, 86400, false)
         toggle("Enabled", "enabled")
         button(if draft.position then "Move spawn zone" else "Place spawn zone", function()

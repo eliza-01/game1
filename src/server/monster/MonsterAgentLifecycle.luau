@@ -5,7 +5,7 @@ local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("
 local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
 local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor"))
-local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
+local Navigation = require(script.Parent:WaitForChild("MonsterNavigationDispatch"))
 local TargetPolicy = require(script.Parent:WaitForChild("MonsterTargetPolicy"))
 
 local Special = require(script.Parent:WaitForChild("MonsterSkillCast"))

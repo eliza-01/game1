@@ -259,6 +259,7 @@ class MonsterSpawnStore:
             data = data if data is not None else game_balance.load(self.root)
             row = self._balance_row(record["balanceId"], data)
             model = self._model_for_row(row, data)
+            value.setdefault("deathChase", row["deathChase"])
             name = row["nameEn"] or row["id"]
             value["monsterName"] = name
             value["level"] = row["level"]
@@ -280,6 +281,8 @@ class MonsterSpawnStore:
         }
         value["readiness"] = self.readiness(str(monster["slug"]))
         if self.kind == "monster":
+            if data is None and (self.root / "config/balance/gameplay.json").is_file():
+                data = game_balance.load(self.root)
             binding = data["monsterBindings"].get(monster["slug"]) if data else None
             row = next((r for r in data["monsters"] if r["id"] == binding), None) if binding else None
             value["legacyBalanceId"] = binding
@@ -364,6 +367,50 @@ class MonsterSpawnStore:
             # callback into the very plugin that is waiting for this request.
             self._commit({**manifest, "records": {**manifest["records"], record["spawnId"]: record}})
             return {"ok": True, "record": view}
+
+    def database_update(self, payload):
+        """Edit existing zone parameters only; Studio owns identity and placement."""
+        if self.kind != "monster" or not isinstance(payload, dict):
+            raise ValueError("Monster Database authoring only")
+        updates = payload.get("updates")
+        if not isinstance(updates, list) or not updates:
+            raise ValueError("No zone changes")
+        editable = {"balanceId", "spawnRadius", "maxAlive", "aggressive", "aggroRadiusStuds",
+                    "deathChase", "homeRadiusStuds", "respawnSeconds", "enabled"}
+        with self._lock:
+            manifest = self._load()
+            records = dict(manifest["records"])
+            seen = set()
+            views = []
+            for update in updates:
+                if not isinstance(update, dict) or set(update) != {"spawnId", "expectedUpdatedAtUtc", "changes"}:
+                    raise ValueError("Invalid zone update")
+                spawn_id = update["spawnId"]
+                if not isinstance(spawn_id, str) or spawn_id in seen or spawn_id not in records:
+                    raise ValueError("Zone missing or duplicated; refresh Database")
+                seen.add(spawn_id)
+                existing = records[spawn_id]
+                if update["expectedUpdatedAtUtc"] != existing.get("updatedAtUtc"):
+                    raise ValueError("Zone changed in Studio or Database; refresh before editing")
+                changes = update["changes"]
+                if not isinstance(changes, dict) or not changes or set(changes) - editable:
+                    raise ValueError("Only existing zone parameters can be edited in Database")
+                for key, value in changes.items():
+                    if key in {"aggressive", "deathChase", "enabled"}:
+                        if type(value) is not bool:
+                            raise ValueError(f"{key} must be a boolean")
+                    elif key == "balanceId":
+                        if not isinstance(value, str) or not value:
+                            raise ValueError("Select a Database monster and level")
+                    elif type(value) not in (int, float):
+                        raise ValueError(f"{key} must be a number")
+                merged = {**existing, **changes}
+                validated = self._validate(merged)
+                record = {**existing, **validated}
+                records[spawn_id] = record
+                views.append(self._record_view(record))
+            self._commit({**manifest, "records": records})
+            return {"ok": True, "records": views}
 
     def snapshot(self) -> dict:
         manifest = self._load()

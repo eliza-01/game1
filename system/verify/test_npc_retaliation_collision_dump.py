@@ -80,12 +80,12 @@ class M69Tests(unittest.TestCase):
 
     def test_single_collision_policy_and_stationary_npc(self):
         policy=source('src/server/actor/ActorCollisionPolicy.luau')
-        self.assertIn('CollisionGroupSetCollidable(GROUP, GROUP, true)', policy)
+        self.assertIn('CollisionGroupSetCollidable(NON_PLAYER_GROUP, NON_PLAYER_GROUP, false)', policy)
         self.assertIn('root.CanCollide = true', policy)
-        for path,root in [('src/server/character/CharacterRigService.luau','navigationRoot'),
-                          ('src/server/monster/MonsterRigBuilder.luau','navigationRoot'),
-                          ('src/server/npc/NpcRigFactory.luau','root')]:
-            self.assertIn('ActorCollisionPolicy.Assign('+root+')',source(path))
+        for path,root,kind in [('src/server/character/CharacterRigService.luau','navigationRoot','Character'),
+                               ('src/server/monster/MonsterRigBuilder.luau','navigationRoot','Monster'),
+                               ('src/server/npc/NpcRigFactory.luau','root','NPC')]:
+            self.assertIn(f'ActorCollisionPolicy.Assign({root}, "{kind}")',source(path))
         self.assertIn('pinAtRest(agent, true)',source('src/server/npc/NpcCombatAIService.luau'))
 
     def test_type_weight_fields_and_dump_binary_metadata(self):

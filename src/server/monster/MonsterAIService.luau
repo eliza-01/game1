@@ -1,3 +1,4 @@
+local Trace=require(script.Parent:WaitForChild("MonsterNavigationTrace"))
 -- Server-authoritative monster combat AI adapted from RobloxLineage.
 -- Contract: Aggro -> Chase -> Attack. While an authored attack is still active,
 -- a target that leaves weapon range is pursued directly without cancelling the
@@ -9,7 +10,7 @@ local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentati
 local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor"))
 local Skills = require(script.Parent:WaitForChild("MonsterSkills"))
 local Special = require(script.Parent:WaitForChild("MonsterSkillCast"))
-local Navigation = require(script.Parent:WaitForChild("MonsterChaseNavigation"))
+local Navigation = require(script.Parent:WaitForChild("MonsterNavigationDispatch"))
 local Lifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
 local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
 local DeathChase = require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
@@ -38,6 +39,14 @@ local stopNavigation = Navigation.StopNavigation
 local runSpeedStuds = Navigation.RunSpeedStuds
 local navigateTo = Navigation.NavigateTo
 
+local function presentNavigation(agent: any)
+    if agent.recoveryNavigation and agent.recoveryNavigation.mode=="Retry" then
+        Presentation.PlayCombatIdle(agent)
+    else
+        Presentation.PlayRun(agent)
+    end
+end
+
 local AttackMovement = table.freeze({
     StopNavigation = stopNavigation,
     RunSpeedStuds = runSpeedStuds,
@@ -59,8 +68,12 @@ local function leaveCombat(agent: any)
     CombatState.FinishExit(agent)
 end
 
-local function beginReturn(agent: any)
+local function beginReturn(agent: any, reason: string)
     if agent.returning then return end
+    -- Keep the last reason across Return -> Idle -> Aggro for Studio diagnosis.
+    Trace.Event(agent,"RETURN",reason)
+    agent.model:SetAttribute("MonsterLastReturnReason", reason)
+    agent.model:SetAttribute("MonsterLastReturnRecoveryMode", agent.model:GetAttribute("MonsterRecoveryMode") or "None")
     Special.Cancel(agent)
     Retreat.Clear(agent)
     -- Invalidate pending attack hit events BEFORE clearing the target.
@@ -82,21 +95,22 @@ end
 
 local function updateReturn(agent: any)
     local home = agent.home
-    if horizontalDistance(agent.root.Position, home) <= 2 then
+    if horizontalDistance(agent.root.Position, home) <= 2
+        and (not Navigation.Enabled(agent) or math.abs(agent.root.Position.Y-home.Y)<=2) then
         leaveCombat(agent)
         return
     end
     setState(agent, "Return")
     navigateTo(agent, home, runSpeedStuds(agent))
-end
-
-local function outsideHome(agent: any, position: Vector3): boolean
-    return HomeLeash.Outside(agent.spawnCenter, position, agent.homeRadius)
+    presentNavigation(agent)
 end
 
 local function updateTarget(agent: any, now: number)
     if agent.target and targetIsValid(agent.target) and TargetPolicy.AllowsTarget(agent, agent.target) then return end
-    if agent.target then beginReturn(agent); return end
+    if agent.target then
+        beginReturn(agent, if targetIsValid(agent.target) then "TargetOutsideTerritoryOrIsolation" else "TargetLost")
+        return
+    end
     if not aggressive(agent) or now < agent.nextTargetScanAt then return end
     agent.nextTargetScanAt = now + TARGET_SCAN_INTERVAL
     local target = TargetPolicy.AcquireNearestTarget(agent)
@@ -123,15 +137,20 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
     if agent.model:GetAttribute("MonsterSpawning") == true or agent.attacking or Retreat.Waiting(agent) then return end
     local targetRoot = rootOf(attacker)
     if not targetRoot then return end
-    if horizontalDistance(agent.root.Position, targetRoot.Position) <= attackRadius(agent) then
+    if horizontalDistance(agent.root.Position, targetRoot.Position) <= attackRadius(agent)
+        and ((not Navigation.Enabled(agent) and Retreat.IsRanged(agent.model)) or TargetPolicy.CanBeginTargetedCast(agent,attacker)) then
         stopNavigation(agent)
         Presentation.PlayCombatIdle(agent)
         AttackExecutor.Begin(agent, attacker, AttackMovement, random)
     else
         setState(agent, "Chase")
-        AttackExecutor.ClearPursuit(agent)
-        Presentation.PlayRun(agent)
-        navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))
+        if not Navigation.Enabled(agent) or agent.attackPursuitActive then AttackExecutor.ClearPursuit(agent) end
+        if navigateTo(agent, targetRoot.Position, runSpeedStuds(agent)) == "StuckTimeout" then
+            beginReturn(agent, "StuckTimeout")
+            updateReturn(agent)
+        else
+            presentNavigation(agent)
+        end
     end
 end
 
@@ -168,10 +187,18 @@ local function runAgent(agent: any)
         if target then
             if agent.lastDamageAt <= 0 then agent.lastDamageAt = now end
             local targetRoot = rootOf(target)
-            if not DeathChase.IsBound(agent.model) and (outsideHome(agent, agent.root.Position)
-                or (targetRoot and outsideHome(agent, targetRoot.Position))
-                or HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds())) then
-                beginReturn(agent)
+            if DeathChase.UsesHomeLeash(agent.model) then
+                local reason: string? = nil
+                if not DeathChase.AllowsPursuitPosition(agent, agent.root.Position) then reason = "MonsterOutsideHomeLeash"
+                elseif targetRoot and not DeathChase.AllowsPursuitPosition(agent, targetRoot.Position) then reason = "TargetOutsideHomeLeash"
+                elseif HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds()) then reason = "NoDamageTimeout" end
+                if reason then
+                    beginReturn(agent, reason)
+                    updateReturn(agent)
+                    continue
+                end
+            elseif not DeathChase.AllowsPursuitPosition(agent, agent.root.Position) then
+                beginReturn(agent, "MonsterOutsideDeathChaseTerritory")
                 updateReturn(agent)
                 continue
             end
@@ -184,6 +211,12 @@ local function runAgent(agent: any)
         end
         if target and not agent.attacking and Special.TryBegin(agent,target) then continue end
         local action = CombatState.Decide(agent.attacking, targetRoot ~= nil, distance, attackRadius(agent))
+        if action == "BeginAttack" and (Navigation.Enabled(agent) or not Retreat.IsRanged(agent.model)) and not TargetPolicy.CanBeginTargetedCast(agent,target) then
+            action = "Chase"
+        end
+        if targetRoot and Trace.Enabled(agent) then
+            Trace.Changed(agent,"AI_ACTION",action,"distance="..tostring(distance),"target="..tostring(target),"mode="..tostring(agent.model:GetAttribute("MonsterRecoveryMode")))
+        end
         if action == "AttackActive" then
             -- Active-attack movement is owned by maintainAttackPursuit().
             -- The slower AI decision loop must not issue competing MoveTo calls.
@@ -194,9 +227,13 @@ local function runAgent(agent: any)
             AttackExecutor.Begin(agent, target, AttackMovement, random)
         elseif action == "Chase" then
             setState(agent, "Chase")
-            AttackExecutor.ClearPursuit(agent)
-            Presentation.PlayRun(agent)
-            navigateTo(agent, targetRoot.Position, runSpeedStuds(agent))
+            if not Navigation.Enabled(agent) or agent.attackPursuitActive then AttackExecutor.ClearPursuit(agent) end
+            if navigateTo(agent, targetRoot.Position, runSpeedStuds(agent)) == "StuckTimeout" then
+                beginReturn(agent, "StuckTimeout")
+                updateReturn(agent)
+            else
+                presentNavigation(agent)
+            end
         elseif agent.model:GetAttribute("MonsterCombatActive") == true then
             leaveCombat(agent)
         end

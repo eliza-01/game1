@@ -1,3 +1,4 @@
+local Trace=require(script.Parent:WaitForChild("MonsterNavigationTrace"))
 -- Server-authoritative execution of authored monster attacks.
 -- Owns Hit/finish timeline callbacks and active-attack pursuit (not general navigation).
 -- Attack serial and target checks reject stale callbacks after death/target change.
@@ -60,6 +61,8 @@ end
 
 local function maintainAttackPursuit(agent: any, target: Model, serial: number, movement: any)
     task.spawn(function()
+        local nextObstacleCheck = 0
+        local clear = true
         while agent.active
             and agent.attacking
             and agent.attackSerial == serial
@@ -70,7 +73,17 @@ local function maintainAttackPursuit(agent: any, target: Model, serial: number, 
                 clearAttackPursuit(agent)
                 return
             end
-            pursueDirectlyDuringAttack(agent, liveRoot, movement)
+            local now = os.clock()
+            if now >= nextObstacleCheck then
+                nextObstacleCheck = now + .2
+                clear = TargetPolicy.MeleeObstacleClear(agent, target)
+                Trace.Changed(agent,"ATTACK_PURSUIT_CLEAR",tostring(clear))
+            end
+            if clear then
+                pursueDirectlyDuringAttack(agent, liveRoot, movement)
+            else
+                clearAttackPursuit(agent)
+            end
             -- Facing is updated continuously by the shared tracker even at rest.
             RunService.Heartbeat:Wait()
         end
@@ -101,6 +114,7 @@ function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, r
         timing = AttackTimelineConfig.ResolveRuntime(row.clipId, fittedPercent)
         percent = fittedPercent
     end
+    Trace.Event(agent,"ATTACK_BEGIN",tostring(target))
     agent.attacking = true
     Facing.Track(agent.model, agent.root, agent.humanoid, target, rootOf, true)
     agent.attackSerial += 1

@@ -22,7 +22,7 @@ class MultipartLocationLod(unittest.TestCase):
         s=read('src/client/world/StudioLodPreviewAdapter.luau'); r=read('src/client/world/LocationWorldStreamer.luau')
         self.assertIn('LodAssembly.Create(template, record.root:GetPivot(), record.sourceParts',s)
         self.assertNotIn('if not record.source or record.spec.lod1',s)
-        for fragment in ('LodAssembly.Create(prototype, record.pivotFrame, record.fullBounds', 'for _, component in ipairs(row.components)', 'if replacement or variant == "UNLOADED" then', 'if record.part then continue end', 'LocationCompositeVisual.Create', 'record.failedAssemblies[variant] = prototype', 'record.visualCost or 1'):
+        for fragment in ('LodAssembly.Create(prototype, record.pivotFrame, record.fullBounds', 'for _, component in ipairs(row.components)', 'if replacement or variant == "UNLOADED" then', 'if record.part then queue:Remove(record); continue end', 'LocationCompositeVisual.Create', 'record.failedAssemblies[variant] = prototype', 'record.visualCost or 1'):
             self.assertIn(fragment,r)
         self.assertIn('desired = "FULL"',s)
         self.assertEqual(r.count('RunService.Heartbeat:Connect'),1)

@@ -62,6 +62,6 @@ class LeafAndLodDebugM434(TestCase):
         self.assertIn('preview:Step(MAX_CHANGES_PER_TICK)', streamer)
         self.assertIn('houseAdapter:Resolve(cameraPosition)', streamer)
         self.assertIn('houseAdapter:Step(', streamer)
-        self.assertIn('Policy.Resolve(distance, record.desired, record.distances, record.mode)', streamer)
+        self.assertIn('LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)', streamer)
         self.assertIn('warn("[game1][LOD] template staging incomplete;', streamer)
         self.assertIn('Policy.ResolveHouse(', source('src/client/world/StudioLodPreviewAdapter.luau'))

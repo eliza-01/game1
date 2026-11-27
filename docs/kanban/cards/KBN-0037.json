@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "157476b5f8bfd14ec38edacbe6c5bcd09549afc55fa790b7aa7993bf7fa443bf",
+  "specSha256": "eb224330cf1b7d787d17f9bbf022c02cd03d9bb0f439491a73ae2a6717f0b9d2",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 7,
-  "updatedAt": "2026-11-27T19:24:00+00:00",
+  "revision": 9,
+  "updatedAt": "2026-11-27T21:30:00+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -69,7 +69,7 @@
       "id": "KBN-0037-A03",
       "title": "Неподвижный игрок не вызывает глобальную пересортировку LOD; большие сборки бюджетируются; streaming/коллизии/телепорты работают",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M619: Static Placement Index и локальная сортировка реализованы. 420 camera samples, 750372 сравнений Lua-модели с полным обходом. Threshold queue, cache, incremental budget, Real Estate и Studio/DEV/профиль открыты. M620: threshold cache и persistent queue, 129212 desired comparisons / 2356 samples; stationary и lifecycle проверены. Prototype/root events, assembly budget, House и Studio/DEV открыты."
     },
     {
       "id": "KBN-0037-A04",

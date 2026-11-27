@@ -11,6 +11,10 @@ local Policy = require(World:WaitForChild("LocationLodDistancePolicy"))
 local HouseVisualAdapter = require(script.Parent:WaitForChild("HouseVisualAdapter"))
 local LocationCompositeVisual = require(script.Parent:WaitForChild("LocationCompositeVisual"))
 local LodAssembly = require(script.Parent:WaitForChild("LocationLodAssembly"))
+local StaticPlacementIndex = require(script.Parent:WaitForChild("StaticPlacementIndex"))
+local LocationLodCandidates = require(script.Parent:WaitForChild("LocationLodCandidates"))
+local LodThresholdCache = require(script.Parent:WaitForChild("LodThresholdCache"))
+local LodTransitionQueue = require(script.Parent:WaitForChild("LodTransitionQueue"))
 local Appearance = require(World:WaitForChild("RuntimeVisualAppearance"))
 local Streamer = {}
 local started = false
@@ -120,6 +124,15 @@ local function available(record, candidate, level)
     return LodAssembly.Count(candidate) > 0
 end
 
+local function work(transition)
+    local record, variant, prototype = transition.record, transition.variant, transition.prototype
+    local useAssembly = prototype and variant ~= "FULL"
+        and (record.components ~= nil or prototype:IsA("Model"))
+    local targetCost = if useAssembly then LodAssembly.Count(prototype)
+        elseif variant == "FULL" and record.components then #record.components else 1
+    return math.min(MAX_CHANGES_PER_TICK, math.max(1, targetCost, record.visualCost or 1)), useAssembly, targetCost
+end
+
 function Streamer.Start()
     if started then return end
     started = true
@@ -146,6 +159,9 @@ function Streamer.Start()
 
     local folder = nil
     local records = {}
+    local composites = {}
+    local candidates = nil
+    local queue = nil
     local cache = nil
     if manifest then
         folder = Instance.new("Folder")
@@ -153,7 +169,7 @@ function Streamer.Start()
         folder.Parent = Workspace -- locally created; never server-owned
         for _, row in ipairs(manifest.placements) do
             table.insert(records, {
-                id = row.id, slug = row.slug, pivot = Vector3.new(row.pivot[1], row.pivot[2], row.pivot[3]),
+                order = #records + 1, id = row.id, slug = row.slug, pivot = Vector3.new(row.pivot[1], row.pivot[2], row.pivot[3]),
                 cframe = transform(row.cframe), size = Vector3.new(table.unpack(row.size)),
                 pivotFrame = transform(row.pivot),
                 mode = manifest.modes[row.slug], distances = Policy.WithHysteresis(manifest.assetDistances[row.slug], manifest.hysteresis), desired = nil, actual = "UNLOADED", part = nil, distance = math.huge,
@@ -162,12 +178,15 @@ function Streamer.Start()
             local record = records[#records]
             record.fullBounds = {{CFrame=record.cframe, Size=record.size}}
             if row.components then
+                table.insert(composites, record)
                 record.fullBounds = {}
                 for _, component in ipairs(row.components) do
                     table.insert(record.fullBounds, {CFrame=transform(component.cframe), Size=Vector3.new(table.unpack(component.size))})
                 end
             end
         end
+        candidates = LocationLodCandidates.new(StaticPlacementIndex.new(records))
+        queue = LodTransitionQueue.new(LocationLodCandidates.SortTransitions)
         cache = ReplicatedStorage:WaitForChild(Contract.TemplateFolder, 30)
         if not cache then
             warn("[game1][LOD] server template cache missing; runtime visuals disabled")
@@ -188,6 +207,7 @@ function Streamer.Start()
     local elapsed = 0
     local visualElapsed = VISUAL_INTERVAL -- first distance test immediately
     local lastWarning = 0
+    local lastCamera = nil
     RunService.Heartbeat:Connect(function(dt)
         if houseAdapter then houseAdapter:FollowMoving() end
         elapsed += dt
@@ -209,23 +229,13 @@ function Streamer.Start()
             preview:Step(MAX_CHANGES_PER_TICK)
         end
         if not manifest then return end
-        -- Reserve half the existing shared budget for houses so dense Location
-        -- placement fields cannot starve the house adapter indefinitely.
-        local changes = if houseAdapter then houseAdapter:Step(MAX_CHANGES_PER_TICK // 2) else 0
-        for _, record in ipairs(records) do
-            local distance = (cameraPosition - record.pivot).Magnitude
-            record.distance = distance
-            record.desired = Policy.Resolve(distance, record.desired, record.distances, record.mode)
-        end
-        -- Release stale distant visuals first, then prioritize nearest loads.
-        -- Both phases share the same MAX_CHANGES_PER_TICK budget.
-        table.sort(records, function(a, b)
-            local aUnload = a.desired == "UNLOADED" and a.actual ~= "UNLOADED"
-            local bUnload = b.desired == "UNLOADED" and b.actual ~= "UNLOADED"
-            if aUnload ~= bUnload then return aUnload end
-            return a.distance < b.distance
-        end)
-        for _, record in ipairs(records) do
+        local cameraChanged = lastCamera ~= camera
+        lastCamera = camera
+        queue:Begin(cameraPosition, cameraChanged)
+        local localRecords = candidates:Collect(cameraPosition, cameraChanged)
+        local deferredEffects = {}
+        for _, record in ipairs(localRecords) do
+            LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)
             -- Roblox native streaming can independently remove the parent
             -- technical Model. Recover when that root later streams back in.
             if record.part and not record.part:IsDescendantOf(Workspace) then
@@ -244,16 +254,26 @@ function Streamer.Start()
                     if available(record, candidate, fallback) then prototype = candidate; variant = fallback; break end
                 end
                 if not prototype then
-                    if record.part then continue end
+                    if record.part and record.components then deferredEffects[record] = true end
+                    if record.part then queue:Remove(record); continue end
                     variant = "UNLOADED"
                 end
             end
-            local useAssembly = prototype and variant ~= "FULL"
-                and (record.components ~= nil or prototype:IsA("Model"))
-            local targetCost = if useAssembly then LodAssembly.Count(prototype)
-                elseif variant == "FULL" and record.components then #record.components else 1
-            local cost = math.min(MAX_CHANGES_PER_TICK, math.max(1, targetCost, record.visualCost or 1))
+            queue:Set(record, variant, prototype)
+        end
+        local transitions = queue:Ordered(LodThresholdCache.Distance)
+        -- Preserve the shared house reservation except for an aged large
+        -- transition that could never fit in the Location half of the budget.
+        -- Houses still get the remainder; failed attempts relinquish aging.
+        local first = transitions[1]
+        local reserveLocation = first and first.aged and queue.tick % 2 == 0
+            and work(first) > MAX_CHANGES_PER_TICK // 2
+        local changes = if houseAdapter and not reserveLocation then houseAdapter:Step(MAX_CHANGES_PER_TICK // 2) else 0
+        for _, transition in ipairs(transitions) do
+            local record, variant, prototype = transition.record, transition.variant, transition.prototype
+            local cost, useAssembly, targetCost = work(transition)
             if variant ~= record.actual and changes + cost <= MAX_CHANGES_PER_TICK then
+                queue:Attempted(transition)
                 local replacement = nil
                 if useAssembly then
                     local assemblyError
@@ -293,11 +313,16 @@ function Streamer.Start()
                     record.visualCost = if replacement then targetCost else nil
                     record.actual = if replacement then variant else "UNLOADED"
                     changes += cost
+                    queue:Remove(record)
                 end
             end
-            -- Effect visibility follows the committed visual state, not a
-            -- guessed range or an unavailable published template.
-            if record.components then
+        end
+        candidates:Retain(localRecords)
+        -- Keep the existing effect lifecycle for every composite, including
+        -- distant roots that may stream in late. Do not tie effect visibility
+        -- to candidate membership. Event-driven invalidation is a later phase.
+        for _, record in ipairs(composites) do
+            if not deferredEffects[record] then
                 LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")
             end
         end

@@ -397,3 +397,8 @@ runtime tint mechanism also used by compound hair. Armor and head atlas
 contracts remain unchanged. Never republish mesh/image assets just to tint.
 
 M618: only Legacy Monster / NPC native path requests use NavigationScheduler; never enqueue Experimental Navigation or Rescue Graph. Preserve original combat ownership and deadlines. Queued results are consumed by the current navigator, never apply movement from a worker. See `docs/workflows/M618_NAVIGATION_BUDGET_RU.md`.
+
+
+M619: Runtime LOD stage 1 only. StaticPlacementIndex is a conservative immutable BVH for Location snapshot pivot; never use it to decide LOD or change House bounds semantics. Keep previous desired/actual records until unload; preserve nil on first sample, logical UNLOADED for omitted records. Composite effects still run separately for late roots. Do not change server physics or AI. Continue with threshold queue. See `docs/workflows/RUNTIME_LOD_STREAMING_REFACTOR_SPEC_RU.md`.
+
+M620: Runtime LOD stage 2. LodThresholdCache uses conservative clearance from the last resolve, not per-frame deltas. Keep queue reconciliation on stationary ticks for late prototypes/proxies; do not bypass fallback or actual ownership. LodTransitionQueue has one pending entry per placement; age after 8 ticks, unload-first, alternating house reservation for oversized aged entries. Next: prototype readiness cache. Studio/DEV acceptance pending.

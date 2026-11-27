@@ -1,5 +1,6 @@
 """One mechanics documentation schema for shared rules and future per-asset scripts."""
 from .house import ITEMS as HOUSE_ITEMS
+from .lod import ITEMS as LOD_ITEMS
 from .windmill import ITEMS as WINDMILL_ITEMS
 from .npc import ITEMS as NPC_ITEMS
 from .monster import ITEMS as MONSTER_ITEMS
@@ -10,6 +11,7 @@ DOMAINS = (
     {'id': 'windmill', 'label': 'Windmill', 'description': 'Windmill 02 · ротор и дверь', 'items': WINDMILL_ITEMS},
     {'id': 'npc', 'label': 'NPC', 'description': 'Технические карты по каждому NPC и его собственным скриптам', 'items': NPC_ITEMS},
     {'id': 'monster', 'label': 'Monster', 'description': 'Общие серверные механики монстров: spawn, AI, навигация, бой и возврат', 'items': MONSTER_ITEMS},
+    {'id': 'lod', 'label': 'LOD', 'description': 'Клиентский Runtime LOD и границы серверной физики', 'items': LOD_ITEMS},
     {'id': 'character', 'label': 'Character', 'description': 'Механики персонажа и общий контракт управления', 'items': CHARACTER_ITEMS},
 )
 
@@ -17,6 +19,15 @@ DOMAINS = (
 # actor-specific scripts belong to a distinct item's sources list, never an
 # arbitrary file path supplied by the browser.
 SOURCES = {
+    'location-streamer': ('src/client/world/LocationWorldStreamer.luau', 'LOD · общий координатор'),
+    'static-placement-index': ('src/client/world/StaticPlacementIndex.luau', 'LOD · immutable spatial index'),
+    'location-lod-candidates': ('src/client/world/LocationLodCandidates.luau', 'LOD · локальные кандидаты и приоритет'),
+    'lod-threshold-cache': ('src/client/world/LodThresholdCache.luau', 'LOD · пороговый кэш'),
+    'lod-transition-queue': ('src/client/world/LodTransitionQueue.luau', 'LOD · очередь переходов'),
+    'location-lod-policy': ('src/shared/world/LocationLodDistancePolicy.luau', 'LOD · пороги и гистерезис'),
+    'house-visual-adapter': ('src/client/world/HouseVisualAdapter.luau', 'House · визуальный LOD частей'),
+    'location-composite-visual': ('src/client/world/LocationCompositeVisual.luau', 'LOD · составные объекты и эффекты'),
+    'runtime-lod-spec': ('docs/workflows/RUNTIME_LOD_STREAMING_REFACTOR_SPEC_RU.md', 'LOD · ТЗ этапов'),
     'npc-spawner': ('src/server/npc/NpcSpawnerService.luau', 'NPC · spawn и lifecycle'),
     'npc-spawns': ('src/server/npc/NpcSpawnRegistry.luau', 'NPC · записи spawn'),
     'npc-registry': ('src/shared/npc/NpcRegistry.luau', 'NPC · опубликованный реестр'),

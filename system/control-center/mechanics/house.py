@@ -134,6 +134,7 @@ ITEMS = [
              {'title': 'Позиционирование', 'lines': [
                  'Размещение хранит (plotIndex, houseLevel, houseVariant, spawnPivotLocalCFrame) относительно plot_NN_volume. Замена опубликованной модели не должна переносить дом.',
                  'Общий pivot берётся из авторского house_armature, совместного с MeshPart. land_spawn_01_socket не является Pivot участка.',
+                 'M619: Location LOD использует spatial index по pivot; HouseVisualAdapter пока сохраняет независимые расстояния до bounds каждой части. См. Mechanics → LOD.',
                  'Сокеты должны существовать в FBX, Lua не создаёт отсутствующие Bones. Коллизии авторятся отдельным Collision Blueprint, независимо от сокетов.',
              ]},
          ], ['socket-authoring-doc', 'socket-ownership-doc']),

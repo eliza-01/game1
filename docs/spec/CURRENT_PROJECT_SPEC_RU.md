@@ -12,6 +12,10 @@
 
 M618: Native Navigation Budget только для Legacy Monster и NPC: FIFO, 2 одновременных ComputeAsync и 8 стартов/с (Options → AI Performance; диапазоны 1–8 и 1–30). Experimental Navigation и Rescue Routes не участвуют. Результат применяется только в текущем шаге навигации после проверки актуальности, ожидание не считается физическим застреванием. Studio/DEV и измерения открыты. [M618](../workflows/M618_NAVIGATION_BUDGET_RU.md).
 
+M619: Runtime LOD этап 1 — StaticPlacementIndex (BVH по 3D snapshot pivot и hide+hysteresis), LocationLodCandidates (локальная область + прежние desired/actual до выгрузки). Только реальные переходы сортируются; при равной дистанции — порядок manifest. Policy, интервалы, fallback, сборка, HouseVisualAdapter, Studio Preview, server physics и AI сохранены. Composite effects пока обслуживаются отдельным проходом; threshold queue, cache, incremental budget и Real Estate ещё открыты. Studio/DEV и замеры не выполнены. [ТЗ Runtime LOD](../workflows/RUNTIME_LOD_STREAMING_REFACTOR_SPEC_RU.md).
+
+M620: Runtime LOD этап 2 — LodThresholdCache (запас до порогов ±h, смещение от последнего resolve, точные границы и смена камеры) и LodTransitionQueue (одна заявка на placement, отмена/замена, сортировка только при изменении приоритета). При неподвижной камере BVH и стабильные дистанции не пересчитываются; fallback/proxy/effects продолжают обслуживаться. Aging 8 ticks; тяжёлая просроченная Location-заявка может получить полный бюджет на чётном tick, нечётный сохраняет резерв House. Policy, интервал и визуальный контракт сохранены. Кэш готовности, порционная сборка, Real Estate и Studio/DEV/профиль открыты.
+
 Решение владельца 27.11.2026 (M606a): весь цикл оптимизации из [Kanban KBN-0035–0039](../kanban/README.md#текущий-фокус--27112026--performance-review-m605) обязателен до возобновления новых механик и расширения контента. Допускаются исправления блокирующих дефектов и работы, необходимые для приёмки. Старые задачи сохраняются; приоритет внутри цикла не исключает ни одну карточку.
 
 | Порядок | Обязательный результат | Спецификация |

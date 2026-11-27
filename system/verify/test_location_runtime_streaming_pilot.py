@@ -18,10 +18,13 @@ class RuntimeStreamingPilot(unittest.TestCase):
     def test_shared_state_policy_and_local_only_visual_owner(self):
         client = (ROOT / 'src/client/world/LocationWorldStreamer.luau').read_text(encoding='utf-8')
         policy = (ROOT / 'src/shared/world/LocationLodDistancePolicy.luau').read_text(encoding='utf-8')
-        for expected in ('Policy.Resolve(distance, record.desired, record.distances, record.mode)',
+        threshold = (ROOT / 'src/client/world/LodThresholdCache.luau').read_text(encoding='utf-8')
+        self.assertIn('policy.Resolve(distance, previous, record.distances, record.mode)', threshold)
+        self.assertIn('(position - record.pivot).Magnitude', threshold)
+        for expected in ('LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)',
                          'MAX_CHANGES_PER_TICK = 8', 'CanCollide = false',
                          'CanQuery = false', 'CanTouch = false',
-                         'record.cframe', 'record.size', 'cameraPosition - record.pivot',
+                         'record.cframe', 'record.size',
                          'record.part:Destroy()', 'RunService.Heartbeat'):
             self.assertIn(expected, client)
         self.assertIn('Policy.WithHysteresis', policy)

@@ -8,14 +8,14 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0038.md",
-  "specSha256": "7557e02d4fa55abb34fd97ca07fafc680fb0cf6f2a396e4a963545237ca90008",
+  "specSha256": "a93588f3e4d8eea7a5b4319dff7a815cd26e9b02c273a39404e82b8b263d0fc2",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036",
     "KBN-0037"
   ],
-  "revision": 5,
-  "updatedAt": "2026-11-27T20:42:00+00:00",
+  "revision": 6,
+  "updatedAt": "2026-11-28T00:00:00+00:00",
   "tasks": [
     {
       "id": "KBN-0038-T01",
@@ -60,7 +60,7 @@
       "id": "KBN-0038-A03",
       "title": "Навигационный бюджет соблюдается при одновременных запросах; нет starvation, утечек или stale paths",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M618: native budget FIFO, Lua 1000 requests, cancellation/dedup/limits; protected Experimental Navigation and decision hashes, Options migration. Real Studio/DEV and contention acceptance NOT_RUN."
     },
     {
       "id": "KBN-0038-A04",

@@ -18,6 +18,7 @@ class MonsterChaseNavigationM104(unittest.TestCase):
     def setUpClass(cls):
         cls.ai = read("MonsterAIService.luau")
         cls.nav = read("MonsterChaseNavigation.luau")
+        cls.budget = (MONSTER.parent / 'actor/NavigationScheduler.luau').read_text()
         cls.attack = read("MonsterAttackExecutor.luau")
         cls.wander = read("MonsterWanderController.luau")
         cls.lifecycle = read("MonsterAgentLifecycle.luau")
@@ -38,11 +39,13 @@ class MonsterChaseNavigationM104(unittest.TestCase):
     def test_original_path_config_and_refresh_intervals(self):
         for constant in ('DIRECT_REFRESH_SECONDS = 0.30', 'PATH_REFRESH_SECONDS = 0.75',
                          'PATH_TARGET_MOVE_THRESHOLD = 3', 'STUCK_CHECK_SECONDS = 0.80',
-                         'STUCK_PROGRESS_STUDS = 0.35', 'WAYPOINT_TOLERANCE = 1.25',
-                         'AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3'):
+                         'STUCK_PROGRESS_STUDS = 0.35', 'WAYPOINT_TOLERANCE = 1.25'):
             self.assertIn(constant, self.nav)
-        self.assertIn('pcall(function() path:ComputeAsync(agent.root.Position, destination) end)', self.nav)
-        self.assertIn('if ok and path.Status == Enum.PathStatus.Success then', self.nav)
+        self.assertIn('AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3', self.budget)
+        self.assertIn('pcall(function() path:ComputeAsync(origin, goal) end)', self.budget)
+        self.assertIn('Budget.Request(agent, agent.root, destination)', self.nav)
+        self.assertIn('if not ok or path.Status ~= Enum.PathStatus.Success then', self.budget)
+        self.assertIn('if path then', self.nav)
         self.assertIn('agent.pathIndex = math.min(2, #agent.pathWaypoints)', self.nav)
 
     def test_blocked_connection_and_cleanup_stay_together(self):

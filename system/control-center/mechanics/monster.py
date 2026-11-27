@@ -19,7 +19,7 @@ ITEMS = [
          ['MonsterAggressive', 'MonsterPursuitMode', 'MonsterNavigationBackend', 'MonsterRecoveryMode'], [
              {'title': 'Общий AI Scheduler · M615', 'lines': [
                  'Monster и NPC используют общую очередь обновлений 0,1 с. Monster: первый шаг 0,1–0,2 с, затем интервал после завершения шага; Aggro scan 0,3 с. Получение урона и Heartbeat сопровождения атаки независимы.',
-                 'Experimental Navigation, маршруты, прыжки, BlockedWait и возврат не изменены. AI LOD опционален с M617, лимиты ComputeAsync ещё не включены; требуется приёмка Studio/DEV.',
+                 'Experimental Navigation, маршруты, прыжки, BlockedWait и возврат не изменены. AI LOD опционален с M617, лимиты ComputeAsync для Legacy с M618; требуется приёмка Studio/DEV.',
              ]},
              {'title': 'Локальный Aggro · M616', 'lines': [
                  'PlayerSpatialIndex: XZ-выборка по клеткам 32 studs, один ленивый снимок на пакет решений AI; точная дистанция, LifeState, Isolation, Death Chase и порядок равных дистанций остаются у MonsterTargetPolicy. Высота не ограничивает Aggro.',
@@ -28,6 +28,9 @@ ITEMS = [
              {'title': 'Adaptive AI LOD · M617', 'lines': [
                  'Options → AI Performance, по умолчанию OFF. Активные состояния 0,1 с; агрессивный Idle ожидает действующий дедлайн Aggro (не более 0,3 с). Пассивный Idle — контроль 0,3–2 с; боевой сигнал, смена Aggressive, LifeState или Spawning сокращают дедлайн до 0,1 с.',
                  'Не приостанавливает физику, wandering, урон, анимации или навигацию. Rescue Route, Climb, Retry, BlockedWait, Return, HomeRecall не замедляются. Studio/DEV и замеры открыты.',
+             ]},
+             {'title': 'Native path budget · M618', 'lines': [
+                 'Legacy/NPC: общий FIFO, 2 одновременных запроса и 8 стартов/с по умолчанию (AI Performance). Ожидание не считается отсутствием прогресса; атака, возврат и смена backend отменяют запрос. Experimental и Rescue Routes вне очереди.',
              ]},
              {'title': 'Aggro и границы преследования', 'lines': [
                  'Home Leash: возврат при выходе за home radius от центра спавна или по таймеру без нанесения урона (по умолчанию 30 с, Options). Spawn radius задаёт появление/блуждание, не границу погони.',
@@ -78,7 +81,7 @@ ITEMS = [
                  'Приёмка KBN-0032 открыта: Studio Play, Runtime Draft с двумя клиентами, профиль Legacy/Experimental 50/100/200 активных монстров (CPU, Raycast, физика, время построения графа). Доступность опции Runtime не означает разрешение публикации.',
                  'M593: свободная проекция без сетки 20/4, отсев линий вне радиуса, ранний отсев далёких игроков при aggro. BlockedWait без новых поисков и повторных записей таймера. Граф строится только при активном backend; периодические диагностические записи скорости/лучей и точки плана только в Studio. GP/Test Debug Hub не запускается в опубликованной игре; compiled Draft в Studio загружает его только при Start in Hub; общие безопасные контракты остаются в коде.',
              ]},
-         ], ['monster-ai', 'actor-ai-scheduler', 'actor-ai-queue', 'actor-activity-policy', 'player-spatial-index', 'player-spatial-grid', 'actor-target-root', 'actor-home', 'monster-target', 'monster-death-chase', 'monster-nav',
+         ], ['monster-ai', 'actor-ai-scheduler', 'actor-ai-queue', 'navigation-budget', 'navigation-request-queue', 'actor-activity-policy', 'player-spatial-index', 'player-spatial-grid', 'actor-target-root', 'actor-home', 'monster-target', 'monster-death-chase', 'monster-nav',
              'monster-nav-dispatch', 'monster-nav-experimental', 'monster-nav-config', 'monster-nav-options',
              'monster-recovery-geometry', 'monster-climb', 'monster-rescue-graph', 'monster-rescue-topology', 'monster-rescue-segments', 'monster-rescue-routes',
              'monster-rescue-connections', 'monster-rescue-sampling', 'monster-rescue-entries', 'monster-rescue-exits', 'monster-rescue-paths', 'monster-rescue-queries', 'monster-stuck-watchdog', 'monster-blocked-pursuit', 'monster-blocked-retreat-geometry', 'monster-navigation-speed',

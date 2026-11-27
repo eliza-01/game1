@@ -44,6 +44,9 @@ function game1OptionsRender(){
   const lod=data.monsterAi?.adaptiveLod||{};
   $('option-ai-lod-enabled').checked=lod.enabled===true;
   $('option-ai-lod-seconds').value=String(lod.dormantSeconds??2);
+  const budget=data.monsterAi?.navigationBudget||{};
+  $('option-ai-nav-concurrent').value=String(budget.concurrent??2);
+  $('option-ai-nav-rate').value=String(budget.startsPerSecond??8);
   const nav=data.monsterAi?.experimentalNavigation||{};
   $('option-nav-enabled').checked=nav.enabled!==false;
   $('option-nav-runtime-enabled').checked=nav.runtimeEnabled===true;
@@ -126,7 +129,7 @@ $('option-nav-save').onclick=()=>{
   for(const [k,v] of Object.entries(game1NavigationDefaults))nav[k]=game1OptionNumber('option-nav-'+k,v);
   game1OptionsSave({monsterAi:{experimentalNavigation:nav}},'navigation options saved · Rojo Sync required');
 };
-$('option-ai-lod-save').onclick=()=>game1OptionsSave({monsterAi:{adaptiveLod:{enabled:$('option-ai-lod-enabled').checked,dormantSeconds:game1OptionNumber('option-ai-lod-seconds',2)}}},'AI performance saved · Rojo Sync required');
+$('option-ai-lod-save').onclick=()=>game1OptionsSave({monsterAi:{adaptiveLod:{enabled:$('option-ai-lod-enabled').checked,dormantSeconds:game1OptionNumber('option-ai-lod-seconds',2)},navigationBudget:{concurrent:game1OptionNumber('option-ai-nav-concurrent',2),startsPerSecond:game1OptionNumber('option-ai-nav-rate',8)}}},'AI performance saved · Rojo Sync required');
 $('refresh-options').onclick=game1OptionsLoad;
 $('save-combat-options').onclick=()=>game1OptionsSave({combat:{stateDurationSeconds:game1OptionNumber('option-combat-state-duration',6)},monsterAi:{noDamageReturnSeconds:game1OptionNumber('option-monster-return-time',30)}},'combat and monster return saved');
 function game1NpcOverheadRender(){

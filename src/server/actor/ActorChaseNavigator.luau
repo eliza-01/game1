@@ -1,6 +1,6 @@
 -- Reusable server-owned MoveTo/path fallback component for world actors.
 -- No targeting, attacks or animation responsibilities; owner controls the lifecycle.
-local PathfindingService = game:GetService("PathfindingService")
+local Budget = require(script.Parent:WaitForChild("NavigationScheduler"))
 
 local Navigator = {}
 Navigator.__index = Navigator
@@ -21,13 +21,16 @@ function Navigator.new(root: BasePart, humanoid: Humanoid)
         root = root, humanoid = humanoid, active = true,
         destination = nil, path = nil, waypoints = nil, index = 1,
         nextRefresh = 0, progressAt = os.clock(), progressPosition = root.Position,
-        blocked = false, pathPending = false, serial = 0, mode = "",
+        blocked = false, pathRequest = nil, mode = "",
         blockedConnection = nil,
     }, Navigator)
 end
 
 function Navigator:_clearPath()
     if self.blockedConnection then self.blockedConnection:Disconnect(); self.blockedConnection = nil end
+    Budget.Cancel(self.pathRequest)
+    self.pathRequest = nil
+    if self.path then self.path:Destroy() end
     self.path = nil
     self.waypoints = nil
     self.index = 1
@@ -44,41 +47,62 @@ function Navigator:_direct(position: Vector3, speed: number)
 end
 
 function Navigator:_requestPath(position: Vector3, speed: number)
-    if self.pathPending then return end
-    self.pathPending = true
-    self.serial += 1
-    local serial = self.serial
+    self:_clearPath()
+    self.mode = "Path"
+    self.destination = position
+    self.pathRequest = Budget.Request(self, self.root, position)
     self.nextRefresh = os.clock() + PATH_REISSUE
-    -- ComputeAsync yields: never block the NPC AI scheduler.
-    task.spawn(function()
-        local path = PathfindingService:CreatePath({
-            AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3,
-        })
-        local success = pcall(function() path:ComputeAsync(self.root.Position, position) end)
-        if not self.active or self.serial ~= serial then return end
-        self.pathPending = false
-        if not success or path.Status ~= Enum.PathStatus.Success then
-            self.blocked = false
-            self:_direct(position, speed)
-            return
-        end
-        self:_clearPath()
-        self.mode = "Path"
-        self.path = path
-        self.destination = position
-        self.waypoints = path:GetWaypoints()
-        self.index = math.min(2, #self.waypoints)
-        self.blocked = false
-        self.blockedConnection = path.Blocked:Connect(function(blockedIndex)
-            if blockedIndex >= self.index then self.blocked = true end
-        end)
-        local waypoint = self.waypoints[self.index]
-        if waypoint then self.humanoid:MoveTo(waypoint.Position) end
+    self.humanoid:MoveTo(self.root.Position)
+    self.progressPosition = self.root.Position
+    self.progressAt = os.clock()
+    if not self.pathRequest then
+        self.blocked = true
+        self.nextRefresh = 0
+    end
+end
+
+function Navigator:_consumePath(position: Vector3, speed: number)
+    local ticket = self.pathRequest
+    if not ticket then return false end
+    Budget.UpdateQueued(ticket, position)
+    self.destination = ticket.destination
+    local ready, result = Budget.Take(ticket)
+    if not ready then
+        self.progressPosition = self.root.Position
+        self.progressAt = os.clock()
+        return true
+    end
+    self.pathRequest = nil
+    if Budget.IsStale(result, self.root, self.destination, position, DESTINATION_DELTA) then
+        Budget.Dispose(result)
+        self:_requestPath(position, speed)
+        return true
+    end
+    self.progressPosition = self.root.Position
+    self.progressAt = os.clock()
+    self.nextRefresh = self.progressAt + PATH_REISSUE
+    local path = result and result.path
+    self.blocked = false
+    if not path then
+        self:_direct(position, speed)
+        return true
+    end
+    self.mode = "Path"
+    self.path = path
+    self.waypoints = path:GetWaypoints()
+    self.index = math.min(2, #self.waypoints)
+    self.blockedConnection = path.Blocked:Connect(function(blockedIndex)
+        if blockedIndex >= self.index then self.blocked = true end
     end)
+    local waypoint = self.waypoints[self.index]
+    if waypoint then self.humanoid:MoveTo(waypoint.Position) end
+    return true
 end
 
 function Navigator:Chase(position: Vector3, speed: number)
     if not self.active or not self.root.Parent or not self.humanoid.Parent then return end
+    self.humanoid.WalkSpeed = speed
+    if self:_consumePath(position, speed) then return end
     local now = os.clock()
     -- The first movement command owns a fresh progress window. Time spent
     -- idle/attacking must not count as time stuck in navigation.
@@ -96,10 +120,10 @@ function Navigator:Chase(position: Vector3, speed: number)
     end
     local moved = not self.destination or flatDistance(self.destination, position) >= DESTINATION_DELTA
     if self.blocked then
-        if not self.pathPending and (self.mode ~= "Path" or now >= self.nextRefresh or moved) then
+        if not self.pathRequest and (self.mode ~= "Path" or now >= self.nextRefresh or moved) then
             self:_requestPath(position, speed)
         end
-    elseif self.mode == "Path" and moved and not self.pathPending and now >= self.nextRefresh then
+    elseif self.mode == "Path" and moved and not self.pathRequest and now >= self.nextRefresh then
         self:_requestPath(position, speed)
     elseif self.mode == "" or (self.mode == "Direct" and (moved or now >= self.nextRefresh)) then
         self:_direct(position, speed)
@@ -122,8 +146,6 @@ end
 
 function Navigator:Stop()
     if not self.active then return end
-    self.serial += 1 -- discard any in-flight path request
-    self.pathPending = false
     self.blocked = false
     self.mode = ""
     self.destination = nil

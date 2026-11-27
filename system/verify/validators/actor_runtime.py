@@ -57,7 +57,7 @@ def check_actor_runtime_contracts(
     for required in ['require(script.Parent:WaitForChild("MonsterNavigationDispatch"))', "CombatState.Decide", 'AttackExecutor.Begin(agent, target, AttackMovement, random)', "MonsterAttackExecutor"]:
         if required not in monster_ai_m23:
             report_error(f"RobloxLineage monster AI coordinator missing {required}")
-    for required in ["PathfindingService:CreatePath", "path:ComputeAsync", "path.Blocked:Connect", "issueDirectMove(agent, destination, speed)", "MonsterChaseNavigation.Initialize"]:
+    for required in ["Budget.Request", "Budget.Take", "path.Blocked:Connect", "issueDirectMove(agent, destination, speed)", "MonsterChaseNavigation.Initialize"]:
         if required not in monster_chase_navigation_m104:
             report_error(f"M104 chase navigation contract missing {required}")
     if "PathfindingService" in monster_ai_m23:
@@ -71,8 +71,13 @@ def check_actor_runtime_contracts(
                      'Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent, nil, if Activity.Enabled then Activity.MonsterDelay else nil)', 'Scheduler.Remove(agent)']:
         if required not in monster_agent_lifecycle_m105:
             report_error(f"M105: MonsterAgentLifecycle contract missing {required}")
-    if 'if not agent.active then return end' not in monster_chase_navigation_m104:
-        report_error("M105: cancelled ComputeAsync must not reconnect Path.Blocked")
+    navigation_budget = (root / "src/server/actor/NavigationScheduler.luau").read_text(encoding="utf-8")
+    for required in ["PathfindingService:CreatePath", "path:ComputeAsync", "queue:Request", "queue:Cancel"]:
+        if required not in navigation_budget:
+            report_error(f"M618 navigation budget missing {required}")
+    for required in ["if not agent.active or not agent.root.Parent", "Budget.Cancel(agent.pathRequest)", "Budget.IsStale"]:
+        if required not in monster_chase_navigation_m104:
+            report_error(f"M618: stale path guard missing {required}")
 
     for required in ["pursueDirectlyDuringAttack", "MonsterAttackPursuitActive", "AttackTimelineConfig.ResolveRuntime", "TargetPolicy.AttackStillConnects", "DamageService.Apply("]:
         if required not in monster_attack_m103:

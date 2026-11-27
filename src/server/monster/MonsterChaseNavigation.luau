@@ -1,7 +1,7 @@
 -- Original M94 chase/path navigation, extracted without algorithm changes in M104.
 -- Owns only general Chase navigation; the authored attack pursuit lives in
 -- ActorAttackPursuit via MonsterAttackExecutor, and Wander has its own controller.
-local PathfindingService = game:GetService("PathfindingService")
+local Budget = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("NavigationScheduler"))
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
@@ -26,6 +26,10 @@ end
 
 local function clearPath(agent: any)
     if agent.pathBlockedConnection then agent.pathBlockedConnection:Disconnect(); agent.pathBlockedConnection = nil end
+    Budget.Cancel(agent.pathRequest)
+    agent.pathRequest = nil
+    agent.pathRequestTarget = nil
+    if agent.path then agent.path:Destroy() end
     agent.path = nil
     agent.pathWaypoints = nil
     agent.pathIndex = 1
@@ -65,11 +69,49 @@ local function rebuildPath(agent: any, destination: Vector3, speed: number)
     agent.nextPathAt = os.clock() + PATH_REFRESH_SECONDS
     agent.humanoid.WalkSpeed = math.max(0, speed)
     agent.humanoid.AutoRotate = true
-    local path = PathfindingService:CreatePath({AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3})
-    local ok = pcall(function() path:ComputeAsync(agent.root.Position, destination) end)
-    -- ComputeAsync yields: a removed agent must not reconnect Path.Blocked.
-    if not agent.active then return end
-    if ok and path.Status == Enum.PathStatus.Success then
+    agent.pathRequestTarget = agent.target
+    agent.pathRequestReturning = agent.returning
+    agent.pathRequest = Budget.Request(agent, agent.root, destination)
+    -- No new MoveTo while admission/ComputeAsync is pending. The periodic AI
+    -- still owns attack, return and target checks; waiting is not stuck time.
+    agent.humanoid:MoveTo(agent.root.Position)
+    agent.lastProgressPosition = agent.root.Position
+    agent.lastProgressAt = os.clock()
+    if not agent.pathRequest then
+        -- A cancelled, still-running native request retains its owner slot.
+        agent.pathFallbackRequested = true
+        agent.nextPathAt = 0
+    end
+end
+
+local function consumePath(agent, destination, speed)
+    local ticket = agent.pathRequest
+    if not ticket then return false end
+    if agent.pathRequestTarget ~= agent.target or agent.pathRequestReturning ~= agent.returning then
+        rebuildPath(agent, destination, speed)
+        return true
+    end
+    Budget.UpdateQueued(ticket, destination)
+    agent.lastPathTarget = ticket.destination
+    agent.humanoid.WalkSpeed = math.max(0, speed)
+    local ready, result = Budget.Take(ticket)
+    if not ready then
+        agent.lastProgressPosition = agent.root.Position
+        agent.lastProgressAt = os.clock()
+        return true
+    end
+    agent.pathRequest = nil
+    agent.pathRequestTarget = nil
+    if Budget.IsStale(result, agent.root, agent.lastPathTarget, destination, PATH_TARGET_MOVE_THRESHOLD) then
+        Budget.Dispose(result)
+        rebuildPath(agent, destination, speed)
+        return true
+    end
+    agent.lastProgressPosition = agent.root.Position
+    agent.lastProgressAt = os.clock()
+    agent.nextPathAt = agent.lastProgressAt + PATH_REFRESH_SECONDS
+    local path = result and result.path
+    if path then
         agent.path = path
         agent.pathWaypoints = path:GetWaypoints()
         agent.pathIndex = math.min(2, #agent.pathWaypoints)
@@ -81,9 +123,15 @@ local function rebuildPath(agent: any, destination: Vector3, speed: number)
     else
         issueDirectMove(agent, destination, speed)
     end
+    return true
 end
 
 local function navigateTo(agent: any, destination: Vector3, speed: number)
+    if not agent.active or not agent.root.Parent or not agent.humanoid.Parent then
+        clearPath(agent)
+        return
+    end
+    if consumePath(agent, destination, speed) then return end
     local now = os.clock()
     local progressed = horizontalDistance(agent.lastProgressPosition, agent.root.Position) >= STUCK_PROGRESS_STUDS
     if progressed then
@@ -127,6 +175,7 @@ function MonsterChaseNavigation.Initialize(agent: any)
     agent.pathWaypoints = nil
     agent.pathIndex = 1
     agent.pathBlockedConnection = nil
+    agent.pathRequest = nil
     agent.pathFallbackRequested = false
     agent.lastProgressPosition = agent.root.Position
     agent.lastProgressAt = os.clock()

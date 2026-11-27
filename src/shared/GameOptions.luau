@@ -111,6 +111,14 @@ function GameOptions.AdaptiveAISettings()
     })
 end
 
+function GameOptions.NavigationBudgetSettings()
+    local source = (Registry.monsterAi or {}).navigationBudget or {}
+    return table.freeze({
+        concurrent = math.floor(math.clamp(finite(source.concurrent, 2), 1, 8)),
+        startsPerSecond = math.floor(math.clamp(finite(source.startsPerSecond, 8), 1, 30)),
+    })
+end
+
 function GameOptions.ExperimentalMonsterNavigation()
     local source = (Registry.monsterAi or {}).experimentalNavigation or {}
     return table.freeze({

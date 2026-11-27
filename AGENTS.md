@@ -395,3 +395,5 @@ Character Assembly eye/brow slots are **solid-color**, with `face_colors` per
 side and no atlas picker/appearance. Shared CharacterColorBinder is the one
 runtime tint mechanism also used by compound hair. Armor and head atlas
 contracts remain unchanged. Never republish mesh/image assets just to tint.
+
+M618: only Legacy Monster / NPC native path requests use NavigationScheduler; never enqueue Experimental Navigation or Rescue Graph. Preserve original combat ownership and deadlines. Queued results are consumed by the current navigator, never apply movement from a worker. See `docs/workflows/M618_NAVIGATION_BUDGET_RU.md`.

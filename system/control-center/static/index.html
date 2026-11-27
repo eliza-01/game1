@@ -497,6 +497,8 @@
 <div class="character-grid">
 <label>Adaptive AI LOD <input id="option-ai-lod-enabled" type="checkbox"></label>
 <label>Dormant safety check · sec<input id="option-ai-lod-seconds" type="number" min="0.3" max="2" step="0.1" value="2"></label>
+<label>Legacy/NPC concurrent paths<input id="option-ai-nav-concurrent" type="number" min="1" max="8" step="1" value="2"></label>
+<label>Legacy/NPC path starts · /sec<input id="option-ai-nav-rate" type="number" min="1" max="30" step="1" value="8"></label>
 </div><div class="actions"><button id="option-ai-lod-save" class="primary" type="button">Save AI performance</button></div></div></details>
 <details class="game1-option-section" data-option-section="movement" ><summary><span class="game1-option-icon" aria-hidden="true">🦘</span><span><strong>Movement</strong><small>Прыжок и приземление</small></span></summary>
 <div class="panel character-card">
@@ -1293,7 +1295,7 @@
 <script src="skill-editor.js?v=557"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=617"></script>
+<script src="options.js?v=618"></script>
 <script src="character-creation-options.js?v=505"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>

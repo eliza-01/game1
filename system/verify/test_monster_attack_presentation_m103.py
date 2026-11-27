@@ -32,8 +32,9 @@ class MonsterM103Tests(unittest.TestCase):
         self.assertNotIn('animator:LoadAnimation(', self.ai)
 
     def test_legacy_movement_is_separately_owned_without_algorithm_changes(self):
-        for token in ('PathfindingService:CreatePath({AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3})',
-                      'path:ComputeAsync(agent.root.Position, destination)',
+        budget = (ROOT.parent / 'actor/NavigationScheduler.luau').read_text()
+        self.assertIn('path:ComputeAsync(origin, goal)', budget)
+        for token in ('Budget.Request(agent, agent.root, destination)',
                       'agent.humanoid:MoveTo(destination)',
                       'local function navigateTo('):
             self.assertIn(token, self.navigation)

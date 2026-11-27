@@ -164,6 +164,10 @@
     "adaptiveLod": {
       "enabled": false,
       "dormantSeconds": 2
+    },
+    "navigationBudget": {
+      "concurrent": 2,
+      "startsPerSecond": 8
     }
   },
   "uiPresentation": {

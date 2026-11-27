@@ -265,7 +265,7 @@ MONSTER_NAV_FIELDS = {
 
 def normalize_monster_ai(change, base=None):
     import math
-    if not isinstance(change, dict) or set(change) - {'noDamageReturnSeconds', 'experimentalNavigation', 'adaptiveLod'}:
+    if not isinstance(change, dict) or set(change) - {'noDamageReturnSeconds', 'experimentalNavigation', 'adaptiveLod', 'navigationBudget'}:
         raise ValueError('invalid monsterAi fields')
     result = deepcopy(base or {'noDamageReturnSeconds': 30})
     value = change.get('noDamageReturnSeconds', result['noDamageReturnSeconds'])
@@ -301,6 +301,17 @@ def normalize_monster_ai(change, base=None):
     if type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0.3 <= seconds <= 2:
         raise ValueError('adaptiveLod.dormantSeconds must be 0.3..2')
     result['adaptiveLod'] = {'enabled': lod_enabled, 'dormantSeconds': seconds}
+    budget = change.get('navigationBudget', {})
+    previous = result.get('navigationBudget', {})
+    if not isinstance(budget, dict) or set(budget) - {'concurrent', 'startsPerSecond'}:
+        raise ValueError('invalid navigation budget fields')
+    out_budget = {}
+    for key, default, maximum in (('concurrent', 2, 8), ('startsPerSecond', 8, 30)):
+        n = budget.get(key, previous.get(key, default))
+        if type(n) not in (int, float) or not math.isfinite(n) or not 1 <= n <= maximum or n != int(n):
+            raise ValueError(f'navigationBudget.{key} must be an integer 1..{maximum}')
+        out_budget[key] = int(n)
+    result['navigationBudget'] = out_budget
     return result
 
 
@@ -362,7 +373,7 @@ DEFAULT_PAYLOAD = {
     "flora": deepcopy(FLORA_DEFAULTS),
     "characterCreation": deepcopy(CREATION_DEFAULTS),
     "npcOverhead": deepcopy(NPC_OVERHEAD_DEFAULTS),
-    "monsterAi": {"noDamageReturnSeconds": 30},
+    "monsterAi": normalize_monster_ai({}),
     "worldStreaming": {"targetRadiusStuds": 150},
     "playerJump": {"heightMultiplier": 2.0, "descentTimeMultiplier": 2.0},
     "debugUi": {"desktop": {"showPublishedControls": False}, "mobile": {"showPublishedControls": False}, "startInHub": False, "startedLanguage": False, "startLocale": "auto", "publishedPlaceId": ""},

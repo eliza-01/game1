@@ -311,6 +311,10 @@ return table.freeze({
 			enabled = false,
 			dormantSeconds = 2,
 		}),
+		navigationBudget = table.freeze({
+			concurrent = 2,
+			startsPerSecond = 8,
+		}),
 	}),
 	playerJump = table.freeze({
 		heightMultiplier = 2,

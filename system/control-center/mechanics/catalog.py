@@ -76,6 +76,8 @@ SOURCES = {
     'player-spatial-index': ('src/server/actor/PlayerSpatialIndex.luau', 'Actor · player spatial index'),
     'player-spatial-grid': ('src/server/actor/PlayerSpatialGrid.luau', 'Actor · horizontal spatial grid'),
     'actor-target-root': ('src/server/actor/ActorTargetRoot.luau', 'Actor · combat target root'),
+    'navigation-budget': ('src/server/actor/NavigationScheduler.luau', 'Actor · native path budget'),
+    'navigation-request-queue': ('src/server/actor/NavigationRequestQueue.luau', 'Actor · native path FIFO'),
     'actor-ai-queue': ('src/server/actor/ActorAIScheduleQueue.luau', 'Actor · AI deadline queue'),
     'native-spatial-index': ('src/shared/world/NativePartSpatialIndex.luau', 'Spatial Index · native broad phase'),
     'character-service': ('src/server/character/CharacterService.luau', 'Персонаж · жизненный цикл'),

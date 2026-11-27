@@ -3,6 +3,7 @@
 -- their existing services. The queue permits yielding Legacy path requests.
 local RunService = game:GetService("RunService")
 local PlayerSpatialIndex = require(script.Parent:WaitForChild("PlayerSpatialIndex"))
+local NavigationBudget = require(script.Parent:WaitForChild("NavigationScheduler"))
 local Queue = require(script.Parent:WaitForChild("ActorAIScheduleQueue"))
 local queue = Queue.new(os.clock, task.spawn, function(err)
     warn("[game1][actor-ai] decision failed: " .. tostring(err))
@@ -18,6 +19,7 @@ function ActorAIScheduler.Register(agent, interval, delay, step, onStop, phaseLo
             local ok, err = pcall(queue.Pump, queue, os.clock())
             PlayerSpatialIndex.EndBatch()
             if not ok then error(err, 0) end
+            NavigationBudget.Pump()
         end)
     end
     return registered

@@ -73,7 +73,8 @@ class MonsterAgentLifecycleM105(unittest.TestCase):
         self.assertIn('Presentation.Stop(agent)', body)
         self.assertIn('agent.attackSerial += 1', body)
         self.assertIn('pathBlockedConnection:Disconnect()', self.nav)
-        self.assertIn('if not agent.active then return end', self.nav)
+        self.assertIn('if not agent.active or not agent.root.Parent', self.nav)
+        self.assertIn('Budget.Cancel(agent.pathRequest)', self.nav)
 
     def test_folder_observers_have_defined_lifetime(self):
         self.assertIn('if watchedFolders[folder] then return end', self.lifecycle)
@@ -90,7 +91,7 @@ class MonsterAgentLifecycleM105(unittest.TestCase):
                          'CombatState.Decide(', 'TARGET_SCAN_INTERVAL = 0.30',
                          'THINK_INTERVAL = 0.10'):
             self.assertIn(expected, self.ai)
-        self.assertIn('AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3', self.nav)
+        self.assertIn('AgentRadius = 1, AgentHeight = 4, AgentCanJump = false, WaypointSpacing = 3', (ROOT.parent / 'actor/NavigationScheduler.luau').read_text())
         self.assertNotIn('ActorChaseNavigator', self.ai + self.lifecycle + self.nav)
 
     def test_single_heartbeat_and_no_global_per_agent_watcher(self):

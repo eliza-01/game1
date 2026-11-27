@@ -135,7 +135,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     local selectionCaption = text(selectionCard, "SelectionCaption", 12, Enum.Font.GothamBold, GOLD)
     selectionCaption.Position = UDim2.fromOffset(18, 14)
     selectionCaption.Size = UDim2.new(1, -36, 0, 24)
-    selectionCaption.Text = "1/5"
+    selectionCaption.Text = ""
     local selectionName = text(selectionCard, "SelectionName", 24, Enum.Font.GothamBold, INK)
     selectionName.Position = UDim2.fromOffset(18, 34)
     selectionName.Size = UDim2.new(1, -36, 0, 34)
@@ -212,17 +212,14 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
     footLine.BorderSizePixel = 0
     footLine.Size = UDim2.new(1, 0, 0, 1)
     footLine.Parent = footer
-    -- The current profile store has one occupied slot. Reserve the action visually
-    -- without allowing a second character to overwrite it. A future multi-slot
-    -- lifecycle can enable this button once it has an authoritative free slot.
     local newCharacter = action(footer, "NewCharacter", UDim2.new(1, 0, 0, 44), UDim2.fromOffset(0, 4), false)
-    newCharacter.Visible = false
-    newCharacter.Active = false
-    newCharacter.Interactable = false
-    newCharacter.Selectable = false
-    newCharacter.AutoButtonColor = false
-    newCharacter.TextColor3 = MUTED
-    newCharacter.BackgroundColor3 = Color3.fromRGB(45, 55, 60)
+    local deleteCharacter = action(footer, "DeleteCharacter", UDim2.new(0.5, -3, 0, 44), UDim2.fromOffset(0, 4), false)
+    deleteCharacter.BackgroundColor3 = Color3.fromRGB(93, 48, 46)
+    local previousCharacter = action(selectionCard, "PreviousCharacter", UDim2.fromOffset(34, 40), UDim2.new(0, 4, 0.5, -20), false)
+    local nextCharacter = action(selectionCard, "NextCharacter", UDim2.fromOffset(34, 40), UDim2.new(1, -38, 0.5, -20), false)
+    previousCharacter.Text = "‹"; nextCharacter.Text = "›"
+    previousCharacter.TextSize = 25; nextCharacter.TextSize = 25
+    newCharacter.Visible = false; deleteCharacter.Visible = false
     local enter = action(footer, "EnterWorld", UDim2.new(1, 0, 0, 48), UDim2.fromOffset(0, 4), true)
     local status = text(footer, "CreationStatus", 12, Enum.Font.GothamBold, Color3.fromRGB(238, 187, 154))
     status.TextWrapped = true
@@ -349,7 +346,7 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
         end
         local contentY = tabY + tabHeight + 12
         local enterHeight = if compact then 38 else 44
-        local newActionSpace = if selection then enterHeight + 6 else 0
+        local newActionSpace = if selection or (editing and root:GetAttribute("RosterCanCancel") == true) then enterHeight + 6 else 0
         local footerHeight = (if compact then 64 else 84) + newActionSpace
         local bottom = if compact then 8 else 16
         separator.Position = UDim2.fromOffset(16, contentY - 7)
@@ -359,7 +356,9 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
         footer.Position = UDim2.new(0, 16, 1, -bottom)
         footer.Size = UDim2.new(1, -32, 0, footerHeight)
         newCharacter.Position = UDim2.fromOffset(0, 4)
-        newCharacter.Size = UDim2.new(1, 0, 0, enterHeight)
+        newCharacter.Size = if selection then UDim2.new(0.5, -3, 0, enterHeight) else UDim2.new(1, 0, 0, enterHeight)
+        deleteCharacter.Position = UDim2.new(0.5, 3, 0, 4)
+        deleteCharacter.Size = UDim2.new(0.5, -3, 0, enterHeight)
         local enterY = 4 + newActionSpace
         enter.Position = UDim2.fromOffset(0, enterY)
         enter.Size = UDim2.new(1, 0, 0, enterHeight)
@@ -370,16 +369,17 @@ local function uiParent(parent: Instance, settings: any, overlayParent: ScreenGu
         selectionCard.Size = UDim2.new(1, -32, 0, cardHeight)
         selectionCaption.Position = UDim2.fromOffset(18, 6)
         selectionCaption.Size = UDim2.new(1, -36, 0.23, 0)
-        selectionName.Position = UDim2.new(0, 18, 0.27, 0)
-        selectionName.Size = UDim2.new(1, -36, 0.36, 0)
-        selectionLevel.Position = UDim2.new(0, 18, 0.66, 0)
-        selectionLevel.Size = UDim2.new(1, -36, 0.26, 0)
+        selectionName.Position = UDim2.new(0, 42, 0.27, 0)
+        selectionName.Size = UDim2.new(1, -84, 0.36, 0)
+        selectionLevel.Position = UDim2.new(0, 42, 0.66, 0)
+        selectionLevel.Size = UDim2.new(1, -84, 0.26, 0)
         overlayCard.Size = UDim2.fromOffset(math.max(1, math.min(viewport.X - 32, 460)), 190)
     end
     if parent:IsA("ScreenGui") then parent:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize) end
     resize()
     return {panel = root, title = heading, subtitle = tagline,
         male = male, female = female, enter = enter, newCharacter = newCharacter,
+        deleteCharacter = deleteCharacter, previousCharacter = previousCharacter, nextCharacter = nextCharacter,
         overlay = overlay, overlayCard = overlayCard, overlayLabel = overlayLabel, recovery = recovery,
         overlayRunner = runner, overlayRunnerPose = runnerPose, overlayTrack = progressTrack, overlayFill = progressFill, overlayValue = progressValue,
         status = status, tabs = tabButtons, content = content, editor = editor, invalidateCanvas = invalidateCanvas,
@@ -404,8 +404,8 @@ function Panel.SetMode(views: any, stage: string)
     views.genders.Visible = editing
     views.tabBar.Visible = editing
     views.separator.Visible = editing
-    views.newCharacter.Visible = ready
-    views.newCharacter.Text = Language.Translate("creation.new_character")
+    views.newCharacter.Visible = ready or (editing and views.panel:GetAttribute("RosterCanCancel") == true)
+    views.deleteCharacter.Visible = ready
     views.enter.Visible = editing or ready
     views.layout()
 end

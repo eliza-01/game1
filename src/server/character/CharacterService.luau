@@ -470,7 +470,9 @@ function CharacterService.Start()
         creation:Join(player)
     end)
     Players.PlayerRemoving:Connect(function(player)
-        CharacterCreationProfileStore.RememberPosition(player, player.Character)
+        if player:GetAttribute("CharacterCreationStatus") == "world" then
+            CharacterCreationProfileStore.RememberPosition(player, player.Character)
+        end
         creation:Leave(player)
         CharacterCreationProfileStore.ForgetSession(player)
         spawning[player] = nil
@@ -484,7 +486,9 @@ function CharacterService.Start()
     -- This is a bounded server-owned checkpoint, not a client-supplied position.
     game:BindToClose(function()
         for _, player in ipairs(Players:GetPlayers()) do
-            CharacterCreationProfileStore.RememberPosition(player, player.Character)
+            if player:GetAttribute("CharacterCreationStatus") == "world" then
+                CharacterCreationProfileStore.RememberPosition(player, player.Character)
+            end
         end
     end)
 end

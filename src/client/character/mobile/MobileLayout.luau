@@ -3,42 +3,73 @@
 local Layout = {}
 
 function Layout.Resolve(width, height)
-    local short = math.min(width, height)
-    local secondary = math.floor(math.clamp(short * 0.16, 48, 66))
-    local attack = math.floor(math.clamp(short * 0.22, 64, 90))
-    local margin = math.floor(math.clamp(short * 0.055, 12, 24))
-    local gap = math.floor(math.clamp(short * 0.035, 8, 14))
-    local stick = math.floor(math.clamp(short * 0.25, 76, 112))
+    -- One scale for the whole cluster: preserve the reference proportions.
+    -- The width cap keeps the floating stick and action cluster independent.
+    local short = math.max(1, math.min(width, height))
+    local attack = math.max(1, math.floor(math.min(short * .25, width / 3.65, 120)))
+    local secondary = math.max(1, math.floor(attack * .46))
+    local skill = secondary
+    local stick = math.max(1, math.floor(attack * 1.06))
+    local margin = math.floor(attack * .12)
+    local gap = math.max(1, math.floor(attack * .12))
+    local attackRight = math.floor(attack * .22)
+    local bottom = math.floor(attack * .07)
+    local weapon = math.max(1, math.floor(attack * .37))
+    local weaponMargin = 2 -- device-safe top/right edge; independent of scale
+    local weaponGap = math.max(1, math.floor(attack * .06))
+    local attackBox = {size = attack, x = attackRight, y = bottom}
+    local jumpBox = {size = secondary, x = attackRight + attack + gap, y = bottom}
+    local aimBox = {size = secondary, x = jumpBox.x + secondary + gap, y = bottom}
+    -- Right/bottom-relative polar coordinates, starting on the inner left.
+    -- The arc is centred on Attack, not on the screen or on a separate row.
+    local cx, cy = attackRight + attack/2, bottom + attack/2
+    local arcRadius = attack * .98
+    local skills = {}
+    local maxTop = attackBox.y + attack
+    local maxLeft = aimBox.x + secondary
+    for i, degrees in ipairs({15, 50, 85, 117}) do
+        local angle = math.rad(degrees)
+        local x = math.floor(cx + arcRadius * math.cos(angle) - skill/2 + .5)
+        local y = math.floor(cy + arcRadius * math.sin(angle) - skill/2 + .5)
+        skills[i] = {size = skill, x = x, y = y}
+        maxTop = math.max(maxTop, y + skill)
+        maxLeft = math.max(maxLeft, x + skill)
+    end
     return {
         stick = stick,
         radius = stick * 0.58,
         margin = margin,
-        gap = gap, -- shared spacing for context/info docks; do not infer it from an attack box
-        jump = {size = secondary, x = margin, y = margin},
-        attack = {size = attack, x = margin + secondary + gap, y = margin + gap},
-        aim = {size = secondary, x = margin, y = margin + secondary + gap},
-        contextBottom = margin + math.max(secondary * 2 + gap, attack + gap) + gap,
+        gap = gap,
+        attack = attackBox,
+        jump = jumpBox,
+        aim = aimBox,
+        skills = skills,
+        weapon = {size = weapon, gap = weaponGap, margin = weaponMargin,
+            height = weaponMargin + 2*weapon + weaponGap},
+        clusterWidth = maxLeft - margin,
+        contextBottom = maxTop + gap,
         contextWidth = math.floor(math.clamp(width * 0.36, 152, 230)),
     }
 end
 
 -- Keep the context dock independent of the combat hit targets even on very
 -- short landscape views. In compact mode it sits to the left of the cluster.
-function Layout.Context(width, height, panelHeight)
+function Layout.Context(width, height, panelHeight, preferredWidth)
     local bounds = Layout.Resolve(width, height)
     local right = bounds.margin
     local bottom = bounds.contextBottom
-    local panelWidth = bounds.contextWidth
-    if bottom + panelHeight > height then
-        right = bounds.attack.x + bounds.attack.size + bounds.margin
+    local desiredWidth = math.min(preferredWidth or bounds.contextWidth, width - 2*bounds.margin)
+    local panelWidth = desiredWidth
+    if bottom + panelHeight > height - bounds.weapon.height then
+        right = bounds.margin + bounds.clusterWidth + bounds.gap
         bottom = bounds.margin
         panelWidth = math.min(panelWidth, math.max(0, width - right - bounds.stick - 2*bounds.margin))
         -- Place it above the stick if a particularly narrow viewport has no
         -- horizontal space. Normal phone/tablet safe sizes never need this.
-        if panelWidth < 128 then
+        if panelWidth < math.min(128, desiredWidth) then
             right = bounds.margin
-            bottom = math.max(0, height - panelHeight)
-            panelWidth = bounds.contextWidth
+            bottom = bounds.contextBottom
+            panelWidth = desiredWidth
         end
     end
     return {width = panelWidth, x = right, y = bottom}

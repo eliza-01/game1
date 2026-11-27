@@ -4,6 +4,26 @@
 **Источник инженерных ограничений:** [`AGENTS.md`](../../AGENTS.md).
 **Историческое обоснование:** [аудит 14 октября](../ARCHITECTURE_AUDIT_2026-10-14_RU.md). Его старые размеры файлов и список «следующих этапов» не актуальны.
 
+## M601 · Weapon corner / binding
+
+`WeaponSelectionController` отделяет мобильный DeviceSafeInsets от desktop. `MobileWeaponSlots` измеряет CoreUISafeInsets через GuiService и использует общий MobileLayout; остальные HUD не перемещаются. Database JSON остаётся источником binding, BalanceRegistry — его проекцией. `WeaponEquipService` и серверная авторизация не меняются.
+
+## M599 · Mobile debug and equipment shortcuts
+
+`DebugDockProfile` разделяет наборы launcher и используется bootstrap и layout. `MobileWeaponQuickSelect` владеет жизненным циклом touch slots; `WeaponSlotCatalog` выбирает slug из серверного каталога. `WeaponSelectionController` остаётся владельцем RPC, mobile ветка возвращается до создания desktop picker. Серверные границы не изменены.
+
+## M598 · Mobile HUD geometry
+
+`MobileLayout` вычисляет пропорции и полярные координаты Skill относительно Attack, а также фактические границы контекстной области. `HudCornerLayout` задаёт единый footprint Settings / Debug; `StudioDebugDock` учитывает размер weapon grid на touch. Ввод и RPC M597 неизменны.
+
+## M597 · Mobile action routing
+
+`AttackRepeatInput` хранит источники удержания и автоматический режим; `AttackController` использует существующий RenderStepped и timeline lock. `MovementController` владеет jump hold, ground sensor и импульсом. `MobileActionRegistry` регистрирует UI action surfaces, `MobileActionTouches` хранит независимые пальцы и отличает tap от drag; `MobileInputController` единственный маршрутизатор камеры/джойстика. `MobileLayout` задаёт shared safe-area контракт, `MobileControlsView`/`MobileWeaponSlots`/`SettingsLauncherView` только рисуют UI. `WeaponSelectionController` по-прежнему единственный клиентский владелец DEV equip RPC. [M597](../workflows/M597_MOBILE_HOLD_HUD_RU.md).
+
+## M596 · Character Roster
+
+`CharacterCreationGateway` владеет стадиями и общей блокировкой запросов; `CharacterRosterGateway` управляет списком/выбором/удалением. `CharacterProfileRoster` — чистые операции над схемой v2, `CharacterCreationProfileStore` — миграция, CAS UpdateAsync и выбранная запись. `CharacterProgressionService` по-прежнему работает с `Profiles.Get(player)`, теперь это выбранный ID. `CharacterRosterView` отвечает за UI выбора, `CharacterCreationController` — за RPC, epoch и превью. Отдельных циклов нет. [M596](../workflows/M596_CHARACTER_ROSTER_RU.md).
+
 ## Слои и направления зависимостей
 
 ```text
@@ -52,7 +72,7 @@ Studio Plugin/Host Agent — **authoring plane**, не клиентский иг
 | Blocked wait combat M594 | `MonsterTargetPolicy` → `MonsterBlockedPursuit.IsWaiting`; `MonsterAIService.onDamaged` → `MonsterNavigationDispatch.NotifyDamage` → `MonsterBlockedPursuit` | Ожидание не запрещает обычную атаку; проверка цели/LOS сохраняется; событие урона от текущей цели или приближение будит навигацию без фонового поиска. Активная навигация и отдельная политика специальных действий сохраняются. |
 | Rescue graph | `StudioRescueRoutes` → Place `Game1RescueRoutes` → `MonsterRescueGraph`; `rescue_route_store.py` → manifest | Place — источник координат графа; Database — зеркало; M590: Graph оркестрирует Topology → Routes → Entries → Paths → Exits; Connections — отдельные переходы только от свободных концов целой линии, с перепадом высоты ≤ Options routeConnectionHeight (2 studs по умолчанию), Sampling — 20/4 по длине линии; Segments — геометрия, Queries — per-search кэш и observer; Geometry — физика. Приоритет маршрута по цели, выхода внутри линии по высоте; каталог только метаданные |
 | Trace | `MonsterNavigationTrace` | Studio Server Output, опциональный фильтр; без дополнительных кастов |
-| Debug bootstrap | `ServiceCatalog` / `init.client` → `PublishedDebugAccess` | GP/AG/Buffer только Studio (compiled Draft только при Start in Hub), прочие debug только Studio или авторизованный TestPlace; опубликованный compiled Runtime исключён до require/start. Shared test contracts сохраняются. |
+| Debug bootstrap | `ServiceCatalog` / `init.client` → `PublishedDebugAccess` | GP/AG/Buffer только Studio (compiled Draft только при Start in Hub), прочие debug только Studio или точный настроенный private DEV Place ID, включая compiled Runtime (M595); вне DEV Place исключены до require/start. Shared test contracts сохраняются. |
 | Search cost M593 | `MonsterRescueSampling`, `MonsterExperimentalNavigation` | Свободная проекция без сетки, отсев линий вне радиуса, ожидание без callback/повторной записи таймера; остальное под профилированием. |
 
 [Полный контракт и открытые проверки](../workflows/M570_GAMEPLAY_INFRASTRUCTURE_RU.md). Не объединять authoring, боевые решения, политику преследования и граф в один сервис. Производительность и физика эксперимента требуют измерений.
@@ -151,3 +171,7 @@ IDs). Ошибка MySQL блокирует audit-sensitive publish/delete/Sync,
 ## M533 · Направленные статусы
 
 `MonsterTargetPolicy.CanBeginTargetedCast` проверяет допустимость, дальность и LOS до начала; `MonsterSkillCast` применяет зафиксированный навык без повторной hit-геометрии, сохраняя life/isolation/serial guards. `SkillEffects` остаётся владельцем длительности и модификаторов. `CharacterAnimationController` использует существующий cache и social resolver для stun, `AttackController` завершает aim/movement presentation, `StatusEffectVisuals` владеет локальным attachment и VFX. Схема Database и Remote-контракты не меняются. См. M533 workflow.
+
+## M600 · House interaction presentation
+
+HouseSocketService реплицирует состояния и проверяет действие/дистанцию. HouseSocketPromptController использует прежний 10 Hz цикл; DoorInteractionRaycast связывает runtime proxy с визуальным мешем через HouseVisualAdapter. Вне USE-зоны луч не запускается. HouseInteractionStateIcons кэширует растеризованные SVG на клиенте. NpcDisplayNameFormatter работает только на границе UI.

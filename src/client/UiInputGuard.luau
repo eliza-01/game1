@@ -68,7 +68,8 @@ end
 
 function UiInputGuard.IsWorldSuspended(): boolean
     local gui = localPlayer:FindFirstChildOfClass("PlayerGui")
-    return gui ~= nil and gui:GetAttribute("Game1CharacterSceneInputBlocked") == true
+    return gui ~= nil and (gui:GetAttribute("Game1CharacterSceneInputBlocked") == true
+        or gui:GetAttribute("Game1SettingsInputBlocked") == true)
 end
 
 function UiInputGuard.BlocksWorldInput(input: InputObject?, gameProcessed: boolean?): boolean

@@ -2368,6 +2368,66 @@
           "ja-jp": "色はこのセッションのみ",
           "ko-kr": "색상은 이번 세션에만 저장됩니다"
         }
+      },
+      "creation.delete_character": {
+        "source": "Удалить персонажа",
+        "translations": {
+          "ru-ru": "Удалить персонажа",
+          "en-us": "Delete character",
+          "de-de": "Charakter löschen",
+          "zh-cn": "删除角色",
+          "it-it": "Elimina personaggio",
+          "es-es": "Eliminar personaje",
+          "fr-fr": "Supprimer le personnage",
+          "pt-br": "Excluir personagem",
+          "ja-jp": "キャラクターを削除",
+          "ko-kr": "캐릭터 삭제"
+        }
+      },
+      "creation.confirm_delete": {
+        "source": "Удалить навсегда",
+        "translations": {
+          "ru-ru": "Удалить навсегда",
+          "en-us": "Delete permanently",
+          "de-de": "Endgültig löschen",
+          "zh-cn": "永久删除",
+          "it-it": "Elimina definitivamente",
+          "es-es": "Eliminar definitivamente",
+          "fr-fr": "Supprimer définitivement",
+          "pt-br": "Excluir permanentemente",
+          "ja-jp": "完全に削除",
+          "ko-kr": "영구 삭제"
+        }
+      },
+      "creation.delete_warning": {
+        "source": "Прогресс будет потерян.",
+        "translations": {
+          "ru-ru": "Прогресс будет потерян.",
+          "en-us": "Progress will be lost.",
+          "de-de": "Der Fortschritt geht verloren.",
+          "zh-cn": "进度将丢失。",
+          "it-it": "I progressi andranno persi.",
+          "es-es": "Se perderá el progreso.",
+          "fr-fr": "La progression sera perdue.",
+          "pt-br": "O progresso será perdido.",
+          "ja-jp": "進行状況が失われます。",
+          "ko-kr": "진행 상황이 사라집니다."
+        }
+      },
+      "creation.profile_reload": {
+        "source": "Переподключитесь для загрузки профиля.",
+        "translations": {
+          "ru-ru": "Переподключитесь для загрузки профиля.",
+          "en-us": "Reconnect to reload your profile.",
+          "de-de": "Erneut verbinden, um das Profil zu laden.",
+          "zh-cn": "请重新连接以加载角色资料。",
+          "it-it": "Riconnettiti per ricaricare il profilo.",
+          "es-es": "Vuelve a conectarte para cargar tu perfil.",
+          "fr-fr": "Reconnectez-vous pour recharger le profil.",
+          "pt-br": "Reconecte-se para carregar o perfil.",
+          "ja-jp": "再接続してプロフィールを読み込んでください。",
+          "ko-kr": "프로필을 다시 불러오려면 재접속하세요."
+        }
       }
     },
     "settings": {

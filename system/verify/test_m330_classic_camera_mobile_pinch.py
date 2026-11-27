@@ -30,7 +30,7 @@ class ClassicCameraM330(unittest.TestCase):
         self.assertIn('makeStick(gui, "MoveStick")', VIEW)
         self.assertNotIn('makeStick(gui, "LookStick")', VIEW)
         self.assertNotIn('right.pad', MOBILE)
-        self.assertIn("stick = math.floor(math.clamp(short * 0.25, 76, 112))", LAYOUT)
+        self.assertIn("stick = math.max(1, math.floor(attack * 1.06))", LAYOUT)
         self.assertIn("pad.Visible = true", VIEW)
         self.assertIn("movementController.SetTouchMovement(left.axis, true)", MOBILE)
         self.assertIn('makeAction(gui, "Jump")', VIEW)

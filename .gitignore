@@ -14,3 +14,5 @@ place/game1_runtime_source.rbxlx
 
 
 game1_runtime_source.rbxlx
+# Local location revisions database
+/.control-center/location-place-revisions.sqlite*

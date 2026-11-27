@@ -60,7 +60,7 @@ class FloorAndCharacterSceneM485(unittest.TestCase):
         self.assertIn('character ~= localPlayer.Character then return false', camera)
         self.assertIn('setCameraOrbit(camera, root)', camera)
         self.assertIn('if isCurrent and not isCurrent() then return false end', preview)
-        self.assertEqual(gateway.count('return self:Request(player, function()'), 3)
+        self.assertEqual(gateway.count('return self:Request(player, function()'), 4)
         self.assertIn('self.busy[player] = nil', gateway)
         self.assertIn('self.nextRequest[player] = nil', gateway)
 

@@ -33,11 +33,11 @@ ITEMS = [
          ['NpcEquipmentRegistry.loadouts', 'NpcAnimationRegistry.profiles'], [
              {'title': 'Работает в исходниках', 'lines': [
                  'NpcAnimationService владеет animation tracks, NpcEquipmentService монтирует оружие через общий WeaponEquipService.',
-                 'NpcOverheadController отображает имя и условный HP в радиусах, заданных Options для устройства.',
+                 'NpcOverheadController отображает имя и условный HP в радиусах Options. HealthBarView удаляет цифры только из отображаемого имени NPC; slug, имя Instance, база и уровень не изменяются.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
                  'Опубликованный loadout не является персональным инвентарём NPC; временная смена экипировки и анимационной фазы не восстанавливается из DataStore.',
                  'Нужна Studio/мобильная и мультиклиентская проверка оружия, клипов, HP-видимости, стриминга и очистки GUI.',
              ]},
-         ], ['npc-animation', 'npc-equipment', 'npc-animation-registry', 'npc-overhead', 'weapon-equip']),
+         ], ['npc-animation', 'npc-equipment', 'npc-animation-registry', 'npc-overhead', 'npc-display-name', 'weapon-equip']),
 ]

@@ -101,7 +101,7 @@ local function selectWeapon(player: Player, request: any)
 end
 
 function Service.Start()
-    if started or not Config.Enabled then return end
+    if started or not Config.Enabled or not Access.ServerEnabled() then return end
     started = true
     local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
     remote(remotes, "GetWeaponSelectionCatalog").OnServerInvoke = catalogFor

@@ -60,9 +60,25 @@ function Controller.Start()
         local gui = Instance.new("ScreenGui")
         gui.Name = "Game1WeaponSelectionGui"
         gui.ResetOnSpawn = false
-        gui.IgnoreGuiInset = false
+        if UserInputService.TouchEnabled then
+            -- Use the device safe corner, not the space below the Roblox top bar.
+            gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+            gui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+            gui.ClipToDeviceSafeArea = true
+        else
+            gui.IgnoreGuiInset = false
+        end
         gui.DisplayOrder = 20
         gui.Parent = playerGui
+
+        local function equip(slug: string)
+            return selectRemote:InvokeServer(slug)
+        end
+        if UserInputService.TouchEnabled then
+            require(script.Parent:WaitForChild("MobileWeaponQuickSelect")).Mount(gui, player,
+                function() return getCatalog:InvokeServer() end, equip)
+            return -- no mobile WeaponMenuPanel or catalog UI
+        end
 
         local launcher = makeButton(gui, "⚔  ОРУЖИЕ", 42)
         launcher.Name = "WeaponMenuToggle"
@@ -171,7 +187,7 @@ function Controller.Start()
                 end
             end
             for index, kind in ipairs(kinds) do
-                local height = if UserInputService.TouchEnabled then 44 else 30
+                local height = 30
                 local button = makeButton(categories, categoryLabels[kind] or kind, height)
                 button.Size = UDim2.fromOffset(math.clamp(30 + #button.Text * 8, 70, 144), height)
                 button.BackgroundColor3 = if activeCategory == kind then Color3.fromRGB(31, 94, 81) else SURFACE
@@ -209,7 +225,7 @@ function Controller.Start()
                     loading = true
                     status.Text = "Применяем…"
                     task.spawn(function()
-                        local success, result = pcall(function() return selectRemote:InvokeServer(slug) end)
+                        local success, result = pcall(equip, slug)
                         loading = false
                         if success and typeof(result) == "table" and result.ok == true then
                             selectedSlug = tostring(result.selectedWeaponSlug or "")
@@ -245,23 +261,9 @@ function Controller.Start()
         end
         local function resize()
             local viewport = gui.AbsoluteSize
-            if UserInputService.TouchEnabled then
-                -- The old testing menu extended below short landscape screens.
-                panel.AnchorPoint = Vector2.new(0.5, 0.5)
-                panel.Position = UDim2.fromScale(0.5, 0.5)
-                panel.Size = UDim2.fromOffset(math.min(340, math.max(0, viewport.X - 24)),
-                    math.min(365, math.max(0, viewport.Y - 24)))
-                close.Size = UDim2.fromOffset(44, 44)
-                close.Position = UDim2.new(1, -50, 0, 4)
-                categories.Position = UDim2.fromOffset(10, 52)
-                categories.Size = UDim2.new(1, -20, 0, 46)
-                list.Position = UDim2.fromOffset(10, 104)
-                list.Size = UDim2.new(1, -20, 1, -145)
-            else
-                local camera = workspace.CurrentCamera
-                local desktop = if camera then camera.ViewportSize else viewport
-                panel.Size = UDim2.fromOffset(math.min(294, math.max(220, desktop.X - 28)), math.min(365, math.max(218, desktop.Y - 158)))
-            end
+            local camera = workspace.CurrentCamera
+            local desktop = if camera then camera.ViewportSize else viewport
+            panel.Size = UDim2.fromOffset(math.min(294, math.max(220, desktop.X - 28)), math.min(365, math.max(218, desktop.Y - 158)))
             status.Position = UDim2.new(0, 13, 1, -31)
         end
         resize()

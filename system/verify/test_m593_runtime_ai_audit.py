@@ -123,7 +123,7 @@ check(false,false,false,false); check(false,true,false,true); check(true,true,fa
         for name in ('GameplayTestController', 'GameplayAggroController', 'GameplayBufferController', 'TestLoadoutController', 'HouseSocketDebugController'):
             self.assertGreater(client.index(name), gate)
         self.assertIn('if started or not Access.ServerEnabled() then return end', read('src/server/dev/PublishedDebugAccessService.luau'))
-        self.assertIn('if compiledRuntime() then return false end', read('src/shared/dev/PublishedDebugAccess.luau'))
+        self.assertIn('if not publishedPlaceAllowed() then return false end', read('src/shared/dev/PublishedDebugAccess.luau'))
         self.assertIn('RunService:IsStudio() and (not compiledRuntime() or Options.StartInGameplayHub())', read('src/shared/dev/PublishedDebugAccess.luau'))
         self.assertIn('if DebugAccess.GameplayTestEnabled() then', client)
 

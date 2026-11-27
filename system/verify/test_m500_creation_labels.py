@@ -1,4 +1,4 @@
-"""UI copy and single-slot-safe selection footer contracts."""
+"""UI copy and multi-slot selection footer contracts."""
 from pathlib import Path
 import json
 import unittest
@@ -24,14 +24,18 @@ class CharacterLabelsM500(unittest.TestCase):
         self.assertIn('self.cancel.Text = Language.Translate("feedback.cancel")', palette)
         self.assertIn('if onCancel then onCancel() end', palette)
 
-    def test_new_character_is_reserved_above_play_only_in_selection(self):
+    def test_new_character_and_delete_are_above_play(self):
         panel = (ROOT/'src/client/character/CharacterCreationPanel.luau').read_text(encoding='utf8')
-        self.assertIn('views.newCharacter.Visible = ready', panel)
-        self.assertIn('views.newCharacter.Text = Language.Translate("creation.new_character")', panel)
-        self.assertIn('newCharacter.Interactable = false', panel)
-        self.assertIn('newCharacter.Selectable = false', panel)
-        self.assertNotIn('newCharacter.Activated:Connect', panel)
-        self.assertIn('local newActionSpace = if selection then enterHeight + 6 else 0', panel)
+        view = (ROOT/'src/client/character/CharacterRosterView.luau').read_text(encoding='utf8')
+        controller = (ROOT/'src/client/character/CharacterCreationController.luau').read_text(encoding='utf8')
+        self.assertIn('views.newCharacter.Visible = ready or (editing', panel)
+        self.assertIn('views.deleteCharacter.Visible = ready', panel)
+        self.assertIn('"creation.new_character"', view)
+        self.assertIn('button.Interactable = enabled', view)
+        self.assertIn('#characters < limit', view)
+        self.assertIn('controls.newCharacter.Activated:Connect', controller)
+        self.assertIn('controls.deleteCharacter.Activated:Connect', controller)
+        self.assertIn('local newActionSpace = if selection or', panel)
         self.assertIn('local footerHeight = (if compact then 64 else 84) + newActionSpace', panel)
         self.assertIn('local enterY = 4 + newActionSpace', panel)
         for enter_height in (38, 44):

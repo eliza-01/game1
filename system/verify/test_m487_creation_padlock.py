@@ -35,10 +35,11 @@ class CreationPadlockM487(unittest.TestCase):
         self.assertIn('elseif slot == "eye_r" then color = eyes.r', p)
         self.assertIn('EyeColors.Normalize(colors.eyes, EyeColors.Defaults(row.assembly.parts))', a)
         self.assertIn('recipe.parts[slot].color = eyes[side]', a)
-        self.assertEqual(g.count('self.profiles.SetValidatedAppearance('), 4)
+        self.assertEqual(g.count('self.profiles.SetValidatedAppearance('), 2)
+        self.assertIn('gateway.profiles.SetValidatedAppearance(player, checked)', source('src/server/character/CharacterRosterGateway.luau'))
         self.assertNotIn('appearance = existing.appearance, persisted', g)
         self.assertIn('record.appearance = appearance', s)
-        self.assertIn('writeRecord(player, record, false)', s)
+        self.assertIn('commit(player, session, Roster.Copy(session.document), false)', s)
 
     def test_overlay_spans_enter_and_camera_handoff(self):
         c = source('src/client/character/CharacterCreationController.luau')

@@ -25,7 +25,7 @@ class MobileControlsM432(unittest.TestCase):
         self.assertIn('if current == previous then return end', ROUTER)
 
     def test_reset_paths_and_character_lifecycle(self):
-        for event in ('TouchEnded:Connect(endTouch)', 'WindowFocusReleased:Connect(resetTouch)', 'TextBoxFocused:Connect(refreshVisibility)', 'MenuOpened:Connect', 'MenuClosed:Connect', 'CharacterRemoving:Connect', 'CharacterAdded:Connect(bindCharacter)', 'Enum.UserInputState.Cancel'):
+        for event in ('TouchEnded:Connect(function(input) endTouch(input, false) end)', 'WindowFocusReleased:Connect(resetTouch)', 'TextBoxFocused:Connect(refreshVisibility)', 'MenuOpened:Connect', 'MenuClosed:Connect', 'CharacterRemoving:Connect', 'CharacterAdded:Connect(bindCharacter)', 'Enum.UserInputState.Cancel'):
             self.assertIn(event, ROUTER)
         self.assertIn('character:GetAttribute("LifeState") == "Alive"', ROUTER)
         self.assertIn('model:GetAttributeChangedSignal("LifeState"):Connect(refreshVisibility)', ROUTER)
@@ -47,10 +47,10 @@ class MobileControlsM432(unittest.TestCase):
         self.assertIn('left.pad.BackgroundTransparency = 0.78', VIEW)
 
     def test_weapon_and_aim_presentation_are_event_driven(self):
-        self.assertIn('GetAttributeChangedSignal("EquippedWeaponType")', ROUTER)
         self.assertIn('cameraController.AutoAimChanged(view.SetAim)', ROUTER)
-        self.assertIn('if kind == weapon then return end', VIEW)
-        for icon in ('BowGrip', 'Blade', 'Knuckle', 'LeftArrow', 'ReticleRing'):
+        self.assertIn('view.SetAutomatic(enabled)', ROUTER)
+        self.assertIn('function result.SetAutomatic', VIEW)
+        for icon in ('AttackSlash', 'LeftArrow', 'ReticleRing'):
             self.assertIn(icon, VIEW)
 
     def test_context_dock_uses_same_selection_and_server(self):
@@ -64,11 +64,11 @@ class MobileControlsM432(unittest.TestCase):
         self.assertIn('prompt.KeyboardKeyCode.Name', PROMPT)
         self.assertIn('if visible[socket] and visibleSignature[socket] == state then return end', PROMPT)
 
-    def test_test_weapon_menu_respects_safe_dimensions(self):
+    def test_desktop_weapon_menu_and_mobile_shortcuts_are_separate(self):
         picker = read('src/client/weapon/WeaponSelectionController.luau')
-        self.assertIn('panel.AnchorPoint = Vector2.new(0.5, 0.5)', picker)
-        self.assertIn('math.min(365, math.max(0, viewport.Y - 24))', picker)
-        self.assertIn('close.Size = UDim2.fromOffset(44, 44)', picker)
+        self.assertLess(picker.index('MobileWeaponQuickSelect'), picker.index('local panel = Instance.new'))
+        self.assertIn('return -- no mobile WeaponMenuPanel or catalog UI', picker)
+        self.assertIn('math.min(365, math.max(218, desktop.Y - 158))', picker)
         self.assertIn('gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(resize)', picker)
         self.assertEqual(picker.count('selectRemote:InvokeServer(slug)'), 1)
 

@@ -21,10 +21,11 @@ class DebugIconsM558(unittest.TestCase):
     def test_eight_unique_glyphs_and_no_text_overwrite(self):
         dock=read('src/client/dev/StudioDebugDock.luau')
         icons=read('src/client/dev/StudioDebugIcons.luau')
-        slots=re.findall(r'(\w+) = (\d+)',re.search(r'local slots = \{([^}]+)\}',dock)[1])
+        profile=read('src/client/dev/DebugDockProfile.luau')
+        slots=re.findall(r'(\w+) = (\d+)',re.search(r'local desktop = .*?slots = table.freeze\(\{([^}]+)\}',profile)[1])
         expected=['TL','CS','HS','CD','HP','UI','GP','AG']
         self.assertEqual(slots,list(zip(expected,map(str,range(8)))))
-        self.assertIn('local SLOT_COUNT = 8',dock)
+        self.assertIn('count = 8',profile)
         masks=re.findall(r'(\w+) = \{ label = "([^"]+)", rows = \{(.*?)\n    \} \}',icons,re.S)
         self.assertEqual([m[0] for m in masks],expected)
         for _,_,rows in masks:

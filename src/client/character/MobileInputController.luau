@@ -6,6 +6,8 @@ local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local Mobile = script.Parent:WaitForChild("mobile")
 local View = require(Mobile:WaitForChild("MobileControlsView"))
 local Layout = require(Mobile:WaitForChild("MobileLayout"))
+local ActionTouches = require(Mobile:WaitForChild("MobileActionTouches"))
+local ActionRegistry = require(Mobile:WaitForChild("MobileActionRegistry"))
 
 local MobileInputController = {}
 local started = false
@@ -22,6 +24,8 @@ function MobileInputController.Start(movementController: any, cameraController: 
     local playerGui = player:WaitForChild("PlayerGui")
     local view = View.Create(playerGui)
     local gui = view.gui
+    local actions = ActionTouches.New()
+    local automatic = false
     local left = {input = nil :: InputObject?, center = Vector2.zero, axis = Vector2.zero}
     local lookFingers: {InputObject} = {}
     local lookPositions: {[InputObject]: Vector2} = {}
@@ -44,12 +48,26 @@ function MobileInputController.Start(movementController: any, cameraController: 
         movementController.SetTouchMovement(Vector2.zero, false)
     end
 
+    local function setAutomatic(enabled: boolean)
+        automatic = enabled
+        attackController.SetAutomaticAttack(enabled)
+        view.SetAutomatic(enabled)
+        -- Preserve the existing mobile target assist without making it an attack gate.
+        if enabled ~= (cameraController.AutoAimTarget() ~= nil) then
+            cameraController.ToggleAutoAim()
+        end
+    end
+
     local function resetTouch()
         for input, connection in cancellation do
             connection:Disconnect()
             cancellation[input] = nil
         end
         releaseStick()
+        actions.Clear()
+        attackController.SetAttackHeld("touch", false)
+        movementController.SetTouchJumpHeld(false)
+        setAutomatic(false)
         table.clear(lookFingers)
         table.clear(lookPositions)
         pinchGap = nil
@@ -74,11 +92,6 @@ function MobileInputController.Start(movementController: any, cameraController: 
         table.clear(characterConnections)
         character = model
         if model then
-            local function refreshWeapon()
-                view.SetWeapon(model:GetAttribute("EquippedWeaponType"))
-            end
-            refreshWeapon()
-            table.insert(characterConnections, model:GetAttributeChangedSignal("EquippedWeaponType"):Connect(refreshWeapon))
             table.insert(characterConnections, model:GetAttributeChangedSignal("LifeState"):Connect(refreshVisibility))
         end
         refreshVisibility()
@@ -90,6 +103,7 @@ function MobileInputController.Start(movementController: any, cameraController: 
         view.Layout()
     end
     playerGui:GetAttributeChangedSignal("Game1CharacterSceneInputBlocked"):Connect(refreshVisibility)
+    playerGui:GetAttributeChangedSignal("Game1SettingsInputBlocked"):Connect(refreshVisibility)
     gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(relayout)
     gui:GetPropertyChangedSignal("AbsolutePosition"):Connect(relayout)
     player.CharacterAdded:Connect(bindCharacter)
@@ -117,8 +131,15 @@ function MobileInputController.Start(movementController: any, cameraController: 
         end
     end
 
-    local function endTouch(input: InputObject)
+    local function endTouch(input: InputObject, cancelled: boolean?)
         disconnectTouch(input)
+        local kind, tap, onTap = actions.Finish(input)
+        if kind then
+            if kind == "Attack" then attackController.SetAttackHeld("touch", actions.Held(kind)) end
+            if kind == "Jump" then movementController.SetTouchJumpHeld(actions.Held(kind)) end
+            if onTap and tap and not cancelled and active() then onTap() end
+            return
+        end
         if input == left.input then releaseStick(); return end
         if not lookPositions[input] then return end
         lookPositions[input] = nil
@@ -135,12 +156,12 @@ function MobileInputController.Start(movementController: any, cameraController: 
 
     local function watchCancellation(input: InputObject)
         cancellation[input] = input:GetPropertyChangedSignal("UserInputState"):Connect(function()
-            if input.UserInputState == Enum.UserInputState.Cancel then endTouch(input) end
+            if input.UserInputState == Enum.UserInputState.Cancel then endTouch(input, true) end
         end)
     end
 
     UserInputService.TouchStarted:Connect(function(input: InputObject, gameProcessed: boolean)
-        if not active() or UiInputGuard.BlocksWorldInput(input, gameProcessed) then return end
+        if actions.Has(input) or not active() or UiInputGuard.BlocksWorldInput(input, gameProcessed) then return end
         local position = getTouchPosition(input)
         local point = position - gui.AbsolutePosition
         local size = gui.AbsoluteSize
@@ -166,6 +187,12 @@ function MobileInputController.Start(movementController: any, cameraController: 
 
     UserInputService.TouchMoved:Connect(function(input: InputObject)
         if input == left.input then moveStick(input); return end
+        if actions.Has(input) then
+            local delta = actions.Move(input, getTouchPosition(input))
+            -- An independent free-look finger wins; held action fingers never pinch.
+            if delta and #lookFingers == 0 and delta.Magnitude > 0 then cameraController.RotateTouch(delta) end
+            return
+        end
         local previous = lookPositions[input]
         if not previous then return end
         local current = getTouchPosition(input)
@@ -179,24 +206,35 @@ function MobileInputController.Start(movementController: any, cameraController: 
             pinchGap = currentGap
         end
     end)
-    UserInputService.TouchEnded:Connect(endTouch)
+    UserInputService.TouchEnded:Connect(function(input) endTouch(input, false) end)
     UserInputService.WindowFocusReleased:Connect(resetTouch)
     UserInputService.TextBoxFocused:Connect(refreshVisibility)
     UserInputService.TextBoxFocusReleased:Connect(refreshVisibility)
     GuiService.MenuOpened:Connect(function() menuOpen = true; refreshVisibility() end)
     GuiService.MenuClosed:Connect(function() menuOpen = false; refreshVisibility() end)
 
-    view.jump.Activated:Connect(function()
-        if active() then movementController.RequestJump() end
+    ActionRegistry.SetListener(function(input, kind, onTap)
+        if not active() then return false end
+        if input == left.input or lookPositions[input] then endTouch(input, true) end
+        if not actions.Begin(input, kind, getTouchPosition(input), onTap) then return true end
+        watchCancellation(input)
+        if kind == "Jump" then
+            movementController.SetTouchJumpHeld(true)
+            movementController.RequestJump()
+        elseif kind == "Attack" then
+            attackController.SetAttackHeld("touch", true)
+            attackController.RequestAttack()
+        end
+        return true
     end)
+    ActionRegistry.Register(view.jump, "Jump")
+    ActionRegistry.Register(view.attack, "Attack")
+    ActionRegistry.Register(view.aim, "Aim", function()
+        if active() then setAutomatic(not automatic) end
+    end)
+    for _, button in view.skills do ActionRegistry.Register(button, "Skill") end
     view.SetAim(cameraController.AutoAimTarget())
     cameraController.AutoAimChanged(view.SetAim)
-    view.aim.Activated:Connect(function()
-        if active() then cameraController.ToggleAutoAim() end
-    end)
-    view.attack.Activated:Connect(function()
-        if active() and attackController.RequestAttack then attackController.RequestAttack() end
-    end)
 end
 
 return MobileInputController

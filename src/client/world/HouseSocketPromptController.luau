@@ -21,6 +21,8 @@ local CampfireContract = require(Shared:WaitForChild("world"):WaitForChild("Camp
 local ElevatorFloor = require(Shared:WaitForChild("world"):WaitForChild("HouseElevatorFloor"))
 local Aim = require(Shared:WaitForChild("world"):WaitForChild("HouseSocketAimPolicy"))
 local Occlusion = require(script.Parent:WaitForChild("HouseSocketAimOcclusion"))
+local DoorRaycast = require(script.Parent:WaitForChild("DoorInteractionRaycast"))
+local Icons = require(script.Parent:WaitForChild("HouseInteractionStateIcons"))
 local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local player = Players.LocalPlayer
 local Controller = {}
@@ -85,6 +87,11 @@ end
 
 -- AIM sockets (elevator + chest) use the same client reticle path for both
 -- character types; native prompts cannot bypass AIM visibility.
+local function isDoorAim(prompt: ProximityPrompt): boolean
+    local definition = definitionFor(prompt)
+    return definition ~= nil and definition.role == "door" and prompt.KeyboardKeyCode == Enum.KeyCode.E
+end
+
 local function clientNativeDistance(name: string): number
     local definition = Contract.Get(name)
     if name == WINDMILL_DEFINITION.name then return WINDMILL_DEFINITION.radius end
@@ -98,7 +105,7 @@ local function listen(instance: Instance)
     if not definition then return end
     local name = definition.name
     local prompt: ProximityPrompt = instance
-    prompt.MaxActivationDistance = if definition == CAMPFIRE_DEFINITION then 0 else clientNativeDistance(name)
+    prompt.MaxActivationDistance = if isDoorAim(prompt) then 0 else if definition == CAMPFIRE_DEFINITION then 0 else clientNativeDistance(name)
     prompts[prompt] = prompt.AncestryChanged:Connect(function()
         if not prompt:IsDescendantOf(Workspace) then
             local connection = prompts[prompt]
@@ -117,7 +124,7 @@ function Controller.SetRadius(name: string, value: number)
     for prompt in prompts do
         if prompt:GetAttribute("Game1HouseSocketName") == name then
             local definition = Contract.Get(name)
-            prompt.MaxActivationDistance = if definition and definition.hoverRadius then 0 else value
+            prompt.MaxActivationDistance = if isDoorAim(prompt) then 0 else if definition and definition.hoverRadius then 0 else value
         end
     end
 end
@@ -130,13 +137,14 @@ end
 
 -- E and F at the same socket are represented as ONE panel. Both actions
 -- remain individual server-authored ProximityPrompts for native activation.
-local function availableActions(socket: Attachment): {ProximityPrompt}
+local function availableActions(socket: Attachment, selected: ProximityPrompt): {ProximityPrompt}
     local actions: {ProximityPrompt} = {}
     local root = SpatialRoot.Get(player)
     if not root then return actions end
     for _, name in {"Game1HouseInteraction", "Game1HouseInteractionAlternate"} do
         local prompt = socket:FindFirstChild(name)
         if prompt and prompt:IsA("ProximityPrompt") and prompt.Enabled
+            and (not isDoorAim(prompt) or prompt == selected)
             and ElevatorFloor.AllowsPrompt(prompt, root) then
             table.insert(actions, prompt)
         end
@@ -165,7 +173,7 @@ end
 local function signature(actions: {ProximityPrompt}): string
     local parts = {if keyOwned() then "own" else "lost", if SpatialRoot.IsCustom(player) then "custom" else "native"}
     for _, prompt in actions do
-        table.insert(parts, prompt.KeyboardKeyCode.Name .. "=" .. prompt.ActionText)
+        table.insert(parts, prompt.KeyboardKeyCode.Name .. "=" .. prompt.ActionText .. ":" .. tostring(prompt:GetAttribute("Game1InteractionIcon")))
     end
     return table.concat(parts, "|")
 end
@@ -207,6 +215,10 @@ local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): Proximit
     local aimEntry = math.huge
     local selectedOther: ProximityPrompt? = nil
     local otherDistance = math.huge
+    local doors: {[Model]: boolean} = {}
+    local doorPrompts: {[Model]: ProximityPrompt} = {}
+    local doorDistances: {[Model]: number} = {}
+    local rayDistance = 0
     for prompt in prompts do
         if not prompt.Enabled or not prompt:IsDescendantOf(Workspace)
             or not ElevatorFloor.AllowsPrompt(prompt, root) then continue end
@@ -221,7 +233,17 @@ local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): Proximit
         local maxDistance = if definition == CAMPFIRE_DEFINITION then campfireRadius()
             else if definition == WINDMILL_DEFINITION then WINDMILL_DEFINITION.radius else radius(name)
         if distance > maxDistance then continue end
-        if definition.hoverRadius then
+        if isDoorAim(prompt) then
+            local door = DoorRaycast.DoorOf(socket)
+            if door then
+                doors[door] = true
+                if not doorDistances[door] or distance < doorDistances[door] then
+                    doorDistances[door] = distance
+                    doorPrompts[door] = prompt
+                end
+                rayDistance = math.max(rayDistance, (frame.Position - ray.Origin).Magnitude + maxDistance)
+            end
+        elseif definition.hoverRadius then
             local aimRadius = if definition == CAMPFIRE_DEFINITION then campfireHoverRadius() else hoverRadius(name)
             local hit = Aim.RaySphereEntry(ray.Origin, ray.Direction, frame.Position, aimRadius)
             if hit == nil then continue end
@@ -240,9 +262,12 @@ local function nearestCustomPrompt(root: BasePart, aimedOnly: boolean): Proximit
             end
         end
     end
+    local hitDoor, hitDistance = DoorRaycast.Hit(ray.Origin, ray.Direction, rayDistance, doors, player.Character)
+    if hitDoor and hitDistance <= aimEntry then return doorPrompts[hitDoor] end
     if selectedAim and Occlusion.IsClear(ray.Origin, ray.Direction, aimEntry, player.Character) then
         return selectedAim
     end
+    if hitDoor then return doorPrompts[hitDoor] end
     return selectedOther
 end
 
@@ -260,6 +285,11 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
     gui.Parent = player:WaitForChild("PlayerGui")
     local rowHeight = math.max(if touch then 52 else 44, cfg.fontPx + 19)
     local panelHeight = 12 + #actions * rowHeight
+    local iconOnly = true
+    for _, prompt in actions do
+        if typeof(prompt:GetAttribute("Game1InteractionIcon")) ~= "string" then iconOnly = false; break end
+    end
+    local panelWidth = if iconOnly then rowHeight + 12 else cfg.widthPx
     local background = Instance.new("Frame")
     background.Name = "Panel"
     background.BackgroundColor3 = Color3.fromRGB(18, 24, 31)
@@ -269,14 +299,14 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
         local function layout()
             local bounds = MobileLayout.Context(gui.AbsoluteSize.X, gui.AbsoluteSize.Y, panelHeight)
             background.AnchorPoint = Vector2.new(1, 1)
-            background.Size = UDim2.fromOffset(math.min(cfg.widthPx, bounds.width), panelHeight)
+            background.Size = UDim2.fromOffset(math.min(panelWidth, bounds.width), panelHeight)
             background.Position = UDim2.new(1, -bounds.x + cfg.offsetXPx, 1, -bounds.y + cfg.offsetYPx)
         end
         gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
         layout()
     else
         background.AnchorPoint = Vector2.new(1, 0.5)
-        background.Size = UDim2.fromOffset(cfg.widthPx, panelHeight)
+        background.Size = UDim2.fromOffset(panelWidth, panelHeight)
         background.Position = UDim2.new(1, -22 + cfg.offsetXPx, 0.5, cfg.offsetYPx)
     end
     rounded(background, 11)
@@ -299,8 +329,13 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
         action.AutoButtonColor = true
         action.Active = true
         action.RichText = true
-        action.Text = if touch then actionLabel(prompt.ActionText)
-            else ("[" .. prompt.KeyboardKeyCode.Name .. "]   " .. actionLabel(prompt.ActionText))
+        local iconState = prompt:GetAttribute("Game1InteractionIcon")
+        if typeof(iconState) == "string" then
+            Icons.Apply(action, iconState)
+        else
+            action.Text = if touch then actionLabel(prompt.ActionText)
+                else ("[" .. prompt.KeyboardKeyCode.Name .. "]   " .. actionLabel(prompt.ActionText))
+        end
         action.Parent = background
         rounded(action, 8)
         action.Activated:Connect(function()
@@ -308,6 +343,7 @@ local function makeGui(socket: Attachment, actions: {ProximityPrompt}): LayerCol
             local root = SpatialRoot.Get(player)
             local selected = if root then nearestCustomPrompt(root, false) else nil
             if not selected or selected.Parent ~= socket then return end
+            if not table.find(availableActions(socket, selected), prompt) then return end
             requestAction(prompt)
         end)
     end
@@ -320,8 +356,8 @@ local function hideSocket(socket: Attachment)
     visibleSignature[socket] = nil
 end
 
-local function renderSocket(socket: Attachment)
-    local actions = availableActions(socket)
+local function renderSocket(socket: Attachment, selected: ProximityPrompt)
+    local actions = availableActions(socket, selected)
     if #actions == 0 then hideSocket(socket); return end
     local state = signature(actions)
     if visible[socket] and visibleSignature[socket] == state then return end
@@ -338,9 +374,9 @@ local function updateCustomPrompt()
     local anchor = if nextPrompt then nextPrompt.Parent else nil
     local selectedSocket = if anchor and anchor:IsA("Attachment") then anchor :: Attachment else nil
     for socket in pairs(visible) do
-        if socket == selectedSocket then renderSocket(socket) else hideSocket(socket) end
+        if socket ~= selectedSocket then hideSocket(socket) end
     end
-    if selectedSocket then renderSocket(selectedSocket) end
+    if selectedSocket and nextPrompt then renderSocket(selectedSocket, nextPrompt) end
 end
 
 function Controller.Start()
@@ -455,7 +491,7 @@ function Controller.Start()
         local selected = nearestCustomPrompt(root, not SpatialRoot.IsCustom(player))
         if not selected or not selected:IsDescendantOf(Workspace) then return end
         local definition = definitionFor(selected)
-        if not definition or (not SpatialRoot.IsCustom(player) and not definition.hoverRadius) then return end
+        if not definition or (not SpatialRoot.IsCustom(player) and not definition.hoverRadius and not isDoorAim(selected)) then return end
         local matching: ProximityPrompt? = nil
         for prompt in prompts do
             if prompt.Parent == selected.Parent and prompt.Enabled and prompt.KeyboardKeyCode == input.KeyCode then
@@ -464,6 +500,8 @@ function Controller.Start()
             end
         end
         if not matching then return end
+        local socket = selected.Parent
+        if not socket or not socket:IsA("Attachment") or not table.find(availableActions(socket, selected), matching) then return end
         requestAction(matching)
     end)
     -- Native keyboard ProximityPrompt.Triggered remains connected on the

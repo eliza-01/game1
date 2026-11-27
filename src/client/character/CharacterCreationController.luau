@@ -24,6 +24,7 @@ local Editor = require(script.Parent:WaitForChild("CharacterCreationAppearanceVi
 local EyeEdit = require(script.Parent:WaitForChild("CharacterCreationEyeEdit"))
 local FullScreenLayer = require(script.Parent.Parent:WaitForChild("FullScreenLayer"))
 local Panel = require(script.Parent:WaitForChild("CharacterCreationPanel"))
+local RosterView = require(script.Parent:WaitForChild("CharacterRosterView"))
 local Controller = {}
 local started = false
 
@@ -104,6 +105,10 @@ function Controller.Start()
     local Palette = require(script.Parent:WaitForChild("CharacterCreationColorPalette"))
     local palette = Palette.new(controls.panel)
     local selected: string? = nil
+    local selectedId: string? = nil
+    local characters: {any} = {}
+    local slotLimit = 0
+    local confirmingDelete = false
     local stage = "loading"
     local lastStage = ""
     local pending = false
@@ -119,6 +124,7 @@ function Controller.Start()
     local ready: {[string]: boolean} = {}
     local previewError: {[string]: boolean} = {}
     local readFailed = false
+    local readFailureReason: string? = nil
     local sceneReady = false
     local leaving = false
     local activeScene: boolean? = nil
@@ -413,7 +419,7 @@ function Controller.Start()
         local busy = pending or leaving or next(bootstrapPending) ~= nil
         male.Active = not busy
         female.Active = not busy
-        enter.Active = not busy and (retry or (selectedReady and sceneReady))
+        enter.Active = not busy and not confirmingDelete and (retry or (selectedReady and sceneReady))
             and (stage == "creation" or stage == "selection")
         if retry then enter.Text = Language.Translate("creation.retry") end
         if busy then enter.Text = Language.Translate(if stage == "selection" and selected then "creation.entering_world" else if stage == "selection" then "creation.loading_profile" else "creation.working") end
@@ -435,6 +441,8 @@ function Controller.Start()
                 end, savedColors)
             controls.invalidateCanvas()
         end
+        RosterView.Render(controls, stage, characters, selectedId, slotLimit, busy, confirmingDelete,
+            (tonumber(player:GetAttribute("CharacterRosterCount")) or 0) > 0)
         Panel.SetMode(controls, stage)
         if worldRecovery then
             Panel.SetRecovery(controls, Language.Translate("creation.unavailable"))
@@ -443,13 +451,14 @@ function Controller.Start()
                 if leaving or (submitting and stage == "selection") then "creation.entering_world" else "creation.working"), worldProgress)
         elseif next(bootstrapPending) then
             refreshBootstrapOverlay()
-        elseif stage == "selection" and not retry and not selectedReady then
+        elseif stage == "selection" and pending and not retry and not selectedReady then
             Panel.SetSubmitting(controls, true, Language.Translate("creation.loading_profile"))
         else
             Panel.SetSubmitting(controls, false, "")
         end
         if stage == "selection" then
-            Panel.SetSelection(controls, if selectedReady then selected else nil, tonumber(player:GetAttribute("CharacterLevel")))
+            local index = RosterView.Index(characters, selectedId)
+            Panel.SetSelection(controls, selected, if index then characters[index].level else nil)
             title.Text = Language.Translate("creation.selection_title")
             subtitle.Text = ""
         elseif stage == "loading" then
@@ -459,7 +468,8 @@ function Controller.Start()
             title.Text = Language.Translate("creation.selection_title")
             subtitle.Text = Language.Translate("creation.storage_unavailable")
         end
-        if retry then status.Text = Language.Translate(if readFailed then "creation.unavailable" else "creation.preview_failed")
+        if confirmingDelete then status.Text = Language.Translate("creation.delete_warning")
+        elseif retry then status.Text = Language.Translate(if readFailureReason == "profile_reload_required" then "creation.profile_reload" elseif readFailed then "creation.unavailable" else "creation.preview_failed")
         elseif selected and not selectedReady and not pending then status.Text = Language.Translate("creation.loading_profile")
         elseif selectedReady and not pending and status.Text == Language.Translate("creation.loading_profile") then status.Text = "" end
     end
@@ -498,9 +508,10 @@ function Controller.Start()
             react(selected)
         end)
     end
-    local function readSelection()
+    local function readSelection(id: string?, previousError: string?)
         local token = epoch
-        readFailed = false
+        readFailed = false; readFailureReason = nil
+        confirmingDelete = false
         pending = true
         status.Text = Language.Translate("creation.loading_profile")
         refresh()
@@ -509,26 +520,91 @@ function Controller.Start()
             local readRemote = remoteFor("CharacterCreationRead")
             if epoch ~= token or leaving then return end
             if readRemote then
-                ok, response = Request.Invoke(readRemote, function() return epoch == token and not leaving end, 25)
+                ok, response = Request.Invoke(readRemote, function() return epoch == token and not leaving end, 25, id)
             end
             if epoch ~= token or stage ~= "selection" or leaving then return end
             pending = false
             if not ok or type(response) ~= "table" or response.ok ~= true
                 or (response.archetype ~= "human_male" and response.archetype ~= "human_female")
-                or type(response.appearance) ~= "table" then
+                or type(response.characters) ~= "table" or type(response.selectedId) ~= "string" then
+                revisions.human_male += 1; revisions.human_female += 1
+                if currentPreview then currentPreview:KeepOnly(nil) end
+                selectedId = nil; characters = {}; selected = nil
                 readFailed = true
+                readFailureReason = if ok and type(response) == "table" then response.error else nil
                 refresh()
                 return
             end
+            local changedSlot = selectedId ~= response.selectedId
+            selectedId = response.selectedId
+            characters = response.characters
+            slotLimit = response.limit
             selected = response.archetype
+            revisions.human_male += 1; revisions.human_female += 1
+            ready = {}; previewError = {}; sceneReady = false
+            if currentPreview then
+                if changedSlot then currentPreview:KeepOnly(nil) else currentPreview:KeepOnly(selected) end
+            end
+            if type(response.appearance) ~= "table" then
+                readFailed = true -- management stays available even for invalid appearance
+                refresh()
+                return
+            end
             choices[selected] = response.appearance
-            if currentPreview then currentPreview:KeepOnly(selected) end
-            status.Text = ""
+            status.Text = previousError or ""
             requestPreview(selected)
         end)
     end
+    local function rosterAction(action: string, id: string?)
+        if pending or leaving or submitting then return end
+        confirmingDelete = false
+        pending = true; submitting = true
+        refresh()
+        local token = epoch
+        task.spawn(function()
+            local remote = remoteFor("CharacterCreationRoster")
+            if epoch ~= token or leaving then return end
+            local ok, response = false, nil
+            if remote then
+                ok, response = Request.Invoke(remote, function() return epoch == token and not leaving end, 35, action, id)
+            end
+            if epoch ~= token or leaving then return end
+            pending = false; submitting = false
+            if not ok or type(response) ~= "table" or response.ok ~= true then
+                status.Text = Language.Translate("creation.unavailable") .. " (" .. tostring(if ok and type(response) == "table" then response.error else response or "network") .. ")"
+                refresh()
+                -- A transport failure may hide a committed delete. Reload the
+                -- authoritative list before allowing another destructive action.
+                if action == "delete" and stage == "selection" then readSelection(nil, status.Text) end
+                return
+            end
+            if action == "delete" and stage == "selection" then readSelection() else refresh() end
+        end)
+    end
+    controls.previousCharacter.Activated:Connect(function()
+        if stage ~= "selection" or pending or leaving or confirmingDelete then return end
+        local id = RosterView.Adjacent(characters, selectedId, -1)
+        if id then readSelection(id) end
+    end)
+    controls.nextCharacter.Activated:Connect(function()
+        if stage ~= "selection" or pending or leaving or confirmingDelete then return end
+        local id = RosterView.Adjacent(characters, selectedId, 1)
+        if id then readSelection(id) end
+    end)
+    controls.newCharacter.Activated:Connect(function()
+        if pending or leaving or submitting then return end
+        if confirmingDelete then confirmingDelete = false; status.Text = ""; refresh(); return end
+        if stage == "selection" and selectedId and #characters < slotLimit then rosterAction("new", nil)
+        elseif stage == "creation" and (tonumber(player:GetAttribute("CharacterRosterCount")) or 0) > 0 then rosterAction("cancel", nil) end
+    end)
+    controls.deleteCharacter.Activated:Connect(function()
+        if stage ~= "selection" or pending or leaving or not selectedId then return end
+        if confirmingDelete then rosterAction("delete", selectedId)
+        else confirmingDelete = true; refresh() end
+    end)
     enter.Activated:Connect(function()
         if pending or leaving or (stage ~= "creation" and stage ~= "selection") then return end
+        if confirmingDelete then return end
         if next(bootstrapPending) ~= nil then return end
         if stage == "selection" and readFailed then readSelection(); return end
         if not selected then return end
@@ -558,7 +634,7 @@ function Controller.Start()
                     if requestedStage == "creation" then
                         ok, response = Request.Invoke(remote, function() return epoch == token and not leaving end, 35, chosen, choices[chosen])
                     else
-                        ok, response = Request.Invoke(remote, function() return epoch == token and not leaving end, 35)
+                        ok, response = Request.Invoke(remote, function() return epoch == token and not leaving end, 35, selectedId)
                     end
                 end
                 if epoch ~= token or leaving then return end
@@ -579,7 +655,7 @@ function Controller.Start()
             end
             if epoch ~= token or leaving then return end
             submitting = false
-            status.Text = Language.Translate("creation.unavailable") .. " (" .. reason .. ")"
+            status.Text = if reason == "profile_reload_required" then Language.Translate("creation.profile_reload") else Language.Translate("creation.unavailable") .. " (" .. reason .. ")"
             pending = false; refresh()
         end)
     end)
@@ -628,8 +704,8 @@ function Controller.Start()
             stage = nextStage
             lastStage = nextStage
             pending = false; activeTab = nil
-            selected = nil
-            ready = {}; previewError = {}; readFailed = false; sceneReady = false; selectionAnchors = nil
+            selected = nil; selectedId = nil; characters = {}; confirmingDelete = false
+            ready = {}; previewError = {}; readFailed = false; readFailureReason = nil; sceneReady = false; selectionAnchors = nil
             status.Text = ""
             bootstrapPending = {}
             bootstrapProgress = {}
@@ -748,6 +824,7 @@ function Controller.Start()
     player:GetAttributeChangedSignal("CharacterCreationPending"):Connect(sync)
     player:GetAttributeChangedSignal("CharacterCreationStatus"):Connect(sync)
     player:GetAttributeChangedSignal("CharacterProfilePersisted"):Connect(refresh)
+    player:GetAttributeChangedSignal("CharacterRosterCount"):Connect(refresh)
     player:GetAttributeChangedSignal("CharacterLevel"):Connect(refresh)
     Language.Changed:Connect(refresh)
     refresh()

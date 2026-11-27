@@ -39,12 +39,12 @@ class FireplaceStatusCollapseRestoreM445(unittest.TestCase):
     def test_idle_registered_source_is_visible_in_range(self):
         self.assertIn('Game1FireplaceFuelState', self.ui)
         self.assertIn('elseif registered(socket) and ray and hoverRadius > 0 then', self.ui)
-        self.assertIn('setBar(fuelRow, 0, "Не горит"', self.ui)
+        self.assertIn('setBar(fuelRow, 0, Language.Translate("hud.not_burning")', self.ui)
         self.assertIn('dock:Present("fireplace", socket,', self.ui)
 
     def test_button_beside_attack_uses_same_ui_offsets(self):
         self.assertIn('MobileLayout.Resolve(width, height)', self.dock)
-        self.assertIn('attack.x + attack.size + bounds.gap', self.dock)
+        self.assertIn('bounds.jump.x + bounds.jump.size + bounds.gap', self.dock)
         self.assertNotIn('bounds.attack.gap', self.dock)
         self.assertIn('cfg.offsetXPx', self.dock)
         self.assertIn('cfg.offsetYPx', self.dock)

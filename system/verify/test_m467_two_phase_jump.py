@@ -42,7 +42,7 @@ class TwoPhaseJumpContracts(unittest.TestCase):
         self.assertLess(impulse, seq)
         self.assertLess(seq, airborne)
         self.assertIn('if deltaVelocity > 0 then', fn)
-        self.assertIn('if not isGrounded() then', fn)
+        self.assertIn('if not isGrounded() or os.clock() < airLockUntil or jumpInFlight then', fn)
         self.assertNotIn('AnimationAirborne', m[m.index('function MovementController.RequestJump()'):])
 
     def test_grounding_and_death_release_airborne_flag(self):

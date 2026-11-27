@@ -1,16 +1,23 @@
 -- Shared Studio-only debug toolbar coordinates. ScreenGui keeps the Roblox Core UI inset.
 local Workspace = game:GetService("Workspace")
+local Input = game:GetService("UserInputService")
+local HudCornerLayout = require(script.Parent.Parent:WaitForChild("HudCornerLayout"))
+local MobileLayout = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
 
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
+local Profile = require(script.Parent:WaitForChild("DebugDockProfile"))
 local StudioDebugDock = {}
 local Icons = require(script.Parent:WaitForChild("StudioDebugIcons"))
 
 local BUTTON_SIZE = 44
 local BUTTON_GAP = 8
-local LEFT = 16
+local LEFT = HudCornerLayout.DebugLeft
 local TOP = 8
 local WINDOW_TOP = TOP + BUTTON_SIZE + BUTTON_GAP
-local slots = { TL = 0, CS = 1, HS = 2, CD = 3, HP = 4, UI = 5, GP = 6, AG = 7 }
-local SLOT_COUNT = 8
+local function profile()
+    return Profile.Resolve(Input.TouchEnabled, Access.GameplayTestEnabled())
+end
 local STEP = BUTTON_SIZE + BUTTON_GAP
 local CLOSED = Color3.fromRGB(28, 37, 48)
 local SELECTED = Color3.fromRGB(31, 76, 70)
@@ -20,22 +27,29 @@ local function availableWidth(): number
     local camera = Workspace.CurrentCamera
     return if camera then camera.ViewportSize.X else 0
 end
-local function columns(width: number): number
-    if width <= 0 then return SLOT_COUNT end
-    return math.clamp(math.floor((width - LEFT - 8 + BUTTON_GAP) / STEP), 1, SLOT_COUNT)
+local function columns(width: number, height: number?, slotCount: number): number
+    if width <= 0 then return slotCount end
+    local right = 8
+    if Input.TouchEnabled then
+        local camera = Workspace.CurrentCamera
+        local weapon = MobileLayout.Resolve(width, height or (camera and camera.ViewportSize.Y) or width).weapon
+        right = math.max(right, weapon.margin + 2*weapon.size + weapon.gap + BUTTON_GAP)
+    end
+    return HudCornerLayout.DebugColumns(width, right, BUTTON_SIZE, BUTTON_GAP, slotCount)
 end
 
-function StudioDebugDock.ButtonPosition(id: string, width: number?): UDim2
-    local slot = assert(slots[id], "unknown debug panel: " .. id)
-    local count = columns(width or availableWidth())
+function StudioDebugDock.ButtonPosition(id: string, width: number?, height: number?): UDim2
+    local active = profile()
+    local slot = assert(active.slots[id], "inactive debug panel: " .. id)
+    local count = columns(width or availableWidth(), height, active.count)
     return UDim2.fromOffset(LEFT + (slot % count) * STEP, TOP + math.floor(slot / count) * STEP)
 end
 
-function StudioDebugDock.WindowPosition(id: string, width: number, viewportWidth: number?): UDim2
+function StudioDebugDock.WindowPosition(id: string, width: number, viewportWidth: number?, viewportHeight: number?): UDim2
     local viewport = viewportWidth or availableWidth()
-    local desiredX = StudioDebugDock.ButtonPosition(id, viewport).X.Offset
+    local desiredX = StudioDebugDock.ButtonPosition(id, viewport, viewportHeight).X.Offset
     local x = if viewport > 0 then math.min(desiredX, math.max(8, viewport - width - 8)) else desiredX
-    return UDim2.fromOffset(x, WINDOW_TOP + (math.ceil(SLOT_COUNT / columns(viewport)) - 1) * STEP)
+    return UDim2.fromOffset(x, WINDOW_TOP + (math.ceil(profile().count / columns(viewport, viewportHeight, profile().count)) - 1) * STEP)
 end
 
 -- Each launcher reflects its actual panel, never hover or initial construction.
@@ -48,9 +62,9 @@ function StudioDebugDock.Bind(id: string, launcher: TextButton, panel: GuiObject
     local paintIcon = Icons.Mount(id, launcher)
     local function layout()
         local viewport = screen.AbsoluteSize.X
-        launcher.Position = StudioDebugDock.ButtonPosition(id, viewport)
+        launcher.Position = StudioDebugDock.ButtonPosition(id, viewport, screen.AbsoluteSize.Y)
         local panelWidth = if adaptive then math.min(width, math.max(1, viewport - 16)) else width
-        local position = StudioDebugDock.WindowPosition(id, panelWidth, viewport)
+        local position = StudioDebugDock.WindowPosition(id, panelWidth, viewport, screen.AbsoluteSize.Y)
         if bottomHeight then
             -- Bottom-left panels keep their bottom edge fixed as the viewport changes.
             panel.AnchorPoint = Vector2.new(0, 1)

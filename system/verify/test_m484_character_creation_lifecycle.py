@@ -45,10 +45,10 @@ class CharacterLifecycleM484(unittest.TestCase):
         self.assertIn('DataStoreService:GetDataStore', profile)
         self.assertIn('database:GetAsync', profile)
         self.assertIn('database:UpdateAsync', profile)
-        self.assertIn('if createOnly and previous ~= nil', profile)
-        self.assertIn('if not saved and not RunService:IsStudio()', profile)
-        self.assertIn('records[player] = nil', profile)
-        self.assertIn('schemaVersion = 1', profile)
+        self.assertIn('if not Roster.Matches(previous, session.expected) then return nil end', profile)
+        self.assertIn('if not RunService:IsStudio() then return false end', profile)
+        self.assertIn('sessions[player] = nil', profile)
+        self.assertIn('raw.schemaVersion == 1', source('src/server/character/CharacterProfileRoster.luau'))
         self.assertIn('decodeFrame', profile)
         self.assertIn('safeFrame(root.CFrame)', profile)
         service = source('src/server/character/CharacterService.luau')
@@ -95,7 +95,7 @@ class CharacterLifecycleM484(unittest.TestCase):
         for name in ('Settings_language', 'CharacterCreationManage',
                      'settings.change_character', 'settings.coming_soon'):
             self.assertIn(name if name != 'Settings_language' else '"Settings_" .. tab', menu)
-        self.assertIn('launcher.Text = "⚙"', menu)
+        self.assertIn('LauncherView.Decorate(launcher)', menu)
         self.assertNotIn('"🌐  "', menu)
         manifest = json.loads(source('assets/manifests/game-localization.json'))
         for category, keys in {

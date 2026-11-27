@@ -42,7 +42,7 @@ local function visualTopOffset(model: Model, anchor: BasePart): number
     return math.max(anchor.Size.Y / 2 + 1, top - anchor.Position.Y + 0.7)
 end
 
-local function displayName(model: Model, monster: boolean): string
+local function rawDisplayName(model: Model, monster: boolean): string
     if monster then
         local english = model:GetAttribute("MonsterNameEn")
         local russian = model:GetAttribute("MonsterNameRu")
@@ -66,6 +66,15 @@ local function displayName(model: Model, monster: boolean): string
         return (text:gsub("(%a)([%w']*)", function(first, tail)
             return first:upper() .. tail:lower()
         end))
+    end
+    return text
+end
+
+local NpcDisplayNameFormatter = require(script.Parent:WaitForChild("NpcDisplayNameFormatter"))
+local function displayName(model: Model, monster: boolean): string
+    local text = rawDisplayName(model, monster)
+    if model:GetAttribute("Game1NpcRuntime") == true or model:GetAttribute("NpcSlug") ~= nil then
+        return NpcDisplayNameFormatter.Format(text)
     end
     return text
 end

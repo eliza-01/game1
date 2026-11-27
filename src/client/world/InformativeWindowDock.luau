@@ -149,21 +149,24 @@ function Dock.Get(): any
         content.Position = UDim2.fromOffset(12, headerHeight + 6)
         content.Size = UDim2.new(1, -24, 0, contentHeight)
 
-        -- Keep the neutral restore control beside the attack region on both
-        -- screen sizes. No themed icon, no gameplay input interception outside
-        -- the visible window and its compact button.
+        -- Use the full combat cluster, not only the attack rectangle.
         local size = gui.AbsoluteSize
         local width = if size.X >= 240 then size.X else 1280
-        local height = if size.Y >= 240 then size.Y else 720
+        local height = if size.Y >= 180 then size.Y else 720
         local bounds = MobileLayout.Resolve(width, height)
-        -- MobileLayout.Resolve exposes gap on the ROOT layout, not under
-        -- attack. Reading attack.gap (or a missing layout field) would abort
-        -- the client bootstrap before Studio debug tools can start.
-        local attack = bounds.attack
-        local rightInset = (attack.x + attack.size + bounds.gap)
-        restore.Position = UDim2.new(1,
-            -rightInset + cfg.offsetXPx,
-            1, -attack.y + cfg.offsetYPx)
+        if UiSettings.ActiveDevice() == "mobile" then
+            local box = MobileLayout.Context(width, height, panelHeight, math.min(340, width-24))
+            panel.AnchorPoint = Vector2.new(1, 1)
+            panel.Position = UDim2.new(1, -box.x + cfg.offsetXPx, 1, -box.y + cfg.offsetYPx)
+            panel.Size = UDim2.fromOffset(box.width, panelHeight)
+            constraint.MinSize = Vector2.new(math.min(250, box.width), panelHeight)
+            local collapsedBox = MobileLayout.Context(width, height, 40, 82)
+            restore.Position = UDim2.new(1, -collapsedBox.x + cfg.offsetXPx, 1, -collapsedBox.y + cfg.offsetYPx)
+        else
+            panel.AnchorPoint = Vector2.new(0.5, 1)
+            local rightInset = bounds.jump.x + bounds.jump.size + bounds.gap
+            restore.Position = UDim2.new(1, -rightInset + cfg.offsetXPx, 1, -bounds.attack.y + cfg.offsetYPx)
+        end
         restore.TextSize = math.max(12, cfg.titleFontPx - 1)
     end
 

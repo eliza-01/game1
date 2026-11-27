@@ -1,4 +1,4 @@
--- Published TestPlace debug controls. Checkbox is not authorization.
+-- Published debug controls: explicitly selected private DEV Place only.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -16,9 +16,14 @@ function Access.GameplayTestEnabled(): boolean
     return RunService:IsStudio() and (not compiledRuntime() or Options.StartInGameplayHub())
 end
 
+local function publishedPlaceAllowed(): boolean
+    local id = Options.PublishedDebugPlaceId()
+    return game.PlaceId > 0 and id ~= "" and id == string.format("%.0f", game.PlaceId)
+end
+
 function Access.ServerEnabled(): boolean
     return RunService:IsStudio()
-        or (not compiledRuntime() and (Options.ShowPublishedDebugControls("desktop")
+        or (publishedPlaceAllowed() and (Options.ShowPublishedDebugControls("desktop")
         or Options.ShowPublishedDebugControls("mobile")))
 end
 
@@ -28,7 +33,7 @@ end
 
 function Access.ClientAllowed(): boolean
     if RunService:IsStudio() then return true end
-    if compiledRuntime() then return false end
+    if not publishedPlaceAllowed() then return false end
     local device = if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
         then "mobile" else "desktop"
     if not Options.ShowPublishedDebugControls(device) then return false end
@@ -42,8 +47,7 @@ function Access.ClientAllowed(): boolean
     local allowed = player:GetAttribute(AUTH_ATTRIBUTE) == true
     if not allowed and not warnedAuthorization then
         warnedAuthorization = true
-        warn("[game1][debug] Published controls enabled, but Roblox creator authorization denied. "
-            .. "Group developer requires rank >= 200; check the owner/group role.")
+        warn("[game1][debug] Published DEV debug authorization not received from server.")
     end
     return allowed
 end

@@ -10,6 +10,9 @@ local Catalog = require(ReplicatedStorage:WaitForChild("Game1Shared")
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local Options = require(Shared:WaitForChild("GameOptions"))
 local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
+local HudCornerLayout = require(script.Parent.Parent:WaitForChild("HudCornerLayout"))
+local LauncherView = require(script.Parent:WaitForChild("SettingsLauncherView"))
+local ActionRegistry = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileActionRegistry"))
 local Controller = {}
 local started = false
 
@@ -52,15 +55,17 @@ function Controller.Start()
 
     local launcher = Instance.new("TextButton")
     launcher.Name = "ChangeLanguage"
-    launcher.AnchorPoint = Vector2.new(1, 0)
-    launcher.Position = UDim2.new(1, -12, 0, 8)
-    launcher.Size = UDim2.fromOffset(44, 44)
+    launcher.AnchorPoint = Vector2.zero
+    launcher.Position = UDim2.fromOffset(HudCornerLayout.SettingsLeft, HudCornerLayout.SettingsTop)
+    launcher.Size = UDim2.fromOffset(HudCornerLayout.SettingsSize, HudCornerLayout.SettingsSize)
     launcher.Font = Enum.Font.GothamBold
     launcher.TextSize = 27
-    launcher.BackgroundColor3 = Color3.fromRGB(25, 40, 52)
-    launcher.TextColor3 = Color3.fromRGB(247, 249, 250)
+    launcher.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    launcher.TextColor3 = Color3.fromRGB(0, 0, 0)
+    launcher.BorderSizePixel = 0
     launcher.Parent = gui
-    corner(launcher, 8)
+    corner(launcher, HudCornerLayout.SettingsSize / 2)
+    LauncherView.Decorate(launcher)
 
     local shade = Instance.new("Frame")
     shade.Name = "ModalBackdrop"
@@ -81,7 +86,10 @@ function Controller.Start()
     backdrop.Visible = false
     backdrop.Parent = FullScreenLayer.Create(gui, "Game1LanguageBackdrop", 300)
     shade.BackgroundTransparency = 1
-    shade:GetPropertyChangedSignal("Visible"):Connect(function() backdrop.Visible = shade.Visible end)
+    shade:GetPropertyChangedSignal("Visible"):Connect(function()
+        backdrop.Visible = shade.Visible
+        player:WaitForChild("PlayerGui"):SetAttribute("Game1SettingsInputBlocked", shade.Visible)
+    end)
 
     local panel = Instance.new("Frame")
     panel.Name = "LanguagePicker"
@@ -206,7 +214,6 @@ function Controller.Start()
         title.Text = State.Translate("language.title")
         subtitle.Text = State.Translate("language.subtitle")
         confirm.Text = State.Translate("language.confirm")
-        launcher.Text = "⚙"
         for locale, button in pairs(buttons) do
             button.BackgroundColor3 = if locale == chosen
                 then Color3.fromRGB(48, 105, 91) else Color3.fromRGB(41, 57, 73)
@@ -275,9 +282,9 @@ function Controller.Start()
             paint()
         end)
     end
-    launcher.Activated:Connect(function()
+    ActionRegistry.Register(launcher, "Settings", function()
         if not pending and not shade.Visible then open() end
-    end)
+    end, true)
     close.Activated:Connect(function()
         if pending then return end
         State.SetLocale(previous)

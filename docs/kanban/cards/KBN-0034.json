@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "KBN-0034",
+  "title": "Character Roster · выбор, создание и удаление",
+  "domain": "Character",
+  "status": "IN_PROGRESS",
+  "priority": "P1",
+  "owner": "Owner + Codex",
+  "favorite": false,
+  "specPath": "docs/kanban/specs/KBN-0034.md",
+  "specSha256": "48fa4b4585141dcb94b6e7a33979f85bdf1c257e480c3b4ca6b32d493c8d8815",
+  "dependsOn": [],
+  "revision": 8,
+  "updatedAt": "2026-11-27T14:08:25+00:00",
+  "tasks": [
+    {
+      "id": "KBN-0034-T01",
+      "title": "Реализовать миграцию, серверный roster, выбор/создание/удаление и локализацию",
+      "done": true
+    },
+    {
+      "id": "KBN-0034-T02",
+      "title": "Проверить Studio и опубликованный DEV на PC/Mobile, включая реальные DataStore",
+      "done": false
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "KBN-0034-A01",
+      "title": "Сохранение legacy, независимые слоты, лимит и подтверждённое удаление в DEV",
+      "status": "NOT_RUN",
+      "evidence": ""
+    },
+    {
+      "id": "KBN-0034-A02",
+      "title": "Проверить конфликт/ошибку DataStore, сохранение прогресса, повторный вход и Character Creation OFF",
+      "status": "NOT_RUN",
+      "evidence": ""
+    }
+  ]
+}

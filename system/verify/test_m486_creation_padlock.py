@@ -40,9 +40,10 @@ class CreationPadlockM486(unittest.TestCase):
         self.assertIn('if epoch ~= token or leaving then return end', c)
         self.assertIn('if stage == "selection" and existing then', g)
         self.assertIn('record.archetype, record.appearance', g)
-        self.assertIn('existing = previous', store)
-        self.assertIn('return nil -- Never overwrite', store)
-        self.assertLess(store.index('writeRecord(player, candidate, true)'), store.index('records[player] = candidate'))
+        self.assertIn('previous.revision == candidate.revision', store)
+        self.assertIn('if not Roster.Matches(previous, session.expected) then return nil end', store)
+        self.assertIn('if replace then session.document = candidate else session.document.revision = candidate.revision end', store)
+        self.assertLess(store.index('session.expected = Roster.Copy(candidate)'), store.index('if replace then session.document = candidate else'))
 
     def test_both_padlocks_share_one_state_and_use_published_grip(self):
         registry = json.loads(src('assets/manifests/location-assets.json'))

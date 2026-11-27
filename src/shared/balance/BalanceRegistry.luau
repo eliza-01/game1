@@ -1925,6 +1925,7 @@ return table.freeze({
         ["newbie_bow"] = "weapon_004",
         ["newbie_dagger"] = "weapon_002",
         ["newbie_saber_01"] = "weapon_001",
+        ["newbie_slayer_01"] = "weapon_003",
         ["newbie_sword_01"] = "weapon_001",
         ["warsmiths_hummer_01"] = "weapon_001",
     }),

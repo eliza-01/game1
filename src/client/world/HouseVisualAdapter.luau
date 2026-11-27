@@ -7,6 +7,7 @@ local InsertService = game:GetService("InsertService")
 local Appearance = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
     :WaitForChild("world"):WaitForChild("RuntimeVisualAppearance"))
 local Workspace = game:GetService("Workspace")
+local DoorRaycast = require(script.Parent:WaitForChild("DoorInteractionRaycast"))
 local Policy = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
     :WaitForChild("world"):WaitForChild("LocationLodDistancePolicy"))
 
@@ -147,7 +148,8 @@ function Adapter:_startVisual(house: House, visual: Visual)
     task.spawn(function()
         local ok, result = pcall(InsertService.CreateMeshPartAsync,
             InsertService, "rbxassetid://" .. meshId,
-            Enum.CollisionFidelity.Box, Enum.RenderFidelity.Performance)
+            if visual.spec.moving then Enum.CollisionFidelity.Default else Enum.CollisionFidelity.Box,
+            Enum.RenderFidelity.Performance)
         local part = if ok and typeof(result) == "Instance" and result:IsA("MeshPart")
             then result else nil
         if part then
@@ -185,6 +187,7 @@ function Adapter:_startVisual(house: House, visual: Visual)
             and (not visual.spec.moving or (proxy ~= nil and proxy:IsDescendantOf(Workspace))) then
             visual.part = part
             part.Parent = self.folder
+            if visual.spec.moving and proxy then DoorRaycast.Bind(proxy, part) end
         else
             if part then part:Destroy() end
             if not ok then
@@ -244,8 +247,12 @@ function Adapter:Step(budget: number): number
                             lod.Color = proxy.Color
                             lod.Material = proxy.Material
                         end
+                        if visual.spec.moving and proxy then
+                            lod.CFrame = proxy.CFrame
+                        end
                         lod.Parent = self.folder
                         visual.lodPart = lod
+                        if visual.spec.moving and proxy then DoorRaycast.Bind(proxy, lod) end
                         operations += 1
                     else
                         lod:Destroy()
@@ -283,11 +290,9 @@ function Adapter:FollowMoving()
     -- nearby animated door visuals need a transform while their server proxies move.
     for _, house: House in ipairs(self.records) do
         for _, visual: Visual in ipairs(house.visual) do
-            if visual.desired == "FULL" and visual.spec.moving and visual.part and visual.proxy and
-               visual.proxy:IsDescendantOf(Workspace) then
-                if visual.part.CFrame ~= visual.proxy.CFrame then
-                    visual.part.CFrame = visual.proxy.CFrame
-                end
+            local part = visual.part or visual.lodPart
+            if visual.spec.moving and part and visual.proxy and visual.proxy:IsDescendantOf(Workspace) then
+                if part.CFrame ~= visual.proxy.CFrame then part.CFrame = visual.proxy.CFrame end
             end
         end
     end

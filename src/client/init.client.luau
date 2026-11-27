@@ -87,10 +87,12 @@ end)
 if not floraOk then warn("[game1][client] flora effect startup failed: " .. tostring(floraError)) end
 require(script:WaitForChild("world"):WaitForChild("BoneOrbController")).Start()
 require(script:WaitForChild("world"):WaitForChild("BoneFireController")).Start()
--- Debug modules are optional: do not require or schedule them in a compiled
--- Runtime or when published controls are disabled. GP remains Studio-only.
+-- Debug modules are optional: only Studio or the configured published DEV Place.
+-- GP remains Studio-only.
 local DebugAccess = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 if DebugAccess.ClientAllowed() then
+    local profile = require(DevRoot:WaitForChild("DebugDockProfile")).Resolve(
+        game:GetService("UserInputService").TouchEnabled, DebugAccess.GameplayTestEnabled())
     if DebugAccess.GameplayTestEnabled() then
         task.spawn(function()
             local ok, err = pcall(function()
@@ -99,15 +101,23 @@ if DebugAccess.ClientAllowed() then
             end)
             if not ok then warn("[game1][gameplay-test] client startup failed: " .. tostring(err)) end
         end)
-        task.spawn(function() require(DevRoot:WaitForChild("GameplayAggroController")).Start() end)
+        if profile.slots.AG ~= nil then
+            task.spawn(function() require(DevRoot:WaitForChild("GameplayAggroController")).Start() end)
+        end
         task.spawn(function() require(DevRoot:WaitForChild("GameplayBufferController")).Start() end)
     end
-    local HouseSocketDebugController = require(DevRoot:WaitForChild("HouseSocketDebugController"))
-    HouseSocketDebugController.Start()
+    if profile.slots.HS ~= nil then
+        local HouseSocketDebugController = require(DevRoot:WaitForChild("HouseSocketDebugController"))
+        HouseSocketDebugController.Start()
+    end
     require(DevRoot:WaitForChild("CameraDebugController")).Start()
     require(DevRoot:WaitForChild("HealthUiDebugController")).Start()
     require(DevRoot:WaitForChild("UiPresentationDebugController")).Start()
-    local TestLoadoutController = require(DevRoot:WaitForChild("TestLoadoutController"))
-    TestLoadoutController.Start()
-    require(DevRoot:WaitForChild("CustomScalingDebugController")).Start()
+    if profile.slots.TL ~= nil then
+        local TestLoadoutController = require(DevRoot:WaitForChild("TestLoadoutController"))
+        TestLoadoutController.Start()
+    end
+    if profile.slots.CS ~= nil then
+        require(DevRoot:WaitForChild("CustomScalingDebugController")).Start()
+    end
 end

@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 
 local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CharacterShared = Shared:WaitForChild("character")
@@ -14,6 +15,16 @@ local UiInputGuard = require(script.Parent.Parent:WaitForChild("UiInputGuard"))
 local BoneMountedAttachmentController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("BoneMountedAttachmentController"))
 local AttackController = {}
 local started = false
+local repeatInput = require(script.Parent:WaitForChild("AttackRepeatInput")).New()
+local attemptAttack: () -> () = function() end
+
+function AttackController.SetAttackHeld(source: string, held: boolean)
+    repeatInput.SetHeld(source, held)
+end
+
+function AttackController.SetAutomaticAttack(enabled: boolean)
+    repeatInput.SetAutomatic(enabled)
+end
 local movementController: any = nil
 local animationController: any = nil
 local aimPoseController: any = nil
@@ -109,7 +120,17 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         -- bounded camera AIM packets until HitEnd, never hitboxes or damage.
         local isBowPresentation = bowCaptureSequence > 0
         local sequence = if isBowPresentation then bowCaptureSequence else meleePresentationSequence
-        if sequence <= 0 then return end
+        if sequence <= 0 then
+            if not repeatInput.IsActive() then return end
+            local c = Players.LocalPlayer.Character
+            if not c or c:GetAttribute("LifeState") ~= "Alive" or UiInputGuard.IsWorldSuspended()
+                or GuiService.MenuIsOpen or UserInputService:GetFocusedTextBox() then
+                repeatInput.Clear()
+                return
+            end
+            if repeatInput.ShouldAttempt(os.clock(), false) then attemptAttack() end
+            return
+        end
         local expectedCharacter = if isBowPresentation then bowPresentationCharacter else meleePresentationCharacter
         local presentationUntil = if isBowPresentation then bowPresentationUntil else meleePresentationUntil
         local playerCharacter = Players.LocalPlayer.Character
@@ -139,8 +160,9 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
             nextMeleeAimAt = now + MELEE_AIM_SEND_INTERVAL
         end
     end)
-    local function attemptAttack()
-        if UiInputGuard.IsWorldSuspended() then return end
+    attemptAttack = function()
+        repeatInput.NoteAttempt(os.clock())
+        if UiInputGuard.IsWorldSuspended() or GuiService.MenuIsOpen or UserInputService:GetFocusedTextBox() then return end
         local player = Players.LocalPlayer
         local character = player.Character
         if not character or tostring(character:GetAttribute("LifeState") or "Alive") ~= "Alive" then
@@ -308,8 +330,20 @@ function AttackController.Start(movement: any?, animation: any?, aimPose: any?)
         if input.UserInputType == CharacterConfig.InputBindings.AttackPrimary[1]
             and not UiInputGuard.BlocksWorldInput(input, processed)
             and not UiInputGuard.IsPointerOnWorldInteraction() then
+            repeatInput.SetHeld("mouse", true)
             attemptAttack()
         end
     end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == CharacterConfig.InputBindings.AttackPrimary[1] then
+            repeatInput.SetHeld("mouse", false)
+        end
+    end)
+    UserInputService.WindowFocusReleased:Connect(repeatInput.Clear)
+    UserInputService.TextBoxFocused:Connect(repeatInput.Clear)
+    GuiService.MenuOpened:Connect(repeatInput.Clear)
+    Players.LocalPlayer.CharacterRemoving:Connect(repeatInput.Clear)
+    Players.LocalPlayer:WaitForChild("PlayerGui"):GetAttributeChangedSignal("Game1CharacterSceneInputBlocked"):Connect(repeatInput.Clear)
+    Players.LocalPlayer.PlayerGui:GetAttributeChangedSignal("Game1SettingsInputBlocked"):Connect(repeatInput.Clear)
 end
 return AttackController

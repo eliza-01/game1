@@ -1,7 +1,7 @@
 --!strict
 -- Explicit player lifecycle: creation -> selection -> gameplay. Never spawn on join.
 local Players = game:GetService("Players")
-local Balance = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared"):WaitForChild("balance"):WaitForChild("Balance"))
+local Roster = require(script.Parent:WaitForChild("CharacterRosterGateway"))
 local SavedColors = require(script.Parent:WaitForChild("CharacterCreationSavedColorStore"))
 local Gateway = {}
 Gateway.__index = Gateway
@@ -14,6 +14,7 @@ function Gateway.new(enabled: boolean, available: (string) -> boolean,
         busy = {} :: {[Player]: boolean}, pending = {} :: {[Player]: boolean}, nextRequest = {} :: {[Player]: number}}, Gateway)
 end
 function Gateway:Stage(player: Player, stage: string)
+    if player.Parent ~= Players then return end
     self.pending[player] = true
     player:SetAttribute("CharacterCreationStatus", stage)
     player:SetAttribute("CharacterCreationPending", true)
@@ -30,7 +31,7 @@ function Gateway:Request(player: Player, operation: () -> any): any
     return result
 end
 function Gateway:Bind(remotes: Folder)
-    if self.enabled then SavedColors.Bind(remotes) end
+    if self.enabled then SavedColors.Bind(remotes); Roster.Bind(self, remotes) end
     local create = remotes:FindFirstChild("CharacterCreationSelect") or Instance.new("RemoteFunction")
     assert(create:IsA("RemoteFunction"), "CharacterCreationSelect must be RemoteFunction")
     create.Name = "CharacterCreationSelect"
@@ -40,6 +41,7 @@ function Gateway:Bind(remotes: Folder)
             if not self.enabled or not self.pending[player] then
                 return {ok = false, error = "creation_not_pending"}
             end
+            if not self.profiles.Ready(player) then return {ok = false, error = "profile_reload_required"} end
             local stage = player:GetAttribute("CharacterCreationStatus")
             local existing = self.profiles.Get(player)
             if stage == "selection" and existing then
@@ -52,6 +54,8 @@ function Gateway:Bind(remotes: Folder)
                     appearance = checked, persisted = player:GetAttribute("CharacterProfilePersisted")}
             end
             if stage ~= "creation" then return {ok = false, error = "creation_not_pending"} end
+            local list = self.profiles.List(player)
+            if #list >= self.profiles.Limit then return {ok = false, error = "character_slots_full"} end
             if archetypeId ~= "human_male" and archetypeId ~= "human_female" then
                 return {ok = false, error = "invalid_archetype"}
             end
@@ -64,14 +68,13 @@ function Gateway:Bind(remotes: Folder)
             if not created then return {ok = false, error = "character_save_failed"} end
             local record = self.profiles.Get(player)
             if not record then return {ok = false, error = "character_save_failed"} end
-            local savedAppearance, savedProblem = self.validate(record.archetype, record.appearance, true)
-            if not savedAppearance then return {ok = false, error = savedProblem or "saved_appearance_invalid"} end
-            self.profiles.SetValidatedAppearance(player, savedAppearance)
+            -- Create committed the already validated appearance. Publish the
+            -- selection stage before any preview/read validation can fail.
             player:SetAttribute("CharacterProfilePersisted", persisted)
-            player:SetAttribute("CharacterProfileArchetype", record.archetype)
+            Roster.Publish(self, player)
             self:Stage(player, "selection")
             self.nextRequest[player] = nil
-            return {ok = true, archetype = record.archetype, appearance = savedAppearance,
+            return {ok = true, archetype = record.archetype, appearance = record.appearance,
                 persisted = persisted, mode = "selection"}
         end)
     end
@@ -79,30 +82,23 @@ function Gateway:Bind(remotes: Folder)
     assert(read:IsA("RemoteFunction"), "CharacterCreationRead must be RemoteFunction")
     read.Name = "CharacterCreationRead"
     read.Parent = remotes
-    read.OnServerInvoke = function(player: Player)
-        if not self.enabled or not self.pending[player] or player:GetAttribute("CharacterCreationStatus") ~= "selection" then
-            return {ok = false, error = "selection_not_pending"}
-        end
-        local record = self.profiles.Get(player)
-        if not record then return {ok = false, error = "character_unavailable"} end
-        local checked, problem = self.validate(record.archetype, record.appearance, true)
-        if not checked then return {ok = false, error = problem or "saved_appearance_invalid"} end
-        self.profiles.SetValidatedAppearance(player, checked)
-        return {ok = true, archetype = record.archetype, appearance = checked}
+    read.OnServerInvoke = function(player: Player, id: any)
+        return self:Request(player, function() return Roster.Read(self, player, id) end)
     end
     local enter = remotes:FindFirstChild("CharacterCreationEnter") or Instance.new("RemoteFunction")
     assert(enter:IsA("RemoteFunction"), "CharacterCreationEnter must be RemoteFunction")
     enter.Name = "CharacterCreationEnter"
     enter.Parent = remotes
-    enter.OnServerInvoke = function(player: Player)
+    enter.OnServerInvoke = function(player: Player, selectedId: any)
         return self:Request(player, function()
             if not self.enabled or not self.pending[player] or player:GetAttribute("CharacterCreationStatus") ~= "selection" then
                 return {ok = false, error = "selection_not_pending"}
             end
+            if not self.profiles.Ready(player) then return {ok = false, error = "profile_reload_required"} end
             if os.clock() < (self.nextRequest[player] or 0) then return {ok = false, error = "rate_limited"} end
             self.nextRequest[player] = os.clock() + 1
             local record = self.profiles.Get(player)
-            if not record or not self.available(record.archetype) then return {ok = false, error = "character_unavailable"} end
+            if not record or record.id ~= selectedId or not self.available(record.archetype) then return {ok = false, error = "character_unavailable"} end
             local checked, problem = self.validate(record.archetype, record.appearance, true)
             if not checked then return {ok = false, error = problem or "saved_appearance_invalid"} end
             self.profiles.SetValidatedAppearance(player, checked)
@@ -155,21 +151,20 @@ function Gateway:Join(player: Player)
     if player.Character then self.dismiss(player) end
     self:Stage(player, "loading")
     task.spawn(function()
-        local record, persisted = self.profiles.Load(player)
+        local record, persisted, usable = self.profiles.Load(player)
         if player.Parent ~= Players or not self.pending[player] then return end
-        if not persisted and not game:GetService("RunService"):IsStudio() then
+        if not usable or (not persisted and not game:GetService("RunService"):IsStudio()) then
             self:Stage(player, "storage_unavailable")
             player:SetAttribute("CharacterProfilePersisted", false)
             return
         end
-        player:SetAttribute("CharacterLevel", Balance.LevelForXP(if record then record.xp else 0))
+        Roster.Publish(self, player)
         if record then
             self:Stage(player, "selection")
         else
             self:Stage(player, "creation")
         end
         player:SetAttribute("CharacterProfilePersisted", persisted)
-        player:SetAttribute("CharacterProfileArchetype", if record then record.archetype else "")
     end)
 end
 function Gateway:Leave(player: Player)

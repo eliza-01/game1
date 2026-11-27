@@ -10,22 +10,40 @@ ITEMS = [
                  'SelectedCharacterArchetype хранится как атрибут Player текущей сессии; authoring registry — не данные пользователя.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
-                 'Нет подтверждённого DataStore-профиля игрока для выбранного персонажа, его HP/характеристик, позиции и долговременной прогрессии.',
+                 'DataStore хранит до 5 независимых персонажей: внешний вид, XP, Gold и последняя позиция. HP/временные характеристики не сохраняются. Published DEV требует отдельной приёмки миграции.',
                  'Нужна Studio и published server проверка ошибок загрузки, R15/Humanoid compatibility, скелета, входа второго игрока и повторного спавна.',
              ]},
          ], ['character-service', 'character-stats', 'character-registry', 'character-rig']),
+    card('character-roster', 'Персонаж · выбор, создание и удаление', 'Сервер + UI',
+         'M596: до пяти независимых персонажей аккаунта, миграция существующего слота без сброса прогресса.',
+         ['CharacterCreation', 'CharacterProfileRoster', 'DataStore UpdateAsync'], [
+             {'title': 'Контракт', 'lines': [
+                 'Новый персонаж открывает редактор; стрелки переключают сохранённые слоты. Удаление только на экране выбора после подтверждения; удаляется только выбранный ID.',
+                 'У каждого ID собственные appearance, XP, Gold и lastWorldCFrame. Общий язык и палитра аккаунта сохраняются. Удаление последнего персонажа возвращает в создание.',
+                 'Хранилище schema v2 в прежнем ключе аккаунта; v1 переносится в первый слот. UpdateAsync проверяет ревизию, предотвращая устаревшую перезапись; при конфликте требуется переподключение.',
+                 'Перед публикацией остановить все старые серверы Experience, поскольку v1 не умеет защищать v2. Не откатывать сервер на v1 после миграции.',
+             ]},
+             {'title': 'Приёмка', 'lines': [
+                 'Проверить PC/Mobile в DEV: миграция, создание до лимита, переключение персонажей одного пола, отказ/подтверждение удаления, удаление последнего, независимость прогресса и повторный вход.',
+                 'Создание и удаление используют серверный ID, этап и лимит; не требуют Debug. При недоступном DataStore published не меняет профили.',
+             ]},
+         ], ['character-creation-gateway', 'character-roster-gateway', 'character-profile-store', 'character-profile-roster', 'character-roster-view']),
     card('character-movement-camera', 'Персонаж · движение, камера, touch', 'Управление',
          'Кастомный ControllerManager, ПКМ и touch/мобильные действия.',
          ['CharacterMovementConfig', 'MobileLayout'], [
              {'title': 'Работает в исходниках', 'lines': [
                  'MovementController, CameraController и MobileInputController управляют локальным вводом; HouseCameraSync согласует heading после телепорта.',
+                 'M597: удержание ЛКМ/Attack повторяет атаку по timeline, Jump повторяется после приземления. Action touches поворачивают камеру; отдельный свободный палец имеет приоритет. Зелёная кнопка — toggle автоатаки, оранжевые — резерв skills.',
+                 'M598: MobileLayout задаёт общий масштаб: Attack у нижнего правого угла, Jump/Auto/Skills около 46% его диаметра; 4 Skills по дуге вокруг Attack, weapon slots около 37% вверху справа. Context/info dock учитывает реальные границы. HudCornerLayout резервирует 44 px для Settings, Debug сдвинут вправо и не занимает weapon grid. WalletHud подгоняет ширину по Gold.',
+                 'M599: Touch Debug — только GP (Studio), UI presentation, HP и CD; оружейные слоты экипируют тип напрямую через DEV RPC без окна каталога. Desktop без изменений.',
+                 'M601: weapon grid 2 px от верхнего/правого края DeviceSafeInsets, размер рассчитывается по CoreUISafeInsets (37% Attack). Newbie Slayer 01 связан с Database weapon_003 (bigsword LVL 1); пустая категория диагностируется и повторно запрашивает каталог при следующем выборе.',
                  'Управление на PC и Touch не должно требовать Studio Debug или Control Center при публикации.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
                  'Текущая камера, ввод и позиция не являются persistent profile; сохранённые Options — настройки проекта, а не предпочтения конкретного игрока.',
                  'Обязательная приёмка ПКМ/поворота камеры, pinch/drag, боевого управления, безопасных областей телефонов и изменения viewport.',
              ]},
-         ], ['movement-client', 'camera-client', 'mobile-client', 'camera-sync', 'movement-config']),
+         ], ['movement-client', 'camera-client', 'mobile-client', 'mobile-actions', 'mobile-layout', 'hud-corner-layout', 'attack-repeat', 'mobile-weapon-slots', 'mobile-weapon-quick-select', 'weapon-slot-catalog', 'debug-dock-profile', 'camera-sync', 'movement-config']),
     card('character-weapon-attack', 'Персонаж · оружие, melee и bow', 'Бой',
          'Серверная проверка атак, отдельный hitscan лука и визуальная стрела.',
          ['AttackService', 'BowHitscanService', 'WeaponEquipService'], [
@@ -34,7 +52,7 @@ ITEMS = [
                  'Выбранное оружие монтируется через BoneModelMount, а летящая/застрявшая стрела — клиентская визуализация, не второй серверный снаряд.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
-                 'WeaponSelectionService — игровой playtest chooser; нет доказанной persistent ownership/inventory модели для выбранного предмета.',
+                 'WeaponSelectionService — playtest chooser: Studio или точный DEV Place ID из Options → Debug / TestPlace (включая compiled Runtime), при включённых галочках PC/Mobile; все допущенные тестировщики. Нет доказанной persistent ownership/inventory модели для выбранного предмета.',
                  'Отдельно проверить урон при тесном контакте, прицеливание вверх/вниз, разные MeshPart, mobile auto-aim, lag/повторный Release и права игрока.',
              ]},
          ], ['attack-service', 'bow-hitscan', 'damage-service', 'weapon-equip', 'weapon-select', 'bone-mount']),

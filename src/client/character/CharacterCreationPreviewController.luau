@@ -257,7 +257,7 @@ function Controller:Set(archetype: string, templateName: string, choice: any, st
     return true
 end
 
-function Controller:KeepOnly(archetype: string)
+function Controller:KeepOnly(archetype: string?)
     for id, model in pairs(self.models) do
         if id ~= archetype then
             self.reactions:Remove(model)

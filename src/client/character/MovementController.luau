@@ -26,6 +26,7 @@ local keysDown: { [Enum.KeyCode]: boolean } = {}
 local touchAxis = Vector2.zero
 local touchMovementActive = false
 local jumpRequested = false
+local touchJumpHeld = false
 local jumpInFlight = false
 local fallForce: VectorForce? = nil
 local fallAttachment: Attachment? = nil
@@ -59,6 +60,7 @@ local airController: AirController? = nil
 local groundSensor: ControllerPartSensor? = nil
 
 local function clearCharacter()
+    touchJumpHeld = false
 	if meleeArcConnection then meleeArcConnection:Disconnect(); meleeArcConnection = nil end
 	meleeMaxResidualYaw = MeleeFacingPolicy.MaxResidualYaw(nil)
     table.clear(keysDown)
@@ -473,7 +475,7 @@ local function performJump()
 	if not navigationRoot or not controllerManager or not airController then
 		return
 	end
-	if not isGrounded() then
+	if not isGrounded() or os.clock() < airLockUntil or jumpInFlight then
 		return
 	end
 
@@ -546,6 +548,7 @@ local function updateMovement(deltaTime: number)
         touchAxis = Vector2.zero
         touchMovementActive = false
         jumpRequested = false
+        touchJumpHeld = false
         controllerManager.MovingDirection = Vector3.zero
         updateJumpDescent()
         return
@@ -631,7 +634,7 @@ local function updateMovement(deltaTime: number)
 		end
 	end
 
-	if jumpRequested then
+	if jumpRequested or (touchJumpHeld and not jumpInFlight and now >= airLockUntil and isGrounded()) then
 		jumpRequested = false
 		if not movementLocked then
 			performJump()
@@ -649,6 +652,10 @@ function MovementController.SetTouchMovement(axis: Vector2, active: boolean)
 		local magnitude = axis.Magnitude
 		touchAxis = if magnitude > 1 then axis.Unit else axis
 	end
+end
+
+function MovementController.SetTouchJumpHeld(held: boolean)
+	touchJumpHeld = held
 end
 
 function MovementController.RequestJump()

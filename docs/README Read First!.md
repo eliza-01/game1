@@ -1,8 +1,16 @@
 
 # Навигация по документации game1
 
-**Последняя сверка Monster AI / Runtime / Debug:** 27 ноября 2026, M593 (дамп M592). [Аудит и приёмка](workflows/M593_MONSTER_RUNTIME_AUDIT_RU.md). Остальной gameplay — M570/M571. Для остальных доменов сохраняются M447 Mechanics audit и M439 общий справочник. Основной подробный список M188–M189 ниже является историческим срезом соответствующих workflow.
+**Последняя сверка Monster AI / Runtime / Debug:** 27 ноября 2026, M595 (дамп M592 + патчи). Debug: [контракт DEV Place](spec/CURRENT_PROJECT_SPEC_RU.md#m595--debug-в-закрытом-dev-place). [Аудит и приёмка](workflows/M593_MONSTER_RUNTIME_AUDIT_RU.md). Остальной gameplay — M570/M571. Для остальных доменов сохраняются M447 Mechanics audit и M439 общий справочник. Основной подробный список M188–M189 ниже является историческим срезом соответствующих workflow.
 **Правило:** читать актуальные контракты прежде, чем исторические milestone-отчёты. Старые тексты оставлены для причин, миграций и отладки, **не** как одновременно действующие ТЗ.
+
+**M601 · Оружие:** [верхний правый угол и Database binding Newbie Slayer](workflows/M601_WEAPON_CORNER_RU.md).
+
+**M600 · Дом и NPC:** [иконки замка/двери, наведение, имена NPC](workflows/M600_HOUSE_INTERACTION_ICONS_RU.md).
+
+**M597–M599 · Управление и HUD:** [удержание, мобильные кнопки, оружие](workflows/M597_MOBILE_HOLD_HUD_RU.md).
+
+**Character Creation M596:** [Character Roster — слоты, миграция и приёмка](workflows/M596_CHARACTER_ROSTER_RU.md).
 
 ## Наиболее актуальная точка входа
 

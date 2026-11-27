@@ -13,7 +13,7 @@ return table.freeze({
 		characterY = 0.6,
 		cursorX = 0.5,
 		cursorY = 0.5,
-		mobileLookSpeed = 1.5,
+		mobileLookSpeed = 1.8,
 	}),
 	healthUi = table.freeze({
 		desktop = table.freeze({
@@ -213,7 +213,7 @@ return table.freeze({
 		maxActiveLeaves = 32,
 	}),
 	characterCreation = table.freeze({
-		enabled = true,
+		enabled = false,
 		useStudioAnchors = true,
 		transitionSeconds = 0.9,
 		faceTransitionSeconds = 0.65,
@@ -314,14 +314,15 @@ return table.freeze({
 	}),
 	debugUi = table.freeze({
 		desktop = table.freeze({
-			showPublishedControls = false,
+			showPublishedControls = true,
 		}),
 		mobile = table.freeze({
 			showPublishedControls = true,
 		}),
 		startInHub = false,
-		startedLanguage = false,
+		startedLanguage = true,
 		startLocale = "ru-ru",
+		publishedPlaceId = "",
 	}),
 	characterAnimations = table.freeze({
 		deathPlaybackPercent = 50,

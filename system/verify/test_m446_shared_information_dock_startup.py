@@ -16,15 +16,15 @@ class SharedInformativeDockM446(unittest.TestCase):
     def test_restore_placement_reads_real_mobile_layout_contract(self):
         layout = read('src/client/character/mobile/MobileLayout.luau')
         dock = read('src/client/world/InformativeWindowDock.luau')
-        self.assertRegex(layout, r'\bgap\s*=\s*math\.floor\(')
+        self.assertRegex(layout, r'\bgap\s*=\s*math\.max\(1, math\.floor\(')
         self.assertIn('gap = gap,', layout)
-        self.assertIn('attack = {size = attack, x = margin + secondary + gap, y = margin + gap}', layout)
+        self.assertIn('attackBox = {size = attack, x = attackRight, y = bottom}', layout)
         self.assertIn('local bounds = MobileLayout.Resolve(width, height)', dock)
-        self.assertIn('attack.x + attack.size + bounds.gap', dock)
+        self.assertIn('bounds.jump.x + bounds.jump.size + bounds.gap', dock)
         self.assertNotIn('bounds.attack.gap', dock)
         self.assertNotRegex(dock, r'(?m)^\s*local rightInset\s*=.*attack\.gap')
-        self.assertRegex(dock, r'local attack = bounds\.attack\s+local rightInset =')
-        self.assertRegex(dock, r'restore\.Position = UDim2\.new\(1,\s+-rightInset \+ cfg\.offsetXPx,')
+        self.assertIn('local box = MobileLayout.Context(width, height, panelHeight', dock)
+        self.assertIn('restore.Position = UDim2.new(1, -collapsedBox.x + cfg.offsetXPx', dock)
 
     def test_shared_chevron_controls_reuse_one_surface(self):
         dock = read('src/client/world/InformativeWindowDock.luau')
@@ -58,7 +58,7 @@ class SharedInformativeDockM446(unittest.TestCase):
     def test_status_is_displayed_when_heat_is_off_and_unminimizes(self):
         presenter = read('src/client/world/HouseFireplaceController.luau')
         dock = read('src/client/world/InformativeWindowDock.luau')
-        self.assertIn('setBar(fuelRow, 0, "Не горит"', presenter)
+        self.assertIn('setBar(fuelRow, 0, Language.Translate("hud.not_burning")', presenter)
         self.assertIn('registered(socket) and ray and hoverRadius > 0', presenter)
         self.assertIn('dock:Present("fireplace", socket,', presenter)
         self.assertIn('collapsed[currentSource] = nil', dock)

@@ -1,4 +1,4 @@
--- Presentation only: one ScreenGui, three actions and a passive floating stick.
+-- Presentation only: combat buttons, reserved skill cells, and passive floating stick.
 local Layout = require(script.Parent:WaitForChild("MobileLayout"))
 local View = {}
 
@@ -53,14 +53,14 @@ end
 -- Icons are vector-like Roblox UI primitives, not asset IDs or text glyphs.
 -- Their images therefore work on a fresh device without uploading textures.
 local function iconLine(parent: Instance, name: string, width: number, height: number,
-    x: number, y: number, rotation: number)
+    x: number, y: number, rotation: number, color: Color3?)
     local line = Instance.new("Frame")
     line.Name = name
     line.AnchorPoint = Vector2.new(0.5, 0.5)
     line.Position = UDim2.fromScale(x, y)
     line.Size = UDim2.fromScale(width, height)
     line.Rotation = rotation
-    line.BackgroundColor3 = PALETTE.text
+    line.BackgroundColor3 = color or PALETTE.text
     line.BackgroundTransparency = 0.06
     line.BorderSizePixel = 0
     line.Parent = parent
@@ -69,12 +69,19 @@ local function iconLine(parent: Instance, name: string, width: number, height: n
     corner.Parent = line
 end
 
+local ACTION_COLORS = {
+    Attack = Color3.fromRGB(255, 255, 255),
+    Jump = Color3.fromRGB(0, 166, 222),
+    Aim = Color3.fromRGB(27, 183, 83),
+    Skill = Color3.fromRGB(255, 133, 37),
+}
 local function makeAction(gui: ScreenGui, name: string): TextButton
     local button = Instance.new("TextButton")
     button.Name = name
     button.AnchorPoint = Vector2.new(1, 1)
-    button.BackgroundColor3 = Color3.new(0, 0, 0)
-    button.BackgroundTransparency = if name == "Attack" then 0.26 else 0.48
+    local isSkill = string.sub(name, 1, 5) == "Skill"
+    button.BackgroundColor3 = Color3.new(1, 1, 1)
+    button.BackgroundTransparency = if isSkill then 0.35 else 0.06
     button.BorderSizePixel = 0
     button.AutoButtonColor = true
     button.Text = ""
@@ -85,7 +92,7 @@ local function makeAction(gui: ScreenGui, name: string): TextButton
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = button
-    stroke(button, PALETTE.rim, 0.72, 1)
+    stroke(button, if isSkill then ACTION_COLORS.Skill elseif name == "Attack" then Color3.new(0,0,0) else ACTION_COLORS[name], 0, 3)
     local glyph = Instance.new("Frame")
     glyph.Name = name .. "Icon"
     glyph.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -105,18 +112,18 @@ local function makeAction(gui: ScreenGui, name: string): TextButton
         local round = Instance.new("UICorner")
         round.CornerRadius = UDim.new(1, 0)
         round.Parent = ring
-        stroke(ring, PALETTE.text, 0.06, 2)
-        iconLine(glyph, "ReticleTop", 0.07, 0.21, 0.5, 0.04, 0)
-        iconLine(glyph, "ReticleBottom", 0.07, 0.21, 0.5, 0.96, 0)
-        iconLine(glyph, "ReticleLeft", 0.21, 0.07, 0.04, 0.5, 0)
-        iconLine(glyph, "ReticleRight", 0.21, 0.07, 0.96, 0.5, 0)
+        stroke(ring, ACTION_COLORS.Aim, 0.06, 2)
+        iconLine(glyph, "ReticleTop", 0.07, 0.21, 0.5, 0.04, 0, ACTION_COLORS.Aim)
+        iconLine(glyph, "ReticleBottom", 0.07, 0.21, 0.5, 0.96, 0, ACTION_COLORS.Aim)
+        iconLine(glyph, "ReticleLeft", 0.21, 0.07, 0.04, 0.5, 0, ACTION_COLORS.Aim)
+        iconLine(glyph, "ReticleRight", 0.21, 0.07, 0.96, 0.5, 0, ACTION_COLORS.Aim)
     elseif name == "Attack" then
-        -- Weapon-specific icons are constructed once in SetWeapon, on equip only.
-    else
+        iconLine(glyph, "AttackSlash", 0.12, 0.80, 0.5, 0.5, 45, Color3.fromRGB(221, 31, 39))
+    elseif name == "Jump" then
         -- Familiar Roblox-style upward jump arrow.
-        iconLine(glyph, "Stem", 0.15, 0.69, 0.5, 0.55, 0)
-        iconLine(glyph, "LeftArrow", 0.15, 0.43, 0.36, 0.30, 45)
-        iconLine(glyph, "RightArrow", 0.15, 0.43, 0.64, 0.30, -45)
+        iconLine(glyph, "Stem", 0.15, 0.69, 0.5, 0.55, 0, ACTION_COLORS.Jump)
+        iconLine(glyph, "LeftArrow", 0.15, 0.43, 0.36, 0.30, 45, ACTION_COLORS.Jump)
+        iconLine(glyph, "RightArrow", 0.15, 0.43, 0.64, 0.30, -45, ACTION_COLORS.Jump)
     end
     return button
 end
@@ -137,40 +144,36 @@ function View.Create(playerGui: PlayerGui)
     local jump = makeAction(gui, "Jump")
     local attack = makeAction(gui, "Attack")
     local aim = makeAction(gui, "Aim")
-    local result = {gui = gui, left = left, jump = jump, attack = attack, aim = aim, radius = 50}
-    local weapon: string? = nil
-    function result.SetWeapon(value: any)
-        local kind = string.lower(tostring(value or ""))
-        if kind ~= "bow" and kind ~= "" then kind = "melee" end
-        if kind == weapon then return end
-        weapon = kind
-        local glyph = attack:FindFirstChild("AttackIcon")
-        if not glyph then return end
-        glyph:ClearAllChildren()
-        if kind == "bow" then
-            iconLine(glyph, "BowUpper", 0.12, 0.43, 0.47, 0.24, -38)
-            iconLine(glyph, "BowLower", 0.12, 0.43, 0.47, 0.76, 38)
-            iconLine(glyph, "BowGrip", 0.12, 0.30, 0.60, 0.50, 0)
-            iconLine(glyph, "String", 0.045, 0.80, 0.33, 0.50, 0)
-            iconLine(glyph, "Arrow", 0.83, 0.07, 0.51, 0.50, 0)
-            iconLine(glyph, "ArrowheadTop", 0.22, 0.07, 0.83, 0.42, 35)
-            iconLine(glyph, "ArrowheadBottom", 0.22, 0.07, 0.83, 0.58, -35)
-        elseif kind == "" then
-            for i = 1, 4 do
-                iconLine(glyph, "Knuckle" .. i, 0.16, 0.29, 0.18 + (i-1)*0.18, 0.32, 0)
+    local skills = {}
+    for i = 1, 4 do skills[i] = makeAction(gui, "Skill" .. i) end
+    local result = {gui = gui, left = left, jump = jump, attack = attack, aim = aim, skills = skills, radius = 50}
+    local automatic = false
+    local target: Model? = nil
+    local function paintAim()
+        aim.BackgroundColor3 = if automatic then ACTION_COLORS.Aim else Color3.new(1,1,1)
+        aim.BackgroundTransparency = 0.06
+        local glyph = aim:FindFirstChild("AimIcon")
+        if glyph then
+            local color = if automatic then Color3.new(1,1,1) else ACTION_COLORS.Aim
+            for _, item in glyph:GetDescendants() do
+                if item:IsA("UIStroke") then item.Color = color
+                elseif item:IsA("Frame") and item.Name ~= "ReticleRing" then item.BackgroundColor3 = color end
             end
-            iconLine(glyph, "Palm", 0.70, 0.39, 0.48, 0.61, 0)
-            iconLine(glyph, "Thumb", 0.19, 0.36, 0.76, 0.59, -25)
-        else
-            iconLine(glyph, "Blade", 0.16, 0.66, 0.53, 0.34, 45)
-            iconLine(glyph, "Crossguard", 0.43, 0.09, 0.37, 0.58, 45)
-            iconLine(glyph, "Grip", 0.10, 0.27, 0.22, 0.79, 45)
-            iconLine(glyph, "Pommel", 0.19, 0.10, 0.13, 0.89, 45)
+        end
+        local outline = aim:FindFirstChildOfClass("UIStroke")
+        if outline then
+            outline.Transparency = 0
+            outline.Thickness = 3
+            outline.Color = if target then Color3.fromRGB(255,255,255) else ACTION_COLORS.Aim
         end
     end
+    function result.SetAutomatic(enabled: boolean)
+        automatic = enabled
+        paintAim()
+    end
     function result.SetAim(selected: Model?)
-        aim.BackgroundColor3 = if selected then Color3.fromRGB(28, 113, 104) else PALETTE.background
-        aim.BackgroundTransparency = if selected then 0.08 else 0.48
+        target = selected
+        paintAim()
     end
     function result.RestStick()
         local size = left.pad.Size.X.Offset
@@ -200,9 +203,14 @@ function View.Create(playerGui: PlayerGui)
             button.Size = UDim2.fromOffset(box.size, box.size)
             button.Position = UDim2.new(1, -box.x, 1, -box.y)
         end
+        for i, button in ipairs(skills) do
+            local box = bounds.skills[i]
+            button.Size = UDim2.fromOffset(box.size, box.size)
+            button.Position = UDim2.new(1, -box.x, 1, -box.y)
+        end
         result.RestStick()
     end
-    result.SetWeapon("")
+    paintAim()
     result.Layout()
     return result
 end

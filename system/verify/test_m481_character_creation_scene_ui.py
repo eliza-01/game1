@@ -85,7 +85,10 @@ class CreationSceneM481(unittest.TestCase):
 
     def test_existing_options_and_categories_preserved(self):
         options=json.loads((ROOT/'assets/manifests/options.json').read_text())
-        self.assertTrue(options['characterCreation']['enabled'])
+        # A project owner may disable creation in Options; migration must preserve either choice.
+        self.assertIs(type(options['characterCreation']['enabled']), bool)
+        for enabled in (True, False):
+            self.assertIs(normalize_character_creation({**options['characterCreation'], 'enabled': enabled})['enabled'], enabled)
         self.assertEqual(len(options['characterCreation']['views']),5)
         for group in ('healthUi','flora','socketRanges','rotations'):
             self.assertIn(group,options)

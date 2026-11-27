@@ -85,11 +85,13 @@ local function updateDoorPrompts(entry: Entry, house: Model)
         local primary = socket and socket:FindFirstChild("Game1HouseInteraction")
         if primary and primary:IsA("ProximityPrompt") then
             primary.ActionText = action
+            primary:SetAttribute("Game1InteractionIcon", if open then "DoorOpen" else "DoorClosed")
             primary.Enabled = not locked
         end
         local alternate = socket and socket:FindFirstChild("Game1HouseInteractionAlternate")
         if alternate and alternate:IsA("ProximityPrompt") then
             alternate.ActionText = "Навесить замок · ключ"
+            alternate:SetAttribute("Game1InteractionIcon", "LockOpen")
             alternate.Enabled = canAttach
         end
     end
@@ -98,6 +100,7 @@ local function updateDoorPrompts(entry: Entry, house: Model)
         local prompt = socket and socket:FindFirstChild("Game1HouseInteraction")
         if prompt and prompt:IsA("ProximityPrompt") then
             prompt.ActionText = "Снять замок · ключ"
+            prompt:SetAttribute("Game1InteractionIcon", "LockClosed")
             prompt.Enabled = locked
         end
     end
@@ -134,9 +137,9 @@ local function handleInteraction(house: Model, name: string, player: Player, key
             or Door.IsMoving(house)) then return end
     end
     local pos = rootPosition(player)
-    -- Any AIM-enabled socket uses the exact USE radius; legacy +2 remains
-    -- for door/padlock prompts, which do not have an AIM region.
+    -- AIM actions use the exact USE radius; the proximity lock keeps its legacy tolerance.
     local allowedDistance = radiusFor(player, name) + (if definition.hoverRadius then 0 else 2)
+    if definition.role == "door" and key == "E" then allowedDistance = radiusFor(player, name) end
     if not pos or (pos - getFrame(socket).Position).Magnitude > allowedDistance then return end
     local now = os.clock()
     if now - (cooldown[player] or 0) < 0.45 then return end
@@ -145,7 +148,7 @@ local function handleInteraction(house: Model, name: string, player: Player, key
         local door = house:FindFirstChild("DoorAssembly")
         local open = door ~= nil and door:GetAttribute("Game1DoorOpen") == true
         local _ok, reason = Padlock.Toggle(house, player, true, open, Door.IsMoving(house))
-        if feedback then feedback:FireClient(player, reason) end
+        if not _ok and feedback then feedback:FireClient(player, reason) end
         updateDoorPrompts(entry, house)
     elseif definition.role == "door" then
         local ok, reason = Door.Toggle(house)
@@ -154,18 +157,13 @@ local function handleInteraction(house: Model, name: string, player: Player, key
             if feedback then
                 feedback:FireClient(player, if RunService:IsStudio() then "Дверь недоступна: " .. reason else "Дверь недоступна")
             end
-        else
-            if feedback then
-                feedback:FireClient(player, if (house:FindFirstChild("DoorAssembly") :: Model):GetAttribute("Game1DoorOpen") == true
-                    then "Дверь открыта" else "Дверь закрыта")
-            end
         end
         updateDoorPrompts(entry, house)
     elseif definition.role == "padlock" then
         local door = house:FindFirstChild("DoorAssembly")
         local doorOpen = door ~= nil and door:GetAttribute("Game1DoorOpen") == true
         local _ok, reason = Padlock.Toggle(house, player, true, doorOpen, Door.IsMoving(house))
-        if feedback then feedback:FireClient(player, reason) end
+        if not _ok and feedback then feedback:FireClient(player, reason) end
         updateDoorPrompts(entry, house)
     elseif definition.role == "elevator" then
         local _ok, message = Elevator.Move(player, entry.sockets, name, key)
@@ -233,7 +231,7 @@ local function register(house: Model)
         prompt.ObjectText = ""
         prompt.KeyboardKeyCode = if key == "F" then Enum.KeyCode.F else Enum.KeyCode.E
         prompt.HoldDuration = 0
-        prompt.MaxActivationDistance = Contract.MaxDebugRadius -- client + server policy restricts per socket
+        prompt.MaxActivationDistance = if definition.role == "door" and key == "E" then 0 else Contract.MaxDebugRadius
         prompt.RequiresLineOfSight = true
         if RunService:IsStudio() then prompt.RequiresLineOfSight = false end
         prompt.Exclusivity = Enum.ProximityPromptExclusivity.OnePerButton
@@ -242,6 +240,8 @@ local function register(house: Model)
         prompt.Parent = socket
         table.insert(entry.generated, prompt)
         table.insert(entry.connections, prompt.Triggered:Connect(function(player)
+            -- Native activation cannot bypass the client door reticle.
+            if definition.role == "door" and key == "E" then return end
             handleInteraction(house, definition.name, player, key)
         end))
     end

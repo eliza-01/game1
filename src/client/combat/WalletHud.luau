@@ -2,6 +2,7 @@
 -- Read-only projection of the server's existing Gold attribute.
 local Players=game:GetService("Players")
 local Input=game:GetService("UserInputService")
+local TextService=game:GetService("TextService")
 local Layout=require(script.Parent.Parent:WaitForChild("character"):WaitForChild("mobile"):WaitForChild("MobileLayout"))
 local View={}
 function View.Start()
@@ -30,6 +31,8 @@ function View.Start()
             local gold=if character then tonumber(character:GetAttribute("Gold")) else nil
             gui.Enabled=character~=nil and character:GetAttribute("LifeState")=="Alive" and gold~=nil
             number.Text=string.format("%d",gold or 0)
+            local content=TextService:GetTextSize(number.Text,number.TextSize,number.Font,Vector2.new(10000,32))
+            plate.Size=UDim2.fromOffset(42+math.ceil(content.X),32)
         end
         if character then
             for _,key in ipairs({"Gold","LifeState"}) do table.insert(connections,character:GetAttributeChangedSignal(key):Connect(update)) end

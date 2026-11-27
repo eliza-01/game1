@@ -16,7 +16,7 @@
     "characterY": 0.6,
     "cursorX": 0.5,
     "cursorY": 0.5,
-    "mobileLookSpeed": 1.5
+    "mobileLookSpeed": 1.8
   },
   "cameraPresets": [
     {
@@ -44,7 +44,7 @@
       }
     }
   ],
-  "activeCameraPreset": "2",
+  "activeCameraPreset": "",
   "healthUi": {
     "desktop": {
       "screen": {
@@ -117,14 +117,15 @@
   },
   "debugUi": {
     "desktop": {
-      "showPublishedControls": false
+      "showPublishedControls": true
     },
     "mobile": {
       "showPublishedControls": true
     },
     "startInHub": false,
-    "startedLanguage": false,
-    "startLocale": "ru-ru"
+    "startedLanguage": true,
+    "startLocale": "ru-ru",
+    "publishedPlaceId": ""
   },
   "worldStreaming": {
     "targetRadiusStuds": 150
@@ -291,7 +292,7 @@
     "maxActiveLeaves": 32
   },
   "characterCreation": {
-    "enabled": true,
+    "enabled": false,
     "useStudioAnchors": true,
     "transitionSeconds": 0.9,
     "faceTransitionSeconds": 0.65,

@@ -483,6 +483,11 @@
 <label>Stuck threshold · %<input id="option-nav-stuckPercent" type="number" min="10" max="90" value="50"></label>
 <label>Stuck return · sec<input id="option-nav-stuckReturnSeconds" type="number" min="5" max="300" value="30" title="Return home after no new movement progress, including Death Chase"></label>
 <label>Search distance · studs<input id="option-nav-searchDistance" type="number" min="10" max="100" value="40"></label>
+<label>Route connection height · studs<input id="option-nav-routeConnectionHeight" type="number" min="0" max="100" step="0.1" value="2" title="Maximum vertical difference between a free route terminal and another route; applies after Rojo Sync and Play restart"></label>
+<label>Blocked retreat buffer · studs<input id="option-nav-blockedRetreatBuffer" type="number" min="0" max="20" step="0.1" value="2"></label>
+<label>Blocked retreat speed · × Run<input id="option-nav-blockedRetreatSpeedMultiplier" type="number" min="0.1" max="5" step="0.1" value="1"></label>
+<label>Blocked reengage speed · × Run<input id="option-nav-blockedReengageSpeedMultiplier" type="number" min="0.1" max="5" step="0.1" value="1.5"></label>
+<label>Rescue Route speed · × Run<input id="option-nav-rescueRouteSpeedMultiplier" type="number" min="0.1" max="5" step="0.1" value="1.5"></label>
 <label>Search width · studs<input id="option-nav-searchWidth" type="number" min="10" max="120" value="60"></label>
 <label>Direct recheck · sec<input id="option-nav-recheckSeconds" type="number" min="0.5" max="3" step="0.1" value="1"></label>
 </div><div class="actions"><button id="option-nav-save" class="primary" type="button">Save navigation options</button></div></div></details>
@@ -1280,7 +1285,7 @@
 <script src="skill-editor.js?v=557"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=575"></script>
+<script src="options.js?v=591"></script>
 <script src="character-creation-options.js?v=505"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>

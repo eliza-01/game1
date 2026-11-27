@@ -116,7 +116,7 @@ $('option-world-streaming-copy').onclick=async()=>{
     toast('Studio Command Bar code copied · apply in Edit mode and publish');
   }catch(error){toast(error.message||'Cannot copy Command Bar code',true)}
 };
-const game1NavigationDefaults={sampleSeconds:1,stuckPercent:50,stuckReturnSeconds:30,searchDistance:40,searchWidth:60,recheckSeconds:1};
+const game1NavigationDefaults={sampleSeconds:1,stuckPercent:50,stuckReturnSeconds:30,searchDistance:40,routeConnectionHeight:2,blockedRetreatBuffer:2,blockedRetreatSpeedMultiplier:1,blockedReengageSpeedMultiplier:1.5,rescueRouteSpeedMultiplier:1.5,searchWidth:60,recheckSeconds:1};
 $('option-nav-save').onclick=()=>{
   const nav={enabled:$('option-nav-enabled').checked};
   for(const [k,v] of Object.entries(game1NavigationDefaults))nav[k]=game1OptionNumber('option-nav-'+k,v);

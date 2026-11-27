@@ -7,7 +7,11 @@ local Graph=require(script.Parent:WaitForChild("MonsterRescueGraph"))
 local Climb=require(script.Parent:WaitForChild("MonsterClimbMotion"))
 local Watchdog=require(script.Parent:WaitForChild("MonsterStuckWatchdog"))
 local DeathChase=require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
+local Blocked=require(script.Parent:WaitForChild("MonsterBlockedPursuit"))
+local RetreatGeometry=require(script.Parent:WaitForChild("MonsterBlockedRetreatGeometry"))
+local Speed=require(script.Parent:WaitForChild("MonsterNavigationSpeed"))
 local Navigation={}
+Navigation.Initialize=Graph.Initialize
 local UP=Vector3.yAxis
 local horizontal=Geometry.Horizontal
 
@@ -17,12 +21,17 @@ local function mode(agent,state,value)
     state.mode=value
     agent.model:SetAttribute("MonsterRecoveryMode",value)
 end
+local function movementSpeed(state,speed)
+    return speed*Speed.Multiplier(state,Config)
+end
 local function resetSample(agent,state,now)
     state.position=agent.root.Position; state.sampleAt=now
     state.expected=0; state.lastAt=now
 end
 local function clearPlan(agent,state,now)
     Climb.Stop(state)
+    state.noAccessiblePlan=nil
+    state.blockedPursuit=nil
     state.plan=nil; state.index=1; state.nextCheck=now+Config.recheckSeconds
     state.retryClimb=nil
     agent.model:SetAttribute("MonsterRecoveryPlanIndex",nil); agent.model:SetAttribute("MonsterRecoveryPlanSize",nil)
@@ -37,7 +46,7 @@ function Navigation.Clear(agent)
     Climb.Stop(state)
     agent.recoveryNavigation=nil
     if agent.model.Parent then
-        if state.plan or state.mode=="Climb" or state.mode=="Retry" then
+        if state.plan or state.mode=="Climb" or state.mode=="Retry" or state.blockedPursuit then
             agent.model:SetAttribute("MonsterLastRecoveryEvent","ExternalNavigationStop")
         end
         agent.model:SetAttribute("MonsterRecoveryMode",nil); agent.model:SetAttribute("MonsterRecoveryPoint",nil)
@@ -92,10 +101,17 @@ local function waitRetry(agent,state,now,reason)
     if failed then state.failed[pointKey(failed)]=now+8 end
     clearPlan(agent,state,now)
     state.retryClimb=retryClimb
+    state.noAccessiblePlan=reason=="NoAccessiblePlan"
     state.retryAt=now+1.5
     mode(agent,state,"Retry")
     agent.humanoid:Move(Vector3.zero,false); agent.humanoid:MoveTo(agent.root.Position)
     agent.model:SetAttribute("MonsterRecoveryPoint",nil)
+    if state.noAccessiblePlan and not agent.returning and agent.target then
+        Blocked.Begin(state)
+        state.stuckWatchdog=nil
+        agent.model:SetAttribute("MonsterRecoveryStuckSeconds",0)
+        mode(agent,state,"BlockedRetreat")
+    end
 end
 local function probeClimb(agent,state,foot,point,height,radius,ray,now,knownHead,knownDistance)
     local delta=horizontal(point-foot)
@@ -121,7 +137,7 @@ local function beginLowClimb(agent,state,foot,point,height,radius,ray,now,landin
             landing=foot+delta.Unit*math.min(delta.Magnitude,radius+.5)+UP*rise
         end
     end
-    if landing and allowed(agent,landing) and Climb.Begin(agent,state,landing,rise,ray,now,speed) then
+    if landing and allowed(agent,landing) and Climb.Begin(agent,state,landing,rise,ray,now,movementSpeed(state,speed)) then
         state.planKind=state.plan and state.mode or "Direct"
         state.retryClimb=nil
         agent.model:SetAttribute("MonsterLastRecoveryEvent","LowClimbSelected")
@@ -133,18 +149,39 @@ local function beginLowClimb(agent,state,foot,point,height,radius,ray,now,landin
     state.retryClimb=true
 end
 local function choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
-    local function connect(a,b) return allowed(agent,b) and eligible(state,a,now) and eligible(state,b,now) and Geometry.Clear(agent,a,b,height,radius,ray) end
+    local function policy(p)
+        if not allowed(agent,p) then return false,"Leash" end
+        if not eligible(state,p,now) then return false,"Cooldown" end
+        return true
+    end
+    local function connect(a,b)
+        if not allowed(agent,b) then return false,"Leash" end
+        if not eligible(state,a,now) then return false,"CooldownOrigin" end
+        if not eligible(state,b,now) then return false,"Cooldown" end
+        return Geometry.RouteEntryClear(a,b,ray)
+    end
     local detour=Geometry.Detour(agent,foot,goal,height,radius,ray,Geometry.Overlap(ray),function(p) return allowed(agent,p) and eligible(state,p,now) end)
-    local route,graphStats=Graph.Find(foot,goal,connect,function(p) return allowed(agent,p) and eligible(state,p,now) end,
-        function(a,b) return allowed(agent,b) and eligible(state,a,now) and Geometry.RecoveryExitClear(a,height,b,ray) end)
+    local observe=Trace.RouteObserver(agent,foot,goal,Config.searchDistance)
+    local route,graphStats=Graph.Find(foot,goal,connect,policy,
+        function(a,b)
+            if not allowed(agent,b) then return false,"Leash" end
+            if not eligible(state,a,now) then return false,"Cooldown" end
+            return Geometry.RecoveryExitClear(a,height,b,ray)
+        end,observe,function(a,b) return Geometry.RouteEntryClear(a,b,ray) end)
     if graphStats and Trace.Enabled(agent) then
-        Trace.Event(agent,"GRAPH_SEARCH","entryCandidates="..graphStats.entryCandidates,"entries="..graphStats.entries,"entryChecks="..graphStats.entryChecks,"reachableExits="..graphStats.reachableExits,"exitChecks="..graphStats.exitChecks)
+        Trace.Event(agent,"GRAPH_SEARCH","entryCandidates="..graphStats.entryCandidates,"entries="..graphStats.entries,"entryChecks="..graphStats.entryChecks,"reachableExits="..graphStats.reachableExits,"exitChecks="..graphStats.exitChecks,"transferChecks="..graphStats.transferChecks)
     end
     if route then
-        for _,p in ipairs(route.points) do if not allowed(agent,p) or not eligible(state,p,now) then route=nil; break end end
+        for _,p in ipairs(route.points) do
+            local ok,reason=policy(p)
+            if not ok then
+                if observe then Trace.Event(agent,"GRAPH_PLAN_REJECTED","point="..Trace.V(p),"reason="..reason) end
+                route=nil; break
+            end
+        end
     end
     if Trace.Enabled(agent) then
-        Trace.Event(agent,"CANDIDATES","collisionCost="..tostring(detour and detour.cost),"routeCost="..tostring(route and route.cost),"exitHeightDelta="..tostring(route and route.exitHeightDelta),"exitDistance="..tostring(route and route.exitDistance),"climb="..Trace.V(landing))
+        Trace.Event(agent,"CANDIDATES","collisionCost="..tostring(detour and detour.cost),"routeCost="..tostring(route and route.cost),"routeId="..tostring(route and route.routeId),"entryRouteId="..tostring(route and route.entryRouteId),"exitHeightDelta="..tostring(route and route.exitHeightDelta),"exitDistance="..tostring(route and route.exitDistance),"climb="..Trace.V(landing))
     end
     local plan,kind=detour,"Collision"
     if route and (not detour or route.cost<detour.cost) then plan,kind=route,"RescueRoute" end
@@ -152,7 +189,7 @@ local function choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,ri
     if landing then
         local localCost=horizontal(landing-foot).Magnitude+rise+(goal-landing).Magnitude
         if (not plan or Geometry.ClimbContinues(landing,goal,height,radius,ray)) and (not plan or localCost<=plan.cost) then
-            if Climb.Begin(agent,state,landing,rise,ray,now,speed) then
+            if Climb.Begin(agent,state,landing,rise,ray,now,movementSpeed(state,speed)) then
                 agent.model:SetAttribute("MonsterLastRecoveryEvent","ClimbSelected")
                 state.retryClimb=nil; state.planKind="Direct"; mode(agent,state,"Climb")
                 agent.model:SetAttribute("MonsterRecoveryPoint",landing); return
@@ -181,12 +218,44 @@ local function directClear(agent,foot,goal,height,ray)
     return Geometry.RecoveryExitClear(foot,height,goal,ray)
 end
 
+-- Only player-targeted NoAccessiblePlan enters this policy. Returning home
+-- retains the original watchdog and recall path.
+local function stepBlocked(agent,state,destination,speed,now)
+    local range=Config.bowRange
+    local before=state.blockedPursuit.phase
+    local phase,point=Blocked.Step(state,agent.root.Position,destination,range,Config.blockedRetreatBuffer,now,movementSpeed(state,speed),function(position,target,desired)
+        return RetreatGeometry.FindPoint(agent,position,target,desired,function(p) return allowed(agent,p) end)
+    end)
+    if phase=="Reengage" then
+        Trace.Event(agent,"BLOCKED_REENGAGE")
+        clearPlan(agent,state,now); state.reengaging=true; state.stuckWatchdog=nil
+        state.nextCheck=now; agent.lastDamageAt=now
+        return false
+    end
+    if phase=="Wait" then
+        if before~="Wait" then
+            agent.lastDamageAt=now
+            agent.humanoid:Move(Vector3.zero,false); agent.humanoid:MoveTo(agent.root.Position)
+            Trace.Event(agent,"BLOCKED_WAIT","range="..tostring(range))
+        end
+        mode(agent,state,"BlockedWait")
+        local seconds=math.floor(Blocked.WaitSeconds(state,now))
+        agent.model:SetAttribute("MonsterRecoveryStuckSeconds",seconds)
+        if seconds>=Config.stuckReturnSeconds then
+            Trace.Event(agent,"STUCK_TIMEOUT","seconds="..tostring(seconds),"mode="..state.mode)
+            return true,"StuckTimeout"
+        end
+    else
+        mode(agent,state,"BlockedRetreat")
+        if point then move(agent,state,point,movementSpeed(state,speed),now)
+        else agent.humanoid:Move(Vector3.zero,false); agent.humanoid.WalkSpeed=0 end
+    end
+    return true
+end
+
 function Navigation.NavigateTo(agent,destination,speed)
     if not agent.active or not agent.root.Parent then return end
     speed=math.max(0,speed)*math.clamp(tonumber(agent.model:GetAttribute("SkillMoveMultiplier")) or 1,0,1)
-    if speed<=.01 then
-        Navigation.Clear(agent); agent.humanoid:Move(Vector3.zero,false); agent.humanoid.WalkSpeed=0; return
-    end
     local now=os.clock()
     local state=agent.recoveryNavigation
     if not state or state.target~=agent.target or state.returning~=agent.returning then
@@ -195,9 +264,16 @@ function Navigation.NavigateTo(agent,destination,speed)
         state={target=agent.target,returning=agent.returning,moveAt=0,index=1,retryAt=0,nextCheck=now,failed={}}
         agent.recoveryNavigation=state; resetSample(agent,state,now); mode(agent,state,"Direct")
     end
+    if state.blockedPursuit then
+        local handled,result=stepBlocked(agent,state,destination,speed,now)
+        if handled then return result end
+    end
+    if speed<=.01 then
+        Navigation.Clear(agent); agent.humanoid:Move(Vector3.zero,false); agent.humanoid.WalkSpeed=0; return
+    end
     -- A chase-level watchdog survives plan changes, local climb failures and
     -- Retry. Return is owned by AI, not by the navigation module.
-    if not agent.returning then
+    do
         local expired,seconds=Watchdog.Step(state,agent.root.Position,now,Config.stuckReturnSeconds)
         if agent.model:GetAttribute("MonsterRecoveryStuckSeconds")~=seconds then
             agent.model:SetAttribute("MonsterRecoveryStuckSeconds",seconds)
@@ -216,9 +292,13 @@ function Navigation.NavigateTo(agent,destination,speed)
     end
     if state.climb then
         if not allowed(agent,state.climb.landing) then waitRetry(agent,state,now,"ClimbOutsidePursuitBoundary"); return end
-        local result=Climb.Step(agent,state,speed,nil,now)
+        local result=Climb.Step(agent,state,movementSpeed(state,speed),nil,now)
         Trace.Changed(agent,"CLIMB_STEP",result)
         if result=="Failed" then waitRetry(agent,state,now,"ClimbFailed")
+        elseif result=="Timeout" then
+            clearPlan(agent,state,now); state.nextCheck=now
+            agent.model:SetAttribute("MonsterLastRecoveryEvent","ClimbTimeout")
+            agent.model:SetAttribute("MonsterRecoveryPoint",nil)
         elseif result=="Done" then resetSample(agent,state,now); state.moveAt=0; state.nextCheck=now; mode(agent,state,state.plan and state.planKind or "Direct") end
         return
     end
@@ -244,6 +324,10 @@ function Navigation.NavigateTo(agent,destination,speed)
             if not state.retryClimb then landing,rise,lower,head=probeClimb(agent,state,foot,goal,height,radius,ray,now) end
             if not head and (state.retryClimb or (lower and lower.Distance<=radius+2)) then
                 beginLowClimb(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
+                return
+            end
+            if state.noAccessiblePlan then
+                state.retryAt=now+1.5 -- direct/low-climb checks only; no repeated graph search
                 return
             end
             choosePlan(agent,state,foot,goal,height,radius,ray,now,landing,rise,speed)
@@ -303,7 +387,7 @@ function Navigation.NavigateTo(agent,destination,speed)
     end
     if not allowed(agent,point) then waitRetry(agent,state,now,"PointOutsidePursuitBoundary"); return end
     -- Accumulate expected displacement with actual effective speed (Slow/Root/Stun).
-    state.expected+=speed*math.max(0,now-state.lastAt)
+    state.expected+=movementSpeed(state,speed)*math.max(0,now-state.lastAt)
     state.lastAt=now
     if now-state.sampleAt>=Config.sampleSeconds then
         for k,untilTime in pairs(state.failed) do if untilTime<=now then state.failed[k]=nil end end
@@ -321,7 +405,7 @@ function Navigation.NavigateTo(agent,destination,speed)
                 beginLowClimb(agent,state,foot,point,height,radius,ray,now,landing,rise,speed)
                 return
             end
-            if state.plan and landing and Climb.Begin(agent,state,landing,rise,ray,now,speed) then
+            if state.plan and landing and Climb.Begin(agent,state,landing,rise,ray,now,movementSpeed(state,speed)) then
                 state.planKind=state.mode
                 mode(agent,state,"Climb"); agent.model:SetAttribute("MonsterRecoveryPoint",landing); return
             end
@@ -335,6 +419,6 @@ function Navigation.NavigateTo(agent,destination,speed)
     end
     local debugPoint=if state.plan then point else nil
     if agent.model:GetAttribute("MonsterRecoveryPoint")~=debugPoint then agent.model:SetAttribute("MonsterRecoveryPoint",debugPoint) end
-    move(agent,state,point+offset,speed,now)
+    move(agent,state,point+offset,movementSpeed(state,speed),now)
 end
 return table.freeze(Navigation)

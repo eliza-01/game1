@@ -22,7 +22,13 @@ class NavigationM561(unittest.TestCase):
     def test_graph_algorithm(self):
         lua=shutil.which('texlua') or shutil.which('lua')
         if not lua: self.skipTest('Standalone Lua interpreter not installed; graph test can run separately')
-        subprocess.run([lua,str(ROOT/'system/verify/rescue_graph_m561.lua'),str(ROOT/'src/server/monster/MonsterRescueGraph.luau'),str(ROOT/'system/studio-plugin/modules/StudioRescueRoutes.luau')],check=True,capture_output=True,text=True)
+        subprocess.run([lua,str(ROOT/'system/verify/rescue_graph_m561.lua'),str(ROOT/'src/server/monster/MonsterRescueGraph.luau')],check=True,capture_output=True,text=True)
+
+    def test_procedural_routes_no_manual_junction(self):
+        plugin=read("system/studio-plugin/modules/StudioRescueRoutes.luau")
+        self.assertNotIn("snapPoint",plugin)
+        self.assertNotIn("Junction",plugin)
+        self.assertIn("local p=mouse.Hit.Position",plugin)
 
     def test_options_merge_without_losing_return_timer(self):
         data=normalize_monster_ai({'experimentalNavigation':{'stuckPercent':40}}, {'noDamageReturnSeconds':88,'experimentalNavigation':{'climbSpeed':7}})

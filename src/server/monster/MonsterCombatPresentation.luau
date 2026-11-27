@@ -106,7 +106,7 @@ function MonsterCombatPresentation.PlayRun(agent: any, pursuitMultiplier: number
     stopTrack(agent.attackTrack)
     local track = agent.runTrack
     if track then
-        local speed = AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "run", agent.runTrack and agent.runTrack.Animation and agent.runTrack.Animation.AnimationId) * math.max(1, pursuitMultiplier or 1)
+        local speed = AnimationSpeedScaling.ResolveScaleForAnimation(agent.model, "run", agent.runTrack and agent.runTrack.Animation and agent.runTrack.Animation.AnimationId) * math.max(0.01, pursuitMultiplier or 1)
         if track.IsPlaying then track:AdjustSpeed(speed) else track:Play(0.08, 1, speed) end
     end
     agent.model:SetAttribute("MonsterAnimationState", "run")

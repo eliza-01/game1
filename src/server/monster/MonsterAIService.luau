@@ -11,6 +11,7 @@ local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor
 local Skills = require(script.Parent:WaitForChild("MonsterSkills"))
 local Special = require(script.Parent:WaitForChild("MonsterSkillCast"))
 local Navigation = require(script.Parent:WaitForChild("MonsterNavigationDispatch"))
+local HomeRecall = require(script.Parent:WaitForChild("MonsterHomeRecall"))
 local Lifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
 local DamageSignals = require(script.Parent.Parent:WaitForChild("combat"):WaitForChild("ActorDamageSignals"))
 local DeathChase = require(script.Parent:WaitForChild("MonsterDeathChasePolicy"))
@@ -40,10 +41,11 @@ local runSpeedStuds = Navigation.RunSpeedStuds
 local navigateTo = Navigation.NavigateTo
 
 local function presentNavigation(agent: any)
-    if agent.recoveryNavigation and agent.recoveryNavigation.mode=="Retry" then
+    local state=agent.recoveryNavigation
+    if state and (state.mode=="Retry" or state.mode=="BlockedWait") then
         Presentation.PlayCombatIdle(agent)
     else
-        Presentation.PlayRun(agent)
+        Presentation.PlayRun(agent, Navigation.PresentationMultiplier(agent))
     end
 end
 
@@ -90,10 +92,19 @@ local function beginReturn(agent: any, reason: string)
     -- Stay combat-active until home so wandering cannot fight navigation.
     agent.model:SetAttribute("MonsterCombatActive", true)
     setState(agent, "Return")
-    Presentation.PlayRun(agent)
+    if reason == "StuckTimeout" then
+        Presentation.Stop(agent)
+        HomeRecall.Begin(agent)
+    else
+        Presentation.PlayRun(agent)
+    end
 end
 
 local function updateReturn(agent: any)
+    if HomeRecall.Active(agent) then
+        if HomeRecall.Step(agent) then leaveCombat(agent) end
+        return
+    end
     local home = agent.home
     if horizontalDistance(agent.root.Position, home) <= 2
         and (not Navigation.Enabled(agent) or math.abs(agent.root.Position.Y-home.Y)<=2) then
@@ -101,8 +112,16 @@ local function updateReturn(agent: any)
         return
     end
     setState(agent, "Return")
-    navigateTo(agent, home, runSpeedStuds(agent))
-    presentNavigation(agent)
+    if navigateTo(agent, home, runSpeedStuds(agent)) == "StuckTimeout" then
+        Trace.Event(agent,"RETURN","StuckTimeout")
+        agent.model:SetAttribute("MonsterLastReturnReason", "StuckTimeout")
+        agent.model:SetAttribute("MonsterLastReturnRecoveryMode", agent.model:GetAttribute("MonsterRecoveryMode") or "None")
+        stopNavigation(agent)
+        Presentation.Stop(agent)
+        HomeRecall.Begin(agent)
+    else
+        presentNavigation(agent)
+    end
 end
 
 local function updateTarget(agent: any, now: number)
@@ -123,7 +142,7 @@ local function onDamaged(attacker: Model?, monster: Model, attempted: number, ap
     if attempted <= 0 or killed or not attacker or not Players:GetPlayerFromCharacter(attacker) then return end
     if not TargetPolicy.IsValid(attacker) or monster:GetAttribute("LifeState") ~= "Alive" then return end
     local agent = Lifecycle.Find(monster)
-    if not agent or not agent.active or not TargetPolicy.AllowsTarget(agent, attacker) then return end
+    if not agent or not agent.active or HomeRecall.Active(agent) or not TargetPolicy.AllowsTarget(agent, attacker) then return end
     if agent.target ~= attacker or agent.returning then
         Retreat.Clear(agent)
         CombatState.Enter(agent, attacker)
@@ -191,7 +210,7 @@ local function runAgent(agent: any)
                 local reason: string? = nil
                 if not DeathChase.AllowsPursuitPosition(agent, agent.root.Position) then reason = "MonsterOutsideHomeLeash"
                 elseif targetRoot and not DeathChase.AllowsPursuitPosition(agent, targetRoot.Position) then reason = "TargetOutsideHomeLeash"
-                elseif HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds()) then reason = "NoDamageTimeout" end
+                elseif not Navigation.IsBlockedRetreating(agent) and HomeLeash.NoDamageTimeout(agent.lastDamageAt, now, GameOptions.HostileNoDamageReturnSeconds()) then reason = "NoDamageTimeout" end
                 if reason then
                     beginReturn(agent, reason)
                     updateReturn(agent)
@@ -254,6 +273,8 @@ end
 function MonsterAIService.Start()
     if started then return end
     started = true
+    Navigation.Prepare()
+    HomeRecall.Start()
     DamageSignals.Event:Connect(onDamaged)
     DamageSignals.Event:Connect(onDamageDealt)
     Lifecycle.Start(runAgent, random)

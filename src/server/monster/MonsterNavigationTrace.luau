@@ -52,4 +52,25 @@ function Trace.Ray(params,label,origin,delta,result)
         "hitPos="..Trace.V(result and result.Position),"distance="..tostring(result and result.Distance),
         "group="..tostring(params.CollisionGroup))
 end
+-- Detailed graph trace is separately opt-in: one search may have many
+-- candidates. Edge metadata is observational; it never affects ranking.
+function Trace.RouteObserver(agent,start,goal,radius)
+    if not Trace.Enabled(agent) or Workspace:GetAttribute("Game1MonsterNavRouteTrace")~=true then return nil end
+    Trace.Event(agent,"GRAPH_BEGIN","start="..Trace.V(start),"goal="..Trace.V(goal),
+        string.format("searchRadius=%.2f exitLimit=%.2f",radius,(start-goal).Magnitude))
+    local labels={}
+    return function(stage,edge,point,distance,reason,result,cached)
+        local label=labels[edge]
+        if not label then
+            local sources={}
+            for source in pairs(edge.sources) do table.insert(sources,source) end
+            table.sort(sources); label=table.concat(sources,","); labels[edge]=label
+        end
+        local hit=result and result.Instance
+        Trace.Event(agent,stage,"edge="..edge.id,"route="..label,
+            "point="..Trace.V(point),string.format("distance=%.3f",distance),
+            "reason="..reason,"hit="..(hit and hit:GetFullName() or "NONE"),
+            "hitPos="..Trace.V(result and result.Position),"cached="..tostring(cached==true))
+    end
+end
 return table.freeze(Trace)

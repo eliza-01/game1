@@ -254,6 +254,11 @@ MONSTER_NAV_FIELDS = {
     'sampleSeconds': (1, .5, 3), 'stuckPercent': (50, 10, 90),
     'stuckReturnSeconds': (30, 5, 300),
     'searchDistance': (40, 10, 100),
+    'routeConnectionHeight': (2, 0, 100),
+    'blockedRetreatBuffer': (2, 0, 20),
+    'blockedRetreatSpeedMultiplier': (1, 0.1, 5),
+    'blockedReengageSpeedMultiplier': (1.5, 0.1, 5),
+    'rescueRouteSpeedMultiplier': (1.5, 0.1, 5),
     'searchWidth': (60, 10, 120), 'recheckSeconds': (1, .5, 3),
 }
 

@@ -150,7 +150,12 @@
       "sampleSeconds": 1,
       "stuckPercent": 50,
       "stuckReturnSeconds": 20,
-      "searchDistance": 40,
+      "searchDistance": 80,
+      "routeConnectionHeight": 2,
+      "blockedRetreatBuffer": 2,
+      "blockedRetreatSpeedMultiplier": 1,
+      "blockedReengageSpeedMultiplier": 1.5,
+      "rescueRouteSpeedMultiplier": 1.5,
       "searchWidth": 60,
       "recheckSeconds": 1
     }

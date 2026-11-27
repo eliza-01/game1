@@ -37,7 +37,7 @@ end
 game={GetService=function() return world end}
 script={Parent={WaitForChild=function() return 'config' end}}
 package.loaded.config={searchDistance=40,searchWidth=60}
-local trace={Enabled=function() return false end,Event=function() end,Ray=function() end,Bind=function() end,V=function() return "mock" end,Changed=function() end,Rate=function() end}
+local trace={Enabled=function() return false end,Event=function() end,Ray=function() end,Bind=function() end,V=function() return "mock" end,Changed=function() end,Rate=function() end,RouteObserver=function() return nil end}
 script.Parent.WaitForChild=function(_,name) return name=="MonsterNavigationTrace" and "trace" or "config" end
 package.loaded.trace=trace
 table.freeze=function(t) return t end
@@ -74,7 +74,52 @@ assert(G.HeadObstacle(v(0,0,0),4,raised,10,{})==nil)
 castCount=0
 assert(not G.RecoveryExitClear(v(0,0,0),4,raised,{}),'wall at 20 vetoes visible heels at 50')
 assert(castCount==2,'no extra casts in exit gate')
+-- M585: report exact hit and short-circuit without an extra cast.
+local hit={Instance=wall}
+for _,blockedAt in ipairs({1,2,0}) do
+    castCount=0
+    function world:Raycast(a,d)
+        castCount=castCount+1
+        if castCount==blockedAt then return hit end
+    end
+    local ok,reason,result=G.HeadPassageClear(v(0,0,0),v(0,0,10),4,{})
+    assert(castCount==1)
+    assert(ok==(blockedAt~=1))
+    if blockedAt==1 then assert(result==hit and reason=='HeadBlocked') end
+    castCount=0
+    ok,reason,result=G.RecoveryExitClear(v(0,0,0),4,v(0,0,10),{})
+    assert(castCount==(blockedAt==1 and 1 or 2))
+    assert(ok==(blockedAt==0))
+    if blockedAt~=0 then assert(result==hit and reason==(blockedAt==1 and 'HeelBlocked' or 'HeadBlocked')) end
+end
+-- Local collision detour retains its head-level passage test.
+castCount=0
+function world:Raycast(a,d)
+    castCount=castCount+1
+    assert(math.abs(a.Y-5.95)<1e-6 and a.X==1 and a.Z==3)
+    assert(d.X==7 and d.Y==3 and d.Z==9)
+end
+assert(G.HeadPassageClear(v(1,2,3),v(8,5,12),4,{}))
+assert(castCount==1)
+-- M587: route entry casts exactly from feet to the candidate, once.
+local foot,point=v(1,2,3),v(8,5,12)
+local entryParams={}
+for _,blocked in ipairs({false,true}) do
+    castCount=0
+    function world:Raycast(a,d,params)
+        castCount=castCount+1
+        assert(a.X==1 and a.Y==2 and a.Z==3,'origin must be feet')
+        assert(d.X==7 and d.Y==3 and d.Z==9,'end must be route point')
+        assert(params==entryParams,'reuse collision filters')
+        if blocked then return hit end
+    end
+    local ok,reason,result=G.RouteEntryClear(foot,point,entryParams)
+    assert(castCount==1 and ok==not blocked)
+    if blocked then assert(reason=='FootBlocked' and result==hit) end
+    assert(G.RouteEntryClear(foot,foot,entryParams) and castCount==1)
+end
 world.Raycast=realRay
+print('M587 foot-only route entry passed')
 print('M574 full-length recovery exit rejects far high wall')
 
 -- Execute the actual navigation state machine, with time and a stationary actor.
@@ -95,14 +140,16 @@ local headCalls,heelCalls=0,0
 local expectedHeelY=.1
 local searches=0
 local geom={Horizontal=G.Horizontal,Body=function() return root.Position,4,1 end,Params=function() return {} end,Overlap=function() return {} end,
-    ProbeClimb=function() return nil,nil,'Ray',high and {Distance=wallDistance} or nil end,Clear=function() return isClear end,HeadClear=function(_,_,goal) heelCalls=heelCalls+1; assert(math.abs(goal.Y-expectedHeelY)<1e-6); return isClear end,
+    ProbeClimb=function() return nil,nil,'Ray',high and {Distance=wallDistance} or nil end,RouteEntryClear=function() return isClear end,HeadClear=function(_,_,goal) heelCalls=heelCalls+1; assert(math.abs(goal.Y-expectedHeelY)<1e-6); return isClear end,
     HeadObstacle=function(_,_,_,reach) headCalls=headCalls+1; lastHeadReach=reach; if high and reach>=wallDistance then return {Distance=wallDistance} end end,
     Detour=function() searches=searches+1;return nil end}
 geom.RecoveryExitClear=function(foot,height,goal,ray)
     return geom.HeadClear(foot,height,goal+Vector3.yAxis*.1,ray) and geom.HeadObstacle(foot,height,goal,G.Horizontal(goal-foot).Magnitude,ray)==nil
 end
 local Watchdog=assert(loadfile(arg[3]))()
-local modules={MonsterStuckWatchdog=Watchdog,MonsterNavigationTrace=trace,MonsterNavigationConfig={recheckSeconds=1,sampleSeconds=1,stuckPercent=50,searchDistance=40,stuckReturnSeconds=30},MonsterRecoveryGeometry=geom,
+local Blocked=assert(loadfile(arg[4]))()
+local Speed=assert(loadfile(arg[5]))()
+local modules={MonsterBlockedPursuit=Blocked,MonsterNavigationSpeed=Speed,MonsterBlockedRetreatGeometry={FindPoint=function(_,p,g,d) return g+(p-g).Unit*d end},MonsterStuckWatchdog=Watchdog,MonsterNavigationTrace=trace,MonsterNavigationConfig={recheckSeconds=1,sampleSeconds=1,stuckPercent=50,searchDistance=40,stuckReturnSeconds=30,blockedRetreatBuffer=2,blockedRetreatSpeedMultiplier=1,blockedReengageSpeedMultiplier=1.5,rescueRouteSpeedMultiplier=1.5,bowRange=40},MonsterRecoveryGeometry=geom,
     MonsterRescueGraph={Find=function() return nil end},MonsterClimbMotion={Stop=function() end},MonsterDeathChasePolicy={AllowsPursuitPosition=function() return true end},ActorHomeLeash={Outside=function() return false end}}
 local parent={WaitForChild=function(_,n) return n end}
 parent.Parent={WaitForChild=function() return parent end}
@@ -116,22 +163,37 @@ assert(attrs.MonsterRecoveryMode=='Retry' and attrs.MonsterLastRecoveryEvent=='N
 assert(attrs.MonsterRecoveryActualSpeed==0 and attrs.MonsterRecoveryExpectedSpeed==10)
 assert(searches==1 and #commands==2 and commands[2].Magnitude==0)
 t=2.7;N.NavigateTo(agent,target,10)
-assert(attrs.MonsterRecoveryMode=='Retry' and searches==2 and #commands==3 and commands[3].Magnitude==0,'retry cannot charge blocked target')
-high=false;isClear=true;t=4.3;N.NavigateTo(agent,target,10)
-assert(attrs.MonsterRecoveryMode=='Direct' and #commands==4 and commands[4].Z==10,'resume when path opens')
+assert(attrs.MonsterRecoveryMode=='Retry' and searches==1 and #commands==2,'no second full search or move into blocked target')
+for _,tick in ipairs({4.3,5.9,7.5,9.1}) do
+    t=tick; N.NavigateTo(agent,target,10)
+    assert(searches==1 and #commands==2,'M588 no repeated failed calculation')
+end
+high=false;isClear=true;t=10.7;N.NavigateTo(agent,target,10)
+assert(attrs.MonsterRecoveryMode=='Direct' and #commands==3 and commands[3].Z==10,'resume when path opens')
 print('M564 navigation retry state machine passed')
 
 -- M566: a high wall triggers recovery before a single Direct movement.
 N.Clear(agent); root.Position=v(0,0,0); commands={}; t=10; isClear=false; high=true;wallDistance=2
 local entry,corner,exit=v(5,0,0),v(5,0,6),v(0,0,8)
-modules.MonsterRescueGraph.Find=function() return {points={entry,corner,exit},cost=15} end
+local entryCalls=0
+geom.RouteEntryClear=function(a,b,params)
+    entryCalls=entryCalls+1
+    assert((a-root.Position).Magnitude==0 and b==entry and params)
+    return true
+end
+modules.MonsterRescueGraph.Find=function(start,_,connect)
+    assert(connect(start,entry),'Graph uses the foot entry helper')
+    return {points={entry,corner,exit},cost=15}
+end
 local h0, f0=headCalls,heelCalls
 N.NavigateTo(agent,target,10)
 assert(attrs.MonsterRecoveryMode=='RescueRoute' and attrs.MonsterRecoveryPlanIndex==1)
 assert(#commands==1 and commands[1].X==5,'no direct move into high wall')
+assert(agent.humanoid.WalkSpeed==15,'route approach is boosted from first MoveTo')
+assert(entryCalls==1,'one foot-only entry check')
 assert(headCalls==h0+1 and heelCalls==f0,'Direct head ray first; no heel ray')
 -- Diagonal heel ray clear but horizontal gate blocked: cannot release.
-isClear=true; t=11.1;root.Position=v(3.5,0,0);N.NavigateTo(agent,target,5)
+isClear=true; t=11.1;root.Position=v(3.5,0,0);N.NavigateTo(agent,target,4)
 assert(attrs.MonsterRecoveryMode=='RescueRoute' and commands[#commands].X==5,'horizontal hit vetoes clear heel ray')
 -- A single pair of clear rays releases immediately, even before the entry.
 high=false; t=12.2;root.Position=v(3.8,0,0);N.NavigateTo(agent,target,.1)
@@ -221,12 +283,13 @@ for i=1,29 do
 end
 t=130;assert(N.NavigateTo(agent,target,10)=='StuckTimeout')
 assert(attrs.MonsterRecoveryStuckSeconds==30)
--- Return must start with its own context, never recursively request a return.
+-- M580: Return starts a fresh watchdog and can request a home recall if stuck.
 N.Clear(agent);agent.returning=true;t=131
 assert(N.NavigateTo(agent,target,10)==nil)
-t=170;assert(N.NavigateTo(agent,target,10)==nil)
-assert(attrs.MonsterRecoveryStuckSeconds==nil)
-print('M575 retry timeout propagates to AI; returning is exempt')
+t=160;assert(N.NavigateTo(agent,target,10)==nil)
+t=161;assert(N.NavigateTo(agent,target,10)=='StuckTimeout')
+assert(attrs.MonsterRecoveryStuckSeconds==30)
+print('M580 chase and return timeouts propagate to AI')
 
 -- M576: a clear horizontal head ray + low measured speed must bypass BOTH
 -- planners, even if they would offer an arbitrarily cheap alternative.
@@ -263,5 +326,45 @@ geom.ProbeClimb=function() return landing,2,'Ray',nil,{Distance=.6} end
 geom.Detour=function() error('route low obstacle must not scan detour') end
 modules.MonsterRescueGraph.Find=function() error('route low obstacle must not search graph') end
 t=221.1;N.NavigateTo(agent,target,10)
-assert(began==3 and attrs.MonsterRecoveryMode=='Climb' and agent.recoveryNavigation.plan==route)
+assert(began==3 and attrs.MonsterRecoveryMode=='Climb' and agent.recoveryNavigation.plan==route and lastSpeed==15)
 print('M578 immediate low jump, forward speed, fallback and retained route passed')
+
+-- M591 actual navigation: no graph retries in retreat/wait, no clock before wait,
+-- fixed database bow radius triggers a fresh approach, and only waiting expires it.
+N.Clear(agent);agent.returning=false;root.Position=v(0,0,0);commands={};t=300
+local weaponRadius=7
+local equippedType="sword"
+agent.target={FindFirstChild=function() return nil end,FindFirstChildOfClass=function() return nil end,
+    GetAttribute=function(_,k)
+        if k=="AttackRadius" then return weaponRadius end
+        if k=="EquippedWeaponType" then return equippedType end
+    end}
+geom.Detour=function() searches=searches+1;return nil end
+modules.MonsterRescueGraph.Find=function() return nil end
+geom.ProbeClimb=function() return nil,nil,'Ray',{Distance=2},{Distance=2} end
+high=true;isClear=false;wallDistance=2;expectedHeelY=.1
+local n=searches
+N.NavigateTo(agent,target,10)
+assert(attrs.MonsterRecoveryMode=='BlockedRetreat' and searches==n+1)
+t=301;N.NavigateTo(agent,target,10)
+assert(commands[#commands].Z==-32 and agent.humanoid.WalkSpeed==10)
+root.Position=v(0,0,-32);t=310;N.NavigateTo(agent,target,10)
+assert(attrs.MonsterRecoveryMode=='BlockedWait' and attrs.MonsterRecoveryStuckSeconds==0 and agent.lastDamageAt==310)
+-- Switching equipment in Wait must neither change range nor restart the clock.
+for i,tick in ipairs({311,325,339}) do
+    weaponRadius=({40,3,7})[i];equippedType=({"bow","","sword"})[i]
+    t=tick;assert(N.NavigateTo(agent,target,10)==nil)
+end
+assert(searches==n+1 and attrs.MonsterRecoveryStuckSeconds==29)
+-- Player enters bow range even with sword equipped, normal direct path available.
+t=339.5;high=false;isClear=true;N.NavigateTo(agent,v(0,0,7),10)
+assert(attrs.MonsterRecoveryMode=='Direct' and agent.humanoid.WalkSpeed==15 and agent.lastDamageAt==339.5)
+assert(searches==n+1)
+-- Another encounter, already outside the range: wait immediately and recall only after 30s.
+N.Clear(agent);root.Position=v(0,0,-33);high=true;isClear=false;t=400
+weaponRadius=3;equippedType=""
+N.NavigateTo(agent,target,10);t=401;N.NavigateTo(agent,target,10)
+assert(attrs.MonsterRecoveryMode=='BlockedWait')
+t=430;assert(N.NavigateTo(agent,target,10)==nil)
+t=431;assert(N.NavigateTo(agent,target,10)=='StuckTimeout')
+print('M591 blocked pursuit integration passed')

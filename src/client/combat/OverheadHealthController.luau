@@ -194,6 +194,7 @@ local function updateVisibility()
             continue
         end
         local alive = model.Parent == watchedFolder and model:GetAttribute("LifeState") == "Alive"
+            and model:GetAttribute("MonsterHomeRecalling") ~= true
         local focused = model == aimedMonster or model == lockedMonster
         -- The server's current target is the authority. Aggro/Chase/Attack
         -- all keep this attribute until the monster actually leaves combat.

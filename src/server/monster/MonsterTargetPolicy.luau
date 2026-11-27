@@ -102,7 +102,7 @@ end
 
 local function isRecovering(agent: any): boolean
     local state = agent.recoveryNavigation
-    return state ~= nil and (state.plan ~= nil or state.climb ~= nil or state.mode == "Retry")
+    return state ~= nil and (state.plan ~= nil or state.climb ~= nil or state.mode == "Retry" or state.blockedPursuit ~= nil)
 end
 
 local function canBeginTargetedCast(agent: any, target: Model): boolean

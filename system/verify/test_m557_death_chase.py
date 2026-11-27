@@ -29,7 +29,7 @@ class DeathChase(unittest.TestCase):
             self.assertIn(token,p)
         ai=read('src/server/monster/MonsterAIService.luau')
         self.assertIn('if DeathChase.UsesHomeLeash(agent.model) then',ai)
-        self.assertIn('elseif HomeLeash.NoDamageTimeout(',ai)
+        self.assertIn('elseif not Navigation.IsBlockedRetreating(agent) and HomeLeash.NoDamageTimeout(',ai)
         self.assertIn('TargetPolicy.AllowsTarget(agent, agent.target)',ai)
         self.assertIn('DeathChase.AllowsPosition(agent.model, root.Position)',read('src/server/monster/MonsterTargetPolicy.luau'))
         self.assertIn('not TargetPolicy.AllowsTarget(agent, target)',read('src/server/monster/MonsterAttackExecutor.luau'))

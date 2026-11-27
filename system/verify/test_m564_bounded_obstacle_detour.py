@@ -24,7 +24,7 @@ class BoundedObstacleDetour(unittest.TestCase):
                            .replace('state.index+=1','state.index=state.index+1')
                            .replace('state.expected+=','state.expected=state.expected+')
                            .replace('if state.plan then point else nil','state.plan and point or nil'))
-            proc = subprocess.run([lua, str(ROOT/'system/verify/obstacle_detour_m564.lua'), str(module), str(nav), str(BASE/'MonsterStuckWatchdog.luau')], capture_output=True, text=True)
+            proc = subprocess.run([lua, str(ROOT/'system/verify/obstacle_detour_m564.lua'), str(module), str(nav), str(BASE/'MonsterStuckWatchdog.luau'), str(BASE/'MonsterBlockedPursuit.luau'), str(BASE/'MonsterNavigationSpeed.luau')], capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, proc.stdout+proc.stderr)
 
     def test_retry_replans_without_recharging_wall(self):
@@ -40,7 +40,7 @@ class BoundedObstacleDetour(unittest.TestCase):
         dispatch = (BASE / 'MonsterNavigationDispatch.luau').read_text()
         self.assertIn('MonsterNavigationBackend', dispatch)
         ai = (BASE / 'MonsterAIService.luau').read_text()
-        self.assertIn('agent.recoveryNavigation.mode=="Retry" then\n        Presentation.PlayCombatIdle(agent)', ai)
+        self.assertIn('state.mode=="Retry" or state.mode=="BlockedWait"', ai)
 
 
 if __name__ == '__main__':

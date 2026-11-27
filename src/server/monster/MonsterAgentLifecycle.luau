@@ -5,6 +5,7 @@ local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("
 local CombatState = require(script.Parent:WaitForChild("MonsterCombatState"))
 local Presentation = require(script.Parent:WaitForChild("MonsterCombatPresentation"))
 local AttackExecutor = require(script.Parent:WaitForChild("MonsterAttackExecutor"))
+local HomeRecall = require(script.Parent:WaitForChild("MonsterHomeRecall"))
 local Navigation = require(script.Parent:WaitForChild("MonsterNavigationDispatch"))
 local TargetPolicy = require(script.Parent:WaitForChild("MonsterTargetPolicy"))
 
@@ -22,6 +23,7 @@ local function releaseAgent(agent: any)
     if agents[model] ~= agent then return end
     agents[model] = nil
     agent.active = false
+    HomeRecall.Cancel(agent)
     Special.Cancel(agent)
     Retreat.Clear(agent)
     agent.attackSerial += 1 -- Invalidate delayed Hit and attack-finish callbacks.
@@ -39,6 +41,7 @@ end
 local function stopOnDeath(agent: any)
     local model = agent.model
     if agents[model] ~= agent or tostring(model:GetAttribute("LifeState") or "") == "Alive" then return end
+    HomeRecall.Cancel(agent)
     agent.attackSerial += 1
     Special.Cancel(agent)
     Retreat.Clear(agent)

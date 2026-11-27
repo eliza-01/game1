@@ -7,6 +7,7 @@ local Geometry=require(script.Parent:WaitForChild("MonsterRecoveryGeometry"))
 -- direction; world gravity and normal physical collision remain in charge.
 local Climb={}
 local UP=Vector3.yAxis
+local MAX_JUMP_SECONDS=1
 local JUMP_VELOCITY=CharacterConfig.JumpVelocity*math.sqrt(JumpSettings.heightMultiplier)
 
 local function grounded(agent)
@@ -48,7 +49,7 @@ function Climb.Begin(agent,state,landing,_rise,_params,now,speed)
     if state.climb or root.Anchored or speed<=.01 then return false end
     local delta=Geometry.Horizontal(landing-root.Position)
     if delta.Magnitude<=.05 then return false end
-    local c={root=root,model=agent.model,humanoid=agent.humanoid,landing=landing,direction=delta.Unit}
+    local c={root=root,model=agent.model,humanoid=agent.humanoid,landing=landing,direction=delta.Unit,startedAt=now}
     state.climb=c
     -- Replace the old MoveTo command before taking off.
     agent.humanoid:MoveTo(root.Position)
@@ -60,6 +61,11 @@ end
 function Climb.Step(agent,state,speed,_params,now)
     local c=state.climb
     if not c or agent.root.Anchored or speed<=.01 then return "Failed" end
+    if now-c.startedAt>=MAX_JUMP_SECONDS then
+        Trace.Event(agent,"CLIMB_TIMEOUT")
+        Climb.Stop(state)
+        return "Timeout"
+    end
     if c.launchedAt then
         -- FloorMaterial can remain stale immediately after the impulse.
         -- End only on landing, not on reaching the old estimated top point.

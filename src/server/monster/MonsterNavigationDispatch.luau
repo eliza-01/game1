@@ -5,13 +5,24 @@ local RunService=game:GetService("RunService")
 local Workspace=game:GetService("Workspace")
 local Legacy=require(script.Parent:WaitForChild("MonsterChaseNavigation"))
 local Experimental=require(script.Parent:WaitForChild("MonsterExperimentalNavigation"))
+local Speed=require(script.Parent:WaitForChild("MonsterNavigationSpeed"))
+local Blocked=require(script.Parent:WaitForChild("MonsterBlockedPursuit"))
 local Dispatch={}
+function Dispatch.PresentationMultiplier(agent)
+    return Speed.Multiplier(agent.recoveryNavigation,Config)
+end
+function Dispatch.IsBlockedRetreating(agent)
+    return Blocked.IsRetreating(agent.recoveryNavigation)
+end
 function Dispatch.Enabled(agent)
     if not RunService:IsStudio() then return false end
     local override=Workspace:GetAttribute("Game1ExperimentalMonsterNavigation")
     if override==false or (override==nil and not Config.enabled) then return false end
     local kind=agent.model:GetAttribute("GameplayTestKind")
     return kind==nil or kind=="group" or (kind=="zone" and (tonumber(agent.model:GetAttribute("GameplayTestZone")) or 99)<=6)
+end
+function Dispatch.Prepare()
+    if RunService:IsStudio() then Experimental.Initialize() end
 end
 Dispatch.Initialize=Legacy.Initialize
 Dispatch.RunSpeedStuds=Legacy.RunSpeedStuds

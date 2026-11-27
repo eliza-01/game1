@@ -42,7 +42,10 @@ end
 function Geometry.HeadClear(foot,height,targetPoint,params)
     local origin=foot+UP*(height-.05)
     local delta=targetPoint-origin
-    return delta.Magnitude<.05 or tracedRay("HEEL_RAY",origin,delta,params)==nil
+    if delta.Magnitude<.05 then return true end
+    local hit=tracedRay("HEEL_RAY",origin,delta,params)
+    if hit then return false,"HeelBlocked",hit end
+    return true
 end
 -- A slanted sight ray can pass above a fence while the melee body is still outside.
 -- Use the current foot level and physical root, not the target's elevated Y.
@@ -60,13 +63,22 @@ function Geometry.Probe(foot,height,direction,distance,params)
     local lower=tracedRay("PROBE_FOOT",foot+UP*.25,delta,params)
     return head,lower
 end
--- Route connectors: two centre rays only. World geometry is authored without
--- gaps narrower than an actor; physical lift safety is owned by ClimbMotion.
-function Geometry.Clear(agent,a,b,height,radius,params)
+-- Local collision detour: head-level passage may allow low obstacles.
+function Geometry.HeadPassageClear(a,b,height,params)
     local delta=b-a
     if delta.Magnitude<.05 then return true end
-    if Workspace:Raycast(a+UP*(height-.05),delta,params) then return false end
-    return Workspace:Raycast(a+UP*.25,delta,params)==nil
+    local head=Workspace:Raycast(a+UP*(height-.05),delta,params)
+    if head then return false,"HeadBlocked",head end
+    return true
+end
+-- Rescue Route entry: only the finite segment from feet to the route point.
+-- Any collider hit rejects this candidate; other candidates remain eligible.
+function Geometry.RouteEntryClear(foot,point,params)
+    local delta=point-foot
+    if delta.Magnitude==0 then return true end
+    local hit=Workspace:Raycast(foot,delta,params)
+    if hit then return false,"FootBlocked",hit end
+    return true
 end
 -- Primary direct-movement gate. Horizontal, no scan beyond the target.
 function Geometry.HeadObstacle(foot,height,goal,attackRadius,params)
@@ -78,8 +90,11 @@ end
 -- A clear diagonal to the target's heels must never hide a high wall
 -- farther than the normal short Direct lookahead. Both rays cover the goal.
 function Geometry.RecoveryExitClear(foot,height,goal,params)
-    return Geometry.HeadClear(foot,height,goal+UP*.1,params)
-        and Geometry.HeadObstacle(foot,height,goal,horizontal(goal-foot).Magnitude,params)==nil
+    local ok,reason,hit=Geometry.HeadClear(foot,height,goal+UP*.1,params)
+    if not ok then return false,reason,hit end
+    local head=Geometry.HeadObstacle(foot,height,goal,horizontal(goal-foot).Magnitude,params)
+    if head then return false,"HeadBlocked",head end
+    return true
 end
 -- Probe the *actual* surface above the foot-ray hit, rather than trusting MeshPart bounds.
 function Geometry.ClimbPoint(agent,foot,height,radius,direction,head,lower,params)
@@ -122,12 +137,6 @@ function Geometry.ClimbContinues(landing,goal,height,radius,params)
     -- Successive low steps are allowed, but remain a heuristic rather than a path guarantee.
     return head==nil or (lower~=nil and head.Distance-lower.Distance>=.35)
 end
-local function headPassage(a,b,height,radius,params)
-    local delta=b-a
-    if delta.Magnitude<.05 then return true end
-    local origin=a+UP*(height-.05)
-    return Workspace:Raycast(origin,delta,params)==nil
-end
 function Geometry.Detour(agent,foot,goal,height,radius,params,overlap,allowed)
     local delta=horizontal(goal-foot)
     if delta.Magnitude<.01 then return nil end
@@ -154,7 +163,7 @@ function Geometry.Detour(agent,foot,goal,height,radius,params,overlap,allowed)
     -- No wall-follow, no arbitrary graph search over the world geometry.
     local count=math.min(8,#points)
     local best,bestCost=nil,math.huge
-    local function passage(a,b) return headPassage(a,b,height,radius,params) end
+    local function passage(a,b) return Geometry.HeadPassageClear(a,b,height,params) end
     local function entry(c)
         if c.entry==nil then c.entry=passage(foot,c.point) end
         return c.entry

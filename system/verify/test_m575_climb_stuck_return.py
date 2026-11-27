@@ -31,7 +31,7 @@ class ClimbStuckReturn(unittest.TestCase):
 
     def test_return_owned_by_ai_and_not_plan(self):
         nav=(BASE/'MonsterExperimentalNavigation.luau').read_text()
-        self.assertIn('if not agent.returning then\n        local expired,seconds=Watchdog.Step',nav)
+        self.assertIn('do\n        local expired,seconds=Watchdog.Step',nav)
         self.assertNotIn('stuckWatchdog',nav.split('local function clearPlan',1)[1].split('function Navigation.Clear',1)[0])
         ai=(BASE/'MonsterAIService.luau').read_text()
         self.assertEqual(ai.count('beginReturn(agent, "StuckTimeout")'),2)

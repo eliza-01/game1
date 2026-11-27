@@ -52,6 +52,16 @@ humanoid.FloorMaterial='Ground'
 assert(C.Step(agent,state,6,{},1.3)=='Moving' and impulses==2)
 local before=root.AssemblyLinearVelocity
 C.Stop(state); assert(state.climb==nil and root.AssemblyLinearVelocity==before and humanoid.direction.Magnitude==0)
+-- No floor contact (or no takeoff) can hold the navigation state beyond 1s.
+humanoid.FloorMaterial='Air'
+assert(C.Begin(agent,state,landing,3,{},3,6))
+local beforeTimeout=impulses
+assert(C.Step(agent,state,6,{},3.99)=='Moving')
+assert(C.Step(agent,state,6,{},4)=='Timeout' and state.climb==nil and impulses==beforeTimeout)
+humanoid.FloorMaterial='Ground'
+assert(C.Begin(agent,state,landing,3,{},5,6))
+humanoid.FloorMaterial='Air'
+assert(C.Step(agent,state,6,{},6)=='Timeout' and state.climb==nil)
 -- Death owns the root; cleanup never changes anchoring or momentum.
 humanoid.FloorMaterial='Air';assert(C.Begin(agent,state,landing,3,{},2,6))
 root.Anchored=true;life='Dying';C.Stop(state);assert(root.Anchored and state.climb==nil)

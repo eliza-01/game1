@@ -106,6 +106,11 @@ function GameOptions.ExperimentalMonsterNavigation()
         stuckPercent = math.clamp(finite(source.stuckPercent, 50), 10, 90),
         stuckReturnSeconds = math.clamp(finite(source.stuckReturnSeconds, 30), 5, 300),
         searchDistance = math.clamp(finite(source.searchDistance, 40), 10, 100),
+        routeConnectionHeight = math.clamp(finite(source.routeConnectionHeight, 2), 0, 100),
+        blockedRetreatBuffer = math.clamp(finite(source.blockedRetreatBuffer, 2), 0, 20),
+        blockedRetreatSpeedMultiplier = math.clamp(finite(source.blockedRetreatSpeedMultiplier, 1), 0.1, 5),
+        blockedReengageSpeedMultiplier = math.clamp(finite(source.blockedReengageSpeedMultiplier, 1.5), 0.1, 5),
+        rescueRouteSpeedMultiplier = math.clamp(finite(source.rescueRouteSpeedMultiplier, 1.5), 0.1, 5),
         searchWidth = math.clamp(finite(source.searchWidth, 60), 10, 120),
         recheckSeconds = math.clamp(finite(source.recheckSeconds, 1), .5, 3),
     })

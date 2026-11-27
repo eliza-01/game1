@@ -125,7 +125,7 @@ function Assembly.Prepare(prototype, targetFrame, targetParts, applyAppearance, 
         job:Unit()
         for _, descriptor in ipairs(metadata.parts) do
             local source = descriptor.source
-            local copy = job:Own(source:Clone())
+            local copy = job:Own(source:Clone(), "meshClones")
             job:Unit()
             copy.Name = descriptor.sourceName
             copy.Size = descriptor.size * scale
@@ -147,7 +147,7 @@ end
 
 function Assembly.PrepareSingle(prototype, record, applyAppearance)
     return Job.new(function(job)
-        local copy = job:Own(prototype:Clone())
+        local copy = job:Own(prototype:Clone(), "meshClones")
         job.bundle = copy
         job:Unit()
         copy.Name = Assembly.SourceName(prototype)

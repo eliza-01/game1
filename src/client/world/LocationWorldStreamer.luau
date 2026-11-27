@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local CollectionService = game:GetService("CollectionService")
+local Stats = game:GetService("Stats")
 local World = ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world")
 local Registry = require(World:WaitForChild("LocationAssetRegistry"))
 local Contract = require(World:WaitForChild("LocationRuntimeManifestContract"))
@@ -17,12 +18,13 @@ local LodThresholdCache = require(script.Parent:WaitForChild("LodThresholdCache"
 local LodTransitionQueue = require(script.Parent:WaitForChild("LodTransitionQueue"))
 local LodPrototypeCache = require(script.Parent:WaitForChild("LodPrototypeCache"))
 local LodRuntimeWork = require(script.Parent:WaitForChild("LodRuntimeWork"))
+local LodDiagnostics = require(script.Parent:WaitForChild("LodDiagnostics"))
 local Appearance = require(World:WaitForChild("RuntimeVisualAppearance"))
 local Streamer = {}
 local started = false
 local active = nil
 local TICK = 0.25
-local MAX_CHANGES_PER_TICK = 8 -- legacy House/Studio preview budget; Location uses per-frame work units
+local MAX_CHANGES_PER_TICK = 8 -- Studio authoring preview only; Runtime uses per-frame work units
 local VISUAL_TAG = "Game1DistanceVisual"
 local VISUAL_INTERVAL = 1 -- one update/second; piggybacks on the existing LOD Heartbeat
 
@@ -41,8 +43,9 @@ local function removeVisual(part)
         part.LocalTransparencyModifier = record.original
     end
 end
-local function sampleVisuals(cameraPosition, preview)
+local function sampleVisuals(cameraPosition, preview, diagnostics)
     for part, record in visuals do
+        if diagnostics.enabled then diagnostics:Add("taggedVisualVisits") end
         if not part:IsDescendantOf(Workspace) then
             removeVisual(part)
             continue
@@ -165,6 +168,8 @@ function Streamer.Start()
     local prototypeCache = nil
     local prototypeChangedConnection = nil
     local runtimeWork = LodRuntimeWork.new()
+    local diagnostics = LodDiagnostics.new()
+    runtimeWork.diagnostics = diagnostics
     if manifest then
         folder = Instance.new("Folder")
         folder.Name = Contract.VisualFolder
@@ -191,6 +196,7 @@ function Streamer.Start()
             end
         end
         queue = LodTransitionQueue.new(LocationLodCandidates.SortTransitions)
+        queue.diagnostics = diagnostics
         prototypeCache = LodPrototypeCache.new(ReplicatedStorage, Contract.TemplateFolder, LodAssembly)
         local dependentsByName = {}
         for _, record in ipairs(records) do
@@ -214,6 +220,7 @@ function Streamer.Start()
     local houseAdapter = nil
     if manifest and manifest.houses then
         houseAdapter = HouseVisualAdapter.new(manifest.houses, prototypeCache, manifest.hysteresis, records)
+        houseAdapter.requests.diagnostics = diagnostics
     end
     if manifest then candidates = LocationLodCandidates.new(StaticPlacementIndex.new(records)) end
     local preview = nil
@@ -234,6 +241,7 @@ function Streamer.Start()
         if queue.entries[record] ~= transition or transition.desired ~= record.desired
             or transition.actual ~= record.actual or (transition.attemptTick == queue.tick and not job) then return false end
         -- Recheck active work against the current camera, even between observations.
+        if diagnostics.enabled then diagnostics:Add("workDistanceChecks") end
         if LodThresholdCache.ResolveAt(record, LodThresholdCache.Measure(record, cameraPosition, Policy),
             Policy, record.desired) ~= transition.desired then return false end
         if transition.prototype then
@@ -315,20 +323,33 @@ function Streamer.Start()
         if record.components then LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED") end
         return true
     end
+    local function sampleWork(dt, stats, captureStart)
+        if not diagnostics.enabled or not captureStart then return end
+        diagnostics:Frame(dt, stats, os.clock()-captureStart)
+        diagnostics:Peak("pendingAsync", houseAdapter and houseAdapter.requests.count or 0)
+        diagnostics:Peak("stagingInstances", runtimeWork.active and #runtimeWork.active.job.owned or 0)
+        diagnostics:Peak("retiredBundles", #runtimeWork.retired)
+    end
     local heartbeatConnection = RunService.Heartbeat:Connect(function(dt)
+        local captureStart = diagnostics.enabled and os.clock() or nil
         if houseAdapter then houseAdapter:FollowMoving() end
         elapsed += dt
         visualElapsed += dt
         local camera = Workspace.CurrentCamera
-        if not camera then runtimeWork:Cancel(); runtimeWork:Cleanup(runtimeWork.CleanupBudget); return end
+        if not camera then
+            runtimeWork:Cancel()
+            local cleaned = runtimeWork:Cleanup(runtimeWork.CleanupBudget)
+            sampleWork(dt, {cleanup=cleaned}, captureStart)
+            return
+        end
         cameraPosition = camera.CFrame.Position
         if visualElapsed >= VISUAL_INTERVAL then
             visualElapsed = 0
             if preview then preview:Resolve(cameraPosition) end
-            sampleVisuals(cameraPosition, preview)
+            sampleVisuals(cameraPosition, preview, diagnostics)
         end
         if elapsed < TICK then
-            if manifest then runtimeWork:Step(callbacks) end
+            if manifest then sampleWork(dt, runtimeWork:Step(callbacks), captureStart) end
             return
         end
         elapsed = 0
@@ -340,11 +361,24 @@ function Streamer.Start()
         local cameraChanged = lastCamera ~= camera
         lastCamera = camera
         queue:Begin(cameraPosition, cameraChanged)
+        local reused = not cameraChanged and candidates.position == cameraPosition and candidates.localRecords ~= nil
         local localRecords = candidates:Collect(cameraPosition, cameraChanged)
+        if diagnostics.enabled then
+            diagnostics:Add("observations")
+            if not reused then diagnostics:Add("spatialQueries") end
+            diagnostics:Add("candidateVisits", #localRecords)
+            diagnostics:Peak("localCandidates", #localRecords)
+        end
         local deferredEffects = {}
         for _, record in ipairs(localRecords) do
             local previousDesired = record.desired
-            LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)
+            local resolved = LodThresholdCache.Resolve(record, cameraPosition, Policy, cameraChanged)
+            if resolved and diagnostics.enabled then
+                diagnostics:Add("distanceResolves")
+                if record.desired ~= previousDesired then
+                    record.diagnosticDesiredAt = if record.desired ~= record.actual then os.clock() else nil
+                end
+            end
             if record.house then
                 houseAdapter:Observe(record, previousDesired, queue)
                 continue
@@ -416,11 +450,12 @@ function Streamer.Start()
         runtimeWork:Begin(queue:Ordered(function(record, position)
             return LodThresholdCache.Distance(record, position, Policy)
         end))
-        runtimeWork:Step(callbacks)
+        local workStats = runtimeWork:Step(callbacks)
         candidates:Retain(localRecords)
         -- Keep the existing effect lifecycle for every composite, including
         -- distant roots that may stream in late. Do not tie effect visibility
         -- to candidate membership. Event-driven invalidation is a later phase.
+        if diagnostics.enabled then diagnostics:Add("compositeVisits", #composites) end
         for _, record in ipairs(composites) do
             if not deferredEffects[record] then
                 LocationCompositeVisual.SetEffects(record, record.actual ~= "UNLOADED")
@@ -430,17 +465,52 @@ function Streamer.Start()
             lastWarning = os.clock()
             warn("[game1][LOD] template staging incomplete; never publish this build before visual validation")
         end
+        sampleWork(dt, workStats, captureStart)
     end)
     active = {heartbeatConnection = heartbeatConnection, visualAddedConnection = visualAddedConnection,
         visualRemovedConnection = visualRemovedConnection, prototypeCache = prototypeCache,
         prototypeChangedConnection = prototypeChangedConnection, houseAdapter = houseAdapter,
-        folder = folder, records = records, composites = composites, preview = preview, runtimeWork = runtimeWork}
+        folder = folder, records = records, composites = composites, preview = preview, runtimeWork = runtimeWork,
+        diagnostics = diagnostics, queue = queue, candidates = candidates, manifest = manifest}
     if manifest then
         print(("[game1][LOD] client visual streamer active | %d placements | snapshot %s")
             :format(#records, tostring(manifest.snapshotRevision)))
     end
 end
 
+
+-- Called by the gated local DEV tool; Runtime never starts a capture itself.
+local function memoryMb()
+    local ok, result = pcall(function() return Stats:GetTotalMemoryUsageMb() end)
+    return if ok then result else nil
+end
+
+function Streamer.StartDiagnostics()
+    if not active or not active.manifest then return false, "Runtime manifest required" end
+    active.diagnostics:Start(active.prototypeCache:Stats())
+    active.memoryStart = memoryMb()
+    return true
+end
+
+function Streamer.FinishDiagnostics()
+    local state = active
+    if not state or not state.diagnostics.enabled then return nil end
+    local work = state.runtimeWork
+    local visible, queued = 0, 0
+    for _, record in ipairs(state.records) do
+        if record.part and record.part:IsDescendantOf(Workspace) then visible += 1 end
+    end
+    for _ in pairs(state.queue.entries) do queued += 1 end
+    return state.diagnostics:Finish(state.prototypeCache:Stats(), {
+        placements=#state.records, visible=visible, queued=queued,
+        memoryStartMb=state.memoryStart, memoryEndMb=memoryMb(),
+        snapshot=tostring(state.manifest.snapshotRevision),
+        localCandidates=#(state.candidates.localRecords or {}),
+        pendingAsync=state.houseAdapter and state.houseAdapter.requests.count or 0,
+        stagingInstances=work.active and #work.active.job.owned or 0,
+        retiredBundles=#work.retired,
+    })
+end
 
 function Streamer.Stop()
     if not started then return end

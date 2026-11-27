@@ -30,14 +30,23 @@ function Queue:Set(record, variant, prototype, metadata, force)
         and entry.actual == record.actual and entry.force == force then return end
     self.entries[record] = {record=record, desired=record.desired, actual=record.actual,
         variant=variant, prototype=prototype, metadata=metadata, force=force,
-        queuedAt=self.tick, aged=false}
+        queuedAt=self.tick, aged=false, createdAt=self.diagnostics and self.diagnostics.enabled and self.diagnostics.clock() or nil}
     self.dirty = true
 end
 
 function Queue:Ordered(distance)
+    local count, maxAge = 0, 0
     for _, entry in pairs(self.entries) do
+        if self.diagnostics and self.diagnostics.enabled then
+            count = count + 1
+            if entry.createdAt and entry.createdAt >= self.diagnostics.startedAt then maxAge = math.max(maxAge, self.diagnostics.clock()-entry.createdAt) end
+        end
         local aged = self.tick - entry.queuedAt >= AGE_TICKS
         if entry.aged ~= aged then entry.aged = aged; self.dirty = true end
+    end
+    if self.diagnostics and self.diagnostics.enabled then
+        self.diagnostics:Peak("queueSize", count)
+        self.diagnostics:Peak("queueAgeMs", maxAge*1000)
     end
     if self.dirty then
         local ordered = {}
@@ -46,6 +55,7 @@ function Queue:Ordered(distance)
             ordered[#ordered+1] = entry
         end
         self.sort(ordered)
+        if self.diagnostics and self.diagnostics.enabled and #ordered > 1 then self.diagnostics:Add("localSorts") end
         self.ordered = ordered
         self.dirty = false
     end

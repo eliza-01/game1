@@ -10,8 +10,9 @@ function Job.new(build)
     return self
 end
 
-function Job:Own(instance)
+function Job:Own(instance, kind)
     self.owned[#self.owned+1] = instance
+    if kind and self.diagnostics and self.diagnostics.enabled then self.diagnostics:Add(kind) end
     return instance
 end
 

@@ -22,10 +22,10 @@ class StaticPlacementIndexM619(unittest.TestCase):
             self.skipTest('Lua CLI unavailable; run standalone Lua oracle when installed')
         subprocess.run([lua, 'system/verify/static_placement_index_m619.lua'], cwd=ROOT, check=True, timeout=30)
 
-    def test_existing_policy_and_adapters_unchanged(self):
+    def test_existing_policy_and_preview_regression_baseline(self):
         for path, digest in {
             'src/shared/world/LocationLodDistancePolicy.luau': 'b30f83c16c45d73f1ab34543a278860038b123b2fda2fd7531f4ab2bf8312515',
-            'src/client/world/StudioLodPreviewAdapter.luau': '4c86f261a55fba2a3e1244cdec515da8106bb090847a61093a11c404e72765c8',
+            'src/client/world/StudioLodPreviewAdapter.luau': 'd27f3cbfa1e3bc9fce85178b15206fe5075e176842ac659719764eb408675100',
         }.items():
             self.assertEqual(hashlib.sha256(read(path).encode()).hexdigest(), digest, path)
 

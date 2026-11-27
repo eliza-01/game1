@@ -1,8 +1,8 @@
 # Eyesland / Game1 — ТЗ: Runtime LOD Streaming
 
 **Карточка:** KBN-0037 (клиентская производительность), связанные KBN-0007 / KBN-0017.
-**Рабочая база:** диагностический срез M613 от 27.11.2026 + подтверждённая последовательность M614–M622; M623 — текущая интеграция Real Estate. Патчи M619–M623 code/oracle checked в восстановленной sandbox-копии, Roblox Studio/DEV/Mobile и профильная приёмка не выполнены.
-**Статус:** этапы 0–3 реализованы: Static Placement Index, LOD Transition Queue, Prototype Readiness Cache. В этапе 1 выбрано дерево 3D influence bounds (BVH) вместо сетки: произвольные радиусы и разреженная карта без обхода пустых ячеек. Следующие этапы — Incremental Assembly & Work Budget и Real Estate Integration.
+**Рабочая база:** диагностический срез M613 от 27.11.2026 + подтверждённая последовательность M614–M623; M624 — диагностика и подготовка приёмки. Патчи M619–M624 code/oracle checked в восстановленной sandbox-копии, Roblox Studio/DEV/Mobile и профильная приёмка не выполнены.
+**Статус:** этапы 0–5 реализованы в Runtime; этап 6 IN_PROGRESS. Диагностика и сценарии приёмки готовы; Preview scheduling, event-driven effects и реальная приёмка ещё открыты. В этапе 1 выбрано дерево 3D influence bounds (BVH) вместо сетки.
 
 ## 1. Цель
 
@@ -102,7 +102,7 @@
 3. M621: Prototype Readiness Cache + immutable assembly metadata / bounds.
 4. M622: Incremental Assembly & Real Work Budget — Runtime Location (static/multipart/composite FULL); общий House budget и порционный Studio Preview остаются открыты.
 5. M623: Real Estate Integration — общий spatial index, queue, work budget и lifecycle.
-6. Next: Integration & Acceptance — исправления по фактическим результатам, не закрывать задачу заранее.
+6. M624: Integration & Acceptance — opt-in diagnostics и матрица проверок, teardown Studio Preview. Реальная приёмка и оставшиеся оптимизации открыты.
 
 Перед каждым патчем восстановить актуальную базу из дампа + подтверждённых патчей. Проверить производителей и потребителей, Rojo/Runtime, применение/обратную проверку, профильные тесты, Luau preflight и verify.py. Обновить Mechanics (LOD / House), основное ТЗ, архитектуру, AGENTS/Read First при необходимости, KBN-0037 и связанные карточки только по реальному прогрессу. Выдать один проверенный .patch, краткий отчёт, один PowerShell-блок (нижний регистр команд; проверка → применение → тесты → при необходимости install plugin → строго control-center-stop.ps1 и control-center.ps1). Не менять пользовательские manifests, настройки или данные без необходимости; независимый откат каждого этапа через Git. Без нового дампа, если цепочка восстанавливается.
 
@@ -140,3 +140,9 @@ M623: Real Estate stage 5 — every house part is a record in the common static 
 Начальные лимиты — группы операций, не гарантия миллисекунд и не оптимальные значения PC/Mobile; `Clone`, `Destroy`, `Parent`, поиск proxy и batch commit неделимы. Эффекты и native-stream-out reconciliation не входят в build/cleanup счётчик. House adapter пока выполняется в observation tick; его async и единый бюджет относятся к этапу 5. Studio Authoring использует тот же multipart builder через `Finish`, но пока не распределяет работу по кадрам.
 
 Engine-independent Lua oracle: 1/8/32/64 parts static/composite, budget counters, swap, desired/generation cancellation, failed staging, proxy mismatch, concurrent unload and cleanup. Реальные Roblox meshes/welds, physics, PC/mobile и MicroProfiler NOT_RUN.
+
+## M624 · Integration & Acceptance (IN_PROGRESS)
+
+M624: opt-in Runtime LOD diagnostics (authorized Studio/DEV debug dock, PC/mobile), bounded capture with heartbeat/callback elapsed, queue/desired→actual latency, local candidates, sorts/cache/async/work counters, peaks and client memory at boundaries; no telemetry or new scheduler. Studio Preview teardown now disconnects Workspace subscriptions, restores authored visibility and destroys local folder. Authoring assembly remains synchronous; composite/tagged passes are measured, not eliminated. Actual Studio/DEV/PC/Mobile, two-client and A/B acceptance NOT_RUN; T03/A03/A06 remain open. See docs/workflows/M624_RUNTIME_LOD_ACCEPTANCE_RU.md.
+
+[Инструкция приёмки и чтения отчёта](M624_RUNTIME_LOD_ACCEPTANCE_RU.md).

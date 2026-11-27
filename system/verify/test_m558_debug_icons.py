@@ -18,14 +18,14 @@ class DebugIconsM558(unittest.TestCase):
             self.assertFalse((ROOT/f'src/client/dev/{name}Controller.luau').exists())
             self.assertFalse((ROOT/f'src/server/dev/{name}Service.luau').exists())
 
-    def test_eight_unique_glyphs_and_no_text_overwrite(self):
+    def test_unique_glyphs_and_no_text_overwrite(self):
         dock=read('src/client/dev/StudioDebugDock.luau')
         icons=read('src/client/dev/StudioDebugIcons.luau')
         profile=read('src/client/dev/DebugDockProfile.luau')
         slots=re.findall(r'(\w+) = (\d+)',re.search(r'local desktop = .*?slots = table.freeze\(\{([^}]+)\}',profile)[1])
-        expected=['TL','CS','HS','CD','HP','UI','GP','AG']
-        self.assertEqual(slots,list(zip(expected,map(str,range(8)))))
-        self.assertIn('count = 8',profile)
+        expected=['TL','CS','HS','CD','HP','UI','GP','AG','LD']
+        self.assertEqual(slots,list(zip(expected,map(str,range(len(expected))))))
+        self.assertIn('count = 9',profile)
         masks=re.findall(r'(\w+) = \{ label = "([^"]+)", rows = \{(.*?)\n    \} \}',icons,re.S)
         self.assertEqual([m[0] for m in masks],expected)
         for _,_,rows in masks:
@@ -33,7 +33,7 @@ class DebugIconsM558(unittest.TestCase):
             self.assertEqual(len(pixels),24)
             self.assertTrue(all(len(row)==24 for row in pixels))
             self.assertGreater(sum(row.count('#') for row in pixels),40)
-        self.assertEqual(len({m[2] for m in masks}),8)
+        self.assertEqual(len({m[2] for m in masks}),len(expected))
         self.assertIn('launcher.Text = ""',icons)
         self.assertIn('canvas.Active = false',icons)
         self.assertIn('paintIcon(if open then ACCENT else TEXT)',dock)

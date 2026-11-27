@@ -15,7 +15,10 @@ function Requests:_release(record, slot)
     if self.slots[record] ~= slot then return end
     self.slots[record] = nil
     self.count = self.count - 1
-    if slot.result then self.dispose(slot.result); slot.result = nil end
+    if slot.result then
+        if self.diagnostics and self.diagnostics.enabled then self.diagnostics:Add("asyncDiscards") end
+        self.dispose(slot.result); slot.result = nil
+    end
 end
 
 function Requests:Invalidate(record)
@@ -52,6 +55,10 @@ function Requests:TakeOrStart(record, current)
     slot = {ticket=record.generation, loading=true, current=current}
     self.slots[record] = slot
     self.count = self.count + 1
+    if self.diagnostics and self.diagnostics.enabled then
+        self.diagnostics:Add("asyncStarts")
+        self.diagnostics:Peak("pendingAsync", self.count)
+    end
     self.spawn(function()
         local ok, result = pcall(self.load, record)
         slot.loading = false
@@ -59,6 +66,7 @@ function Requests:TakeOrStart(record, current)
         if self.destroyed or slot.cancelled or not current(slot.ticket) then
             self:_release(record, slot)
         elseif not ok or not result then
+            if self.diagnostics and self.diagnostics.enabled then self.diagnostics:Add("asyncFailures") end
             record.retryAt = self.clock() + RETRY_SECONDS
             self.report(record, result)
             self:_release(record, slot)

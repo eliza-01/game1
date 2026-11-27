@@ -120,4 +120,8 @@ if DebugAccess.ClientAllowed() then
     if profile.slots.CS ~= nil then
         require(DevRoot:WaitForChild("CustomScalingDebugController")).Start()
     end
+    local lodDebugOk, lodDebugError = pcall(function()
+        require(DevRoot:WaitForChild("LodDebugController")).Start()
+    end)
+    if not lodDebugOk then warn("[game1][LOD] diagnostics UI failed: " .. tostring(lodDebugError)) end
 end

@@ -170,7 +170,7 @@ function Adapter:Prepare(transition)
         if not acquired then return nil, "FULL pending", true end
     end
     local job = Job.new(function(build)
-        local part = acquired or build:Own(transition.prototype:Clone())
+        local part = acquired or build:Own(transition.prototype:Clone(), "meshClones")
         build.bundle = part
         build:Unit()
         part.Name = visual.spec.name .. (if transition.variant == "LOD1" then "__LOD1" else "")

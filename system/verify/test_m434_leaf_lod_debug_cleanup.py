@@ -53,7 +53,11 @@ class LeafAndLodDebugM434(TestCase):
         self.assertNotIn('Game1RuntimeLodStatus', streamer)
         self.assertNotIn('Studio LOD preview |', streamer)
         self.assertNotIn('makeStatus()', streamer)
-        self.assertNotIn(':Stats()', streamer)
+        # M624: only explicit capture boundaries may enumerate cache stats;
+        # the retired continuous probe must remain absent.
+        runtime, capture = streamer.split('function Streamer.StartDiagnostics()', 1)
+        self.assertNotIn(':Stats()', runtime)
+        self.assertEqual(capture.count('prototypeCache:Stats()'), 2)
         for path in ('src/client/world/StudioLodPreviewAdapter.luau',
                      'src/client/world/HouseVisualAdapter.luau'):
             self.assertNotIn('function Adapter:Stats(', source(path))

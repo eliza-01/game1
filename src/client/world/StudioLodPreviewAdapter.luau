@@ -62,8 +62,8 @@ function Adapter.new(originalTransparency, paint)
             end
         end
     end
-    Workspace.DescendantAdded:Connect(add)
-    Workspace.DescendantRemoving:Connect(function(part)
+    self.addedConnection = Workspace.DescendantAdded:Connect(add)
+    self.removingConnection = Workspace.DescendantRemoving:Connect(function(part)
         if self.inventory[part] then self.inventory[part] = nil; self.dirty = true end
     end)
     for _, part in ipairs(Workspace:GetDescendants()) do add(part) end
@@ -278,5 +278,12 @@ function Adapter:FollowMoving()
             record.clone.Material = record.source.Material
         end
     end
+end
+function Adapter:Destroy()
+    if self.addedConnection then self.addedConnection:Disconnect(); self.addedConnection = nil end
+    if self.removingConnection then self.removingConnection:Disconnect(); self.removingConnection = nil end
+    for _, record in pairs(self.records) do restore(record) end
+    self.records, self.inventory, self.managed = {}, {}, {}
+    self.folder:Destroy()
 end
 return table.freeze(Adapter)

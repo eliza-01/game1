@@ -43,9 +43,13 @@ function Work:Retire(bundle)
     self.retired[#self.retired+1] = owned
 end
 
-function Work:Cancel()
+function Work:Cancel(stale)
     if not self.active then return end
     local job = self.active.job
+    if self.diagnostics and self.diagnostics.enabled then
+        self.diagnostics:Add("cancelledJobs")
+        if stale then self.diagnostics:Add("staleJobCancels") end
+    end
     if job.bundle and job.bundle.Parent then job.bundle.Parent = nil end
     local owned = job:Cancel()
     if #owned > 0 then self.retired[#self.retired+1] = owned end
@@ -63,10 +67,30 @@ function Work:Cleanup(limit)
     return used
 end
 
+function Work:_committed(entry, job)
+    local d = self.diagnostics
+    if not d or not d.enabled then return end
+    d:Add("commits")
+    d:Add(job and "buildCommits" or "unloadCommits")
+    if job then d:Add("weldBindings", #(job.links or {})) end
+    if entry.createdAt and entry.createdAt >= d.startedAt then d:Latency(d.clock()-entry.createdAt) end
+    local record = entry.record
+    if record and record.actual == record.desired and record.diagnosticDesiredAt then
+        if record.diagnosticDesiredAt >= d.startedAt then d:DesiredLatency(d.clock()-record.diagnosticDesiredAt) end
+        record.diagnosticDesiredAt = nil
+    end
+end
+
+function Work:_failed(entry, reason, retryable, callbacks)
+    local d = self.diagnostics
+    if d and d.enabled then d:Add(retryable and "retryableAttempts" or "failedAttempts") end
+    callbacks.failed(entry, reason, retryable)
+end
+
 function Work:Step(callbacks)
     local stats = {build=0, cleanup=self:Cleanup(self.CleanupBudget), commit=0}
     self.last = stats
-    if self.active and not callbacks.valid(self.active.entry, self.active.job) then self:Cancel() end
+    if self.active and not callbacks.valid(self.active.entry, self.active.job) then self:Cancel(true) end
     -- Unloads progress independently of a large build. Reserve a retirement
     -- slot for cancellation or replacement; never grow an unbounded backlog.
     local ready = self.active and self.active.job.state == "ready"
@@ -74,7 +98,8 @@ function Work:Step(callbacks)
     if #self.retired == 0 and not reserveCommit then
         local entry = self:_next(self.unloads, "unloadIndex", callbacks.valid)
         if entry then
-            callbacks.commit(entry, nil, self)
+            local ok, reason, retryable = callbacks.commit(entry, nil, self)
+            if ok then self:_committed(entry, nil) else self:_failed(entry, reason, retryable, callbacks) end
             stats.commit = 2
         end
     end
@@ -82,9 +107,11 @@ function Work:Step(callbacks)
         local entry = self:_next(self.builds, "buildIndex", callbacks.valid)
         if entry then
             local ok, job, reason, retryable = pcall(callbacks.prepare, entry)
-            if not ok then callbacks.failed(entry, job, false)
-            elseif job then self.active = {entry=entry, job=job}
-            else callbacks.failed(entry, reason, retryable == true) end
+            if not ok then self:_failed(entry, job, false, callbacks)
+            elseif job then
+                job.diagnostics = self.diagnostics
+                self.active = {entry=entry, job=job}
+            else self:_failed(entry, reason, retryable == true, callbacks) end
             -- One start attempt per frame, even if a proxy is absent.
             stats.build = 1
         end
@@ -93,18 +120,19 @@ function Work:Step(callbacks)
     if not active then return stats end
     local job, entry = active.job, active.entry
     stats.build = stats.build + job:Advance(self.BuildBudget - stats.build)
+    if self.diagnostics and self.diagnostics.enabled then self.diagnostics:Peak("stagingInstances", #job.owned) end
     if job.state == "failed" then
-        callbacks.failed(entry, job.problem, job.retryable == true)
+        self:_failed(entry, job.problem, job.retryable == true, callbacks)
         self:Cancel()
     elseif job.state == "ready" and #self.retired <= 1 then
         local cost = 4 + 2 * #(job.links or {})
         if stats.commit + cost <= self.CommitBudget then
-            if not callbacks.valid(entry, job) then self:Cancel()
+            if not callbacks.valid(entry, job) then self:Cancel(true)
             else
                 stats.commit = stats.commit + cost
                 local ok, reason, retryable = callbacks.commit(entry, job, self)
-                if ok then self.active = nil
-                else callbacks.failed(entry, reason, retryable == true); self:Cancel() end
+                if ok then self:_committed(entry, job); self.active = nil
+                else self:_failed(entry, reason, retryable == true, callbacks); self:Cancel() end
             end
         end
     end

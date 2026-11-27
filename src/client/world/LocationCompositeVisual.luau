@@ -69,7 +69,7 @@ function Adapter.Prepare(prototype: Model, record: any, paint: any, asset: any, 
                 error("component unavailable")
             end
             work:Unit()
-            local part = work:Own(source:Clone())
+            local part = work:Own(source:Clone(), "meshClones")
             work:Unit()
             part.Size = proxy.Size
             part.CFrame = proxy.CFrame
@@ -81,7 +81,7 @@ function Adapter.Prepare(prototype: Model, record: any, paint: any, asset: any, 
             work:Unit()
             part.Parent = bundle
             work:Unit()
-            local joint = work:Own(Instance.new("Weld"))
+            local joint = work:Own(Instance.new("Weld"), "weldCreates")
             joint.Name = "Game1VisualProxyWeld"
             joint.C0 = CFrame.identity
             joint.C1 = CFrame.identity

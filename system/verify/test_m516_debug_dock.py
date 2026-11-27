@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEV = ROOT / 'src/client/dev'
 
 class DebugDock(unittest.TestCase):
-    def test_all_eight_launchers_use_shared_state(self):
+    def test_all_launchers_use_shared_state(self):
         dock = (DEV / 'StudioDebugDock.luau').read_text(encoding='utf8')
         self.assertIn('GP = 6', (DEV / 'DebugDockProfile.luau').read_text(encoding='utf8'))
         self.assertIn('launcher.AutoButtonColor = false', dock)
@@ -13,7 +13,7 @@ class DebugDock(unittest.TestCase):
         self.assertIn('if open then SELECTED else CLOSED', dock)
         self.assertIn('if open then ACCENT else TEXT', dock)
         self.assertIn('panel:GetPropertyChangedSignal("Visible"):Connect(paint)', dock)
-        for name in ('TestLoadout','CustomScalingDebug','HouseSocketDebug','CameraDebug','HealthUiDebug','UiPresentationDebug','GameplayTest','GameplayAggro'):
+        for name in ('TestLoadout','CustomScalingDebug','HouseSocketDebug','CameraDebug','HealthUiDebug','UiPresentationDebug','GameplayTest','GameplayAggro','LodDebug'):
             with self.subTest(name=name):
                 source = (DEV / (name + 'Controller.luau')).read_text(encoding='utf8')
                 self.assertIn('Dock.Bind(', source)
@@ -41,11 +41,11 @@ class DebugDock(unittest.TestCase):
         self.assertIn('math.floor(slot / count)', dock)
         self.assertIn('screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)', dock)
         for width in (280, 320, 375, 480, 600, 1024, 1920):
-            columns = min(8, max(1, (width - 60 - 8 + 8) // 52))
-            points = {(60 + i % columns * 52, 8 + i // columns * 52) for i in range(8)}
-            self.assertEqual(len(points), 8)
+            columns = min(9, max(1, (width - 60 - 8 + 8) // 52))
+            points = {(60 + i % columns * 52, 8 + i // columns * 52) for i in range(9)}
+            self.assertEqual(len(points), 9)
             self.assertTrue(all(x + 44 <= width - 8 for x, y in points))
-            panel_top = 60 + ((8 + columns - 1) // columns - 1) * 52
+            panel_top = 60 + ((9 + columns - 1) // columns - 1) * 52
             self.assertTrue(all(y + 44 < panel_top for x, y in points))
 
 if __name__ == '__main__':

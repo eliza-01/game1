@@ -2,7 +2,7 @@
 ITEMS = [
     {'id': 'runtime-lod-streaming', 'title': 'Runtime LOD · индекс и очередь',
      'kind': 'Клиентский стриминг', 'scope': 'shared',
-     'summary': 'M623: Location + Real Estate используют общий BVH, threshold cache, очередь и work budget.',
+     'summary': 'M624: общий Runtime LOD + opt-in диагностический отчёт на PC/Mobile.',
      'sockets': [], 'sections': [
          {'title': 'Location Assets', 'lines': [
              'StaticPlacementIndex строится один раз по manifest: 3D-границы влияния hide + hysteresis каждой записи. Policy.Resolve остаётся единственным источником FULL / LOD1 / LOD2 / UNLOADED.',
@@ -15,6 +15,10 @@ ITEMS = [
              'M623: каждая часть дома — самостоятельная запись общего BVH/queue/work budget. Surface distance до scaled bounds, без LOD1 — FULL до собственного hide. FULL async: четыре in-flight/ready слота, retry 15 сек, generation/proxy guard, detached job и atomic commit. При пропаже proxy движущийся visual отсоединяется и снимается DoorRaycast binding; при возврате proxy обновляются CFrame и цвет. FollowMoving обходит только активные движущиеся части.',
              'Для составных объектов сохраняется отдельный проход эффектов по actual, включая позднюю репликацию технического root. Серверная навигация не зависит от клиентского LOD.',
          ]},
+         {'title': 'Диагностика M624', 'lines': [
+             'DEV debug dock → LOD diagnostics → Start capture / Stop capture. По умолчанию выключена; один существующий Heartbeat, без remotes. Heartbeat/callback elapsed, queue/desired latency, cache/async/work counters, peaks, client memory; не CPU всего клиента.',
+             'Отчёт локальный, читается на PC и телефоне; JSON в client Output. Studio Preview teardown освобождает connections и возвращает FULL, сборка preview остаётся синхронной.',
+         ]},
          {'title': 'Недостающее / проверить', 'lines': [
              'Runtime Location incremental assembly реализован. Studio Preview multipart использует тот же job builder синхронно; House integration реализована; budgeted Preview scheduling, event-driven effect invalidation и runtime profiling остаются открыты. Clone/Destroy/Parent и commit неделимы внутри группы; CPU deadline не гарантируется. Stale raw async MeshPart удаляется сразу (до четырёх слотов), вне счётчика job. Aging после 8 ticks; root/proxy absence retryable.',
              'Studio / Runtime / DEV Mobile, две камеры с разным LOD, коллизии, телепортация, CPU и память требуют фактической приёмки. Канбан KBN-0037 остаётся IN_PROGRESS.',
@@ -22,5 +26,5 @@ ITEMS = [
      ], 'sources': ['location-streamer', 'static-placement-index', 'location-lod-candidates',
                     'lod-threshold-cache', 'lod-transition-queue', 'lod-prototype-cache',
                     'location-lod-assembly', 'lod-assembly-job', 'lod-runtime-work', 'location-lod-policy', 'house-visual-adapter',
-                    'house-mesh-requests', 'location-composite-visual', 'runtime-lod-spec']},
+                    'house-mesh-requests', 'location-composite-visual', 'runtime-lod-spec', 'lod-diagnostics', 'lod-debug-controller', 'lod-acceptance']},
 ]

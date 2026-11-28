@@ -71,7 +71,7 @@ class AlignmentRegistry(unittest.TestCase):
             result=self.align(kind)
             self.assertEqual(result['alignmentStatus'],'GEOMETRY_VERIFIED')
             self.assertEqual(result['alignment']['meshId'],response()['meshId'])
-            self.assertFalse(result['runtimeReady'])
+            self.assertTrue(result['runtimeReady'])
             self.assertEqual(self.new_owner().describe(kind,'same')['alignment'],result['alignment'])
             self.align(kind)
             self.assertEqual([h['event'] for h in self.owner.history(kind,'same')].count('GEOMETRY_ALIGNED'),1)

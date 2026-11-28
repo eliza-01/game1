@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Contract = require(ReplicatedStorage:WaitForChild("Game1Shared")
     :WaitForChild("weapon"):WaitForChild("WeaponPresentationContract"))
 
+local LocalVisibility = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcLocalVisibility"))
 local NpcWeaponVisibilityController = {}
 local started = false
 local boundFolder: Folder? = nil
@@ -13,16 +14,7 @@ local actorStates: {[Model]: any} = {}
 local EQUIPPED_NAMES = { EquippedWeaponRight = true, EquippedWeaponLeft = true }
 
 local function setPartHidden(weaponState: any, part: BasePart, hidden: boolean)
-    local originals = weaponState.originals
-    if hidden then
-        if originals[part] == nil then
-            originals[part] = part.LocalTransparencyModifier
-        end
-        part.LocalTransparencyModifier = 1
-    elseif originals[part] ~= nil then
-        part.LocalTransparencyModifier = originals[part]
-        originals[part] = nil
-    end
+    LocalVisibility.Set(part, weaponState, hidden)
 end
 
 local function applyWeapon(weaponState: any, hidden: boolean)
@@ -40,6 +32,7 @@ local function unbindWeapon(actorState: any, weapon: Model)
     end
     actorState.weapons[weapon] = nil
     weaponState.descendantAdded:Disconnect()
+    weaponState.descendantRemoving:Disconnect()
     applyWeapon(weaponState, false)
 end
 
@@ -50,13 +43,15 @@ local function bindWeapon(actorState: any, weapon: Model)
     end
     local weaponState = {
         model = weapon,
-        originals = {},
     }
     actorState.weapons[weapon] = weaponState
     weaponState.descendantAdded = weapon.DescendantAdded:Connect(function(node)
         if node:IsA("BasePart") and actorState.hidden then
             setPartHidden(weaponState, node, true)
         end
+    end)
+    weaponState.descendantRemoving = weapon.DescendantRemoving:Connect(function(node)
+        if node:IsA("BasePart") then setPartHidden(weaponState, node, false) end
     end)
     if actorState.hidden then
         applyWeapon(weaponState, true)

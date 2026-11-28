@@ -123,6 +123,7 @@ local function spawnOne(state: any): boolean
     local hp = math.max(1, finite(stats.MaxHP, 100))
     entity:SetAttribute("Game1NpcRuntime", true)
     entity:SetAttribute("NpcSlug", slug)
+    entity:SetAttribute("Game1MnpcFullModelId", tostring(definition.modelAssetId or ""))
     local weaponSet = NpcEquipmentService.Equip(entity, slug, equipmentContext, rigLease)
     local profile = (NpcAnimationRegistry.profiles or {})[slug]
     local aligned = NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)

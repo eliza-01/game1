@@ -7,6 +7,7 @@ local HealthBarView = require(script.Parent:WaitForChild("HealthBarView"))
 local HealthUiSettings = require(script.Parent:WaitForChild("HealthUiSettings"))
 local CameraController = require(script.Parent.Parent:WaitForChild("character"):WaitForChild("CameraController"))
 
+local LocalVisibility = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcLocalVisibility"))
 local Controller = {}
 local player = Players.LocalPlayer
 local started = false
@@ -193,7 +194,7 @@ local function updateVisibility()
             table.insert(detachedMonsters, model)
             continue
         end
-        local alive = model.Parent == watchedFolder and model:GetAttribute("LifeState") == "Alive"
+        local alive = model.Parent == watchedFolder and model:GetAttribute("LifeState") == "Alive" and LocalVisibility.Full(model)
             and model:GetAttribute("MonsterHomeRecalling") ~= true
         local focused = model == aimedMonster or model == lockedMonster
         -- The server's current target is the authority. Aggro/Chase/Attack

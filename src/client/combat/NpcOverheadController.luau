@@ -9,6 +9,7 @@ local GameOptions = require(Shared:WaitForChild("GameOptions"))
 local HealthBarView = require(script.Parent:WaitForChild("HealthBarView"))
 local HealthUiSettings = require(script.Parent:WaitForChild("HealthUiSettings"))
 
+local LocalVisibility = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcLocalVisibility"))
 local Controller = {}
 local player = Players.LocalPlayer
 local views: {[Model]: any} = {}
@@ -88,7 +89,7 @@ local function refresh()
     local hpSq = profile.healthRadiusStuds * profile.healthRadiusStuds
     for model, view in pairs(views) do
         local root = model:FindFirstChild("RootCollider")
-        local alive = model.Parent == watched and model:GetAttribute("LifeState") == "Alive"
+        local alive = model.Parent == watched and model:GetAttribute("LifeState") == "Alive" and LocalVisibility.Full(model)
         local distSq = math.huge
         if selfRoot and selfRoot:IsA("BasePart") and root and root:IsA("BasePart") then
             local delta = selfRoot.Position - root.Position

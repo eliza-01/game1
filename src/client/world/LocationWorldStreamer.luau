@@ -23,6 +23,7 @@ local LodRuntimeWork = require(script.Parent:WaitForChild("LodRuntimeWork"))
 local LodLoadPriority = require(script.Parent:WaitForChild("LodLoadPriority"))
 local LodDiagnostics = require(script.Parent:WaitForChild("LodDiagnostics"))
 local Appearance = require(World:WaitForChild("RuntimeVisualAppearance"))
+local MnpcLodController = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcLodController"))
 local Streamer = {}
 local started = false
 local active = nil
@@ -349,7 +350,16 @@ function Streamer.Start()
         diagnostics:Peak("stagingInstances", runtimeWork.active and #runtimeWork.active.job.owned or 0)
         diagnostics:Peak("retiredBundles", #runtimeWork.retired)
     end
+    local mnpc = MnpcLodController.new()
     local heartbeatConnection = RunService.Heartbeat:Connect(function(dt)
+        if mnpc then
+            local ok, reason = pcall(mnpc.Step, mnpc, dt)
+            if not ok then
+                warn("[game1][MNPC LOD] disabled after presentation error: " .. tostring(reason))
+                pcall(mnpc.Destroy, mnpc)
+                mnpc = nil
+            end
+        end
         local captureStart = diagnostics.enabled and os.clock() or nil
         if houseAdapter then houseAdapter:FollowMoving() end
         elapsed += dt
@@ -493,7 +503,7 @@ function Streamer.Start()
         end
         sampleWork(dt, workStats, captureStart)
     end)
-    active = {heartbeatConnection = heartbeatConnection, visualAddedConnection = visualAddedConnection,
+    active = {mnpc = mnpc, heartbeatConnection = heartbeatConnection, visualAddedConnection = visualAddedConnection,
         visualRemovedConnection = visualRemovedConnection, prototypeCache = prototypeCache,
         prototypeChangedConnection = prototypeChangedConnection, houseAdapter = houseAdapter,
         folder = folder, records = records, compositeEffects = compositeEffects, preview = preview, runtimeWork = runtimeWork,
@@ -548,6 +558,7 @@ function Streamer.Stop()
         state.prototypeChangedConnection}) do
         if connection then pcall(function() connection:Disconnect() end) end
     end
+    if state.mnpc then state.mnpc:Destroy() end
     if state.runtimeWork then state.runtimeWork:Destroy() end
     if state.houseAdapter then state.houseAdapter:Destroy() end
     if state.prototypeCache then state.prototypeCache:Destroy() end

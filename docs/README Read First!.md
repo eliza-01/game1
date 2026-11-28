@@ -153,3 +153,5 @@ M626 · Near-first Runtime LOD: после публикации M625 владе�
 - [M532 — независимый melee Headshot, GP Export/Skip/Retry, timing-only fallback](workflows/M532_HEADSHOT_GP_RECOVERY_RU.md).
 
 - [M533 — Targeted Status Effects](workflows/M533_TARGETED_STATUS_EFFECTS_RU.md).
+
+- [M638 · MNPC Runtime LOD / red dummy](workflows/M638_MNPC_RUNTIME_LOD_RU.md) — текущая визуальная интеграция, native isolation открыта.

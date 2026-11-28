@@ -9,6 +9,8 @@ local Sampler = require(script.Parent:WaitForChild("ActorLocomotionSampler"))
 local Pool = require(script.Parent:WaitForChild("ActorSamplerPool"))
 local LowerBodyPose = require(script.Parent:WaitForChild("ActorLowerBodyPose"))
 
+local LocalVisibility = require(script.Parent:WaitForChild("MnpcLocalVisibility"))
+local RigObserver = require(script.Parent:WaitForChild("MnpcRigObserver"))
 local Controller = {}
 local started = false
 local entries = {}
@@ -60,7 +62,7 @@ local function acquire(entry): boolean
     if entries[entry.model] ~= entry or not entry.model.Parent
         or not entry.root.Parent or not entry.visual.Parent
         or entry.model:GetAttribute("LifeState") ~= "Alive"
-        or entry.model:GetAttribute("NpcAttackPursuitActive") ~= true then
+        or entry.model:GetAttribute("NpcAttackPursuitActive") ~= true or not LocalVisibility.Full(entry.model) then
         Pool:Release(sampler)
         return false
     end
@@ -70,9 +72,9 @@ end
 
 local function bind(model: Model)
     if entries[model] or model:GetAttribute("Game1NpcRuntime") ~= true then return end
-    local visual = model:FindFirstChild("ImportedRig") or model
+    local visual = model:FindFirstChild("ImportedRig")
     local root = model:FindFirstChild("HumanoidRootPart")
-    if not visual:IsA("Model") or not root or not root:IsA("BasePart") then return end
+    if not visual or not visual:IsA("Model") or not root or not root:IsA("BasePart") then return end
     local lower = Skeleton.ResolveLowerBodyPaths(visual)
     if #lower == 0 then return end
     local entry = {
@@ -99,28 +101,8 @@ local function bind(model: Model)
     if model:GetAttribute("NpcAttackPursuitActive") == true then active[entry] = true end
 end
 
--- Model, attributes and navigation root do not necessarily replicate in order.
-local function watchModel(model: Model)
-    task.spawn(function()
-        local deadline = os.clock() + 5
-        while model.Parent and not entries[model] and os.clock() < deadline do
-            if model:GetAttribute("Game1NpcRuntime") == true
-                and model:FindFirstChild("HumanoidRootPart") then
-                bind(model)
-                return
-            end
-            task.wait(0.1)
-        end
-    end)
-end
-
 local function bindFolder(folder: Folder)
-    for _, child in ipairs(folder:GetChildren()) do
-        if child:IsA("Model") then watchModel(child) end
-    end
-    folder.ChildAdded:Connect(function(child)
-        if child:IsA("Model") then watchModel(child) end
-    end)
+    RigObserver.Watch(folder, entries, bind, unbind)
 end
 
 local function step(dt: number)
@@ -131,7 +113,7 @@ local function step(dt: number)
             unbind(entry.model)
             continue
         end
-        if entry.model:GetAttribute("LifeState") ~= "Alive" then
+        if entry.model:GetAttribute("LifeState") ~= "Alive" or not LocalVisibility.Full(entry.model) then
             entry.weight = 0
             release(entry)
             active[entry] = nil

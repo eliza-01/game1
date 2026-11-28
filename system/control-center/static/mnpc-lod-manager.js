@@ -17,7 +17,7 @@
   const item = () => state.data?.items.find(row=>key(row)===state.selected);
   function profileFields(prefix,p) {
     return `<div class="lm-setting-grid lm-mnpc-profile">
-      <label class="lm-checkbox">Enabled (future Runtime)<input id="${prefix}-enabled" type="checkbox" ${p.enabled?'checked':''}></label>
+      <label class="lm-checkbox">Enabled · Runtime<input id="${prefix}-enabled" type="checkbox" ${p.enabled?'checked':''}></label>
       <label>FULL · studs<input id="${prefix}-full" type="number" min="1" max="10000" step="1" value="${esc(p.full)}"></label>
       <label>Unload · studs<input id="${prefix}-hide" type="number" min="1" max="10000" step="1" value="${esc(p.hide)}"></label>
       <label>Hysteresis ±<input id="${prefix}-hysteresis" type="number" min="0" max="100" step="1" value="${esc(p.hysteresis)}"></label></div>`;
@@ -37,7 +37,7 @@
       const color=row.status==='PUBLISHED'?'ready':row.status==='STAGED'||row.status==='ATLAS_READY'?'warning':'empty';
       return `<tr><td><b>${esc(row.name)}</b><small>${esc(row.kind)} · ${esc(row.slug)}</small></td>
         <td>${esc(row.fullStatus)}<small>${esc(row.fullModelId)} · r${esc(row.fullRevision)}</small></td>
-        <td><span class="lm-chip lm-${color}">${esc(statuses[row.status]||row.status)}</span><small>${row.geometry?`${esc(row.geometry.triangles)} tri · `:''}r${esc(row.revision)}</small></td>
+        <td><span class="lm-chip lm-${color}">${esc(statuses[row.status]||row.status)}</span><small>${row.geometry?`${esc(row.geometry.triangles)} tri · `:''}r${esc(row.revision)} · ${row.runtimeReady?'Mesh':'Red dummy'}</small></td>
         <td>${esc(row.profile.full)} / ${esc(row.profile.hide)} ±${esc(row.profile.hysteresis)}<small>${row.inherits?'Default':'Override'} · ${row.profile.enabled?'On':'Off'}</small></td>
         <td><button type="button" data-mnpc-edit="${esc(key(row))}" ${state.busy?'disabled':''}>Edit</button></td></tr>`;
     }).join(''):'<tr><td colspan="5">Нет подходящих существ.</td></tr>';
@@ -92,7 +92,7 @@
         <button type="button" class="primary" data-mnpc-action="publish" ${publishAllowed?'':'disabled'}>${row.status==='MODEL_PENDING'?'Resume operation':'Publish LOD1'}</button></div>
       <p class="lm-note">Готовая idle-поза, один mesh с именем lod1, одна UV, без костей. Для автоматической привязки нужен captured-idle bake.</p>
       <div class="actions"><button type="button" data-mnpc-action="align" ${alignAllowed?'':'disabled'}>Verify import &amp; alignment · Studio</button></div>
-      <p class="lm-note">${row.alignment?`Geometry verified · Mesh ID ${esc(row.alignment.meshId)} · max error ${esc(row.alignment.maxVertexError.toFixed(4))} studs`:'Geometry alignment not verified'} · Runtime OFF. Проверка цвета/UV и внешний вид остаются открытыми.</p>
+      <p class="lm-note">${row.alignment?`Geometry verified · Mesh ID ${esc(row.alignment.meshId)} · max error ${esc(row.alignment.maxVertexError.toFixed(4))} studs`:'Geometry alignment not verified'} · ${row.runtimeReady?'Runtime mesh':'Runtime red dummy'}. Проверка цвета/UV остаётся открытой.</p>
       <details><summary>Distance · ${row.inherits?'Inherited':'Override'}</summary>${profileFields('mnpc-actor',row.profile)}
         <div class="actions"><button type="button" data-mnpc-action="save-actor">Save override</button><button type="button" data-mnpc-action="inherit" ${row.inherits?'disabled':''}>Use defaults</button></div></details>
       <details><summary>Publication history</summary><div class="lm-revisions">${history}</div></details>`;

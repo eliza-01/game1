@@ -97,7 +97,7 @@ class MnpcAuthoring(unittest.TestCase):
         items=self.owner.overview()['items']
         self.assertEqual([(r['kind'],r['slug']) for r in items],[('monster','same'),('npc','same')])
         self.assertNotEqual(items[0]['fullFingerprint'],items[1]['fullFingerprint'])
-        self.assertFalse(self.owner.overview()['runtimeEnabled'])
+        self.assertTrue(self.owner.overview()['runtimeEnabled'])
         self.assertTrue(list((self.root/'.control-center/backups').glob('before_m633*')))
         self.new_owner()
         self.assertEqual(len(list((self.root/'.control-center/backups').glob('before_m633*'))),1)
@@ -195,7 +195,7 @@ class MnpcAuthoring(unittest.TestCase):
         status,view=write_world('/api/lod-manager/mnpc/settings',lambda:payload,deps)
         self.assertEqual(status,200)
         self.assertEqual(view['items'][0]['profile'],profile)
-        self.assertFalse(view['runtimeEnabled'])
+        self.assertTrue(view['runtimeEnabled'])
         self.assertEqual(write_world('/api/lod-manager/mnpc/settings',lambda:payload,deps)[0],400)
         payload.update(expectedRevision=1,kind='npc',slug='same',profile={**profile,'hide':125})
         self.assertEqual(write_world('/api/lod-manager/mnpc/settings',lambda:payload,deps)[0],400)

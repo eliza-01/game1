@@ -22,7 +22,7 @@ from .model_lod_common import (check_revision, distances_valid, inspect_fbx,
     preserve_source, publish_geometry, sha256, verified_source)
 
 _SLUG = re.compile(r'[a-z0-9][a-z0-9_]{0,63}\Z')
-DEFAULT_PROFILE = {'enabled': False, 'full': 100, 'hide': 200, 'hysteresis': 10}
+DEFAULT_PROFILE = {'enabled': True, 'full': 100, 'hide': 200, 'hysteresis': 10}
 
 
 def _digest(value):
@@ -191,7 +191,9 @@ class MnpcLodResource:
             from .mnpc_lod_alignment import identity
             if isinstance(alignment, dict) and alignment.get('schemaVersion') == 1 and alignment.get('identity') == identity(item):
                 item.update(alignment=alignment, alignmentStatus='GEOMETRY_VERIFIED',
-                            reason='Published mesh geometry aligned; native texture/visual review and Runtime integration pending')
+                            reason='Published mesh geometry aligned; native texture/visual review pending')
+                from .mnpc_lod_runtime import asset
+                item['runtimeReady'] = asset(item) is not None
         elif row['image_id'] or atlas['current']:
             item.update(status='ATLAS_READY', reason='Image published; Model publication pending')
         else:
@@ -206,7 +208,7 @@ class MnpcLodResource:
                 rows = {(r['kind'],r['slug']): dict(r) for r in db.execute('SELECT * FROM mnpc_lod1')}
             items = [self._describe(kind, actor, rows.get((kind, actor['slug'])), settings, loadouts)
                      for kind, store in self.stores.items() for actor in store.list()]
-            return {'schemaVersion': 1, 'settings': settings, 'items': items, 'runtimeEnabled': False}
+            return {'schemaVersion': 1, 'settings': settings, 'items': items, 'runtimeEnabled': True}
 
     def describe(self, kind, slug):
         actor = self._actor(kind, slug)

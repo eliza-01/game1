@@ -10,6 +10,8 @@ local MonsterLocomotionSampler = require(script.Parent:WaitForChild("MonsterLoco
 local Pool = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorSamplerPool"))
 local ActorLowerBodyPose = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorLowerBodyPose"))
 
+local LocalVisibility = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcLocalVisibility"))
+local RigObserver = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcRigObserver"))
 local Controller = {}
 local started = false
 local entries = {}
@@ -107,7 +109,7 @@ local function acquireSampler(entry): boolean
 	if entries[entry.model] ~= entry or not entry.model.Parent
 		or not entry.root.Parent or not entry.visual.Parent
 		or entry.model:GetAttribute("LifeState") ~= "Alive"
-		or entry.model:GetAttribute("MonsterAttackPursuitActive") ~= true then
+		or entry.model:GetAttribute("MonsterAttackPursuitActive") ~= true or not LocalVisibility.Full(entry.model) then
 		Pool:Release(sampler)
 		return false
 	end
@@ -132,68 +134,57 @@ local function bindMonster(model: Model)
 	if entries[model] or model:GetAttribute("Game1MonsterRuntime") ~= true then
 		return
 	end
-	task.spawn(function()
-		local visual = model:FindFirstChild("ImportedRig") or model
-		local root = model:FindFirstChild("HumanoidRootPart") or model:WaitForChild("HumanoidRootPart", 5)
-		if not visual or not visual:IsA("Model") or not root or not root:IsA("BasePart") or not model.Parent or entries[model] then
-			return
+	local visual = model:FindFirstChild("ImportedRig")
+	local root = model:FindFirstChild("HumanoidRootPart")
+	if not visual or not visual:IsA("Model") or not root or not root:IsA("BasePart") or not model.Parent or entries[model] then
+		return
+	end
+	local lowerPaths = MonsterSkeletonMap.ResolveLowerBodyPaths(visual)
+	local lowerRootPaths = MonsterSkeletonMap.ResolveIndependentLowerBodyRoots(visual, lowerPaths)
+	if #lowerPaths == 0 then
+		warnOnce(tostring(model:GetAttribute("MonsterVisualKey") or model.Name), "no lower-body bone branches resolved; attack locomotion composition disabled for this rig")
+		return
+	end
+	local entry = {
+		model = model,
+		visual = visual,
+		root = root,
+		targetBones = MonsterSkeletonMap.BuildBonePathMap(visual),
+		lowerPaths = lowerPaths,
+		lowerRootPaths = lowerRootPaths,
+		visualRootOffsetRotation = root.CFrame:ToObjectSpace(visual:GetPivot()).Rotation,
+		rootMotionBones = resolveRootMotionBones(visual),
+		weight = 0,
+		sampler = nil,
+		connections = {},
+		disabled = false,
+	}
+	entries[model] = entry
+	local function refreshActive()
+		setEntryActive(entry, entry.sampler ~= nil or model:GetAttribute("MonsterCombatActive") == true
+			or model:GetAttribute("MonsterAttackPursuitActive") == true)
+	end
+	table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitActive"):Connect(refreshActive))
+	table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterCombatActive"):Connect(refreshActive))
+	table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitPlaybackSpeed"):Connect(function()
+		if entry.sampler then
+			entry.sampler:SetPlaybackSpeed(tonumber(model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1)
 		end
-		local lowerPaths = MonsterSkeletonMap.ResolveLowerBodyPaths(visual)
-		local lowerRootPaths = MonsterSkeletonMap.ResolveIndependentLowerBodyRoots(visual, lowerPaths)
-		if #lowerPaths == 0 then
-			warnOnce(tostring(model:GetAttribute("MonsterVisualKey") or model.Name), "no lower-body bone branches resolved; attack locomotion composition disabled for this rig")
-			return
+		if model:GetAttribute("MonsterAttackPursuitActive") == true then
+			setEntryActive(entry, true)
 		end
-		local entry = {
-			model = model,
-			visual = visual,
-			root = root,
-			targetBones = MonsterSkeletonMap.BuildBonePathMap(visual),
-			lowerPaths = lowerPaths,
-			lowerRootPaths = lowerRootPaths,
-			visualRootOffsetRotation = root.CFrame:ToObjectSpace(visual:GetPivot()).Rotation,
-			rootMotionBones = resolveRootMotionBones(visual),
-			weight = 0,
-			sampler = nil,
-			connections = {},
-			disabled = false,
-		}
-		entries[model] = entry
-		local function refreshActive()
-			setEntryActive(entry, entry.sampler ~= nil or model:GetAttribute("MonsterCombatActive") == true
-				or model:GetAttribute("MonsterAttackPursuitActive") == true)
-		end
-		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitActive"):Connect(refreshActive))
-		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterCombatActive"):Connect(refreshActive))
-		table.insert(entry.connections, model:GetAttributeChangedSignal("MonsterAttackPursuitPlaybackSpeed"):Connect(function()
-			if entry.sampler then
-				entry.sampler:SetPlaybackSpeed(tonumber(model:GetAttribute("MonsterAttackPursuitPlaybackSpeed")) or 1)
-			end
-			if model:GetAttribute("MonsterAttackPursuitActive") == true then
-				setEntryActive(entry, true)
-			end
-		end))
-		table.insert(entry.connections, model.Destroying:Connect(function()
-			unbind(model)
-		end))
-		table.insert(entry.connections, model.AncestryChanged:Connect(function()
-			if not model:IsDescendantOf(Workspace) then unbind(model) end
-		end))
-		refreshActive()
-	end)
+	end))
+	table.insert(entry.connections, model.Destroying:Connect(function()
+		unbind(model)
+	end))
+	table.insert(entry.connections, model.AncestryChanged:Connect(function()
+		if not model:IsDescendantOf(Workspace) then unbind(model) end
+	end))
+	refreshActive()
 end
 
 local function bindFolder(folder: Folder)
-	for _, child in folder:GetChildren() do
-		if child:IsA("Model") then
-			bindMonster(child)
-		end
-	end
-	folder.ChildAdded:Connect(function(child)
-		if child:IsA("Model") then
-			bindMonster(child)
-		end
-	end)
+    RigObserver.Watch(folder, entries, bindMonster, unbind)
 end
 
 local function step(deltaTime: number)
@@ -213,7 +204,7 @@ local function step(deltaTime: number)
 		local distanceSquared = cameraDelta:Dot(cameraDelta)
 		local alive = tostring(model:GetAttribute("LifeState")) == "Alive"
         -- Death owns the whole rig immediately; never blend running legs into Death.
-        if not alive then
+        if not alive or not LocalVisibility.Full(model) then
             entry.weight = 0
             releaseSampler(entry)
             setEntryActive(entry, false)

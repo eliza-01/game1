@@ -99,3 +99,6 @@ KBN-0025–0030: Combat Analytics, Effects & Status System, Character Skills, Mo
 ## M537 · Design и Favorites
 
 [Design · KBN-0031](specs/KBN-0031.md) — закреплённая карточка продуктового плана: маршрут 1–30, Any, локации и цели каждого уровня, навыки без классов. Звезда в заголовке любой карточки переключает `favorite` (boolean, отсутствует = false); сохранение через revision/backup/history. Закреплённые показываются первыми среди результатов фильтра, затем ID; экспорт также учитывает закрепление.
+
+
+**M638: владелец утвердил red dummy при отсутствии LOD1. Общий клиентский Runtime FULL / LOD1 / UNLOADED для Monster и NPC, runtime registry с M637 identity/alignment, красный статический Part без collide/query/touch/Animator, native weld к root, замена verified mesh после async readiness. Hysteresis, player distance, combat pin, local visibility/effects, attack sampler binding и overhead gate; existing world Heartbeat, отдельная capped MNPC lane. Реплицированный native FULL маскируется, но не гарантирует прекращение Animator; M632 остаётся Studio-only OFF, production shell-only/demand, strict native isolation и A07 NOT_RUN. Реальные LOD1 не блокируют продолжение. См. M638_MNPC_RUNTIME_LOD_RU.md.**

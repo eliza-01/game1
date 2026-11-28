@@ -213,6 +213,7 @@ local function spawnOne(state: any): Model?
     MnpcLifecycle.CopyTemplateMetadata(model, template)
     if record.testOwner then state.testConstructing = model end
     MonsterInitialAttributes.Apply(model, definition, record, instanceId)
+    model:SetAttribute("Game1MnpcFullModelId", tostring(definition.modelAssetId or ""))
     model:SetAttribute("Damageable", false)
     local prepared = MnpcLifecycle.PrepareShell(model, navigationRoot, template, surface, yaw, "Monster")
     local visual, rigLease = MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster", prepared)

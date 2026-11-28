@@ -127,6 +127,8 @@ npcs.atlases = location_assets.atlases
 npcs.export()
 mnpc_lod = MnpcLodResource(ROOT, monsters, npcs, npc_equipment, weapons, location_assets.atlases,
     animations={"monster": monster_animations, "npc": npc_animations})
+from services.mnpc_lod_runtime import export as export_mnpc_runtime, affects_runtime as mnpc_runtime_mutation
+export_mnpc_runtime(mnpc_lod)
 weapons.export()
 arrows.export()
 location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)
@@ -310,7 +312,10 @@ class Handler(BaseHTTPRequestHandler):
         if not self.auth():
             return self.out(401, {"error": "unauthorized"})
         try:
-            status, payload = dispatch_write_request(self.parsed().path, self.body, WRITE_SOURCES)
+            path = self.parsed().path
+            status, payload = dispatch_write_request(path, self.body, WRITE_SOURCES)
+            if status < 300 and mnpc_runtime_mutation(path):
+                export_mnpc_runtime(mnpc_lod)
         except Exception:
             import traceback
             traceback.print_exc()
@@ -324,7 +329,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         if not self.auth():
             return self.out(401, {"error": "unauthorized"})
-        status, payload = dispatch_delete_request(self.parsed().path, self.body, WRITE_SOURCES)
+        path = self.parsed().path
+        status, payload = dispatch_delete_request(path, self.body, WRITE_SOURCES)
+        if status < 300 and mnpc_runtime_mutation(path):
+            export_mnpc_runtime(mnpc_lod)
         return self.out(status, payload)
 
     def log_message(self, fmt, *args):

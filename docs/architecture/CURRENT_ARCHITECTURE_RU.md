@@ -250,3 +250,6 @@ IDs). Ошибка MySQL блокирует audit-sensitive publish/delete/Sync,
 ## M600 · House interaction presentation
 
 HouseSocketService реплицирует состояния и проверяет действие/дистанцию. HouseSocketPromptController использует прежний 10 Hz цикл; DoorInteractionRaycast связывает runtime proxy с визуальным мешем через HouseVisualAdapter. Вне USE-зоны луч не запускается. HudSvgIcons кэширует растеризованные SVG на клиенте. NpcDisplayNameFormatter работает только на границе UI.
+
+
+**M638: владелец утвердил red dummy при отсутствии LOD1. Общий клиентский Runtime FULL / LOD1 / UNLOADED для Monster и NPC, runtime registry с M637 identity/alignment, красный статический Part без collide/query/touch/Animator, native weld к root, замена verified mesh после async readiness. Hysteresis, player distance, combat pin, local visibility/effects, attack sampler binding и overhead gate; existing world Heartbeat, отдельная capped MNPC lane. Реплицированный native FULL маскируется, но не гарантирует прекращение Animator; M632 остаётся Studio-only OFF, production shell-only/demand, strict native isolation и A07 NOT_RUN. Реальные LOD1 не блокируют продолжение. См. M638_MNPC_RUNTIME_LOD_RU.md.**

@@ -16,9 +16,13 @@ function HitboxMeshGeometryCache.Key(meshPart: MeshPart): string
     return ok and tostring(content) or meshPart:GetFullName()
 end
 
-function HitboxMeshGeometryCache.Read(meshPart: MeshPart): any
+function HitboxMeshGeometryCache.Read(meshPart: MeshPart, retryFailed: boolean?): any
     local key = HitboxMeshGeometryCache.Key(meshPart)
     local cached = geometryCache[key]
+    if retryFailed and cached and cached.state == "failed" and cached.users == 0 then
+        geometryCache[key] = nil
+        cached = nil
+    end
     if cached then
         cached.users += 1
         while cached.state == "loading" do

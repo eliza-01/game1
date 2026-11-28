@@ -101,6 +101,9 @@
 <div><span class="eyebrow">modular characters · v2 / reusable armor</span><h2>characters</h2></div>
 <div class="metrics"><div><b id="metric-total">0</b><span>whole-model registered</span></div><div><b id="metric-published">0</b><span>whole-model published</span></div><div><b id="metric-active">0</b><span>whole-model startup</span></div></div>
 </div>
+<details class="panel" id="character-hitboxes-panel"><summary>Combat hitboxes · Character components</summary>
+<div class="actions"><button id="character-hitboxes-capture" type="button">Capture Character hitboxes · Studio</button></div>
+<p id="character-hitboxes-status" class="hint" role="status" aria-live="polite">Studio Edit · synced Rojo · published assemblies.</p></details>
 <div class="panel" id="armor-panel">
 <div class="armor-head"><div><span class="eyebrow">01 · armor catalog</span><h3>Комплекты брони</h3><small class="hint">Комплект → части → пол → геометрия m001 + текстура t001. Публикация здесь не требуется.</small></div></div>
 <form id="armor-set-form" class="armor-set-form">
@@ -932,6 +935,7 @@
         <div class="lm-filters"><input id="mnpc-lod-search" type="search" placeholder="Поиск по имени / slug" aria-label="Поиск MNPC">
           <select id="mnpc-lod-filter" aria-label="MNPC type"><option value="all">All</option><option value="monster">Monsters</option><option value="npc">NPC</option></select>
           <button id="mnpc-lod-refresh" type="button">Refresh</button></div></div>
+      <div class="actions"><button id="mnpc-hitboxes-all" type="button">Capture all FULL hitboxes · Studio</button></div>
       <details class="lm-mnpc-editor"><summary>MNPC defaults · Distance settings</summary>
         <div id="mnpc-lod-defaults"></div>
       </details>
@@ -1289,6 +1293,7 @@
 <script src="atlas-identity.js?v=435"></script>
 <script src="character-atlas-ui.js?v=435"></script>
 <script src="character-assemblies.js?v=461"></script>
+<script src="character-hitboxes.js?v=653"></script>
 <script src="animation-speed-catalog.js?v=1"></script>
 <script src="animation-speed-filters.js?v=1"></script>
 <script src="animation-speed.js?v=478"></script>
@@ -1305,7 +1310,7 @@
 <script src="location-collision.js?v=385"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=405"></script>
-<script src="mnpc-lod-manager.js?v=638"></script>
+<script src="mnpc-lod-manager.js?v=651"></script>
 <script src="lod-manager.js?v=633"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>

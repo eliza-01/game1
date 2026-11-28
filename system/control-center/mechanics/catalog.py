@@ -19,6 +19,9 @@ DOMAINS = (
 # actor-specific scripts belong to a distinct item's sources list, never an
 # arbitrary file path supplied by the browser.
 SOURCES = {
+    'character-hitbox-components': ('docs/workflows/M653_CHARACTER_HITBOX_COMPONENTS_RU.md', 'Character · M653 component hitboxes'),
+    'hitbox-cache-compatibility': ('docs/workflows/M652_HITBOX_CACHE_COMPATIBILITY_RU.md', 'Hitbox · M652 совместимость кэша'),
+    'hitbox-asset-authoring': ('docs/workflows/M651_HITBOX_ASSET_PIPELINE_RU.md', 'Hitbox · MNPC authoring и coverage'),
     'hitbox-asset-contract': ('docs/workflows/M649_HITBOX_ASSET_CONTRACT_RU.md', 'Hitbox · контракт готовых bounds'),
     'hitbox-asset-definitions': ('src/server/combat/HitboxAssetDefinitions.luau', 'Hitbox · проверка и Studio oracle'),
     'hitbox-geometry-lifetime': ('src/server/combat/HitboxMeshGeometryCache.luau', 'Hitbox · временные geometry leases'),
@@ -154,6 +157,7 @@ SOURCES = {
     'character-regeneration': ('src/server/character/CharacterRegenerationService.luau', 'HP regeneration'),
     'death-service': ('src/server/combat/DeathLifecycleService.luau', 'Death lifecycle'),
     'world-animation-preload': ('src/client/character/animation/WorldAnimationPreloader.luau', 'Прогрев анимаций мира'),
+    'animation-playback-reliability': ('docs/workflows/M654_ANIMATION_PLAYBACK_RELIABILITY_RU.md', 'Character · M654 life pose handoff'),
     'character-animation': ('src/client/character/animation/CharacterAnimationController.luau', 'Анимации персонажа'),
     'info-dock': ('src/client/world/InformativeWindowDock.luau', 'Информативные окна'),
     'resource-feedback': ('src/client/world/FloatingResourceFeedback.luau', 'Получение и расход'),

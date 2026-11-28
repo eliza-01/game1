@@ -2,14 +2,15 @@
 from .house import card
 
 ITEMS = [
-    card('character-hitbox-asset-contract', 'Hitbox · M649 готовые bounds', 'Сервер',
+    card('character-hitbox-asset-contract', 'Hitbox · M649–M653 готовые bounds', 'Сервер',
          'Общий для Character, Monster и NPC контракт; миграция открыта.',
          ['CombatHitboxDefinitionSource', 'CombatHitboxMode'], [
              {'title': 'Жизненный цикл', 'lines': [
                  'Сначала session cache и проверенный asset registry; вершины/веса только на промахе, освобождение после последнего расчёта.',
-                 'SAT, headshot, padding, AI и MNPC demand не меняются. Реестр пока пуст; Studio oracle, authoring migration и native parity остаются открытыми.',
+                 'M653: Characters → Combat hitboxes · Character components. Один общий oracle, отдельные компоненты, raw head union до padding. Native capture и parity открыты; fallback при несовместимости.',
+                 'SAT, headshot, padding, AI и MNPC demand не меняются. M651: LOD Manager → MNPC → Capture all FULL hitboxes · Studio. M652: общий session/asset контракт без world AABB размеров, строгие identity/scale/mapping, допуск CFrame 0.0002; root center корректирует broad radius. Реальный registry из 4 записей сохранён; Character variants и native coverage открыты. Runtime fallback сохраняется.',
              ]},
-         ], ['hitbox-asset-contract', 'hitbox-asset-definitions', 'hitbox-geometry-lifetime']),
+         ], ['character-hitbox-components', 'hitbox-asset-contract', 'hitbox-asset-authoring', 'hitbox-cache-compatibility', 'hitbox-asset-definitions', 'hitbox-geometry-lifetime']),
     card('character-assembly-spawn', 'Персонаж · сборка и появление', 'Сервер',
          'Выбор опубликованного archetype, сборка кастомного rig и runtime stats.',
          ['CharacterRegistry.archetypes', 'CharacterStatsService'], [
@@ -74,13 +75,14 @@ ITEMS = [
          ['LifeState', 'ReturnToTownAvailable'], [
              {'title': 'Работает в исходниках', 'lines': [
                  'CharacterService запускает DeathIdle без автоматического respawn и создаёт нового персонажа по ReturnToTown после серверной проверки состояния.',
+                 'M654: готовность life track до Play, terminal hold Death/Revive до ready locomotion, локальный Return curtain, Model-scoped server ACK. Published owner/observer NOT_RUN.',
                  'CharacterRegenerationService обновляет восстановление; DamageService работает с серверными HP/Defense и LifeState.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
                  'HP, смерть, cooldown восстановления, checkpoint и возвращение в город не сохраняются как аккаунтная прогрессия между сессиями.',
                  'Нужна мультиклиентская проверка death/return, повторных команд, гонок респавна и очистки старого hitbox/animation/UI.',
              ]},
-         ], ['character-service', 'character-regeneration', 'death-service', 'damage-service']),
+         ], ['animation-playback-reliability', 'character-service', 'character-regeneration', 'death-service', 'damage-service']),
     card('character-visual-ui', 'Персонаж · анимации, UI и уведомления', 'Презентация',
          'Клиентские анимации, оборудование, полосы здоровья, UI-профили и уведомления ресурсов.',
          ['GameOptions.UiPresentationSettings', 'InformativeWindowDock'], [
@@ -95,5 +97,5 @@ ITEMS = [
                  'Визуальный +N/−N сам по себе не доказывает изменение серверного inventory; отсутствует общий authoritative ledger для ресурсов/награды.',
                  'Обязательно проверить в реальном Play и на телефоне: шевроны, ПКМ, safe area, respawn/head Bone, мультиклиент и LOD/Streaming.',
              ]},
-         ], ['character-animation', 'world-animation-preload', 'bone-mount', 'info-dock', 'resource-feedback', 'ui-settings', 'health-ui']),
+         ], ['animation-playback-reliability', 'character-animation', 'world-animation-preload', 'bone-mount', 'info-dock', 'resource-feedback', 'ui-settings', 'health-ui']),
 ]

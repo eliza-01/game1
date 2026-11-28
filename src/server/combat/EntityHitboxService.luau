@@ -8,6 +8,7 @@ local CombatShared = Shared:WaitForChild("combat")
 local SkeletonHeadResolver = require(CombatShared:WaitForChild("SkeletonHeadResolver"))
 local HitboxMeshGeometryCache = require(script.Parent:WaitForChild("HitboxMeshGeometryCache"))
 local HitboxAssetDefinitions = require(script.Parent:WaitForChild("HitboxAssetDefinitions"))
+local CharacterHitboxComponents = require(script.Parent:WaitForChild("CharacterHitboxComponents"))
 local HitboxDefinitionBuilder = require(script.Parent:WaitForChild("HitboxDefinitionBuilder"))
 local HitboxSpatialQueries = require(script.Parent:WaitForChild("HitboxSpatialQueries"))
 local HitboxRuntimeFrames = require(script.Parent:WaitForChild("HitboxRuntimeFrames"))
@@ -162,18 +163,7 @@ function EntityHitboxService.Detach(entity: Model)
     clearAttributes(entity)
 end
 
-function EntityHitboxService.Attach(entity: Model, visual: Model): any
-    EntityHitboxService.Detach(entity)
-
-    local root = entity:FindFirstChild("RootCollider")
-    if not root or not root:IsA("BasePart") then
-        entity:SetAttribute("CombatHitboxMode", "unavailable")
-        entity:SetAttribute("CombatHitboxCount", 0)
-        warn(("[game1][combat-hitbox] %s has no RootCollider; combat hitboxes were not built")
-            :format(entity:GetFullName()))
-        return { count = 0, headBoneName = "", hasHead = false }
-    end
-
+local function buildBinding(entity: Model, visual: Model, root: BasePart)
     local resolved = SkeletonHeadResolver.Resolve(visual)
     local records = {}
     for _, meshPart in ipairs(meshPartsForVisual(visual)) do
@@ -186,15 +176,7 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
         })
     end
 
-    if #records == 0 then
-        entity:SetAttribute("CombatHitboxMode", "unavailable")
-        entity:SetAttribute("CombatHitboxCount", 0)
-        warn(("[game1][combat-hitbox] %s has no visual MeshPart; combat hitboxes were not built")
-            :format(entity:GetFullName()))
-        return { count = 0, headBoneName = "", hasHead = false }
-    end
-
-    local binding = {
+    return {
         entity = entity,
         visual = visual,
         root = root,
@@ -204,59 +186,52 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
         headParentBone = resolved.headParentBone,
     }
 
+end
+
+local resolveGeometry
+
+function EntityHitboxService.Attach(entity: Model, visual: Model): any
+    EntityHitboxService.Detach(entity)
+
+    local root = entity:FindFirstChild("RootCollider")
+    if not root or not root:IsA("BasePart") then
+        entity:SetAttribute("CombatHitboxMode", "unavailable")
+        entity:SetAttribute("CombatHitboxCount", 0)
+        warn(("[game1][combat-hitbox] %s has no RootCollider; combat hitboxes were not built")
+            :format(entity:GetFullName()))
+        return { count = 0, headBoneName = "", hasHead = false }
+    end
+
+    local binding = buildBinding(entity, visual, root)
+    local records = binding.records
+    if #records == 0 then
+        entity:SetAttribute("CombatHitboxMode", "unavailable")
+        entity:SetAttribute("CombatHitboxCount", 0)
+        warn(("[game1][combat-hitbox] %s has no visual MeshPart; combat hitboxes were not built")
+            :format(entity:GetFullName()))
+        return { count = 0, headBoneName = "", hasHead = false }
+    end
+
     local definition, buildError
     local geometryUnavailable = false
     local source = "session"
-    local key = HitboxDefinitionBuilder.CacheKey(binding)
-    definition = HitboxDefinitionBuilder.Cached(binding)
+    local key = HitboxDefinitionBuilder.AssetKey(binding)
+    local sig = HitboxAssetDefinitions.Signature(binding)
+    definition = HitboxAssetDefinitions.SessionLookup(binding, key, sig)
+    if not definition and sig and entity:GetAttribute("CharacterArchetype") then
+        definition = CharacterHitboxComponents.Lookup(binding)
+        if definition then source = "component_asset" end
+    end
     if not definition then
-        definition = HitboxAssetDefinitions.Lookup(binding, key)
+        definition = HitboxAssetDefinitions.Lookup(binding, key, sig)
         source = "asset"
     end
     if not definition then
         source = "runtime_migration"
         -- Only a genuine cache miss needs vertex data. All acquired geometry
         -- leases are released, including partial failures and builder errors.
-        local acquired = {}
-        local ok, failure = pcall(function()
-            for _, record in ipairs(records) do
-                local meshPart = record.meshPart
-                local geometry = HitboxMeshGeometryCache.Read(meshPart)
-                table.insert(acquired, geometry)
-                if geometry.state ~= "ready" then
-                    geometryUnavailable = true
-                    break
-                end
-                record.geometry = geometry
-            end
-            if geometryUnavailable then
-                definition = HitboxDefinitionBuilder.Fallback(binding)
-                source = "root_bounds_fallback"
-            else
-                -- Capture only the actual first calculation, never label an
-                -- older session-cached pose as a fresh authoring oracle.
-                local signature = nil
-                key = HitboxDefinitionBuilder.CacheKey(binding)
-                if not HitboxDefinitionBuilder.Cached(binding) then
-                    signature = HitboxAssetDefinitions.CaptureSignature(binding)
-                end
-                definition, buildError = HitboxDefinitionBuilder.Resolve(binding)
-                if definition and signature then
-                    local recorded, captureError = pcall(HitboxAssetDefinitions.Record, key, signature, definition)
-                    if not recorded then warn("[game1][hitbox-assets] capture failed: " .. tostring(captureError)) end
-                end
-            end
-        end)
-        for _, geometry in ipairs(acquired) do
-            HitboxMeshGeometryCache.Release(geometry)
-        end
-        for _, record in ipairs(records) do
-            record.geometry = nil
-        end
-        if not ok then
-            definition = nil
-            buildError = tostring(failure)
-        end
+        definition, buildError, geometryUnavailable = resolveGeometry(binding, false)
+        if geometryUnavailable then source = "root_bounds_fallback" end
     end
     if not definition then
         entity:SetAttribute("CombatHitboxMode", "unavailable")
@@ -297,6 +272,81 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
         headBoneName = binding.headBone and binding.headBone.Name or "",
         hasHead = binding.headBox ~= nil,
     }
+end
+
+-- Shared lease owner: runtime uses the session cache, authoring computes a
+-- fresh oracle and refuses permission fallback. Neither retains vertices.
+resolveGeometry = function(binding, authoring, onAuthoring)
+    local acquired = {}
+    local definition, buildError, geometryUnavailable
+    local ok, failure = pcall(function()
+        for _, record in ipairs(binding.records) do
+            local meshPart = record.meshPart
+            local geometry = if authoring then HitboxMeshGeometryCache.Read(meshPart, true) else HitboxMeshGeometryCache.Read(meshPart)
+            table.insert(acquired, geometry)
+            if geometry.state ~= "ready" then
+                geometryUnavailable = true
+                if authoring then error("mesh unavailable: " .. tostring(geometry.error)) end
+                break
+            end
+            record.geometry = geometry
+        end
+        if geometryUnavailable then
+            definition = HitboxDefinitionBuilder.Fallback(binding)
+        elseif authoring then
+            definition, buildError = HitboxDefinitionBuilder.BuildUncached(binding)
+            if definition and onAuthoring then onAuthoring(binding, definition) end
+        else
+            -- Reads can yield. Re-sample the actual pose immediately before
+            -- the non-yielding oracle so cached bounds describe that pose.
+            local key = HitboxDefinitionBuilder.AssetKey(binding)
+            local sig = HitboxAssetDefinitions.Signature(binding)
+            definition = HitboxAssetDefinitions.SessionLookup(binding, key, sig)
+            if not definition then
+                definition, buildError = HitboxDefinitionBuilder.BuildUncached(binding)
+                if definition then
+                    HitboxAssetDefinitions.Remember(key, sig, definition)
+                    local captureSig = HitboxAssetDefinitions.CaptureSignature(binding)
+                    if captureSig then
+                        local recorded, captureError = pcall(HitboxAssetDefinitions.Record, key, captureSig, definition)
+                        if not recorded then warn("[game1][hitbox-assets] capture failed: " .. tostring(captureError)) end
+                    end
+                    print(("[game1][combat-hitbox] definition cached · %d source vertices · %d body boxes · head=%s")
+                        :format(definition.sourceVertexCount, #definition.bodyBoxes, tostring(definition.headBox ~= nil)))
+                end
+            end
+        end
+    end)
+    for _, geometry in ipairs(acquired) do HitboxMeshGeometryCache.Release(geometry) end
+    for _, record in ipairs(binding.records) do record.geometry = nil end
+    if not ok then definition, buildError = nil, tostring(failure) end
+    return definition, buildError, geometryUnavailable == true
+end
+
+function EntityHitboxService.CaptureAsset(entity: Model, visual: Model)
+    assert(RunService:IsStudio() and not RunService:IsRunning() and entity.Parent == nil,
+        "hitbox authoring requires a detached Studio Edit assembly")
+    local root = entity:FindFirstChild("RootCollider")
+    assert(root and root:IsA("BasePart"), "missing authoring collider")
+    local binding = buildBinding(entity, visual, root)
+    assert(#binding.records > 0, "missing authoring meshes")
+    local definition, failure = resolveGeometry(binding, true)
+    assert(definition, failure or "hitbox oracle failed")
+    return HitboxAssetDefinitions.AuthoringRow(binding, HitboxDefinitionBuilder.AssetKey(binding), definition)
+end
+
+function EntityHitboxService.CaptureCharacterComponents(entity: Model, visual: Model)
+    assert(RunService:IsStudio() and not RunService:IsRunning() and entity.Parent == nil
+        and entity:GetAttribute("CharacterArchetype"), "character component capture requires detached Studio Edit assembly")
+    local root = entity:FindFirstChild("RootCollider")
+    assert(root and root:IsA("BasePart"), "missing authoring collider")
+    local binding = buildBinding(entity, visual, root)
+    local rows
+    local definition, failure = resolveGeometry(binding, true, function(bound, oracle)
+        rows = CharacterHitboxComponents.Capture(bound, oracle)
+    end)
+    assert(definition and rows, failure or "character component capture failed")
+    return rows
 end
 
 function EntityHitboxService.QueryDamageablesInBox(

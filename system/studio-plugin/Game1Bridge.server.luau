@@ -254,6 +254,9 @@ local handleMnpcCapture = require(script.Parent.modules.StudioMnpcCaptureCommand
 local handleMnpcAlignment = require(script.Parent.modules.StudioMnpcAlignmentCommand)({
     RunService = RunService, HttpService = HttpService, bridgeUrl = BRIDGE_URL, bridgeToken = BRIDGE_TOKEN,
 })
+local handleHitboxCapture = require(script.Parent.modules.StudioHitboxAssetCommand)({
+    RunService = RunService, HttpService = HttpService, bridgeUrl = BRIDGE_URL, bridgeToken = BRIDGE_TOKEN,
+})
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -276,6 +279,8 @@ local function pollBridge()
         handleMonsterSpawn(data)
     elseif data.command == "mnpc-capture-v1" then
         handleMnpcCapture(data)
+    elseif data.command == "hitbox-capture-v1" then
+        handleHitboxCapture(data)
     elseif data.command == "mnpc-align-v1" then
         handleMnpcAlignment(data)
     elseif data.command == "timeline-editor" then

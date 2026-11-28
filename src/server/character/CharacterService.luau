@@ -1,7 +1,6 @@
 local PlayerSpatialIndex = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("PlayerSpatialIndex"))
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local InsertService = game:GetService("InsertService")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -21,6 +20,7 @@ local CharacterCreationStreamingService = require(script.Parent:WaitForChild("Ch
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
 local CharacterRigService = require(script.Parent:WaitForChild("CharacterRigService"))
 local VoidRecovery = require(script.Parent:WaitForChild("CharacterVoidRecovery"))
+local CharacterAssetTemplate = require(script.Parent:WaitForChild("CharacterAssetTemplate"))
 local CharacterAssemblyBuilder = require(script.Parent:WaitForChild("CharacterAssemblyBuilder"))
 local CharacterStatsService = require(script.Parent:WaitForChild("CharacterStatsService"))
 local Progression = require(script.Parent:WaitForChild("CharacterProgressionService"))
@@ -91,27 +91,8 @@ local function loadAssetTemplate(assetId: number, cacheKey: string): Model?
         return cached
     end
 
-    local ok, bundle = pcall(InsertService.LoadAsset, InsertService, assetId)
-    if not ok or not bundle then
-        warn("[game1] cannot load character asset", assetId, bundle)
-        return nil
-    end
-
-    local imported: Instance = bundle
-    local children = bundle:GetChildren()
-    if bundle:IsA("Model") and #children == 1 then
-        imported = children[1]
-        imported.Parent = nil
-        bundle:Destroy()
-    end
-
-    local template: Model
-    if imported:IsA("Model") then
-        template = imported
-    else
-        template = Instance.new("Model")
-        imported.Parent = template
-    end
+    local template = CharacterAssetTemplate.Load(assetId)
+    if not template then return nil end
     template.Name = cacheKey
     template.Parent = cache
     return template
@@ -162,13 +143,13 @@ local function destroyPreviousCharacter(player: Player)
     end
 end
 
-local function beginPlayerDeathIdle(player: Player)
+local function beginPlayerDeathIdle(player: Player, reportedCharacter: Model?)
     local context = deathContexts[player]
     if not context then
         return
     end
     local character = context.character
-    if not character.Parent or player.Character ~= character or tostring(character:GetAttribute("LifeState") or "") ~= "Dying" then
+    if reportedCharacter ~= character or not character.Parent or player.Character ~= character or tostring(character:GetAttribute("LifeState") or "") ~= "Dying" then
         return
     end
     if character:GetAttribute("DeathIdleLifecycleStarted") == true then
@@ -392,15 +373,18 @@ function CharacterService.ReturnToTown(player: Player): (boolean, string?)
     return true, nil
 end
 
-local function finishRevive(player: Player)
+local function finishRevive(player: Player, reportedCharacter: Model?, visualReady: boolean?)
     local character = player.Character
-    if not character or not character.Parent then
+    if not character or character ~= reportedCharacter or not character.Parent then
         return
     end
     if tostring(character:GetAttribute("LifeState") or "") ~= "Reviving"
         or character:GetAttribute("RevivePending") ~= true
     then
         return
+    end
+    if visualReady ~= true then
+        warn("[game1][animation-life] revive visual unavailable; releasing gameplay: " .. character.Name)
     end
     character:SetAttribute("RevivePending", false)
     character:SetAttribute("HP", math.max(0, tonumber(character:GetAttribute("MaxHP")) or 0))

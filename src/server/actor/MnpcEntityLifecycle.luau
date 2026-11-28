@@ -6,13 +6,13 @@ local Geometry = require(script.Parent:WaitForChild("MnpcRigGeometry"))
 local VisualRig = require(script.Parent:WaitForChild("MnpcVisualRig"))
 local Lifecycle = {}
 
-function Lifecycle.Create(name: string, surface: Vector3, yaw: number, kind: "Monster" | "NPC"): (Model, BasePart, Humanoid)
+function Lifecycle.Create(name: string, surface: Vector3, yaw: number, kind: "Monster" | "NPC", authoring: boolean?): (Model, BasePart, Humanoid)
     local entity = Instance.new("Model")
     entity.Name = name
     entity:SetAttribute("Game1MnpcKind", kind)
     entity:SetAttribute("Game1MnpcRigReady", false)
     entity:SetAttribute("Damageable", false)
-    local root, humanoid = Shell.Create(entity, surface, yaw, kind)
+    local root, humanoid = Shell.Create(entity, surface, yaw, kind, authoring)
     return entity, root, humanoid
 end
 

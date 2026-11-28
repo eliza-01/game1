@@ -17,7 +17,7 @@ COMBAT = ROOT / 'src/server/combat'
 
 def payload():
     part = [['mesh'], 'rbxassetid://123', [0]*12, [0]*12, []]
-    return {'schemaVersion': 1, 'entries': [{'key':'key','signature':json.dumps([[part],[],[],[],[]]),'definition':{
+    return {'schemaVersion': 2, 'entries': [{'key':'key','signature':json.dumps([[part],[],[],[],[],[[0]*12,[0]*12]]),'definition':{
         'broadRadius':4,'sourceVertexCount':2,'bodyBoxes':[{'kind':'mesh','recordIndex':1,'center':[0,0,0],'size':[1,2,3]}]}}]}
 
 
@@ -26,7 +26,7 @@ class HitboxAssetContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td)/'registry.luau'
             src = Path(td)/'capture.json'
-            shutil.copyfile(COMBAT/'HitboxAssetRegistry.luau', path)
+            path.write_text(registry.render({'schemaVersion': 2, 'entries': []}), encoding='utf-8')
             data = payload(); src.write_text(json.dumps(data), encoding='utf-8')
             self.assertEqual(registry.import_capture(src,path),1)
             self.assertEqual(registry.read_registry(path),registry.normalize(data))
@@ -41,7 +41,7 @@ class HitboxAssetContract(unittest.TestCase):
         for field,value in [('size',[0,2,3]),('size',[1,float('nan'),3]),('recordIndex',2),('kind','root')]:
             data=payload(); data['entries'][0]['definition']['bodyBoxes'][0][field]=value
             with self.assertRaises(ValueError): registry.normalize(data)
-        data=payload(); data['schemaVersion']=2
+        data=payload(); data['schemaVersion']=1
         with self.assertRaises(ValueError): registry.normalize(data)
         data=payload(); data['entries']*=2
         with self.assertRaises(ValueError): registry.normalize(data)
@@ -51,10 +51,10 @@ class HitboxAssetContract(unittest.TestCase):
         if not lua: self.skipTest('Standalone Lua unavailable')
         with tempfile.TemporaryDirectory() as td:
             geom=(COMBAT/'HitboxMeshGeometryCache.luau').read_text(encoding='utf-8')
-            geom=geom.replace('local geometryCache: { [string]: any }','local geometryCache').replace(': MeshPart','').replace('): string',')').replace('): any',')').replace(': any)',')')
+            geom=geom.replace('local geometryCache: { [string]: any }','local geometryCache').replace(': MeshPart','').replace('): string',')').replace('): any',')').replace(': any)',')').replace(': boolean?', '')
             geom=re.sub(r'([\w.]+) ([+\-/])= (.+)',r'\1 = \1 \2 \3',geom)
             defs=(COMBAT/'HitboxAssetDefinitions.luau').read_text(encoding='utf-8')
-            defs=defs.replace('capturedCount += 1','capturedCount = capturedCount + 1')
+            defs=re.sub(r'([\w.]+) \+= (.+)',r'\1 = \1 + \2',defs)
             gp=Path(td)/'geometry.lua';gp.write_text(geom,encoding='utf-8')
             dp=Path(td)/'defs.lua';dp.write_text(defs,encoding='utf-8')
             subprocess.run([lua,str(ROOT/'system/verify/hitbox_asset_m649.lua'),str(gp),str(dp)],check=True,timeout=15)
@@ -62,8 +62,8 @@ class HitboxAssetContract(unittest.TestCase):
     def test_lookup_precedes_geometry_and_records_do_not_retain_vertices(self):
         service=(COMBAT/'EntityHitboxService.luau').read_text(encoding='utf-8')
         builder=(COMBAT/'HitboxDefinitionBuilder.luau').read_text(encoding='utf-8')
-        self.assertLess(service.index('HitboxDefinitionBuilder.Cached(binding)'),service.index('HitboxMeshGeometryCache.Read(meshPart)'))
-        self.assertLess(service.index('HitboxAssetDefinitions.Lookup(binding, key)'),service.index('HitboxMeshGeometryCache.Read(meshPart)'))
+        self.assertLess(service.index('HitboxAssetDefinitions.SessionLookup(binding, key, sig)'),service.index('HitboxMeshGeometryCache.Read(meshPart)'))
+        self.assertLess(service.index('HitboxAssetDefinitions.Lookup(binding, key, sig)'),service.index('HitboxMeshGeometryCache.Read(meshPart)'))
         self.assertIn('HitboxMeshGeometryCache.Release(geometry)',service)
         self.assertIn('record.geometry = nil',service)
         self.assertNotIn('record.preparedVertices',builder)

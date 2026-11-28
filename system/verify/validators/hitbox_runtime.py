@@ -15,13 +15,13 @@ def check_hitbox_runtime(ROOT: Path, err: Callable[[str], None]):
     hitbox_implementation_text = "\n".join((hitbox_text, hitbox_geometry_text, hitbox_builder_text, hitbox_frames_text, hitbox_queries_text))
     asset_text = (ROOT / "src/server/combat/HitboxAssetDefinitions.luau").read_text(encoding="utf-8")
     registry_text = (ROOT / "src/server/combat/HitboxAssetRegistry.luau").read_text(encoding="utf-8")
-    for required in ('HitboxDefinitionBuilder.Cached(binding)', 'HitboxAssetDefinitions.Lookup(binding, key)',
+    for required in ('HitboxAssetDefinitions.SessionLookup(binding, key, sig)', 'HitboxAssetDefinitions.Lookup(binding, key, sig)',
                      'HitboxMeshGeometryCache.Release(geometry)', 'record.geometry = nil'):
         if required not in hitbox_text:
             err(f"m649 hitbox lifetime/registry missing {required}")
     read_index = hitbox_text.find('HitboxMeshGeometryCache.Read(meshPart)')
     if read_index >= 0 and any(hitbox_text.find(token) > read_index for token in (
-            'HitboxDefinitionBuilder.Cached(binding)', 'HitboxAssetDefinitions.Lookup(binding, key)')):
+            'HitboxAssetDefinitions.SessionLookup(binding, key, sig)', 'HitboxAssetDefinitions.Lookup(binding, key, sig)')):
         err("m649 cached definitions must be checked before geometry reads")
     if 'record.preparedVertices' in hitbox_builder_text or 'cached.vertices = nil' not in hitbox_geometry_text:
         err("m649 source vertices must not outlive definition construction")
@@ -34,7 +34,7 @@ def check_hitbox_runtime(ROOT: Path, err: Callable[[str], None]):
     # queries have distinct owners. Runtime coordination remains in the facade.
     for required in (
         'HitboxMeshGeometryCache.Read(meshPart)',
-        'HitboxDefinitionBuilder.Resolve(binding)',
+        'HitboxDefinitionBuilder.BuildUncached(binding)',
         'HitboxSpatialQueries.BoxContact(binding, boxCFrame, boxSize, originPosition, frameSerial)',
         'HitboxSpatialQueries.AimContact(binding, rayOrigin, direction, distanceLimit, frameSerial)',
     ):
@@ -45,7 +45,7 @@ def check_hitbox_runtime(ROOT: Path, err: Callable[[str], None]):
             err(f"m99 facade still owns separate concern: {forbidden}")
     for module_name, module_text, required in (
         ("geometry cache", hitbox_geometry_text, ("geometryCache", "CreateEditableMeshAsync", "GetVertexBones")),
-        ("definition builder", hitbox_builder_text, ("definitionCache", "buildDefinition", "strongestInfluence")),
+        ("definition builder", hitbox_builder_text, ("AssetKey", "buildDefinition", "strongestInfluence")),
         ("frame cache", hitbox_frames_text, ("worldFrameSerial", "TransformedBoneFrame", "Refresh")),
         ("spatial queries", hitbox_queries_text, ("obbIntersects", "rayBoxDistance", "BoxContact", "AimContact")),
     ):
@@ -57,7 +57,6 @@ def check_hitbox_runtime(ROOT: Path, err: Callable[[str], None]):
         "GetVertexBones",
         "GetVertexBoneWeights",
         "GetBoneCFrame",
-        "definitionCache",
         "precomputed_bone_boxes",
         "obbIntersects",
         "strongestInfluence",

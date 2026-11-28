@@ -26,6 +26,7 @@ function AnimationTrackCache.new(animator: Animator)
 	return setmetatable({
 		animator = animator,
 		entries = {},
+		failedUntil = {},
 		destroyed = false,
 	}, AnimationTrackCache)
 end
@@ -43,9 +44,10 @@ local function loadTrack(self, descriptor, key: string, nameSuffix: string): Ani
 	end
 	local existing = entry[key]
 	if existing then
-		applyDescriptor(existing.track, descriptor)
+		if not existing.track.IsPlaying then applyDescriptor(existing.track, descriptor) end
 		return existing.track
 	end
+	if os.clock() < (self.failedUntil[clipId] or 0) then return nil end
 	local animation = Instance.new("Animation")
 	animation.Name = clipId .. nameSuffix
 	animation.AnimationId = animationId
@@ -53,11 +55,18 @@ local function loadTrack(self, descriptor, key: string, nameSuffix: string): Ani
 		return self.animator:LoadAnimation(animation)
 	end)
 	if not ok then
+		self.failedUntil[clipId] = os.clock() + 2
 		animation:Destroy()
 		warn(("[game1][animation] failed to load %s%s: %s"):format(clipId, nameSuffix, tostring(trackOrError)))
 		return nil
 	end
 	local track = trackOrError :: AnimationTrack
+	if self.destroyed then
+		track:Destroy()
+		animation:Destroy()
+		return nil
+	end
+	self.failedUntil[clipId] = nil
 	applyDescriptor(track, descriptor)
 	entry[key] = { animation = animation, track = track }
 	return track
@@ -100,6 +109,7 @@ function AnimationTrackCache:Prewarm(descriptors, timeoutSeconds: number?)
 	local animations = {}
 	local failed = 0
 	for _, descriptor in ipairs(descriptors or {}) do
+		if self.destroyed then break end
 		local track = self:Get(descriptor)
 		local clipId = tostring(descriptor.clipId or descriptor.animationId or "")
 		local entry = self.entries[clipId]
@@ -167,6 +177,7 @@ function AnimationTrackCache:Destroy()
 		end
 	end
 	table.clear(self.entries)
+	table.clear(self.failedUntil)
 end
 
 return AnimationTrackCache

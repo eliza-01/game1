@@ -5,7 +5,6 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local SkeletonHeadResolver = require(Shared:WaitForChild("combat"):WaitForChild("SkeletonHeadResolver"))
 
 local HitboxDefinitionBuilder = {}
-local definitionCache: { [string]: any } = {}
 local MIN_BOX_AXIS = 0.05
 local BODY_BOX_PADDING = 0.035
 local HEAD_BOX_PADDING = 0.015
@@ -124,7 +123,7 @@ local function strongestInfluence(source: any): any?
     return strongest
 end
 
-local function definitionCacheKey(binding: any): string
+function HitboxDefinitionBuilder.AssetKey(binding: any): string
     local chunks = {}
     for index, record in ipairs(binding.records) do
         local scale = record.scale
@@ -138,7 +137,6 @@ local function definitionCacheKey(binding: any): string
             scale.Z
         ))
     end
-    local root = binding.root
     local headName = binding.headBone and binding.headBone.Name or ""
     local parentName = binding.headParentBone and binding.headParentBone.Name or ""
     local identity = tostring(
@@ -147,19 +145,11 @@ local function definitionCacheKey(binding: any): string
         or binding.entity:GetAttribute("CharacterArchetype")
         or binding.visual.Name
     )
-    table.insert(chunks, string.format(
-        "identity:%s|root:%.6f,%.6f,%.6f|head:%s|parent:%s",
-        identity,
-        root.Size.X,
-        root.Size.Y,
-        root.Size.Z,
-        headName,
-        parentName
-    ))
+    table.insert(chunks, string.format("identity:%s|head:%s|parent:%s", identity, headName, parentName))
     return table.concat(chunks, "|")
 end
 
-local function buildDefinition(binding: any): (any?, string?)
+local function buildDefinition(binding: any): (any?, string?, any?)
     local basis = binding.root.CFrame
     local headBone = binding.headBone
     local headParentBone = binding.headParentBone
@@ -273,7 +263,7 @@ local function buildDefinition(binding: any): (any?, string?)
         bodyBoxes = bodyBoxes,
         headBox = headBox,
         sourceVertexCount = totalVertices,
-    }, nil
+    }, nil, if headBounds.count > 0 then headBounds else nil
 end
 
 -- Permission-safe coarse definition. Only used when AssetService cannot read
@@ -308,29 +298,41 @@ function HitboxDefinitionBuilder.MeshScale(meshPart: MeshPart): Vector3
     return meshScale(meshPart)
 end
 
-function HitboxDefinitionBuilder.CacheKey(binding: any): string
-    return definitionCacheKey(binding)
+-- Fresh oracle; the asset contract owns the compact session cache.
+function HitboxDefinitionBuilder.BuildUncached(binding: any): (any?, string?, any?)
+    return buildDefinition(binding)
 end
 
-function HitboxDefinitionBuilder.Cached(binding: any): any?
-    return definitionCache[definitionCacheKey(binding)]
-end
-
-function HitboxDefinitionBuilder.Resolve(binding: any): (any?, string?)
-    local key = definitionCacheKey(binding)
-    local cached = definitionCache[key]
-    if cached then
-        return cached, nil
+-- Component oracle uses the same classification, dominant anchors and padding.
+-- Keep the unpadded head contribution so the final union applies padding once.
+function HitboxDefinitionBuilder.MergeComponents(binding, components)
+    local result = {bodyBoxes = {}, broadRadius = 0, sourceVertexCount = 0}
+    local head = newBounds()
+    for i, component in ipairs(components) do
+        result.broadRadius = math.max(result.broadRadius, component.broadRadius)
+        result.sourceVertexCount += component.sourceVertexCount
+        for _, box in ipairs(component.bodyBoxes) do
+            local copy = table.clone(box)
+            copy.recordIndex = i
+            table.insert(result.bodyBoxes, copy)
+        end
+        if component.rawHead then
+            growBounds(head, component.rawHead.minimum)
+            growBounds(head, component.rawHead.maximum)
+        end
     end
-
-    local definition, buildError = buildDefinition(binding)
-    if not definition then
-        return nil, buildError
+    -- Preserve the exact oracle's lexicographic order, including index 10+.
+    local function key(box)
+        if box.kind == "bone" then return ("bone:%d:%s"):format(box.recordIndex, box.boneName) end
+        return ("mesh:%d"):format(box.recordIndex)
     end
-    definitionCache[key] = definition
-    print(("[game1][combat-hitbox] definition cached · %d source vertices · %d body boxes · head=%s")
-        :format(definition.sourceVertexCount, #definition.bodyBoxes, tostring(definition.headBox ~= nil)))
-    return definition, nil
+    table.sort(result.bodyBoxes, function(a,b) return key(a) < key(b) end)
+    if head.count > 0 then
+        assert(binding.headBone and binding.headParentBone, "missing component head anchor")
+        local localCFrame, size = boxFromBounds(head, HEAD_BOX_PADDING)
+        result.headBox = {kind = "head", boneName = binding.headBone.Name, localCFrame = localCFrame, size = size}
+    end
+    return result
 end
 
 return table.freeze(HitboxDefinitionBuilder)

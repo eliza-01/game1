@@ -8,7 +8,7 @@ function Shell.RootFrame(surface: Vector3, yaw: number): CFrame
     return CFrame.new(surface + Vector3.new(0, ROOT_SIZE.Y * 0.5 + HIP_HEIGHT, 0)) * CFrame.Angles(0, yaw, 0)
 end
 
-function Shell.Create(model: Model, surface: Vector3, yaw: number, kind: "Monster" | "NPC"): (BasePart, Humanoid)
+function Shell.Create(model: Model, surface: Vector3, yaw: number, kind: "Monster" | "NPC", authoring: boolean?): (BasePart, Humanoid)
     assert(model:FindFirstChild("HumanoidRootPart") == nil, "MNPC shell already exists")
     assert(kind == "Monster" or kind == "NPC", "Invalid MNPC kind")
     local root = Instance.new("Part")
@@ -18,7 +18,13 @@ function Shell.Create(model: Model, surface: Vector3, yaw: number, kind: "Monste
     root.Transparency = 1
     root.CastShadow = false
     root.Anchored = false
-    ActorCollisionPolicy.Assign(root, kind)
+    if authoring then
+        local run = game:GetService("RunService")
+        assert(run:IsStudio() and not run:IsRunning() and model.Parent == nil, "authoring shell requires Studio Edit")
+        root.CanCollide = false
+    else
+        ActorCollisionPolicy.Assign(root, kind)
+    end
     root.CanTouch = false
     root.CanQuery = false
     root.Massless = false

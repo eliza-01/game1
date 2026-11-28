@@ -167,7 +167,7 @@ def check_actor_runtime_contracts(
     for required in ['reviveOnSpawn', 'LifeState", "Reviving"', 'RevivePending', 'ReviveAnimationFinished', 'createCharacter(player, requested, true)']:
         if required not in character_service_m25:
             report_error(f"return-to-town revive server contract missing {required}")
-    for required in ['current == "Reviving"', 'playBaseLifeAction("revive"', 'notifyReviveAnimationFinished', 'lastLifeState == "Reviving"']:
+    for required in ['current == "Reviving"', 'playBaseLifeAction("revive"', 'notifyReviveAnimationFinished', 'lastLifeState == "Reviving"', 'DeathAnimationPolicy.LatchVisibleTerminalPose(reviveTrack, deltaTimeSim)', 'RevivePoseReady']:
         if required not in character_animation_m25:
             report_error(f"return-to-town revive animation contract missing {required}")
     client_init_m25 = (root / "src/client/init.client.luau").read_text(encoding="utf-8")

@@ -21,7 +21,7 @@ def lua_source(name):
     source = (ACTOR / (name + '.luau')).read_text(encoding='utf-8')
     # Only the explicitly used Luau type annotations and if expressions differ
     # from Lua. Execute the implementation, not a second shell/rig algorithm.
-    source = re.sub(r'(?<!:): (?:"Monster" \| "NPC"|Model|BasePart|Humanoid|Folder|Vector3|CFrame|string|number|boolean|any\?)(?=[,)])', '', source)
+    source = re.sub(r'(?<!:): (?:"Monster" \| "NPC"|Model|BasePart|Humanoid|Folder|Vector3|CFrame|string|number|boolean\?|boolean|any\?)(?=[,)])', '', source)
     source = re.sub(r'\): (?:\([^\n]+\)|Model\?|CFrame)\n', ')\n', source)
     source = source.replace('return visual :: Model, if visualRoot and visualRoot:IsA("BasePart") then visualRoot else nil',
                             'return visual, (visualRoot and visualRoot:IsA("BasePart")) and visualRoot or nil')

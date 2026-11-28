@@ -393,6 +393,17 @@ function CharacterRigService.Build(
     }
 end
 
+-- Use the identical placement/root path for offline hitbox authoring, without
+-- creating movement controllers or mutating collision groups in Studio Edit.
+function CharacterRigService.BuildHitboxAuthoring(character: Model, template: Model): Model?
+    local runService = game:GetService("RunService")
+    assert(runService:IsStudio() and not runService:IsRunning() and character.Parent == nil,
+        "detached Studio Edit required")
+    local root = createRoot(character, CFrame.new(0, CharacterConfig.RootAnchorOffset, 0))
+    local visual = attachVisual(character, root, template, false)
+    return visual
+end
+
 function CharacterRigService.Finish(rig: any)
     createGroundSensor(rig.controllerManager, rig.groundSensorPart)
 end

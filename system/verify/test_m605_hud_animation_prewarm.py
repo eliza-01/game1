@@ -14,7 +14,7 @@ class M605(unittest.TestCase):
         self.assertIn('player.Character == model and leaving',ui)
         ctrl=read('src/client/character/animation/CharacterAnimationController.luau')
         self.assertEqual(ctrl.count('AnimationTrackCache.new(animator)'),1)
-        self.assertIn('if character ~= newCharacter or cache ~= boundCache then return end\n            warmResult = result',ctrl)
+        self.assertRegex(ctrl,r'if character ~= newCharacter or cache ~= boundCache then return end\s+warmResult = result')
         self.assertIn('while current() and os.clock() < deadline',ctrl)
     def test_world_content_is_batched_and_session_cached(self):
         source=read('src/client/character/animation/WorldAnimationPreloader.luau')

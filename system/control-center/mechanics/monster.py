@@ -2,14 +2,14 @@
 from .house import card
 
 ITEMS = [
-    card('monster-hitbox-asset-contract', 'Hitbox · M649 готовые bounds', 'Сервер',
+    card('monster-hitbox-asset-contract', 'Hitbox · M649–M652 готовые bounds', 'Сервер',
          'Общий для Character, Monster и NPC контракт; миграция открыта.',
          ['CombatHitboxDefinitionSource', 'CombatHitboxMode'], [
              {'title': 'Жизненный цикл', 'lines': [
                  'Сначала session cache и проверенный asset registry; вершины/веса только на промахе, освобождение после последнего расчёта.',
-                 'SAT, headshot, padding, AI и MNPC demand не меняются. Реестр пока пуст; Studio oracle, authoring migration и native parity остаются открытыми.',
+                 'SAT, headshot, padding, AI и MNPC demand не меняются. M651: LOD Manager → MNPC → Capture all FULL hitboxes · Studio. M652: общий session/asset контракт без world AABB размеров, строгие identity/scale/mapping, допуск CFrame 0.0002; root center корректирует broad radius. Реальный registry из 4 записей сохранён; Character variants и native coverage открыты. Runtime fallback сохраняется.',
              ]},
-         ], ['hitbox-asset-contract', 'hitbox-asset-definitions', 'hitbox-geometry-lifetime']),
+         ], ['hitbox-asset-contract', 'hitbox-asset-authoring', 'hitbox-cache-compatibility', 'hitbox-asset-definitions', 'hitbox-geometry-lifetime']),
     card('monster-overhead', 'Монстры · имя, HP и GP портрет', 'Клиент',
          'M646–M647 · общий ленивый пул Monster/NPC, без изменения серверной логики.',
          ['LifeState', 'Game1MnpcLocalLod', 'MonsterCombatActive', 'MonsterTargetUserId'], [

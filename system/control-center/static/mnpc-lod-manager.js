@@ -58,6 +58,10 @@
       <div class="lm-meta">FULL fingerprint: ${esc(row.fullFingerprint||'—')}<br>Model ID: ${esc(row.modelAssetId||'—')} · Image ID: ${esc(row.imageAssetId||'—')}${row.atlasVariantId?` · Atlas #${esc(row.atlasVariantId)}`:''}${row.moderationState?` · ${esc(row.moderationState)}`:''}</div>
       ${g?`<p class="lm-note">${esc(g.vertices)} vertices · ${esc(g.triangles)} triangles · FBX scene bounds: ${esc(g.boundsMin.map(n=>n.toFixed(3)).join(', '))} → ${esc(g.boundsMax.map(n=>n.toFixed(3)).join(', '))}<br>${esc(row.sourcePath)}</p>`:''}
       <details><summary>FULL visual source / equipment</summary><pre class="lm-mnpc-source">${esc(JSON.stringify(row.fullIdentity,null,2))}</pre></details>
+      <details><summary>Combat hitboxes · FULL</summary>
+        <p class="lm-note">Studio Edit, Sync Model + Atlas. Расчёт боевых bounds по реальному FULL, не по LOD1. Без Cloud upload. Для проверки покрытия требуется новый Play.</p>
+        <div class="actions"><button type="button" data-mnpc-action="hitboxes" ${row.fullFingerprint?'':'disabled'}>Capture hitboxes · Studio</button></div>
+      </details>
       <details open><summary>Capture FULL idle · Studio</summary>
         <p class="lm-note">Studio Edit + актуальные Rojo / Model + Atlas. Захват опубликованного idle, экипировки, вершин и UV в координатах навигационного root. Cloud не изменяется.</p>
         <div class="actions"><button type="button" data-mnpc-action="capture" ${stageAllowed?'':'disabled'}>Capture idle &amp; geometry</button></div>
@@ -111,7 +115,7 @@
   async function run(fn, success, redraw=true) {
     if(state.busy)return;
     setBusy(true);message('Processing…');
-    try {await fn();message(success||'');}
+    try {const result=await fn();message(typeof success==='function'?success(result):success||'');}
     catch(error){message(error.message);}
     finally {setBusy(false);if(redraw)render();}
   }
@@ -123,6 +127,17 @@
   }
   async function load() {return run(async()=>{try{await reload();}catch(error){state.data=null;throw error;}},'');}
   $('mnpc-lod-refresh').addEventListener('click',load);
+  $('mnpc-hitboxes-all').addEventListener('click',()=>run(async()=>{
+    const rows=(state.data?.items||[]).filter(row=>row.fullFingerprint&&row.fullStatus==='PUBLISHED');
+    if(!rows.length)throw Error('No published FULL models; refresh the catalog');
+    let completed=0;const failures=[];
+    for(const row of rows){
+      message(`Hitboxes ${completed+failures.length+1}/${rows.length} · ${row.slug}`);
+      try{await post(`${path(row)}/hitboxes`,{fullFingerprint:row.fullFingerprint});completed++;}
+      catch(error){failures.push(`${row.slug}: ${error.message}`);}
+    }
+    return {completed,failures};
+  },result=>`Hitboxes captured ${result.completed}; errors ${result.failures.length}. ${result.failures.join(' · ')} Runtime coverage not verified.`,false));
   $('mnpc-lod-search').addEventListener('input',renderRows);
   filter.addEventListener('change',()=>{try{window.localStorage?.setItem('game1.lod.mnpc.filter',filter.value);}catch(_){}renderRows();});
   $('mnpc-lod-rows').addEventListener('click',event=>{
@@ -152,6 +167,9 @@
   $('mnpc-lod-editor').addEventListener('click',event=>{
     const button=event.target.closest('button[data-mnpc-action]'),row=item();if(!button||!row||state.busy)return;
     const action=button.dataset.mnpcAction;
+    if(action==='hitboxes')return run(async()=>{
+      return post(`${path(row)}/hitboxes`,{fullFingerprint:row.fullFingerprint});
+    },result=>`Hitboxes captured · ${result.bodyBoxes} body · head ${result.headBox?'yes':'no'} · registry ${result.entries}. Runtime coverage not verified.`,false);
     if(action==='close'){state.selected='';state.history=[];render();return;}
     if(action==='choose-fbx'||action==='choose-texture')return run(async()=>{
       const field=action==='choose-fbx'?'fbx':'texture';

@@ -29,6 +29,16 @@ def route(path, body, deps):
         except (ValueError,TypeError,KeyError) as error:
             return 400,{'error':str(error),'schema_version':2}
 
+    if path == '/api/characters/hitboxes':
+        try:
+            payload = body()
+            if not isinstance(payload, dict) or set(payload) != {'id'}:
+                raise ValueError('Character hitbox capture requires archetype id')
+            from services.character_hitbox_authoring import capture
+            return 200, capture(payload['id'])
+        except (ValueError, OSError, RuntimeError, KeyError, TypeError) as error:
+            return 400, {'error': str(error)}
+
     response = character_components.write(path, body, deps)
     if response is not None:
         return response

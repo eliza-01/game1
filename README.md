@@ -1,5 +1,7 @@
 # game1
 
+Актуальная ревизия: M654 — [Animation Playback Reliability](docs/workflows/M654_ANIMATION_PLAYBACK_RELIABILITY_RU.md), приёмка Published открыта.
+
 Независимый Roblox-проект (основа MMO) с custom characters, server-authoritative combat, Monster/NPC, Asset Manager, системой локаций/декора, Real Estate и Studio Bridge. **Не использует Place и базы RobloxLineage.**
 
 ## С чего начать
@@ -49,6 +51,6 @@ python system/studio-plugin/validate_luau.py
 
 Runtime behaviour Roblox Studio, публикация через Open Cloud и источники Blender проверяются **отдельно**. Успех Python-тестов не означает проверенный Play session.
 
-**Актуальная база:** диагностический дамп `game1_diag_2026-11-28_16-21-34.zip` (M645) + M646–M650. M650 — исправление near-first загрузки, код готов; [M650](docs/workflows/M650_NEAR_ASSET_LOADING_RU.md). MNPC LOD функционально принят в одиночной игре; полная многопользовательская приёмка и реальные LOD1 открыты. M646–M647 — Overhead UI Pool функционально принят владельцем; полный ресурсный A05 открыт. M648 — Character Creation Prewarm CODE_COMPLETE, нативная приёмка открыта. [M648](docs/workflows/M648_CHARACTER_ASSET_PREWARM_RU.md). M649 — контракт готовых hitboxes и ограничение времени жизни геометрии; миграция открыта. [M649](docs/workflows/M649_HITBOX_ASSET_CONTRACT_RU.md). [M646](docs/workflows/M646_OVERHEAD_UI_POOL_RU.md) · [M647](docs/workflows/M647_OVERHEAD_INTEGRATION_RU.md). [READ FIRST](docs/README%20Read%20First!.md) · [MNPC](docs/workflows/MNPC_LOD_SPEC_RU.md) · [Kanban](docs/kanban/specs/KBN-0037.md).
+**Актуальная база:** диагностический дамп `game1_diag_2026-11-28_17-27-55.zip` (M651, четыре реальных MNPC captures) + M652–M653. M653 — Character component hitbox authoring, [M653](docs/workflows/M653_CHARACTER_HITBOX_COMPONENTS_RU.md), native capture open. M652 — исправление session/asset signature compatibility, native coverage открыто; [M652](docs/workflows/M652_HITBOX_CACHE_COMPATIBILITY_RU.md). M651 — MNPC hitbox authoring, native migration открыта; [M651](docs/workflows/M651_HITBOX_ASSET_PIPELINE_RU.md). M650 — исправление near-first загрузки, код готов; [M650](docs/workflows/M650_NEAR_ASSET_LOADING_RU.md). MNPC LOD функционально принят в одиночной игре; полная многопользовательская приёмка и реальные LOD1 открыты. M646–M647 — Overhead UI Pool функционально принят владельцем; полный ресурсный A05 открыт. M648 — Character Creation Prewarm CODE_COMPLETE, нативная приёмка открыта. [M648](docs/workflows/M648_CHARACTER_ASSET_PREWARM_RU.md). M649 — контракт готовых hitboxes и ограничение времени жизни геометрии; миграция открыта. [M649](docs/workflows/M649_HITBOX_ASSET_CONTRACT_RU.md). [M646](docs/workflows/M646_OVERHEAD_UI_POOL_RU.md) · [M647](docs/workflows/M647_OVERHEAD_INTEGRATION_RU.md). [READ FIRST](docs/README%20Read%20First!.md) · [MNPC](docs/workflows/MNPC_LOD_SPEC_RU.md) · [Kanban](docs/kanban/specs/KBN-0037.md).
 
 - [M236: Location Assets — Model/Mesh ID history and Find → Replace](docs/workflows/LOCATION_ASSETS_ID_HISTORY_TWO_PHASE_SYNC_M236_RU.md)

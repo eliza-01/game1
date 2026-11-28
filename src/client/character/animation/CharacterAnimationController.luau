@@ -51,6 +51,17 @@ local lastLifeState = "Alive"
 local deathTrack: AnimationTrack? = nil
 local deathTerminalPoseHeld = false
 local deathTerminalReported = false
+local reviveTrack: AnimationTrack? = nil
+local reviveTerminalPoseHeld = false
+local lifeRequest = nil
+local nextAnimatorProbe = 0
+local nextLoopProbe = 0
+local loopPending = false
+local revealAfterEvaluation = false
+local awaitingRevivePose = false
+local reviveReportPending = false
+local LIFE_LOAD_SECONDS = 8
+local RETRY_SECONDS = 0.25
 
 local function disconnectJumpStart()
 	if jumpStartStoppedConnection then
@@ -96,6 +107,15 @@ local function clearCharacter()
 	deathTrack = nil
 	deathTerminalPoseHeld = false
 	deathTerminalReported = false
+	reviveTrack = nil
+	reviveTerminalPoseHeld = false
+	lifeRequest = nil
+	nextAnimatorProbe = 0
+	nextLoopProbe = 0
+	loopPending = false
+	revealAfterEvaluation = false
+	awaitingRevivePose = false
+	reviveReportPending = false
 end
 
 local function findAnimator(model: Model): Animator?
@@ -186,7 +206,13 @@ end
 
 local refreshLoop
 
-local function stopCurrentAction(fadeTime: number?)
+local function stopCurrentAction(fadeTime: number?, retainLifePose: boolean?)
+	local retaining = retainLifePose == true and currentAction ~= nil
+		and (currentAction == reviveTrack or currentAction == deathTrack)
+	if not retaining then
+		if currentAction == reviveTrack then reviveTrack = nil end
+		if currentAction == deathTrack then deathTrack = nil end
+	end
 	if character and currentActionSlot == "attack" then
 		character:SetAttribute("AnimationAttackUpperBodyComposed", false)
 		character:SetAttribute("AnimationAttackLowerBodySlot", nil)
@@ -195,7 +221,7 @@ local function stopCurrentAction(fadeTime: number?)
 	end
 	if currentActionComposed then
 		AttackUpperBodyComposer.End()
-	elseif currentAction and currentAction.IsPlaying then
+	elseif not retaining and currentAction and currentAction.IsPlaying then
 		currentAction:Stop(fadeTime or 0)
 	end
 	currentActionOnComplete = nil
@@ -239,47 +265,69 @@ local function applyBackwardPlayback(track: AnimationTrack, slot: string)
 		track:AdjustSpeed(playbackScale)
 		return
 	end
-	task.spawn(function()
-		local deadline = os.clock() + 1
-		while track.IsPlaying and track.Length <= 0 and os.clock() < deadline do
-			RunService.Heartbeat:Wait()
-		end
-		if track.IsPlaying and track.Length > 0 then
-			track.TimePosition = math.max(0, track.Length - 0.001)
-			track:AdjustSpeed(-playbackScale)
-		end
-	end)
+	if track.IsPlaying and track.Length > 0 then
+		if track.Speed >= 0 then track.TimePosition = math.max(0, track.Length - 0.001) end
+		track:AdjustSpeed(-playbackScale)
+	end
+end
+
+local function releaseLifeHold()
+	if not deathTrack and not reviveTrack and currentActionSlot ~= "death" and currentActionSlot ~= "revive" then return end
+	if currentActionSlot == "death" or currentActionSlot == "revive" then
+		stopCurrentAction(0.10)
+		currentAction = nil
+		currentActionSlot = ""
+		character:SetAttribute("AnimationActionSlot", nil)
+		character:SetAttribute("AnimationActionClip", nil)
+	end
+	-- An accepted attack may already own the action slot while its locomotion
+	-- is still loading. Retire only the detached life hold, never the attack.
+	if deathTrack and deathTrack.IsPlaying then deathTrack:Stop(0.10) end
+	if reviveTrack and reviveTrack.IsPlaying then reviveTrack:Stop(0.10) end
+	deathTrack = nil
+	reviveTrack = nil
+	deathTerminalPoseHeld = false
+	reviveTerminalPoseHeld = false
+	print("[game1][animation-life] successor ready; life pose released")
 end
 
 refreshLoop = function()
-	if not character or not cache or lifeTransition then
-		return
-	end
+	if not character or lifeTransition then return end
+	if not cache then loopPending = true; return end
+	loopPending = false
 	-- The server attribute owns the stun lifetime. Interrupt any composed attack
 	-- and reuse the published social clip in the existing action/cache owner.
 	if character:GetAttribute("SkillStunned") == true then
 		if currentActionSlot ~= "stun" then
-			stopCurrentLoop(0.06)
 			if airborneSequence ~= -1 then jumpStartFinished = true end
-			currentLoop = nil
-			currentLoopClipId = ""
-			stopCurrentAction(0.06)
-			currentAction = nil
-			currentActionSlot = "stun"
-			currentActionLockedUntil = 0
 			local descriptor = SocialAnimationPlayback.Resolve(character, "unaware")
 			local track = descriptor and cache:Get(descriptor) or nil
-			currentAction = track
-			character:SetAttribute("AnimationActionSlot", "stun")
-			character:SetAttribute("AnimationActionClip", descriptor and descriptor.clipId or "")
-			character:SetAttribute("AnimationResolvedSlot", "stun")
-			character:SetAttribute("AnimationResolvedClip", descriptor and descriptor.clipId or "")
-			if track then
-				track.Looped = true
-				track:Play(0.06, 1, animationPlaybackScale("social", descriptor.animationId))
-			else
-				warn("[game1][animation] stun unaware clip unavailable")
+			if not cache:IsLoaded(track) then
+				if currentActionSlot == "attack" then stopCurrentAction(0.06); currentAction = nil; currentActionSlot = "" end
+				loopPending = true
+				return
 			end
+			-- Keep the existing locomotion under the full-body stun action.
+			local replacesLife = deathTrack ~= nil or reviveTrack ~= nil
+			if replacesLife then
+				track.Looped = true
+				track:Play(0, 1, animationPlaybackScale("social", descriptor.animationId))
+			end
+			if currentActionSlot == "death" or currentActionSlot == "revive" then
+				releaseLifeHold()
+			else
+				stopCurrentAction(0.06)
+				if replacesLife then releaseLifeHold() end
+			end
+			currentAction = track
+			currentActionSlot = "stun"
+			currentActionLockedUntil = 0
+			character:SetAttribute("AnimationActionSlot", "stun")
+			character:SetAttribute("AnimationActionClip", descriptor.clipId or "")
+			character:SetAttribute("AnimationResolvedSlot", "stun")
+			character:SetAttribute("AnimationResolvedClip", descriptor.clipId or "")
+			track.Looped = true
+			if not replacesLife then track:Play(0.06, 1, animationPlaybackScale("social", descriptor.animationId)) end
 		end
 		return
 	elseif currentActionSlot == "stun" then
@@ -298,8 +346,7 @@ refreshLoop = function()
 			-- AnimationTrack is cached from an earlier jump.
 			airborneSequence = sequence
 			jumpStartFinished = false
-			stopCurrentLoop(0.04)
-			currentLoop = nil
+			disconnectJumpStart()
 			currentLoopClipId = ""
 		end
 		slot = if jumpStartFinished then "jump_loop" else "jump_start"
@@ -334,9 +381,8 @@ refreshLoop = function()
 		character:SetAttribute("AnimationAttackLowerBodySlot", slot)
 	end
 	if not descriptor then
-		stopCurrentLoop(0.12)
-		currentLoop = nil
-		currentLoopClipId = ""
+		-- Missing locomotion must not remove the last visible pose.
+		loopPending = true
 		character:SetAttribute("AnimationResolvedSlot", slot)
 		character:SetAttribute("AnimationResolvedClip", "")
 		return
@@ -347,30 +393,45 @@ refreshLoop = function()
 	if not attackLowerBodyActive then
 		publishPlaybackPercent(slot)
 	end
-	if currentLoop and currentLoopClipId == clipId then
+	if currentLoop and currentLoopClipId == clipId and currentLoop.IsPlaying then
+		releaseLifeHold()
 		applyBackwardPlayback(currentLoop, slot)
 		return
 	end
 
 	local nextTrack = cache:Get(descriptor)
-	if not nextTrack then
-		if inJump and slot == "jump_start" then
-			jumpStartFinished = true
-			refreshLoop()
-		end
-		return
+	if not cache:IsLoaded(nextTrack) then
+		loopPending = true
+		if currentLoop and currentLoop.IsPlaying then return end
+		local idle = AnimationResolver.Resolve(character, "base", nil, "idle")
+		local idleTrack = idle and cache:Get(idle) or nil
+		if not cache:IsLoaded(idleTrack) then return end
+		descriptor = idle
+		nextTrack = idleTrack
+		slot = "idle"
+		clipId = tostring(idle.clipId or "")
+		playbackScale = animationPlaybackScale(slot, idle.animationId)
 	end
 	local isJumpSlot = slot == "jump_start" or slot == "jump_loop"
-	stopCurrentLoop(if isJumpSlot then 0.05 else 0.15)
+	local previousLoop = currentLoop
+	disconnectJumpStart()
 	currentLoop = nextTrack
 	currentLoopClipId = clipId
 	nextTrack.Looped = descriptor.looped == true
-	if isJumpSlot then
+	if reviveTrack or deathTrack then
+		-- Full replacement weight before fading an Action4 hold: two unequal
+		-- fade lengths must not expose the rig's bind pose between tracks.
+		nextTrack:Play(0, 1, playbackScale)
+	elseif isJumpSlot then
 		nextTrack:Play(0.05, 1, playbackScale)
 	else
 		-- Preserve the existing locomotion blend for walk/run/idle.
 		nextTrack:Play(0.15, 1, playbackScale)
 	end
+	if previousLoop and previousLoop ~= nextTrack and previousLoop.IsPlaying then
+		previousLoop:Stop(if isJumpSlot then 0.05 else 0.15)
+	end
+	releaseLifeHold()
 	applyBackwardPlayback(nextTrack, slot)
 	character:SetAttribute("AnimationResolvedSlot", slot)
 	character:SetAttribute("AnimationResolvedClip", clipId)
@@ -392,208 +453,231 @@ refreshLoop = function()
 	end
 end
 local function notifyDeathTerminalReached(boundCharacter: Model)
-	if deathTerminalReported or character ~= boundCharacter or not boundCharacter.Parent then
-		return
-	end
-	deathTerminalReported = true
+	if deathTerminalReported or character ~= boundCharacter or not boundCharacter.Parent then return end
 	local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
 	local event = remotes and remotes:FindFirstChild("DeathTerminalReached")
 	if event and event:IsA("RemoteEvent") then
-		event:FireServer()
+		deathTerminalReported = true
+		event:FireServer(boundCharacter)
 	end
 end
 
-local function notifyReviveAnimationFinished(boundCharacter: Model)
-	if character ~= boundCharacter or tostring(boundCharacter:GetAttribute("LifeState") or "") ~= "Reviving" then
-		return
-	end
+local function notifyReviveAnimationFinished(boundCharacter: Model, visualReady: boolean): boolean
+	if character ~= boundCharacter or tostring(boundCharacter:GetAttribute("LifeState") or "") ~= "Reviving" then return false end
 	local remotes = ReplicatedStorage:FindFirstChild("Game1Remotes")
 	local remote = remotes and remotes:FindFirstChild("ReviveAnimationFinished")
 	if remote and remote:IsA("RemoteEvent") then
-		remote:FireServer()
+		remote:FireServer(boundCharacter, visualReady)
+		return true
 	end
+	return false
+end
+
+local function playBaseLifeAction(slot: string)
+	-- Resolve once per life transition; no asynchronous Stopped callback can
+	-- release the new character or retire a pose before its successor is ready.
+	lifeRequest = { slot = slot, deadline = os.clock() + LIFE_LOAD_SECONDS, nextProbe = 0 }
 end
 
 local function playDeath()
-	if not character or not cache then
-		return
-	end
-	local boundCharacter = character
-	local descriptor = AnimationResolver.Resolve(boundCharacter, "base", nil, "death")
-	local track = descriptor and cache:Get(descriptor) or nil
-
-	stopCurrentLoop(0)
-	currentLoop = nil
-	currentLoopClipId = ""
-	stopCurrentAction(0)
-	currentAction = track
-	currentActionSlot = "death"
-	currentActionLockedUntil = 0
-	boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
-	deathTrack = track
 	deathTerminalPoseHeld = false
 	deathTerminalReported = false
-	boundCharacter:SetAttribute("AnimationActionSlot", "death")
-	boundCharacter:SetAttribute("AnimationActionClip", descriptor and tostring(descriptor.clipId or "") or "")
-	boundCharacter:SetAttribute("DeathAnimationStartedAt", os.clock())
-	boundCharacter:SetAttribute("DeathTerminalPoseHeld", false)
+	playBaseLifeAction("death")
+end
 
-	if not track then
-		warn("[game1][animation] required death animation track is missing; character remains Dying")
-		return
+local function stepLifeRequest()
+	local request = lifeRequest
+	local boundCharacter = character
+	if not request or not boundCharacter then return end
+	local now = os.clock()
+	if now < request.nextProbe then return end
+	request.nextProbe = now + RETRY_SECONDS
+	if cache then
+		request.descriptor = request.descriptor or AnimationResolver.Resolve(boundCharacter, "base", nil, request.slot)
+		request.track = request.track or (request.descriptor and cache:Get(request.descriptor))
 	end
-
-	publishPlaybackPercent("death")
-	DeathAnimationPolicy.Start(track, animationPlaybackScale("death", track.Animation and track.Animation.AnimationId))
+	local track = request.track
+	if cache and cache:IsLoaded(track) then
+		local slot = request.slot
+		-- Start at full weight before retiring any existing pose. The same
+		-- terminal latch is used for death and revive; no second pose owner.
+		local oldAction = currentAction
+		local wasComposed = currentActionComposed
+		DeathAnimationPolicy.Start(track, animationPlaybackScale(slot, track.Animation and track.Animation.AnimationId))
+		if oldAction ~= track or wasComposed then stopCurrentAction(0) end
+		if deathTrack and deathTrack ~= track and deathTrack.IsPlaying then deathTrack:Stop(0) end
+		if reviveTrack and reviveTrack ~= track and reviveTrack.IsPlaying then reviveTrack:Stop(0) end
+		stopCurrentLoop(0)
+		currentLoop = nil
+		currentLoopClipId = ""
+		currentAction = track
+		currentActionSlot = slot
+		currentActionLockedUntil = 0
+		boundCharacter:SetAttribute("AnimationActionEndsAt", nil)
+		boundCharacter:SetAttribute("AnimationActionSlot", slot)
+		boundCharacter:SetAttribute("AnimationActionClip", tostring(request.descriptor.clipId or ""))
+		publishPlaybackPercent(slot)
+		lifeRequest = nil
+		if slot == "death" then
+			deathTrack = track
+			reviveTrack = nil
+			boundCharacter:SetAttribute("DeathAnimationStartedAt", now)
+			boundCharacter:SetAttribute("DeathTerminalPoseHeld", false)
+		else
+			deathTrack = nil
+			reviveTrack = track
+			reviveTerminalPoseHeld = false
+			revealAfterEvaluation = true
+		end
+		print(("[game1][animation-life] %s ready · %s · length %.3f"):format(slot, tostring(request.descriptor.animationId), track.Length))
+	elseif now >= request.deadline and not request.reported then
+		request.reported = true
+		warn(("[game1][animation-life] %s not ready after %ds · %s"):format(request.slot, LIFE_LOAD_SECONDS,
+			tostring(request.descriptor and request.descriptor.animationId or "no descriptor/Animator")))
+		if request.slot == "revive" then
+			-- A failed visual may not indefinitely disable a returned player.
+			lifeRequest = nil
+			reviveReportPending = true
+			if boundCharacter:GetAttribute("LifeState") == "Alive" then
+				lifeTransition = false
+				refreshLoop()
+			end
+		end
+		-- Death keeps its prior pose and retries; never fabricate the terminal edge.
+	end
 end
 
 local function maintainDeathTerminalPose(deltaTimeSim: number)
 	local boundCharacter = character
 	local track = deathTrack
-	if not boundCharacter
-		or not track
-		or deathTerminalPoseHeld
-		or tostring(boundCharacter:GetAttribute("LifeState") or "Alive") ~= "Dying"
-	then
-		return
+	if not boundCharacter or not track then return end
+	local state = boundCharacter:GetAttribute("LifeState")
+	if state ~= "Dying" and state ~= "DeathIdle" then return end
+	if not deathTerminalPoseHeld then
+		local step = if state == "DeathIdle" then track.Length / math.max(0.01, track.Speed) else deltaTimeSim
+		local reached, terminalTime = DeathAnimationPolicy.LatchVisibleTerminalPose(track, step)
+		if not reached then return end
+		deathTerminalPoseHeld = true
+		boundCharacter:SetAttribute("DeathAnimationLength", track.Length)
+		boundCharacter:SetAttribute("DeathAnimationTerminalTime", terminalTime)
+		boundCharacter:SetAttribute("AnimationResolvedSlot", "death_idle")
+		boundCharacter:SetAttribute("DeathTerminalPoseHeld", true)
+		boundCharacter:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
 	end
-
-	local reached, terminalTime = DeathAnimationPolicy.LatchVisibleTerminalPose(track, deltaTimeSim)
-	if not reached then
-		return
-	end
-
-	deathTerminalPoseHeld = true
-	boundCharacter:SetAttribute("DeathAnimationLength", track.Length)
-	boundCharacter:SetAttribute("DeathAnimationTerminalTime", terminalTime)
-	boundCharacter:SetAttribute("AnimationResolvedSlot", "death_idle")
-	boundCharacter:SetAttribute("DeathTerminalPoseHeld", true)
-	boundCharacter:SetAttribute("DeathTerminalPoseHeldAt", os.clock())
-	notifyDeathTerminalReached(boundCharacter)
-end
-
-local function playBaseLifeAction(slot: string, onStopped)
-	if not character or not cache then
-		if onStopped then onStopped() end
-		return
-	end
-	local descriptor = AnimationResolver.Resolve(character, "base", nil, slot)
-	if not descriptor then
-		if onStopped then onStopped() end
-		return
-	end
-	local track = cache:Get(descriptor)
-	if not track then
-		if onStopped then onStopped() end
-		return
-	end
-	stopCurrentLoop(0.08)
-	currentLoop = nil
-	currentLoopClipId = ""
-	stopCurrentAction(0.04)
-	currentAction = track
-	currentActionSlot = slot
-	currentActionLockedUntil = 0
-	publishPlaybackPercent(slot)
-	local playbackScale = animationPlaybackScale(slot, descriptor.animationId)
-	character:SetAttribute("AnimationActionSlot", slot)
-	character:SetAttribute("AnimationActionClip", tostring(descriptor.clipId or ""))
-	track.Looped = false
-	track:Play(0.06, 1, playbackScale)
-	track.Stopped:Once(function()
-		if currentAction == track then
-			currentAction = nil
-			currentActionSlot = ""
-			currentActionLockedUntil = 0
-		end
-		if onStopped then onStopped() end
-	end)
+	if state == "Dying" then notifyDeathTerminalReached(boundCharacter) end
 end
 
 local function handleLifeState()
-	if not character then
-		return
-	end
+	if not character then return end
 	local current = tostring(character:GetAttribute("LifeState") or "Alive")
 	local previous = lastLifeState
 	lastLifeState = current
 	if current == "Dying" and previous ~= "Dying" then
 		lifeTransition = true
+		reviveReportPending = false
+		-- Cancel composed attack immediately even while the death clip loads.
+		-- Native locomotion remains underneath until Death actually starts.
+		if currentActionComposed or currentActionSlot == "attack" then
+			stopCurrentAction(0.06)
+			currentAction = nil
+			currentActionSlot = ""
+		end
 		playDeath()
 	elseif current == "DeathIdle" then
-		-- Keep the frozen terminal frame of Death. There is deliberately no
-		-- separate death_wait animation in game1.
 		lifeTransition = true
+		if not deathTrack and not lifeRequest then playDeath() end
 	elseif current == "Reviving" and previous ~= "Reviving" then
-		deathTrack = nil
-		deathTerminalPoseHeld = false
-		deathTerminalReported = false
 		lifeTransition = true
-		stopCurrentAction(0)
-		currentAction = nil
-		currentActionSlot = ""
-		currentActionLockedUntil = 0
-		character:SetAttribute("AnimationActionEndsAt", nil)
-		local reviveCharacter = character
-		playBaseLifeAction("revive", function()
-			if reviveCharacter then
-				notifyReviveAnimationFinished(reviveCharacter)
-			end
-		end)
+		character:SetAttribute("RevivePoseReady", false)
+		awaitingRevivePose = true
+		reviveReportPending = false
+		playBaseLifeAction("revive")
 	elseif current == "Alive" and previous == "Reviving" then
+		lifeRequest = nil
+		reviveReportPending = false
 		lifeTransition = false
-		refreshLoop()
+		refreshLoop() -- releases the held revive pose ONLY when locomotion is ready
 	elseif current == "Alive" and previous ~= "Alive" then
-		-- Same-character resurrection remains supported for dev/test lifecycles.
 		lifeTransition = true
-		playBaseLifeAction("revive", function()
-			if not character then return end
-			lifeTransition = false
-			refreshLoop()
-		end)
+		playBaseLifeAction("revive")
 	else
 		refreshLoop()
 	end
 end
 
+local function attachAnimator(newCharacter: Model): boolean
+	if character ~= newCharacter or cache then return cache ~= nil end
+	animator = findAnimator(newCharacter)
+	if not animator then return false end
+	cache = AnimationTrackCache.new(animator)
+	local boundCache = cache
+	local descriptors = AnimationResolver.ListForCharacter(newCharacter)
+	task.spawn(function()
+		local result = boundCache:Prewarm(descriptors, 4)
+		if character ~= newCharacter or cache ~= boundCache then return end
+		warmResult = result
+		print(("[game1][animation] prewarm %d/%d ready in %.3fs"):format(result.ready, result.total, result.elapsed))
+	end)
+	return true
+end
+
 local function maintainDeathPose(deltaTimeSim: number)
+	local boundCharacter = character
+	if not boundCharacter then return end
+	local now = os.clock()
+	if revealAfterEvaluation then
+		revealAfterEvaluation = false
+		awaitingRevivePose = false
+		boundCharacter:SetAttribute("RevivePoseReady", true)
+	end
+	if not cache and now >= nextAnimatorProbe then
+		nextAnimatorProbe = now + RETRY_SECONDS
+		if attachAnimator(boundCharacter) then
+			print("[game1][animation-life] late Animator attached")
+			refreshLoop()
+		end
+	end
+	stepLifeRequest()
 	maintainDeathTerminalPose(deltaTimeSim)
+	if reviveTrack and currentAction == reviveTrack and lifeTransition and not reviveTerminalPoseHeld then
+		local reached = DeathAnimationPolicy.LatchVisibleTerminalPose(reviveTrack, deltaTimeSim)
+		if reached then
+			reviveTerminalPoseHeld = true
+			reviveReportPending = true
+			print("[game1][animation-life] revive terminal held")
+			if lastLifeState == "Alive" then lifeTransition = false; refreshLoop() end
+		end
+	end
+	if reviveReportPending and lastLifeState == "Reviving" then
+		if notifyReviveAnimationFinished(boundCharacter, reviveTerminalPoseHeld) then reviveReportPending = false end
+	end
+	if not lifeTransition and now >= nextLoopProbe and (loopPending or (currentLoop and not currentLoop.IsPlaying)) then
+		nextLoopProbe = now + RETRY_SECONDS
+		refreshLoop()
+	end
+	if awaitingRevivePose and lastLifeState == "Alive" and currentLoop and currentLoop.IsPlaying then
+		-- Fallback revive: reveal only after the first evaluated locomotion pose.
+		revealAfterEvaluation = true
+	end
 end
 
 local function bindCharacter(newCharacter: Model)
+	if localPlayer.Character ~= newCharacter or character == newCharacter then return end
 	clearCharacter()
 	character = newCharacter
-	animator = findAnimator(newCharacter)
-    -- A missing Animator disables only presentation. Combat metadata remains
-    -- available so local input can still initiate server-authoritative actions.
-    if animator then
-        cache = AnimationTrackCache.new(animator)
-        local boundCache = cache
-        local descriptors = AnimationResolver.ListForCharacter(newCharacter)
-        task.spawn(function()
-            local result = boundCache:Prewarm(descriptors, 4)
-            if character ~= newCharacter or cache ~= boundCache then return end
-            warmResult = result
-            print(("[game1][animation] prewarm %d/%d ready in %.3fs")
-                :format(result.ready, result.total, result.elapsed))
-        end)
-    else
-        warn("[game1][animation] Animator missing; visual unavailable, gameplay continues")
-    end
-    lastLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
+	lastLifeState = "Alive"
+	local initialLifeState = tostring(newCharacter:GetAttribute("LifeState") or "Alive")
+	lifeTransition = initialLifeState ~= "Alive"
+	if not attachAnimator(newCharacter) then
+		nextAnimatorProbe = os.clock() + RETRY_SECONDS
+		warn("[game1][animation] Animator missing; visual unavailable, gameplay continues; retrying")
+	end
 	local refreshAttributes = { "SkillStunned", "GameplayTestHubRunMultiplier", "MovementState", "InCombat", "AnimationMovementDirection", "AnimationWeaponSet", "RunSpeed", "AttackSpeed", "AttackMovementLocomotionMode", "AttackMovementRunSpeedMultiplier", "AnimationAirborne", "AnimationJumpSequence" }
 	for _, attribute in ipairs(refreshAttributes) do
 		table.insert(connections, newCharacter:GetAttributeChangedSignal(attribute):Connect(refreshLoop))
 	end
 	table.insert(connections, newCharacter:GetAttributeChangedSignal("LifeState"):Connect(handleLifeState))
-	if lastLifeState == "Reviving" then
-		-- A return-to-town character is born directly in Reviving, so there is no
-		-- attribute edge for the client to observe. Synthesize the transition once.
-		lastLifeState = "Alive"
-		handleLifeState()
-	else
-		refreshLoop()
-	end
+	handleLifeState()
 	print("[game1][animation] character animation profile bound")
 end
 
@@ -611,7 +695,7 @@ function CharacterAnimationController.PlayAction(slot: string)
     if slot ~= "attack" then
         if not cache then return nil end
         local track = cache:Get(descriptor)
-        if not track then return nil end
+        if not cache:IsLoaded(track) then return nil end
         stopCurrentAction(0.06)
         local speed = animationPlaybackScale(slot, descriptor.animationId)
         track.Looped = false
@@ -641,7 +725,9 @@ function CharacterAnimationController.PlayAction(slot: string)
     end
     local actionStartedAt = os.clock()
     local runtimeDuration = timeline.duration
-    stopCurrentAction(0.06)
+    -- Combat timing remains independent of visual readiness. Keep a detached
+    -- life hold underneath the attack until real locomotion can replace it.
+    stopCurrentAction(0.06, not (currentLoop and currentLoop.IsPlaying))
     currentActionToken += 1
     local token = currentActionToken
     local boundCharacter = character
@@ -819,7 +905,6 @@ function CharacterAnimationController.WaitForPrewarm(model: Model, current: () -
         if character == model and warmResult then
             return warmResult.total > 0 and warmResult.failed == 0
         end
-        if character == model and not animator then return false end
         RunService.Heartbeat:Wait()
     end
     return false

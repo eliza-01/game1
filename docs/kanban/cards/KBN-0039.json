@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0039.md",
-  "specSha256": "e823330f69b9ecd67ff10b18fcefbca2c1b4f276a4d3496402adedfba82c2939",
+  "specSha256": "6f68abc5eb7bd194fdcf322acc12bee1d5ba79ea4b04c674ae46b1c55f95a164",
   "dependsOn": [
     "KBN-0035",
     "KBN-0038"
   ],
-  "revision": 4,
-  "updatedAt": "2026-11-28T14:20:00+00:00",
+  "revision": 8,
+  "updatedAt": "2026-11-28T15:30:00+00:00",
   "tasks": [
     {
       "id": "KBN-0039-T01",
@@ -23,7 +23,7 @@
     },
     {
       "id": "KBN-0039-T02",
-      "title": "Подготовить миграцию существующих опубликованных моделей и сравнить bounds с runtime oracle",
+      "title": "M652/M653 · MNPC and male Character startup accepted; native Runtime/Published coverage open",
       "done": false
     },
     {
@@ -33,7 +33,7 @@
     },
     {
       "id": "KBN-0039-T04",
-      "title": "Ввести приоритетный прогрев уникальных клипов по области и общим лимитам загрузки",
+      "title": "Priority Animation Prewarm — после M654 Published проверки",
       "done": false
     },
     {
@@ -45,6 +45,11 @@
       "id": "KBN-0039-T06",
       "title": "Измерить холодную/тёплую загрузку, RAM и первый бой на PC и телефоне",
       "done": false
+    },
+    {
+      "id": "KBN-0039-T07",
+      "title": "M654 · Animation Playback Reliability CODE_COMPLETE; Published acceptance open",
+      "done": false
     }
   ],
   "acceptance": [
@@ -52,25 +57,31 @@
       "id": "KBN-0039-A01",
       "title": "Готовые хитбоксы эквивалентны прежним для mesh/rig/scale; несовпадение ревизии диагностируется, миграция обратима",
       "status": "NOT_RUN",
-      "evidence": "M649: standalone Lua capture/lookup invalidation + compiler roundtrip; real meshes, CFrame/pose parity and migration NOT_RUN. M649: владелец подтвердил «с попаданиями все в порядке» (functional smoke only); M651 authoring/migration after M650 near-first fix."
+      "evidence": "M649: standalone Lua capture/lookup invalidation + compiler roundtrip; real meshes, CFrame/pose parity and migration NOT_RUN. M649: владелец подтвердил «с попаданиями все в порядке» (functional smoke only); M651 authoring/migration after M650 near-first fix. M651: canonical v2 signature, detached Studio Edit capture and atomic compiler, Lua yaw/center invalidation and Python bridge mocks; actual meshes/coverage/parity NOT_RUN. M651 log: 3 mismatches, owner hit smoke OK; M652 structural signature/tolerance and 360 yaw Lua mock; native parity NOT_RUN. M652 startup log: all 3 live MNPC types accepted; M653 oracle component union/record order and signature doubles, native capture/parity NOT_RUN. M653 log: male 11 components accepted, 125 boxes; owner deferred count parity to general Runtime/Published acceptance."
     },
     {
       "id": "KBN-0039-A02",
       "title": "Обычный Runtime не требует расчёта EditableMesh после полной миграции; подтверждён выигрыш старта и памяти",
       "status": "NOT_RUN",
-      "evidence": "M649: session cache before mesh reads, in-flight geometry leases release; registry empty until authoring migration; native coverage and cold/warm RAM NOT_RUN."
+      "evidence": "M649: session cache before mesh reads, in-flight geometry leases release; registry empty until authoring migration; native coverage and cold/warm RAM NOT_RUN. M651: authoring available for MNPC; registry still empty in supplied patch, Runtime miss path retained; Character variants open. M651 registry 4 real rows; log 31 source reads. M652 unified bounded session cache; native post-patch reads NOT_RUN. M652 startup log: 0 MNPC source reads, Character 11 reads ~5.6 s; M653 component capture/lookup code, actual Character data NOT_RUN. M653 log: 0 reads, 8 ms weapon-equipped to ready; not controlled benchmark."
     },
     {
       "id": "KBN-0039-A03",
       "title": "Первый вход, создание/выбор персонажа и первый бой после входа проходят с исправной внешностью и анимациями, включая Death/DeathIdle",
       "status": "NOT_RUN",
-      "evidence": "M648: default previews first, optional unique component warm after bootstrap, same typed preloader, cancellation on edit/exit; Lua plan/service/client doubles. Native first entry, roster, first battle and Death NOT_RUN."
+      "evidence": "M648: default previews first, optional unique component warm after bootstrap, same typed preloader, cancellation on edit/exit; Lua plan/service/client doubles. Native first entry, roster, first battle and Death NOT_RUN. M654: actual controller functions + DeathAnimationPolicy in Lua doubles, late Animator/Length/Alive and full-weight successor; owner reported Published RestPose before patch, native verification NOT_RUN."
     },
     {
       "id": "KBN-0039-A04",
       "title": "Есть воспроизводимое сравнение cold/warm loading и памяти; отказ загрузки не зависает и корректно диагностируется",
       "status": "NOT_RUN",
       "evidence": "M648: bounded background requests and timeout/cancellation in Lua doubles; native cold/warm time and RAM NOT_RUN."
+    },
+    {
+      "id": "KBN-0039-A05",
+      "title": "Published Death/Revive/Idle без RestPose у владельца и наблюдателей, при сетевой задержке и смене персонажа",
+      "status": "NOT_RUN",
+      "evidence": "M654 code and Lua doubles only; native owner and observer verification pending."
     }
   ]
 }

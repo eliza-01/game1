@@ -4,6 +4,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Language = require(script.Parent.Parent:WaitForChild("localization"):WaitForChild("LanguageState"))
 
+local FullScreenLayer = require(script.Parent.Parent:WaitForChild("FullScreenLayer"))
+
 local Controller = {}
 local started = false
 local localPlayer = Players.LocalPlayer
@@ -13,6 +15,33 @@ local statusLabel: TextLabel? = nil
 local boundCharacter: Model? = nil
 local characterConnections = {}
 local invoking = false
+local curtain: Frame? = nil
+local coverGeneration = 0
+local awaitingReplacement: Model? = nil
+
+local function endCover()
+    coverGeneration += 1
+    awaitingReplacement = nil
+    if curtain then curtain.Visible = false end
+end
+
+local function beginCover(previous: Model?)
+    if not curtain then return end
+    coverGeneration += 1
+    local ticket = coverGeneration
+    awaitingReplacement = previous
+    curtain.Visible = true
+    task.delay(20, function()
+        if coverGeneration ~= ticket then return end
+        warn("[game1][animation-life] return curtain timeout; visual readiness not confirmed")
+        endCover()
+    end)
+end
+
+local function updateCover(character: Model?)
+    if not curtain or not curtain.Visible or not character or character == awaitingReplacement then return end
+    if character:GetAttribute("RevivePoseReady") == true then endCover() end
+end
 
 local function disconnectCharacter()
     for _, connection in ipairs(characterConnections) do
@@ -91,6 +120,15 @@ local function ensureGui()
     status.Visible = false
     status.Parent = frame
 
+    local transition = Instance.new("Frame")
+    transition.Name = "ReturnTransition"
+    transition.Size = UDim2.fromScale(1, 1)
+    transition.BackgroundColor3 = Color3.fromRGB(12, 17, 21)
+    transition.BorderSizePixel = 0
+    transition.Active = true
+    transition.Visible = false
+    transition.Parent = FullScreenLayer.Create(gui, "Game1ReturnCurtain", gui.DisplayOrder - 1)
+    curtain = transition
     screenGui = gui
     button = returnButton
     statusLabel = status
@@ -106,12 +144,17 @@ local function ensureGui()
         if statusLabel then
             statusLabel.Visible = false
         end
+        local requestCharacter = boundCharacter
+        beginCover(requestCharacter)
+        local requestGeneration = coverGeneration
         local remotes = ReplicatedStorage:WaitForChild("Game1Remotes")
         local remote = remotes:WaitForChild("ReturnToTown") :: RemoteFunction
         local ok, accepted, errorMessage = pcall(function()
             return remote:InvokeServer()
         end)
         if not ok or accepted ~= true then
+            if boundCharacter ~= requestCharacter then return end
+            if requestGeneration == coverGeneration then endCover() end
             invoking = false
             returnButton.Active = true
             returnButton.AutoButtonColor = true
@@ -152,6 +195,10 @@ local function bindCharacter(character: Model?)
     end
     boundCharacter = character
     table.insert(characterConnections, character:GetAttributeChangedSignal("LifeState"):Connect(updateVisibility))
+    table.insert(characterConnections, character:GetAttributeChangedSignal("RevivePoseReady"):Connect(function()
+        if boundCharacter == character then updateCover(character) end
+    end))
+    updateCover(character)
     table.insert(characterConnections, character:GetAttributeChangedSignal("ReturnToTownAvailable"):Connect(updateVisibility))
     table.insert(characterConnections, character.Destroying:Connect(function()
         if boundCharacter == character then

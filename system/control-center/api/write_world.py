@@ -23,6 +23,9 @@ def route(path, body, deps):
                 return 200, owner.save_settings(payload)
             if len(tail) == 3:
                 kind, slug, action = tail
+                if action == 'hitboxes':
+                    from services.hitbox_asset_authoring import capture
+                    return 200, capture(owner, kind, slug, payload)
                 if action == 'stage':
                     return 200, owner.stage(kind, slug, payload)
                 if action == 'capture':

@@ -68,7 +68,6 @@ class HitboxDecompositionM99Tests(unittest.TestCase):
 
     def test_definition_cache_key_and_bounds_are_unchanged(self):
         for token in (
-            'local definitionCache: { [string]: any } = {}',
             'scale.X,', 'scale.Y,', 'scale.Z',
             'binding.entity:GetAttribute("MonsterSlug")',
             'binding.entity:GetAttribute("NpcSlug")',
@@ -80,9 +79,11 @@ class HitboxDecompositionM99Tests(unittest.TestCase):
             'local strongest = strongestInfluence(source)',
             'headCutoffY',
             'table.sort(groupKeys)',
-            'definitionCache[key] = definition',
         ):
             self.assertIn(token, self.builder)
+        self.assertIn('function HitboxDefinitionBuilder.AssetKey', self.builder)
+        self.assertIn('function Definitions.Remember', read('HitboxAssetDefinitions'))
+        self.assertNotIn('root.Size.X,', self.builder)
         self.assertNotIn('CreateEditableMeshAsync', self.builder)
         self.assertNotIn('GetDescendants()', self.builder)
 

@@ -172,6 +172,15 @@
       "StudioMnpcAlignmentCommand": {
         "$path": "modules/StudioMnpcAlignmentCommand.luau"
       },
+      "StudioHitboxAssetCommand": {
+        "$path": "modules/StudioHitboxAssetCommand.luau"
+      },
+      "StudioCharacterHitboxCapture": {
+        "$path": "modules/StudioCharacterHitboxCapture.luau"
+      },
+      "StudioHitboxAssetCapture": {
+        "$path": "modules/StudioHitboxAssetCapture.luau"
+      },
       "StudioMnpcCaptureCommand": {
         "$path": "modules/StudioMnpcCaptureCommand.luau"
       },

@@ -74,12 +74,20 @@ local modules={ActorCollisionPolicy={Assign=function(root,kind) root.CanCollide=
 script={Parent={WaitForChild=function(_,name) return name end}}
 require=function(name) return assert(modules[name],name) end
 local collection={GetTags=function(_,model) return model.tags end,AddTag=function(_,model,tag) table.insert(model.tags,tag) end}
-game={GetService=function(_,name) assert(name=='CollectionService'); return collection end}
+local running=false
+local run={IsStudio=function() return true end,IsRunning=function() return running end}
+game={GetService=function(_,name) if name=='RunService' then return run end; assert(name=='CollectionService'); return collection end}
 modules.MnpcNavigationShell=assert(loadfile(arg[1]))()
 modules.MnpcRigGeometry=assert(loadfile(arg[4]))()
 modules.MnpcPresentationLifecycle=assert(loadfile(arg[5]))()
 modules.MnpcVisualRig=assert(loadfile(arg[2]))()
 local L=assert(loadfile(arg[3]))()
+local authored, authoredRoot=L.Create('Authoring',V.new(0,0,0),0,'Monster',true)
+assert(authored.Parent==nil and authoredRoot.CanCollide==false and authoredRoot.collisionKind==nil)
+authored:Destroy()
+running=true
+assert(not pcall(L.Create,'Forbidden',V.new(0,0,0),0,'Monster',true))
+running=false
 local function near(a,b) assert(math.abs(a-b)<1e-8, tostring(a)..' != '..tostring(b)) end
 local function fixture(wrapped,valid)
     local wrapper=Instance.new('Model'); wrapper.Name='source'; wrapper:SetAttribute('Game1ModelAssetId','42'); wrapper.tags={'source-tag'}

@@ -23,9 +23,16 @@ require = function(key)
     if key == "PublishedDebugAccess" then return {ServerEnabled=function() return arg[3]=='debug' end} end
     return originalRequire(key)
 end
-local vectorMT={__sub=function(a,b) return {X=a.X-b.X,Z=a.Z-b.Z} end}
-local function vec(x,z) return setmetatable({X=x,Z=z},vectorMT) end
-local function player(x,z) return {Character={Position=vec(x,z)}} end
+local vectorMT={__sub=function(a,b)
+    local x,y,z=a.X-b.X,a.Y-b.Y,a.Z-b.Z
+    return {X=x,Y=y,Z=z,Magnitude=math.sqrt(x*x+y*y+z*z)}
+end}
+local function vec(x,z,y) return setmetatable({X=x,Y=y or 0,Z=z},vectorMT) end
+local function player(x,z,reach,y)
+    return {Character={Position=vec(x,z,y),GetAttribute=function(_,key)
+        assert(key=="AttackRadius"); return reach
+    end}}
+end
 os.clock=function() return now end
 warn=function() end
 task={spawn=function(f) table.insert(queued,f) end}
@@ -34,15 +41,19 @@ local Demand = dofile(arg[1])
 local function actor(kind,x,slug,initial,template)
     local attrs={LifeState="Alive", Damageable=not initial, HP=77,Game1MnpcKind=kind}
     attrs[kind=='NPC' and 'NpcSlug' or 'MonsterSlug']=slug or 'same'
-    local model={Parent=true, GetAttribute=function(_, k) return attrs[k] end,SetAttribute=function(_, k,v) attrs[k]=v end,
+    local function node(class) return {IsA=function(_,name) return class==name end} end
+    local descendants={node('MeshPart'),node('Bone'),node('Animator')}
+    if initial then descendants={} end
+    attrs.CombatHitboxCount=not initial and 5 or nil
+    local model={Parent=true, GetDescendants=function() return descendants end, GetAttribute=function(_, k) return attrs[k] end,SetAttribute=function(_, k,v) attrs[k]=v end,
         FindFirstChild=function(_,k) assert(k=='RootCollider'); return {Size={Magnitude=10}} end}
     local a={model=model,root={Position=vec(x,0)},state="Idle",kind=kind}
     local data={release=0,acquire=0,ready=true,allow=true,fail=false}
     if initial then assert(Demand.CanSpawnShell(model,a.root,template)) end
     Demand.Register(model,{
         canRelease=function() return data.allow end,
-        release=function() data.release=data.release+1; attrs.Damageable=false; return true end,
-        acquire=function(alive) data.acquire=data.acquire+1; if data.cancel then data.cancel(); assert(not alive()) end; return not data.fail end,
+        release=function() data.release=data.release+1; attrs.Damageable=false; descendants={};attrs.CombatHitboxCount=nil; return true end,
+        acquire=function(alive) data.acquire=data.acquire+1; if data.cancel then data.cancel(); assert(not alive()) end; if not data.fail then descendants={node("MeshPart"),node("Bone"),node("Animator")};attrs.CombatHitboxCount=5 end; return not data.fail end,
         ready=function() return data.ready end,
     },initial,template)
     return a,attrs,data
@@ -53,9 +64,8 @@ local m,ma,md=actor("Monster",0,nil,false,template)
 local n,na,nd=actor("NPC",100)
 step(m,0); step(n,0); Demand.Pump(); assert(queries==0 and md.release==0 and nd.release==0)
 enabled=true
--- Debug controls can change reach to 420 at any moment. Test both modes.
-local edge = arg[3]=='debug' and 510 or 185
-players={player(edge,0),player(5000,0)}
+-- Same FULL exit threshold in Studio and production, regardless of debug cap.
+players={player(109,0,9),player(5000,0,420)}
 step(m,1); step(m,8); assert(md.release==0)
 players={player(10000,0)}
 assert(not Demand.CanSpawnShell(m.model,m.root,template))
@@ -63,16 +73,18 @@ step(m,9); step(n,9); step(m,13.9); assert(md.release==0)
 n.attacking=true; step(n,14); assert(nd.release==0)
 step(m,14); assert(md.release==1 and ma.Game1MnpcDemandStage=="shell" and ma.HP==77)
 assert(Demand.CanSpawnShell(m.model,m.root,template))
+if arg[3]=="debug" then assert(ma.Game1MnpcResourceAudit=="shell M0 B0 A0 H0") else assert(ma.Game1MnpcResourceAudit==nil) end
 assert(not Demand.CanSpawnShell(m.model,m.root,{}))
 local s,sa,sd=actor('Monster',200,nil,true,template)
 assert(sa.Game1MnpcDemandStage=='shell' and not sa.Damageable and sd.release==0)
 Demand.Remove(s.model)
 n.attacking=false; step(n,16); step(n,21); assert(nd.release==1 and na.Game1MnpcDemandStage=="shell")
 -- Nearest wins even if far actor's AI tick arrived first.
-players={player(100,0)}; nd.ready=false
+players={player(80,0)}; nd.ready=false
 step(m,22); step(n,22); Demand.Pump(); assert(#queued==1 and na.Game1MnpcDemandStage=="loading")
 dispatch(); step(n,23); step(m,23); Demand.Pump(); assert(#queued==0 and not na.Damageable and na.Game1MnpcDemandStage=='preparing')
 nd.ready=true; step(n,24); assert(na.Game1MnpcDemandStage=="full" and na.Damageable)
+if arg[3]=="debug" then assert(na.Game1MnpcResourceAudit=="full M1 B1 A1 H5") end
 Demand.Pump(); assert(#queued==1); dispatch(); step(m,25); assert(ma.Damageable and ma.HP==77)
 -- Release hysteresis, pinned effects, and disabled switch restores dormant actors.
 players={}; ma.ActiveSkillEffects="Bleed"; step(m,26); step(m,32); assert(md.release==1)
@@ -86,8 +98,23 @@ step(m,68); assert(ma.Game1MnpcDemandStage=="shell")
 step(m,73); Demand.Pump(); md.cancel=function() Demand.Remove(m.model); m.model.Parent=nil end; dispatch()
 players={}; step(n,74); step(n,79); players={player(100,0)}; step(n,80); Demand.Pump(); dispatch(); step(n,81)
 assert(na.Damageable and na.HP==77)
--- Disabled profile cannot release; authored full distance and monster aggro can extend admission.
+-- Disabled profile cannot release; authored FULL distance and live combat pins remain.
 local d,da,dd=actor('NPC',0,'disabled'); players={}; step(d,82); step(d,90); assert(dd.release==0)
-local l,la,ld=actor('NPC',0,'long'); players={player(355,0)}; step(l,91); step(l,99); assert(ld.release==0)
-local a,aa,ad=actor('Monster',0); aa.MonsterAggroRadius=600; players={player(620,0)}; step(a,100); step(a,108); assert(ad.release==0)
-print('M639 demand oracle: opt-in, policy, catalog/debug reach, qualified spawn, mixed nearest admission, pin, retry, timeout, cancellation passed')
+local l,la,ld=actor('NPC',0,'long'); players={player(309,0)}; step(l,91); step(l,99); assert(ld.release==0)
+-- Authored aggro distance alone is not a FULL request. An actual target is.
+local a,aa,ad=actor('Monster',0); aa.MonsterAggroRadius=600
+players={player(110,0,9)}; step(a,100); step(a,105); assert(ad.release==1)
+players={player(91,0,9)}; step(a,106); Demand.Pump(); assert(#queued==0)
+players={player(90,0,9)}; step(a,107); Demand.Pump(); dispatch(); step(a,108); assert(aa.Damageable)
+-- Any nearby player holds the rig; a distant player's long reach cannot
+-- extend the reach of the nearby player. Actual long reach still holds.
+local b,ba,bd=actor('NPC',0)
+players={player(160,0,9),player(60,0,9)}; step(b,109); step(b,115); assert(bd.release==0)
+players={player(160,0,9),player(500,0,420)}; step(b,116); step(b,121); assert(bd.release==1)
+players={player(160,0,200)}; step(b,122); Demand.Pump(); dispatch(); step(b,123); assert(ba.Damageable)
+players={player(160,0,9)}; b.target={}; step(b,124); step(b,130); assert(bd.release==1)
+b.target=nil; step(b,131); step(b,136); assert(bd.release==2)
+-- Shared visual distance is 3D, not an XZ-only release radius.
+local v,va,vd=actor('Monster',0)
+players={player(0,0,9,120)}; step(v,137); step(v,142); assert(vd.release==1)
+print('M645 demand oracle: shared FULL thresholds, live per-player reach, mixed admission, 3D distance, pins, retries, timeout and cancellation passed')

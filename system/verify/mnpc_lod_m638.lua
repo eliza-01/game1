@@ -12,6 +12,11 @@ for _, test in ipairs({{0,nil,'FULL'},{100,nil,'LOD1'},{200,nil,'UNLOADED'},
     assert(Policy.Resolve(test[1],test[2],p,false)==test[3])
 end
 assert(Policy.Resolve(1000,nil,p,true)=='FULL')
+math.clamp=function(v,lo,hi) return math.min(hi,math.max(lo,v)) end
+assert(Policy.AttackReach(9,5,7,420)==22)
+assert(Policy.AttackReach(420,5,7,420)==433)
+assert(Policy.AttackReach(999,5,7,420)==433)
+assert(Policy.AttackReach(nil,5,7,420)==20)
 assert(not Policy.Valid({enabled=true,full=100,hide=105,hysteresis=10}))
 local v = {LocalTransparencyModifier=.3}; local a,b={},{}
 Visibility.Set(v,a,true); Visibility.Set(v,b,true); Visibility.Set(v,a,false)
@@ -33,6 +38,9 @@ local function instance(class,name)
     local i={class=class,Name=name,children={},attrs={},ChildAdded=signal(),ChildRemoved=signal(),Parent=true,Position=vec(0),CFrame=CFrame.new(),Size=Vector3.new(2,4,2)}
     function i:IsA(c) return c==self.class or (c=='BasePart' and (self.class=='Part' or self.class=='MeshPart')) end
     function i:GetChildren() local out={};for _,c in pairs(self.children) do out[#out+1]=c end;return out end
+    function i:GetDescendants()
+        local out={};for _,c in pairs(self.children) do out[#out+1]=c;for _,d in ipairs(c:GetDescendants()) do out[#out+1]=d end end;return out
+    end
     function i:FindFirstChild(n) return self.children[n] end
     function i:FindFirstChildWhichIsA(c) for _,o in pairs(self.children) do if o:IsA(c) then return o end end end
     function i:FindFirstChildOfClass(c) return self:FindFirstChildWhichIsA(c) end
@@ -94,6 +102,10 @@ ctl:Step(.25);assert(ctl:Describe().playerRoot=='NavigationRoot' and ctl:Describ
 custom.children.RootCollider=savedCollider
 ctl:Step(.25);assert(ctl:Describe().playerRoot=='RootCollider')
 assert(ctl:Describe().counts.LOD1==2 and ctl:Describe().rows[1].reason=='distance')
+assert(ctl:Describe().rows[1].meshes==1 and ctl:Describe().rows[1].bones==0 and ctl:Describe().rows[1].animators==0 and ctl:Describe().serverCounts.unregistered==2)
+m.attrs.Game1MnpcDemandStage='shell';m.attrs.Game1MnpcResourceAudit='shell M0 B0 A0 H0';m.children.ImportedRig=nil
+local audit=ctl:Describe();assert(audit.serverCounts.shell==1 and audit.rows[1].meshes==0 and audit.rows[1].bones==0 and audit.rows[1].animators==0 and audit.rows[1].audit=='shell M0 B0 A0 H0')
+m.attrs.Game1MnpcDemandStage=nil;m.attrs.Game1MnpcResourceAudit=nil;m.children.ImportedRig=instance('Model','ImportedRig');m.children.ImportedRig.children.mesh=instance('MeshPart','mesh')
 assert(not ctl.records[m].part.CanCollide and not ctl.records[m].part.CanQuery and not ctl.records[m].part.CanTouch)
 player.Character.attrs.AttackRadius=200;ctl:Step(.25);assert(ctl:Describe().counts.FULL==2 and ctl:Describe().rows[1].reason=='attack reach')
 player.Character.attrs.AttackRadius=nil;m.attrs.Game1GameplayTestOwner=42;ctl:Step(.25);assert(ctl:Describe().rows[1].reason=='gameplay test' and not m.hidden)

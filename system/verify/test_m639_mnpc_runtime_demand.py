@@ -31,7 +31,9 @@ class RuntimeDemandM639(unittest.TestCase):
     def test_opt_in_readiness_and_batch_scope(self):
         demand=read('src/server/actor/MnpcDemandLifecycle.luau')
         self.assertNotIn('Game1MnpcDemandPilot',demand)
-        self.assertIn('DebugAccess.ServerEnabled() then maxReach = Attack.MaxAimDistance',demand)
+        self.assertIn('Policy.Resolve(distance, previous, profile, distance <= reach)',demand)
+        self.assertNotIn('DebugAccess.ServerEnabled() then maxReach',demand)
+        self.assertNotIn('PREWARM',demand)
         self.assertIn('qualified[template]',demand)
         self.assertIn('if not best or distance < bestDistance',demand.replace('elseif not best','if not best'))
         scheduler=read('src/server/actor/ActorAIScheduler.luau')

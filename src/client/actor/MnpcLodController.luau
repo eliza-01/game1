@@ -72,9 +72,9 @@ local function fullReady(model)
 end
 local function pinReason(record, player, distance, profile, collider)
     local model = record.model
-    local reach = math.clamp(tonumber(player.Character:GetAttribute("AttackRadius")) or AttackConfig.Range, 0, AttackConfig.MaxAimDistance)
     local extent = collider and collider.Size.Magnitude * 0.5 or 0
-    if distance <= reach + extent + 8 then return "attack reach" end
+    local reach = Policy.AttackReach(player.Character:GetAttribute("AttackRadius"), extent, AttackConfig.Range, AttackConfig.MaxAimDistance)
+    if distance <= reach then return "attack reach" end
     if record.actual == "FULL" and distance < profile.hide and model:GetAttribute("LifeState") ~= "Alive" then return "death presentation" end
     -- 0 is the explicit no-target sentinel, not a player identity.
     if player.UserId ~= 0 and (model:GetAttribute("MonsterTargetUserId") == player.UserId
@@ -228,18 +228,31 @@ end
 function Controller:Describe()
     local rows = {}
     local counts = {FULL = 0, LOD1 = 0, UNLOADED = 0, UNTRACKED = 0}
+    local serverCounts = {full = 0, shell = 0, loading = 0, preparing = 0, fault = 0, unregistered = 0}
     for model, record in pairs(self.records) do
         local stage = record.actual or "UNTRACKED"
         counts[stage] = (counts[stage] or 0) + 1
+        local server = model:GetAttribute("Game1MnpcDemandStage") or "unregistered"
+        serverCounts[server] = (serverCounts[server] or 0) + 1
+        local meshes, bones, animators = 0, 0, 0
+        for _, node in ipairs(model:GetDescendants()) do
+            if node:IsA("MeshPart") then meshes = meshes + 1 end
+            if node:IsA("Bone") then bones = bones + 1 end
+            if node:IsA("Animator") then animators = animators + 1 end
+        end
         local row = {name = model.Name, kind = record.kind, distance = record.distance,
+            meshes = meshes, bones = bones, animators = animators,
+            audit = model:GetAttribute("Game1MnpcResourceAudit"),
+            hitboxes = tonumber(model:GetAttribute("CombatHitboxCount")) or 0,
+            hp = model:GetAttribute("HP"), damageable = model:GetAttribute("Damageable"),
             actual = stage, desired = record.desired or "-", reason = self.waitingForPlayerRoot and "waiting for player root" or record.reason or "not observed",
-            server = model:GetAttribute("Game1MnpcDemandStage") or "-", profile = record.profile}
+            server = server, profile = record.profile}
         rows[#rows + 1] = row
     end
     table.sort(rows, function(a, b) return (a.distance or math.huge) < (b.distance or math.huge) end)
     local player = Players.LocalPlayer
     local character = player and player.Character
-    return {counts = counts, rows = rows, playerRoot = self.playerRoot and self.playerRoot.Name, waitingForPlayerRoot = self.waitingForPlayerRoot == true, reach = character and (tonumber(character:GetAttribute("AttackRadius")) or AttackConfig.Range)}
+    return {counts = counts, serverCounts = serverCounts, rows = rows, playerRoot = self.playerRoot and self.playerRoot.Name, waitingForPlayerRoot = self.waitingForPlayerRoot == true, reach = character and (tonumber(character:GetAttribute("AttackRadius")) or AttackConfig.Range)}
 end
 function Controller:Destroy()
     if self.destroyed then return end

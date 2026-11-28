@@ -6,6 +6,7 @@ local Options = require(Shared:WaitForChild("GameOptions"))
 local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Dock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local Streamer = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("LocationWorldStreamer"))
+local MnpcView = require(script.Parent:WaitForChild("MnpcStatusView"))
 local Controller = {}
 local started = false
 
@@ -61,6 +62,50 @@ function Controller.Start()
         BackgroundTransparency=1,TextColor3=Color3.fromRGB(240,247,250),Font=Enum.Font.Code,TextSize=13,
         TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,
         Text="Runtime LOD · start, close panel, run scenario, reopen and stop. Results are local; JSON in client Output."})
+    -- MNPC uses explicit row heights and CanvasSize; unlike a single autosizing
+    -- TextLabel, the last row is reachable even on a small touch viewport.
+    local mnpcScroll = make(panel,"ScrollingFrame",{Visible=false, Active=true, ScrollingEnabled=true,
+        ScrollingDirection=Enum.ScrollingDirection.Y, Position=UDim2.fromOffset(8,52),Size=UDim2.new(1,-16,1,-60),
+        BackgroundTransparency=1, BorderSizePixel=0, ScrollBarThickness=6,
+        ScrollBarImageColor3=Color3.fromRGB(135,155,175), CanvasSize=UDim2.fromOffset(0,0),
+        AutomaticCanvasSize=Enum.AutomaticSize.None})
+    local function renderMnpc(view)
+        mnpcScroll:ClearAllChildren()
+        local y = 0
+        local function line(parent, value, x, top, height, strong, color)
+            return make(parent,"TextLabel",{Text=value,Position=UDim2.fromOffset(x,top),Size=UDim2.new(1,-x-4,0,height),
+                BackgroundTransparency=1,Font=strong and Enum.Font.GothamSemibold or Enum.Font.Gotham,
+                TextSize=12,TextColor3=color or Color3.fromRGB(231,239,245),TextWrapped=true,
+                TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Center})
+        end
+        local muted = Color3.fromRGB(164,183,198)
+        for i, value in ipairs(view.summary) do
+            line(mnpcScroll,value,2,y,24,i<=4,i>4 and muted or nil).Size = UDim2.new(1,-12,0,24)
+            y = y + 24
+        end
+        for _, group in ipairs(view.groups) do
+            line(mnpcScroll,string.format("%s (%d)",group.name,#group.rows),2,y,24,true).Size = UDim2.new(1,-12,0,24)
+            y = y + 24
+            for _, row in ipairs(group.rows) do
+                local card = make(mnpcScroll,"Frame",{Position=UDim2.fromOffset(0,y),Size=UDim2.new(1,-10,0,80),
+                    BackgroundColor3=Color3.fromRGB(28,37,48),BorderSizePixel=0})
+                make(card,"UICorner",{CornerRadius=UDim.new(0,6)})
+                line(card,row.title,6,2,20,true)
+                line(card,row.status,6,22,18,true)
+                line(card,row.resources,6,40,18,false,muted)
+                line(card,row.server,6,58,20,false,muted)
+                y = y + 84
+            end
+        end
+        mnpcScroll.CanvasSize = UDim2.fromOffset(0,y)
+        mnpcScroll.CanvasPosition = Vector2.new(0,0)
+        scroll.Visible = false
+        mnpcScroll.Visible = true
+    end
+    local function showCapture()
+        mnpcScroll.Visible = false
+        scroll.Visible = true
+    end
     local recording = false
     local function syncPanel()
         panel.Visible = playerGui:GetAttribute("Game1DebugPanelOpen") == "LD"
@@ -72,25 +117,10 @@ function Controller.Start()
     syncPanel()
     mnpcStatus.Activated:Connect(function()
         local snapshot, reason = Streamer.MnpcStatus()
-        local lines = {"MNPC · server demand " .. (if Options.MnpcDemandEnabled() then "ON" else "OFF")}
-        if not snapshot then
-            lines[#lines + 1] = tostring(reason)
-        else
-            local c = snapshot.counts
-            lines[#lines + 1] = "Player root: " .. (snapshot.playerRoot or "WAIT")
-            lines[#lines + 1] = "Attack radius: " .. tostring(snapshot.reach or "-")
-            lines[#lines + 1] = string.format("FULL %d | LOD1 %d | OUT %d | WAIT %d", c.FULL, c.LOD1, c.UNLOADED, c.UNTRACKED)
-            for i = 1, math.min(12, #snapshot.rows) do
-                local row = snapshot.rows[i]
-                local p = row.profile
-                lines[#lines + 1] = string.format("\n%s · %s studs\n%s → %s | %s\nserver: %s | %s", row.name,
-                    row.distance and string.format("%.0f", row.distance) or "?", row.desired, row.actual, row.reason,
-                    row.server, p and string.format("%s/%s ±%s", tostring(p.full), tostring(p.hide), tostring(p.hysteresis)) or "no profile")
-            end
-        end
-        text.Text = table.concat(lines, "\n")
+        renderMnpc(MnpcView.Build(snapshot,Options.MnpcDemandEnabled(),reason))
     end)
     toggle.Activated:Connect(function()
+        showCapture()
         if recording then
             recording = false
             toggle.Text = "Start capture"

@@ -6,7 +6,6 @@ local World = Shared:WaitForChild("world")
 local Policy = require(World:WaitForChild("MnpcLodPolicy"))
 local Registry = require(World:WaitForChild("MnpcLodRegistry"))
 local Attack = require(Shared:WaitForChild("combat"):WaitForChild("AttackConfig"))
-local Balance = require(Shared:WaitForChild("balance"):WaitForChild("Balance"))
 local DebugAccess = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local PlayerIndex = require(script.Parent:WaitForChild("PlayerSpatialIndex"))
 local Root = require(script.Parent:WaitForChild("ActorTargetRoot"))
@@ -15,16 +14,6 @@ local records, pending = {}, {}
 local activeBuild = nil
 local qualified = setmetatable({}, {__mode = "k"})
 local HOLD, RETRY, READY_TIMEOUT = 5, 5, 15
-local PREWARM, RELEASE_MARGIN = 48, 32
--- Cover all equip choices, not only the currently held weapon. Debug loadouts
--- can raise range up to MaxAimDistance; never use a smaller admission radius.
-local maxReach = Attack.Range
-for _, row in ipairs(Balance.Weapons) do
-    local radius = tonumber(row.radius)
-    if radius and radius == radius then maxReach = math.max(maxReach, radius) end
-end
-maxReach = math.clamp(maxReach, 1, Attack.MaxAimDistance)
-if DebugAccess.ServerEnabled() then maxReach = Attack.MaxAimDistance end
 
 local function enabled()
     -- Persisted Options is the sole authority; no per-Place override.
@@ -53,28 +42,25 @@ local function pinned(agent)
         or model:GetAttribute("Game1GameplayTestOwner") ~= nil
 end
 
-local function positive(value)
-    local n = tonumber(value)
-    return n and n == n and n >= 0 and n < math.huge and n or 0
-end
-
-local function radiusFor(model, profile, full)
+-- The spatial query is a conservative candidate envelope only. Each player
+-- is tested against the same 3D LOD policy and their own current attack reach.
+-- Aggro radius is not a visual radius: actual engagement is protected by pinned().
+local function nearest(model, root, profile, full)
     local collider = model:FindFirstChild("RootCollider")
     local extent = collider and collider.Size.Magnitude * 0.5 or 0
-    local base = math.max(profile.full + profile.hysteresis, maxReach + extent + 8,
-        positive(model:GetAttribute("MonsterAggroRadius")), positive(model:GetAttribute("MonsterAttackRadius")),
-        positive(model:GetAttribute("NpcAttackRadius")))
-    return base + PREWARM + (full and RELEASE_MARGIN or 0)
-end
-
-local function nearest(root, radius)
+    local radius = math.max(profile.full + profile.hysteresis,
+        Policy.AttackReach(Attack.MaxAimDistance, extent, Attack.Range, Attack.MaxAimDistance))
+    local previous = full and "FULL" or "LOD1"
     local result = math.huge
     for _, player in ipairs(PlayerIndex.Query(root.Position, radius)) do
-        local other = Root.Get(player.Character)
+        local character = player.Character
+        local other = Root.Get(character)
         if other then
-            local delta = other.Position - root.Position
-            local distance = math.sqrt(delta.X * delta.X + delta.Z * delta.Z)
-            if distance <= radius then result = math.min(result, distance) end
+            local distance = (other.Position - root.Position).Magnitude
+            local reach = Policy.AttackReach(character:GetAttribute("AttackRadius"), extent, Attack.Range, Attack.MaxAimDistance)
+            if Policy.Resolve(distance, previous, profile, distance <= reach) == "FULL" then
+                result = math.min(result, distance)
+            end
         end
     end
     return result
@@ -87,7 +73,20 @@ function Demand.CanSpawnShell(model, root, template)
     local profile, key = profileOf(model)
     local keys = qualified[template]
     return Policy.Valid(profile) and profile.enabled and keys ~= nil and keys[key] == true
-        and nearest(root, radiusFor(model, profile, true)) == math.huge
+        and nearest(model, root, profile, true) == math.huge
+end
+
+-- DEV evidence at stable transitions only. No polling or extra network channel.
+local function audit(model, stage)
+    if not DebugAccess.ServerEnabled() then return end
+    local meshes, bones, animators = 0, 0, 0
+    for _, node in ipairs(model:GetDescendants()) do
+        if node:IsA("MeshPart") then meshes = meshes + 1 end
+        if node:IsA("Bone") then bones = bones + 1 end
+        if node:IsA("Animator") then animators = animators + 1 end
+    end
+    model:SetAttribute("Game1MnpcResourceAudit", string.format("%s M%d B%d A%d H%d", stage,
+        meshes, bones, animators, tonumber(model:GetAttribute("CombatHitboxCount")) or 0))
 end
 
 function Demand.Register(model, callbacks, initialShell, template)
@@ -95,6 +94,7 @@ function Demand.Register(model, callbacks, initialShell, template)
     local stage = initialShell and "shell" or "full"
     records[model] = {callbacks = callbacks, stage = stage, retryAt = 0, template = template, model = model}
     model:SetAttribute("Game1MnpcDemandStage", stage)
+    audit(model, stage)
 end
 
 function Demand.Remove(model)
@@ -130,13 +130,14 @@ local function release(model, record)
     record.stage = "shell"
     record.farSince = nil
     model:SetAttribute("Game1MnpcDemandStage", "shell")
+    audit(model, "shell")
     return true
 end
 
 local function need(agent, full)
     local profile = profileOf(agent.model)
     if not enabled() or not Policy.Valid(profile) or not profile.enabled then return true, 0 end
-    local distance = nearest(agent.root, radiusFor(agent.model, profile, full))
+    local distance = nearest(agent.model, agent.root, profile, full)
     if pinned(agent) then return true, distance == math.huge and 0 or distance end
     return distance < math.huge, distance
 end
@@ -152,6 +153,7 @@ function Demand.Step(agent, now)
             record.stage = "full"
             model:SetAttribute("Damageable", true)
             model:SetAttribute("Game1MnpcDemandStage", "full")
+            audit(model, "full")
             if activeBuild == record then activeBuild = nil end
         elseif now >= record.readyUntil then
             if release(model, record) then record.retryAt = now + RETRY end

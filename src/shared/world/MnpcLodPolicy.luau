@@ -29,6 +29,13 @@ function Policy.Resolve(distance, previous, p, pinned)
     if distance < p.hide then return "LOD1" end
     return "UNLOADED"
 end
+-- Same live weapon reach for both client presentation and server admission.
+-- MaxAimDistance is a validation cap, not the reach of every player.
+function Policy.AttackReach(radius, extent, fallback, cap)
+    local reach = tonumber(radius)
+    if not reach or reach ~= reach then reach = fallback end
+    return math.clamp(reach, 1, cap) + extent + 8
+end
 function Policy.Key(kind, slug)
     if type(slug) ~= "string" or slug == "" then return nil end
     if kind == "NPC" then return "npc:" .. slug end

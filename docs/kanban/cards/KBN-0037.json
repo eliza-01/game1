@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "8d49d9cdeb5279740d34087c32ae99e2fbdd5c28096bdbf078e433f0e11dbf23",
+  "specSha256": "ff81d058a5ee491cb9b8b02b12adae51d160e1835e86ac972725accde438b80e",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 15,
-  "updatedAt": "2026-11-28T17:00:00+00:00",
+  "revision": 16,
+  "updatedAt": "2026-11-28T18:00:00+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -33,7 +33,7 @@
     },
     {
       "id": "KBN-0037-T04",
-      "title": "Индексировать сокеты; кэшировать дверные меши и исключить периодическое изменение CanQuery",
+      "title": "Перепроектировать взаимодействия сокетов/дверей с учётом этажей; затем уточнить индекс и raycast (отложено владельцем)",
       "done": false
     },
     {
@@ -49,6 +49,11 @@
     {
       "id": "KBN-0037-T07",
       "title": "M612: приёмка видимости удалённых атак и включение player attack sampler в общий бюджет",
+      "done": false
+    },
+    {
+      "id": "KBN-0037-T08",
+      "title": "MNPC Visual LOD: FULL / LOD1 / UNLOADED, отдельный visual rig, один статический меш на вариант, общий бюджет (следующая задача)",
       "done": false
     }
   ],
@@ -69,13 +74,13 @@
       "id": "KBN-0037-A03",
       "title": "Неподвижный игрок не вызывает глобальную пересортировку LOD; большие сборки бюджетируются; streaming/коллизии/телепорты работают",
       "status": "NOT_RUN",
-      "evidence": "M619–M623: shared static index/threshold queue/prototype cache, Location/House incremental jobs and retirement. Mixed bounds/index, async slots and mocked adapter lifecycle oracles cover atomic swaps, retry, proxy stream-out/in, appearance and raycast unbind. Budgeted Studio Preview scheduling, actual Studio/DEV Mobile, House5/two-client interactions, collisions/navigation and profiling NOT_RUN. M624: opt-in capture and manual acceptance matrix, Preview teardown fix. Preview scheduling, global composite/tagged visits, actual Studio/DEV and profiling remain open. M625: event-driven composite effect owner, shared path-prefix subscriptions, late descendants, actual/restore/teardown oracle; periodic composite pass removed. Incremental Studio Preview deferred by owner; tagged visual pass and actual Studio/DEV/PC/Mobile, two-client and profiling remain NOT_RUN. M625 owner smoke: published game works, no noticeable degradation; weak phone near fence gaps while far houses appeared. M626 near-first admission by player/surface band, stall escape, async slot pressure and teleport oracle; actual weak phone spawn check pending; stress/profiling deferred by owner."
+      "evidence": "M619–M623: shared static index/threshold queue/prototype cache, Location/House incremental jobs and retirement. Mixed bounds/index, async slots and mocked adapter lifecycle oracles cover atomic swaps, retry, proxy stream-out/in, appearance and raycast unbind. Budgeted Studio Preview scheduling, actual Studio/DEV Mobile, House5/two-client interactions, collisions/navigation and profiling NOT_RUN. M624: opt-in capture and manual acceptance matrix, Preview teardown fix. Preview scheduling, global composite/tagged visits, actual Studio/DEV and profiling remain open. M625: event-driven composite effect owner, shared path-prefix subscriptions, late descendants, actual/restore/teardown oracle; periodic composite pass removed. Incremental Studio Preview deferred by owner; tagged visual pass and actual Studio/DEV/PC/Mobile, two-client and profiling remain NOT_RUN. M625 owner smoke: published game works, no noticeable degradation; weak phone near fence gaps while far houses appeared. M626 near-first admission by player/surface band, stall escape, async slot pressure and teleport oracle; actual weak phone spawn check pending; stress/profiling deferred by owner. M626 owner follow-up: «загрузка работает»; функциональный smoke принят. Формальная A03 и нагрузочная матрица не выполнены."
     },
     {
       "id": "KBN-0037-A04",
-      "title": "Дверь, замок, сокеты и препятствия корректны в Authoring/Runtime и PC/Mobile; Raycast только в зоне; не меняется CanQuery на каждом запросе",
+      "title": "После перепроектирования сокетов корректный выбор этажа/двери/замка и серверная валидация; PC/Mobile; точные критерии нового контракта уточнить",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "Отложено владельцем: текущие сферичные зоны пересекают этажи; сначала новое ТЗ системы взаимодействий."
     },
     {
       "id": "KBN-0037-A05",
@@ -88,6 +93,12 @@
       "title": "Сравнение CPU/frame time, RAM и FPS на фиксированной сцене DEV и телефоне сохранено",
       "status": "NOT_RUN",
       "evidence": ""
+    },
+    {
+      "id": "KBN-0037-A07",
+      "title": "MNPC: независимый Visual LOD двух клиентов, LOD1 без visual rig/Animator/sampler, UNLOADED без owned visual, движение и authoritative hitboxes/AI сохранены",
+      "status": "NOT_RUN",
+      "evidence": "Согласовано направление; docs/workflows/MNPC_LOD_SPEC_RU.md. Реализация и engine proof ещё не выполнены."
     }
   ]
 }

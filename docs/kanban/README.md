@@ -1,5 +1,7 @@
 # Eyesland Development Kanban — порядок работы
 
+**Решение владельца после M626 · следующий этап:** функциональная загрузка окружения принята («загрузка работает»); полная A03/A06, стресс-тесты и Profiler отложены, Incremental Studio Preview отложен. Socket & Door Optimization отложена до новой системы взаимодействий с корректным выбором этажа. Следующая задача — [MNPC Visual LOD (ТЗ)](../workflows/MNPC_LOD_SPEC_RU.md), KBN-0037-T08/A07: FULL / LOD1 / UNLOADED, один цельный статический mesh на визуальный вариант, без клиентского визуального Animator/скелета начиная с LOD1, движение сохранено. Серверная AI/боевые Bone-based hitboxes независимы от LOD наблюдателя; сначала архитектурный аудит и engine pilot разделения authoritative pose и visual rig. Существующие Location/House contracts не меняются. MNPC пока не реализован.
+
 Рабочие документы: `cards/KBN-XXXX.json` + `specs/KBN-XXXX.md`. Постоянный ID карточки **не равен номеру будущего Git-патча**. Номера уже применённых патчей и их подробности сохраняются в `docs/workflows` как история; план не назначает номеров заранее.
 
 ## Текущий фокус · 27.11.2026 · Performance review M605
@@ -36,7 +38,7 @@ M611: данные M610 зафиксированы в KBN-0035; автомати
 | --- | --- | --- |
 | [★ KBN-0035 · Performance Profiler](specs/KBN-0035.md) | P0 | Диагностика, воспроизводимый baseline |
 | [KBN-0036 · Spatial Index](specs/KBN-0036.md) | P0 | Общая инфраструктура локальных запросов |
-| [KBN-0037 · Client Performance](specs/KBN-0037.md) | P0 | Sampler, LOD, сокеты, Overhead UI; крепления T02 выполнены, A/B открыт |
+| [KBN-0037 · Client Performance](specs/KBN-0037.md) | P0 | Sampler, LOD, MNPC (следующая T08), Overhead UI; сокеты отложены, T02 выполнен, A/B открыт |
 | [KBN-0038 · Server Performance](specs/KBN-0038.md) | P0 | Combat broad phase, AI LOD, бюджет навигации |
 | [KBN-0039 · Asset Pipeline](specs/KBN-0039.md) | P1 | Hitbox precompute, прогрев клипов и внешности |
 

@@ -20,12 +20,16 @@ ITEMS = [
              'DEV debug dock → LOD diagnostics → Start capture / Stop capture. По умолчанию выключена; один существующий Heartbeat, без remotes. Heartbeat/callback elapsed, queue/desired latency, cache/async/work counters, peaks, client memory; не CPU всего клиента.',
              'Отчёт локальный, читается на PC и телефоне; JSON в client Output. Studio Preview teardown освобождает connections и возвращает FULL, сборка preview остаётся синхронной.',
          ]},
+         {'title': 'MNPC · следующий этап (план, не реализовано)', 'lines': [
+             'FULL / LOD1 / UNLOADED; один статический mesh на визуальный вариант, без клиентского visual Animator/скелета и sampler начиная с LOD1; движение/поворот сохраняются. Сначала доказать отделение authoritative Bone pose от клиентского rig. AI и боевой hitbox не зависят от наблюдателя. См. ТЗ MNPC.',
+             'Socket & Door Optimization отложена до новой системы взаимодействий с выбором этажа. Нагрузочная приёмка и incremental Studio Preview отложены владельцем.',
+         ]},
          {'title': 'Недостающее / проверить', 'lines': [
              'Runtime Location incremental assembly реализован. Studio Preview multipart использует тот же job builder синхронно; House integration реализована; event-driven effects реализованы; budgeted Preview scheduling отложен владельцем; runtime profiling открыт. Clone/Destroy/Parent и commit неделимы внутри группы; CPU deadline не гарантируется. Stale raw async MeshPart удаляется сразу (до четырёх слотов), вне счётчика job. Aging после 8 ticks внутри кольца и класса; root/proxy absence retryable.',
-             'Studio / Runtime / DEV Mobile, две камеры с разным LOD, коллизии, телепортация, CPU и память требуют фактической приёмки. Нагрузочная приёмка отложена владельцем; короткий smoke на телефоне для M626 открыт. Канбан KBN-0037 остаётся IN_PROGRESS.',
+             'Studio / Runtime / DEV Mobile, две камеры с разным LOD, коллизии, телепортация, CPU и память требуют фактической приёмки. Нагрузочная приёмка отложена владельцем; функциональная загрузка M626 принята владельцем, формальная матрица открыта. Канбан KBN-0037 остаётся IN_PROGRESS.',
          ]},
      ], 'sources': ['location-streamer', 'static-placement-index', 'location-lod-candidates',
                     'lod-threshold-cache', 'lod-transition-queue', 'lod-load-priority', 'lod-prototype-cache',
                     'location-lod-assembly', 'lod-assembly-job', 'lod-runtime-work', 'location-lod-policy', 'house-visual-adapter',
-                    'house-mesh-requests', 'location-composite-visual', 'location-composite-effects', 'runtime-lod-spec', 'lod-diagnostics', 'lod-debug-controller', 'lod-acceptance']},
+                    'house-mesh-requests', 'location-composite-visual', 'location-composite-effects', 'runtime-lod-spec', 'lod-diagnostics', 'lod-debug-controller', 'lod-acceptance', 'mnpc-lod-spec']},
 ]

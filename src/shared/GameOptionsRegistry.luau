@@ -316,6 +316,9 @@ return table.freeze({
 			startsPerSecond = 8,
 		}),
 	}),
+	mnpcDemand = table.freeze({
+		enabled = false,
+	}),
 	playerJump = table.freeze({
 		heightMultiplier = 2,
 		descentTimeMultiplier = 2,

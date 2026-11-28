@@ -19,7 +19,9 @@ function Observer.Watch(folder, entries, bind, unbind)
             local rig = model:FindFirstChild("ImportedRig")
             local root = model:FindFirstChild("HumanoidRootPart")
             local stage = model:GetAttribute("Game1MnpcLocalLod")
+            local demandStage = model:GetAttribute("Game1MnpcDemandStage")
             local ready = model:GetAttribute("Game1MnpcRigReady") == true
+                and (demandStage == nil or demandStage == "full")
                 and (stage == nil or stage == "FULL") and rig and root
             if entry and (not ready or entry.visual ~= rig or entry.root ~= root) then unbind(model) end
             if ready and not entries[model] then bind(model) end
@@ -32,7 +34,7 @@ function Observer.Watch(folder, entries, bind, unbind)
                 if watched[model] == state then refresh() end
             end)
         end
-        for _, attr in ipairs({"Game1MnpcRigReady", "Game1MnpcLocalLod", "Game1MonsterRuntime", "Game1NpcRuntime"}) do
+        for _, attr in ipairs({"Game1MnpcRigReady", "Game1MnpcDemandStage", "Game1MnpcLocalLod", "Game1MonsterRuntime", "Game1NpcRuntime"}) do
             table.insert(state.connections, model:GetAttributeChangedSignal(attr):Connect(schedule))
         end
         table.insert(state.connections, model.ChildAdded:Connect(schedule))

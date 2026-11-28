@@ -1,4 +1,4 @@
-"""Shared Studio pilot lifecycle. Lua doubles are not native animation/physics acceptance."""
+"""Shared opt-in runtime demand lifecycle. Lua doubles are not native acceptance."""
 from pathlib import Path
 import shutil
 import subprocess
@@ -13,20 +13,25 @@ class MnpcDemandM632(unittest.TestCase):
         lua = shutil.which('texlua') or shutil.which('lua')
         if not lua:
             self.skipTest('Standalone Lua unavailable')
-        subprocess.run([lua, str(ROOT/'system/verify/mnpc_demand_m632.lua'),
-                        str(ROOT/'src/server/actor/MnpcDemandLifecycle.luau')], check=True, timeout=15)
+        for mode in ('normal', 'debug'):
+            subprocess.run([lua, str(ROOT/'system/verify/mnpc_demand_m632.lua'),
+                            str(ROOT/'src/server/actor/MnpcDemandLifecycle.luau'),
+                            str(ROOT/'src/shared/world/MnpcLodPolicy.luau'), mode], check=True, timeout=15)
 
-    def test_common_scheduler_and_pilot_gate(self):
+    def test_common_scheduler_and_explicit_gate(self):
         demand = read('src/server/actor/MnpcDemandLifecycle.luau')
         scheduler = read('src/server/actor/ActorAIScheduler.luau')
-        self.assertIn('STUDIO and Workspace:GetAttribute("Game1MnpcDemandPilot") == true', demand)
+        self.assertIn('GameOptions.MnpcDemandEnabled()', demand)
+        self.assertNotIn('Game1MnpcDemandEnabled', demand)
         self.assertIn('PlayerIndex.Query(root.Position, radius)', demand)
         self.assertIn('Demand.Step(current, now)', scheduler)
         self.assertEqual(scheduler.count('RunService.Heartbeat:Connect'), 1)
         for forbidden in ('Heartbeat:Connect', 'task.wait(', 'RemoteEvent', 'GetPlayers('):
             self.assertNotIn(forbidden, demand)
-        self.assertIn('not activeBuild', demand)
-        self.assertIn('if not pilot and record.stage == "full"', demand)
+        self.assertIn('if activeBuild then return end', demand)
+        self.assertIn('pcall(Demand.Pump)', scheduler)
+        self.assertIn('return GameOptions.MnpcDemandEnabled()', demand)
+        self.assertIn('if not enabled() and record.stage == "full"', demand)
 
     def test_live_release_and_rebind_both_domains(self):
         monster = read('src/server/monster/MonsterSpawnerService.luau')

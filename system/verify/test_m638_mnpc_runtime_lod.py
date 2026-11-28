@@ -65,6 +65,6 @@ class RuntimeProjection(unittest.TestCase):
             text=(ROOT/path).read_text()
             self.assertIn('RigObserver.Watch',text)
             self.assertIn('LocalVisibility.Full',text)
-        self.assertIn('Game1MnpcDemandPilot', (ROOT/'src/server/actor/MnpcDemandLifecycle.luau').read_text())
+        self.assertIn('GameOptions.MnpcDemandEnabled()', (ROOT/'src/server/actor/MnpcDemandLifecycle.luau').read_text())
 
 if __name__=='__main__': unittest.main()

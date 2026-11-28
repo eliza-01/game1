@@ -31,7 +31,7 @@ class MnpcPresentationM631(unittest.TestCase):
             ('npc/NpcSpawnerService', 'NpcCombatAIService.Unbind(entity)', 'entity'),
         ):
             source = read('src/server/'+path+'.luau')
-            self.assertIn('local visual, rigLease = MnpcLifecycle.AttachRig(', source)
+            self.assertIn('visual, rigLease = MnpcLifecycle.AttachRig(', source)
             release = source.split('local function release',1)[1].split('\nlocal ',1)[0]
             normal = release.index(f'EntityHitboxService.Detach({entity})', release.index(unbind))
             self.assertLess(normal, release.index('entry.rigLease:Release()'))

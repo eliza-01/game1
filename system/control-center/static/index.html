@@ -500,6 +500,12 @@
 <label>Legacy/NPC concurrent paths<input id="option-ai-nav-concurrent" type="number" min="1" max="8" step="1" value="2"></label>
 <label>Legacy/NPC path starts · /sec<input id="option-ai-nav-rate" type="number" min="1" max="30" step="1" value="8"></label>
 </div><div class="actions"><button id="option-ai-lod-save" class="primary" type="button">Save AI performance</button></div></div></details>
+<details class="game1-option-section" data-option-section="mnpc-lod"><summary><span class="game1-option-icon" aria-hidden="true">👥</span><span><strong>MNPC LOD</strong></span></summary>
+<div class="panel character-card">
+<div class="character-grid"><label>Server rig demand (Monster + NPC) <input id="option-mnpc-demand-enabled" type="checkbox"></label></div>
+<small class="hint">Releases distant server rigs when no player needs them. Default OFF. Save, Rojo Sync, restart Play; publish for new live servers. Visual LOD remains active independently.</small>
+<div class="actions"><button id="option-mnpc-demand-save" class="primary" type="button">Save MNPC LOD</button></div>
+</div></details>
 <details class="game1-option-section" data-option-section="movement" ><summary><span class="game1-option-icon" aria-hidden="true">🦘</span><span><strong>Movement</strong><small>Прыжок и приземление</small></span></summary>
 <div class="panel character-card">
   <div class="section-title"><div><span>character movement · shared gameplay</span><h3>Jump &amp; landing</h3></div></div>
@@ -1311,7 +1317,7 @@
 <script src="skill-editor.js?v=557"></script>
 <script src="gameplay-test.js?v=515"></script>
 <script src="atlas-library.js?v=435"></script>
-<script src="options.js?v=618"></script>
+<script src="options.js?v=640"></script>
 <script src="character-creation-options.js?v=505"></script>
 <script src="languages-options.js?v=455"></script>
 <script src="weapon-atlas-picker.js?v=309"></script>

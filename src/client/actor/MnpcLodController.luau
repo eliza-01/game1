@@ -65,12 +65,13 @@ local function rootOf(model, name)
 end
 local function fullReady(model)
     local rig = model:FindFirstChild("ImportedRig")
-    return model:GetAttribute("Game1MnpcRigReady") == true and rig and rig:IsA("Model")
+    local stage = model:GetAttribute("Game1MnpcDemandStage")
+    return (stage == nil or stage == "full") and model:GetAttribute("Game1MnpcRigReady") == true and rig and rig:IsA("Model")
         and rig:FindFirstChildWhichIsA("MeshPart", true) ~= nil
 end
 local function pinned(record, player, distance, profile, collider)
     local model = record.model
-    local reach = math.clamp(tonumber(player.Character:GetAttribute("AttackRadius")) or 0, 0, AttackConfig.MaxAimDistance)
+    local reach = math.clamp(tonumber(player.Character:GetAttribute("AttackRadius")) or AttackConfig.Range, 0, AttackConfig.MaxAimDistance)
     local extent = collider and collider.Size.Magnitude * 0.5 or 0
     return distance <= reach + extent + 8
         or (record.actual == "FULL" and distance < profile.hide and model:GetAttribute("LifeState") ~= "Alive")

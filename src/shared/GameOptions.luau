@@ -103,6 +103,11 @@ function GameOptions.HostileNoDamageReturnSeconds(): number
     return math.clamp(finite((Registry.monsterAi or {}).noDamageReturnSeconds, 30), 1, 3600)
 end
 
+-- One persisted authoring option for both MNPC domains; read at server startup.
+function GameOptions.MnpcDemandEnabled(): boolean
+    return (Registry.mnpcDemand or {}).enabled == true
+end
+
 function GameOptions.AdaptiveAISettings()
     local source = (Registry.monsterAi or {}).adaptiveLod or {}
     return table.freeze({

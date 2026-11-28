@@ -41,7 +41,7 @@ class MnpcAiPoseBinding(unittest.TestCase):
         self.assertLess(spawn.index('NpcCombatAIService.Bind(entity'),spawn.index('pcall(NpcAnimationService.Create'))
         self.assertLess(spawn.index('entity.Destroying:Connect'),spawn.index('pcall(NpcAnimationService.Create'))
         self.assertLess(spawn.index('NpcCombatAIService.AttachPresentation(entity'),spawn.index('MnpcLifecycle.MarkRigReady(entity)'))
-        self.assertIn('presentation.Destroy()\n        release(state, entity, false)',spawn)
+        self.assertIn('presentation.Destroy()\n            release(state, entity, false)',spawn)
 
     def test_combat_actions_require_real_binding_and_old_monster_attack_bodies_preserved(self):
         hashes=json.loads(read('system/verify/ai_protected_m617.json'))
@@ -71,7 +71,7 @@ class MnpcAiPoseBinding(unittest.TestCase):
             for forbidden in ('Instance.new','Heartbeat','task.wait','RemoteEvent','LoadAnimation','DamageService','EntityHitboxService'):
                 self.assertNotIn(forbidden,source)
         source=read('src/server/monster/MonsterSpawnerService.luau')
-        self.assertLess(source.index('model:SetAttribute("MonsterSpawning", true)'),source.index('MnpcLifecycle.Publish(model'))
+        self.assertLess(source.index('model:SetAttribute("MonsterSpawning", not initialShell)'),source.index('MnpcLifecycle.Publish(model'))
         self.assertLess(source.index('model:SetAttribute("MonsterHomePosition", navigationRoot.Position)'),source.index('MnpcLifecycle.Publish(model'))
         self.assertIn('EntityHitboxService.Attach(model, visual)',source)
         self.assertIn('EntityHitboxService.Attach(entity, visual)',read('src/server/npc/NpcSpawnerService.luau'))

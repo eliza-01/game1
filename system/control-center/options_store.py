@@ -215,6 +215,16 @@ def normalize_world_streaming(change, base=None):
     return result
 
 
+# Shared server MNPC rig demand, independent of visual LOD and AI cadence.
+def normalize_mnpc_demand(change, base=None):
+    if not isinstance(change, dict) or set(change) - {'enabled'}:
+        raise ValueError('mnpcDemand accepts enabled only')
+    value = change.get('enabled', (base or {}).get('enabled', False))
+    if type(value) is not bool:
+        raise ValueError('mnpcDemand.enabled must be boolean')
+    return {'enabled': value}
+
+
 # Player movement physics (shared on PC and mobile; does not modify Workspace.Gravity).
 def normalize_player_jump(change, base=None):
     import math
@@ -374,6 +384,7 @@ DEFAULT_PAYLOAD = {
     "characterCreation": deepcopy(CREATION_DEFAULTS),
     "npcOverhead": deepcopy(NPC_OVERHEAD_DEFAULTS),
     "monsterAi": normalize_monster_ai({}),
+    "mnpcDemand": normalize_mnpc_demand({}),
     "worldStreaming": {"targetRadiusStuds": 150},
     "playerJump": {"heightMultiplier": 2.0, "descentTimeMultiplier": 2.0},
     "debugUi": {"desktop": {"showPublishedControls": False}, "mobile": {"showPublishedControls": False}, "startInHub": False, "startedLanguage": False, "startLocale": "auto", "publishedPlaceId": ""},
@@ -430,6 +441,7 @@ class OptionsStore:
         normalize_character_creation(payload.get('characterCreation', CREATION_DEFAULTS))
         normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
+        normalize_mnpc_demand(payload.get('mnpcDemand', DEFAULT_PAYLOAD['mnpcDemand']))
         normalize_world_streaming(payload.get('worldStreaming', DEFAULT_PAYLOAD['worldStreaming']))
         normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))
         normalize_debug_ui(payload.get('debugUi', DEFAULT_PAYLOAD['debugUi']))
@@ -462,6 +474,7 @@ class OptionsStore:
             "\tcharacterCreation = " + lua_literal(normalize_character_creation(payload.get('characterCreation', CREATION_DEFAULTS))) + ",",
             "\tnpcOverhead = " + lua_literal(normalize_npc_overhead(payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))) + ",",
             "\tmonsterAi = " + lua_literal(normalize_monster_ai(payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))) + ",",
+            "\tmnpcDemand = " + lua_literal(normalize_mnpc_demand(payload.get('mnpcDemand', DEFAULT_PAYLOAD['mnpcDemand']))) + ",",
             "\tplayerJump = " + lua_literal(normalize_player_jump(payload.get('playerJump', DEFAULT_PAYLOAD['playerJump']))) + ",",
             "\tdebugUi = " + lua_literal(normalize_debug_ui(payload.get('debugUi', DEFAULT_PAYLOAD['debugUi']))) + ",",
             "\tcharacterAnimations = table.freeze({",
@@ -516,13 +529,17 @@ class OptionsStore:
                     print(f'[options] M449 campfire range migration skipped: {error}')
             payload['socketRanges'] = normalize_socket_ranges(initial)
             changed = True
-        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges', 'rotations', 'flora', 'characterCreation'):
+        for field in ('healthUi', 'npcOverhead', 'monsterAi', 'mnpcDemand', 'debugUi', 'worldStreaming', 'playerJump', 'uiPresentation', 'socketRanges', 'rotations', 'flora', 'characterCreation'):
             if field not in payload:
                 payload[field] = deepcopy(DEFAULT_PAYLOAD[field])
                 changed = True
         normalized_monster_ai = normalize_monster_ai(payload['monsterAi'])
         if normalized_monster_ai != payload['monsterAi']:
             payload['monsterAi'] = normalized_monster_ai
+            changed = True
+        normalized_demand = normalize_mnpc_demand(payload['mnpcDemand'])
+        if normalized_demand != payload['mnpcDemand']:
+            payload['mnpcDemand'] = normalized_demand
             changed = True
         normalized_debug = normalize_debug_ui(payload['debugUi'])
         if normalized_debug != payload['debugUi']:
@@ -633,6 +650,8 @@ class OptionsStore:
             payload['npcOverhead'] = normalize_npc_overhead(request['npcOverhead'], payload.get('npcOverhead', NPC_OVERHEAD_DEFAULTS))
         if 'monsterAi' in request:
             payload['monsterAi'] = normalize_monster_ai(request['monsterAi'], payload.get('monsterAi', DEFAULT_PAYLOAD['monsterAi']))
+        if 'mnpcDemand' in request:
+            payload['mnpcDemand'] = normalize_mnpc_demand(request['mnpcDemand'], payload.get('mnpcDemand', DEFAULT_PAYLOAD['mnpcDemand']))
         if 'flora' in request:
             next_flora = normalize_flora(request['flora'], payload.get('flora', FLORA_DEFAULTS))
             validate_residents(self.root, next_flora)

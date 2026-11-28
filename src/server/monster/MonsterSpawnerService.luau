@@ -216,22 +216,27 @@ local function spawnOne(state: any): Model?
     model:SetAttribute("Game1MnpcFullModelId", tostring(definition.modelAssetId or ""))
     model:SetAttribute("Damageable", false)
     local prepared = MnpcLifecycle.PrepareShell(model, navigationRoot, template, surface, yaw, "Monster")
-    local visual, rigLease = MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster", prepared)
-    if not visual then
-        model:Destroy()
-        warn("[game1][monster-spawn] monster contains no usable visual rig: " .. slug)
-        return nil
+    local riseFromGround = not record.testOwner and definition.behavior and definition.behavior.riseFromGround == true
+    local initialShell = prepared ~= nil and not record.testOwner and not riseFromGround
+        and Demand.CanSpawnShell(model, navigationRoot, template)
+    local visual, rigLease
+    if not initialShell then
+        visual, rigLease = MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster", prepared)
+        if not visual then
+            model:Destroy()
+            warn("[game1][monster-spawn] monster contains no usable visual rig: " .. slug)
+            return nil
+        end
+        model:SetAttribute("RuntimeAnimationRootBridgeCount", MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual))
     end
-    local animationRootBridgeCount = MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)
-    model:SetAttribute("RuntimeAnimationRootBridgeCount", animationRootBridgeCount)
     -- The GP inspection mode keeps its existing per-player persistent proxy.
     local persistentOwner = if RunService:IsStudio() and Workspace.StreamingEnabled
         and record.testOwner and record.testZone and record.testZone <= 6
         then Players:GetPlayerByUserId(record.testOwner) else nil
     if persistentOwner then model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer end
-    -- The existing production combat/animation path still requires FULL.
-    -- Do not expose a damageable actor before the spawn/pose binding is ready.
-    model:SetAttribute("MonsterSpawning", true)
+    -- A previously qualified distant shell does not need a visual spawn reveal.
+    -- Rise-from-ground and gameplay-test actors keep the original spawn path.
+    model:SetAttribute("MonsterSpawning", not initialShell)
     model:SetAttribute("MonsterHomePosition", navigationRoot.Position)
     MnpcLifecycle.Publish(model, navigationRoot, ensureMonstersFolder())
     if persistentOwner then model:AddPersistentPlayer(persistentOwner) end
@@ -252,14 +257,16 @@ local function spawnOne(state: any): Model?
         model:SetAttribute("MonsterDisplayName", title)
         model:SetAttribute("GameplayTestVisualPlaceholder", proxy)
     end
-    local riseFromGround = not record.testOwner and definition.behavior and definition.behavior.riseFromGround == true
-    local spawnPresentation = MonsterSpawnPresentation.Prepare(model, visual, navigationRoot, humanoid, riseFromGround)
-    local hitbox = EntityHitboxService.Attach(model, visual)
-    model:SetAttribute("CombatHitboxCount", hitbox.count)
-
-    local entry = MonsterAnimationTrackFactory.Load(
-        MonsterAnimationRegistry.profiles and MonsterAnimationRegistry.profiles[slug], model, visual
-    )
+    local spawnPresentation, hitbox
+    local entry = {idleChoices = {}}
+    if not initialShell then
+        spawnPresentation = MonsterSpawnPresentation.Prepare(model, visual, navigationRoot, humanoid, riseFromGround)
+        hitbox = EntityHitboxService.Attach(model, visual)
+        model:SetAttribute("CombatHitboxCount", hitbox.count)
+        entry = MonsterAnimationTrackFactory.Load(
+            MonsterAnimationRegistry.profiles and MonsterAnimationRegistry.profiles[slug], model, visual
+        )
+    end
     entry.visual = visual
     entry.rigLease = rigLease
     entry.navigationRoot = navigationRoot
@@ -271,13 +278,17 @@ local function spawnOne(state: any): Model?
     entry.spawnPresentation = spawnPresentation
     population:RegisterInstance(state, model, entry)
 
-    bindIdleGeneration(state, model, entry)
-    idlePresentation.playBaseIdle(model, entry)
-    spawnPresentation:Start(function()
-        if state.instances[model] == entry and not entry.dying then
-            if not record.testOwner then wanderController:Start(state, model, entry) end
-        end
-    end)
+    if spawnPresentation then
+        bindIdleGeneration(state, model, entry)
+        idlePresentation.playBaseIdle(model, entry)
+        spawnPresentation:Start(function()
+            if state.instances[model] == entry and not entry.dying then
+                if not record.testOwner then wanderController:Start(state, model, entry) end
+            end
+        end)
+    else
+        wanderController:Start(state, model, entry)
+    end
 
     watch(entry, model:GetAttributeChangedSignal("MonsterCombatActive"), function()
         if state.instances[model] ~= entry or entry.dying then
@@ -346,8 +357,8 @@ local function spawnOne(state: any): Model?
             releaseInstance(state, model, false, true)
         end
     end)
-    MnpcLifecycle.MarkRigReady(model)
-    if prepared and not record.testOwner and hitbox.count > 0 and entry.deathTrack then
+    if not initialShell then MnpcLifecycle.MarkRigReady(model) end
+    if prepared and not record.testOwner and (initialShell or (hitbox and hitbox.count > 0 and entry.deathTrack)) then
         Demand.Register(model, {
             canRelease = function()
                 return model:GetAttribute("Damageable") == true and MonsterAgentLifecycle.HasPose(model)
@@ -381,7 +392,7 @@ local function spawnOne(state: any): Model?
                 return true
             end,
             ready = function() return MonsterAgentLifecycle.HasPose(model) end,
-        })
+        }, initialShell, template)
     end
     return model
 end

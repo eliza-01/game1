@@ -154,4 +154,5 @@ M626 · Near-first Runtime LOD: после публикации M625 владе�
 
 - [M533 — Targeted Status Effects](workflows/M533_TARGETED_STATUS_EFFECTS_RU.md).
 
-- [M638 · MNPC Runtime LOD / red dummy](workflows/M638_MNPC_RUNTIME_LOD_RU.md) — текущая визуальная интеграция, native isolation открыта.
+- [M639 · MNPC Runtime demand](workflows/M639_MNPC_RUNTIME_DEMAND_RU.md) — актуальный opt-in серверный lifecycle; native gates открыты.
+- [M638 · MNPC Runtime LOD / red dummy](workflows/M638_MNPC_RUNTIME_LOD_RU.md) — визуальная интеграция, native isolation открыта.

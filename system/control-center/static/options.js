@@ -41,6 +41,7 @@ function game1OptionsRender(){
   const life=data.characterAnimations||{};
   $('option-combat-state-duration').value=String(combat.stateDurationSeconds??6);
   $('option-monster-return-time').value=String(data.monsterAi?.noDamageReturnSeconds??30);
+  $('option-mnpc-demand-enabled').checked=data.mnpcDemand?.enabled===true;
   const lod=data.monsterAi?.adaptiveLod||{};
   $('option-ai-lod-enabled').checked=lod.enabled===true;
   $('option-ai-lod-seconds').value=String(lod.dormantSeconds??2);
@@ -77,7 +78,7 @@ function game1OptionsRender(){
   $('option-npc-overhead-save').disabled=game1OptionsState.saving;
   $('save-character-life-options').disabled=game1OptionsState.saving;
   $('save-player-jump-options').disabled=game1OptionsState.saving;
-  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save','option-rotation-save','option-flora-save','option-creation-save']){
+  for(const id of ['option-camera-save','option-camera-preset-save','option-camera-preset-apply','option-camera-preset-delete','health-ui-save','option-published-debug-save','option-world-streaming-save','option-ui-save','option-sockets-save','option-rotation-save','option-flora-save','option-creation-save','option-mnpc-demand-save']){
     $(id).disabled=game1OptionsState.saving;
   }
 }
@@ -130,6 +131,7 @@ $('option-nav-save').onclick=()=>{
   game1OptionsSave({monsterAi:{experimentalNavigation:nav}},'navigation options saved · Rojo Sync required');
 };
 $('option-ai-lod-save').onclick=()=>game1OptionsSave({monsterAi:{adaptiveLod:{enabled:$('option-ai-lod-enabled').checked,dormantSeconds:game1OptionNumber('option-ai-lod-seconds',2)},navigationBudget:{concurrent:game1OptionNumber('option-ai-nav-concurrent',2),startsPerSecond:game1OptionNumber('option-ai-nav-rate',8)}}},'AI performance saved · Rojo Sync required');
+$('option-mnpc-demand-save').onclick=()=>game1OptionsSave({mnpcDemand:{enabled:$('option-mnpc-demand-enabled').checked}},'MNPC LOD saved · Rojo Sync, restart Play / publish');
 $('refresh-options').onclick=game1OptionsLoad;
 $('save-combat-options').onclick=()=>game1OptionsSave({combat:{stateDurationSeconds:game1OptionNumber('option-combat-state-duration',6)},monsterAi:{noDamageReturnSeconds:game1OptionNumber('option-monster-return-time',30)}},'combat and monster return saved');
 function game1NpcOverheadRender(){

@@ -21,6 +21,7 @@ function ActorAIScheduler.Register(agent, interval, delay, step, onStop, phaseLo
         connection = RunService.Heartbeat:Connect(function()
             PlayerSpatialIndex.BeginBatch()
             local ok, err = pcall(queue.Pump, queue, os.clock())
+            if ok then ok, err = pcall(Demand.Pump) end
             PlayerSpatialIndex.EndBatch()
             if not ok then error(err, 0) end
             NavigationBudget.Pump()

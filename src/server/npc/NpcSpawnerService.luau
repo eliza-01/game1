@@ -112,21 +112,30 @@ local function spawnOne(state: any): boolean
     local equipmentContext = NpcEquipmentService.Resolve(slug)
     entity:SetAttribute("NpcWeaponType", equipmentContext.weaponType)
     entity:SetAttribute("NpcWeaponSet", equipmentContext.weaponSet)
-    local visual, rigLease = MnpcLifecycle.AttachRig(entity, root, template, surface, yaw, "NPC", prepared)
-    if not visual then
-        entity:Destroy()
-        warn("[game1][npc] published model has no usable visual rig: " .. slug)
-        return false
+    entity:SetAttribute("Game1NpcRuntime", true)
+    entity:SetAttribute("NpcSlug", slug)
+    entity:SetAttribute("Game1MnpcFullModelId", tostring(definition.modelAssetId or ""))
+    -- Same authored attack range used by NpcCombatAIService.Bind.
+    entity:SetAttribute("NpcAttackRadius", math.max(0, finite((definition.behavior or {}).attackRadiusStuds, 3)))
+    local initialShell = prepared ~= nil and Demand.CanSpawnShell(entity, root, template)
+    local visual, rigLease
+    if not initialShell then
+        visual, rigLease = MnpcLifecycle.AttachRig(entity, root, template, surface, yaw, "NPC", prepared)
+        if not visual then
+            entity:Destroy()
+            warn("[game1][npc] published model has no usable visual rig: " .. slug)
+            return false
+        end
     end
     MnpcLifecycle.Publish(entity, root, folder())
     local stats = definition.stats or {}
     local hp = math.max(1, finite(stats.MaxHP, 100))
-    entity:SetAttribute("Game1NpcRuntime", true)
-    entity:SetAttribute("NpcSlug", slug)
-    entity:SetAttribute("Game1MnpcFullModelId", tostring(definition.modelAssetId or ""))
-    local weaponSet = NpcEquipmentService.Equip(entity, slug, equipmentContext, rigLease)
     local profile = (NpcAnimationRegistry.profiles or {})[slug]
-    local aligned = NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)
+    local weaponSet, aligned = equipmentContext.weaponSet, false
+    if not initialShell then
+        weaponSet = NpcEquipmentService.Equip(entity, slug, equipmentContext, rigLease)
+        aligned = NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)
+    end
     entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
     entity:SetAttribute("NpcHomeRadiusStuds", math.clamp(finite(record.homeRadiusStuds, 16), 1, 10000))
     entity:SetAttribute("LifeState", "Alive")
@@ -140,8 +149,11 @@ local function spawnOne(state: any): boolean
     entity:SetAttribute("CritChance", math.clamp(finite(stats.CritChance, 0), 0, 100))
     entity:SetAttribute("AttackSpeed", math.max(1, finite(stats.AttackSpeed, 100)))
     entity:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, 50)))
-    local hitbox = EntityHitboxService.Attach(entity, visual)
-    entity:SetAttribute("CombatHitboxCount", hitbox.count)
+    local hitbox
+    if not initialShell then
+        hitbox = EntityHitboxService.Attach(entity, visual)
+        entity:SetAttribute("CombatHitboxCount", hitbox.count)
+    end
     local entry = { root = root, visual = visual, rigLease = rigLease, equipmentContext = equipmentContext, presentation = nil, dying = false }
     state.instances[entity] = entry
     local poseTicket = NpcCombatAIService.Bind(entity, root, function()
@@ -179,24 +191,29 @@ local function spawnOne(state: any): boolean
         release(state, entity, false)
         return false
     end
-    local ok, presentation = pcall(NpcAnimationService.Create, entity, visual, profile)
-    if not ok then
-        warn("[game1][npc] pose preparation failed: " .. tostring(presentation))
-        release(state, entity, false)
-        return false
+    if initialShell then
+        -- Bind registers AI and reserves a pose ticket. A dormant entity must
+        -- relinquish that ticket before the common acquire path can use it.
+        NpcCombatAIService.DetachPresentation(entity)
+    else
+        local ok, presentation = pcall(NpcAnimationService.Create, entity, visual, profile)
+        if not ok then
+            warn("[game1][npc] pose preparation failed: " .. tostring(presentation))
+            release(state, entity, false)
+            return false
+        end
+        if state.instances[entity] ~= entry or not NpcCombatAIService.AttachPresentation(entity, poseTicket, presentation) then
+            presentation.Destroy()
+            release(state, entity, false)
+            return false
+        end
+        entry.presentation = presentation
+        MnpcLifecycle.MarkRigReady(entity)
+        entity:SetAttribute("Damageable", true)
     end
-    if state.instances[entity] ~= entry or not NpcCombatAIService.AttachPresentation(entity, poseTicket, presentation) then
-        presentation.Destroy()
-        release(state, entity, false)
-        return false
-    end
-    entry.presentation = presentation
-    MnpcLifecycle.MarkRigReady(entity)
-    entity:SetAttribute("Damageable", true)
-    -- Only stable effective loadouts qualify for the reversible pilot. A
-    -- different mount fallback would invalidate the AI's weapon-set policy.
-    if prepared and aligned and hitbox.count > 0 and weaponSet == equipmentContext.weaponSet
-        and entity:GetAttribute("NpcWeaponType") == equipmentContext.weaponType then
+    -- Only stable effective loadouts qualify for the reversible lifecycle.
+    if prepared and (initialShell or (aligned and hitbox and hitbox.count > 0 and weaponSet == equipmentContext.weaponSet
+        and entity:GetAttribute("NpcWeaponType") == equipmentContext.weaponType)) then
         Demand.Register(entity, {
             canRelease = function() return entry.presentation ~= nil and entity:GetAttribute("Damageable") == true end,
             release = function()
@@ -237,7 +254,7 @@ local function spawnOne(state: any): boolean
                 return true
             end,
             ready = function() return entry.presentation ~= nil end,
-        })
+        }, initialShell, template)
     end
     return true
 end

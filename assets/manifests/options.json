@@ -495,5 +495,8 @@
         "fov": 70.0
       }
     }
+  },
+  "mnpcDemand": {
+    "enabled": false
   }
 }

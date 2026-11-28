@@ -1,5 +1,7 @@
 # M632 · MNPC Demand-driven Lifecycle
 
+> Исторический отчёт. Актуальный серверный режим и переключатель описаны в [M639](M639_MNPC_RUNTIME_DEMAND_RU.md); M632 pilot заменён.
+
 ## Реализовано
 
 Единый `actor/MnpcDemandLifecycle` для Monster и NPC подключён к существующему `ActorAIScheduler` и `PlayerSpatialIndex`. Без нового Heartbeat, отдельного таймера на сущность, RemoteEvent или нового AI owner. Цикл `full → shell → loading → preparing → full` отделяет собственно риг от entity/root/HP/spawn slot/AI. На обычном FULL пути нет дополнительных пространственных запросов.

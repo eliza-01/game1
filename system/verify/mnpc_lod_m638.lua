@@ -66,7 +66,7 @@ folder.WaitForChild=function(_,key) if key=='world' or key=='combat' or key=='Ga
 script={Parent=folder}
 game={GetService=function(_,k) if k=='Players' then return {LocalPlayer=player} elseif k=='Workspace' then return ws else return folder end end}
 local original=require
-require=function(key) return ({MnpcLodRegistry=registry,MnpcLodPolicy=Policy,AttackConfig={MaxAimDistance=420},MnpcLodMask=mask,MnpcLodPrototypeCache={new=function() return cache end}})[key] or original(key) end
+require=function(key) return ({MnpcLodRegistry=registry,MnpcLodPolicy=Policy,AttackConfig={MaxAimDistance=420,Range=7},MnpcLodMask=mask,MnpcLodPrototypeCache={new=function() return cache end}})[key] or original(key) end
 math.clamp=function(v,lo,hi) return math.min(hi,math.max(lo,v)) end
 local Controller=dofile(rootPath..'/src/client/actor/MnpcLodController.luau')
 local ctl=Controller.new();ctl:Step(.25)
@@ -79,7 +79,8 @@ player.Character.children.HumanoidRootPart.Position=vec(500);ctl:Step(.25)
 assert(m.hidden and n.hidden and not ctl.records[m].part and m.attrs.Game1MnpcLocalLod=='UNLOADED')
 player.Character.children.HumanoidRootPart.Position=vec(130);m.attrs.Game1MnpcRigReady=false;ctl:Step(.25)
 assert(m.hidden and ctl.records[m].part.Name=='MNPC_LOD1_RED_DUMMY')
-m.attrs.Game1MnpcRigReady=true;ctl:Step(.25);assert(not m.hidden and not ctl.records[m].part)
+m.attrs.Game1MnpcRigReady=true;m.attrs.Game1MnpcDemandStage="preparing";ctl:Step(.25);assert(m.hidden and ctl.records[m].part)
+m.attrs.Game1MnpcDemandStage="full";ctl:Step(.25);assert(not m.hidden and not ctl.records[m].part)
 player.Character.children.HumanoidRootPart.Position=vec(0);ctl:Step(.25);monsters.ChildRemoved:Fire(m)
 assert(not ctl.records[m] and not m.hidden and not m.attrs.Game1MnpcLocalLod)
 ctl:Destroy();assert(not n.hidden and not n.attrs.Game1MnpcLocalLod)

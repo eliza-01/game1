@@ -66,12 +66,14 @@ local function typedRequest(item: Item): Instance
 end
 
 -- Shared typed cache and bounded pool across prewarm, previews and world entry.
-local function fetch(item: Item): any?
+local function fetch(item: Item, background: boolean?): any?
     local key = item.key
     if loaded[key] then return {done = true, success = true} end
     if inFlight[key] then return inFlight[key] end
     if (failedUntil[key] or 0) > os.clock() then return {done = true, success = false} end
     if activeCount >= MAX_CONCURRENT then return nil end
+    -- Background warm uses at most one active slot, leaving three for real previews.
+    if background and activeCount > 0 then return nil end
     local result: any = {done = false, success = false}
     inFlight[key] = result
     activeCount += 1
@@ -108,8 +110,7 @@ local function fetch(item: Item): any?
     return result
 end
 
-function Preloader.PreloadModel(model: Model, isCurrent: (() -> boolean)?, onProgress: ((number) -> ())?): (boolean, boolean)
-    local queue = collect(model)
+local function preload(queue: {Item}, isCurrent: (() -> boolean)?, onProgress: ((number) -> ())?, background: boolean?): (boolean, boolean)
     local jobs: {[string]: any} = {}
     local deadline = os.clock() + 25
     local function current(): boolean return not isCurrent or isCurrent() end
@@ -120,7 +121,7 @@ function Preloader.PreloadModel(model: Model, isCurrent: (() -> boolean)?, onPro
         for _, item in ipairs(queue) do
             local job = jobs[item.key]
             if not job then
-                job = fetch(item)
+                job = fetch(item, background)
                 jobs[item.key] = job
             end
             if job and job.done then completed += 1 end
@@ -132,6 +133,24 @@ function Preloader.PreloadModel(model: Model, isCurrent: (() -> boolean)?, onPro
         task.wait(0.05)
     until false
     return successful == #queue and current(), geometryReady and current()
+end
+
+function Preloader.PreloadModel(model: Model, isCurrent: (() -> boolean)?, onProgress: ((number) -> ())?): (boolean, boolean)
+    return preload(collect(model), isCurrent, onProgress, false)
+end
+
+function Preloader.PreloadResources(sources: {MeshPart}, images: {string}, current: () -> boolean): boolean
+    local bucket: {[string]: Item} = {}
+    for _, source in ipairs(sources) do push(bucket, source.MeshId, true, source) end
+    for _, image in ipairs(images) do push(bucket, image, false, nil) end
+    local queue: {Item} = {}
+    for _, item in pairs(bucket) do table.insert(queue, item) end
+    table.sort(queue, function(a, b)
+        if a.geometry ~= b.geometry then return a.geometry end
+        return a.key < b.key
+    end)
+    local loadedAll = preload(queue, current, nil, true)
+    return loadedAll
 end
 
 return table.freeze(Preloader)

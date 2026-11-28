@@ -23,7 +23,7 @@ local WorldAnimations = require(AnimationRoot:WaitForChild("WorldAnimationPreloa
 local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
 local Preview = require(script.Parent:WaitForChild("CharacterCreationPreviewController"))
 local Request = require(script.Parent:WaitForChild("CharacterCreationRequest"))
-local VariantPrewarm = require(script.Parent:WaitForChild("CharacterCreationVariantPrewarm"))
+local AssetPrewarm = require(script.Parent:WaitForChild("CharacterCreationAssetPrewarm"))
 local Editor = require(script.Parent:WaitForChild("CharacterCreationAppearanceView"))
 local EyeEdit = require(script.Parent:WaitForChild("CharacterCreationEyeEdit"))
 local FullScreenLayer = require(script.Parent.Parent:WaitForChild("FullScreenLayer"))
@@ -137,8 +137,6 @@ function Controller.Start()
     local bootstrapProgress: {[string]: number} = {}
     local reactionPending: {[string]: boolean} = {}
     local worldProgress: number? = nil
-    local warmProgress: number? = 0
-    local warming = false
     local worldRecovery = false
     local recoveryBusy = false
     local function remoteFor(name: string): RemoteFunction?
@@ -172,12 +170,8 @@ function Controller.Start()
         end
         local partial = 0
         for id in pairs(bootstrapPending) do partial += bootstrapProgress[id] or 0 end
-        if warmProgress == nil then
-            Panel.SetSubmitting(controls, true, Language.Translate("creation.loading_appearance_assets"))
-        else
-            local progress = math.clamp(0.75 * warmProgress + 0.25 * (completed + partial) / total, 0, 1)
-            Panel.SetLoading(controls, true, Language.Translate("creation.loading_appearance_assets"), progress)
-        end
+        local progress = math.clamp((completed + partial) / total, 0, 1)
+        Panel.SetLoading(controls, true, Language.Translate("creation.loading_appearance_assets"), progress)
     end
 
     local function markBootstrapDone(id: string)
@@ -335,7 +329,7 @@ function Controller.Start()
         else reactionPending[id] = true end
     end
     local function pick(group: string, id: string)
-        if stage ~= "creation" or not selected or pending or leaving or warming then return end
+        if stage ~= "creation" or not selected or pending or leaving then return end
         local values = choices[selected]
         if values[group] == id then return end
         values[group] = id
@@ -348,7 +342,7 @@ function Controller.Start()
         requestPreview(selected)
     end
     local function paint(group: string, value: string, channel: string?)
-        if stage ~= "creation" or not selected or pending or leaving or warming then return end
+        if stage ~= "creation" or not selected or pending or leaving then return end
         local values = choices[selected]
         local previous = if channel then values.colors[group][channel] else values.colors[group]
         if group == "eyes" and channel then
@@ -363,7 +357,7 @@ function Controller.Start()
         react(selected)
     end
     local function material(group: string, value: string)
-        if stage ~= "creation" or not selected or pending or leaving or warming then return end
+        if stage ~= "creation" or not selected or pending or leaving then return end
         local allowed = (settings.materialChoices or {})[group] or {}
         if not table.find(allowed, value) or choices[selected].materials[group] == value then return end
         choices[selected].materials[group] = value
@@ -372,7 +366,7 @@ function Controller.Start()
         react(selected)
     end
     local function customColor(group: string, channel: string?, value: string?, titleText: string)
-        if stage ~= "creation" or not selected or pending or leaving or warming then return end
+        if stage ~= "creation" or not selected or pending or leaving then return end
         local id = selected
         local function preview(hex: string)
             if not id or not currentPreview then return end
@@ -435,7 +429,7 @@ function Controller.Start()
                 if selected then choices[selected] else nil, pick, paint, activeTab,
                 settings, material, customColor, if selected then eyeLocks[selected].locked else true,
                 function(side: string)
-                    if stage ~= "creation" or not selected or pending or leaving or warming then return end
+                    if stage ~= "creation" or not selected or pending or leaving then return end
                     palette:Close()
                     local values = choices[selected]
                     values.colors.eyes = EyeEdit.Toggle(eyeLocks[selected], values.colors.eyes, side)
@@ -503,7 +497,7 @@ function Controller.Start()
     for _, key in ipairs(Panel.Categories) do
         local category = key
         controls.tabs[category].Activated:Connect(function()
-            if stage ~= "creation" or not selected or pending or leaving or warming then return end
+            if stage ~= "creation" or not selected or pending or leaving then return end
             if not controls.tabs[category].Visible then return end
             palette:Close()
             activeTab = if activeTab == category then nil else category
@@ -696,7 +690,6 @@ function Controller.Start()
         submitting = not active
         worldProgress = nil
         worldRecovery = false; recoveryBusy = false
-        warming = false; warmProgress = 0
         Panel.SetSubmitting(controls, submitting, Language.Translate("creation.entering_world"))
         cover(true)
         if currentPreview then currentPreview:Destroy(); currentPreview = nil end
@@ -732,28 +725,25 @@ function Controller.Start()
                 bootstrapPending = {human_male = true, human_female = true}
                 bootstrapProgress = {}
                 refresh(); showStage(true); refreshBootstrapOverlay()
-                warming = true
+                requestPreview("human_male")
+                requestPreview("human_female")
                 task.spawn(function()
-                    local function current(): boolean return epoch == token and not leaving end
-                    local remote = remoteFor("CharacterCreationPreview")
-                    if not current() then return end
-                    local complete = false
-                    if remote then
-                        while previewRequestBusy and current() do task.wait(0.05) end
-                        if not current() then return end
-                        previewRequestBusy = true
-                        local ok, problem = pcall(VariantPrewarm.Run, remote, Catalog.archetypes or {}, choices, current, function(value)
-                            if current() then warmProgress = value; refreshBootstrapOverlay() end
-                        end)
-                        previewRequestBusy = false
-                        if not ok then warn("[game1][character-creation] variant prewarm: " .. tostring(problem)) end
-                        complete = ok and problem == true
+                    local function current(): boolean return epoch == token and not leaving and not submitting end
+                    local waitUntil = os.clock() + 60
+                    while current() and next(bootstrapPending) ~= nil and os.clock() < waitUntil do task.wait(0.1) end
+                    if next(bootstrapPending) ~= nil then return end
+                    if not current() or not ready.human_male or not ready.human_female then return end
+                    -- Once an actual geometry edit starts, retire optional warm;
+                    -- any missing asset will use the original foreground path.
+                    local maleRevision, femaleRevision = revisions.human_male, revisions.human_female
+                    local function idle(): boolean
+                        return current() and revisions.human_male == maleRevision and revisions.human_female == femaleRevision
+                            and not previewRequestBusy and ready.human_male == true and ready.human_female == true
                     end
-                    if not current() then return end
-                    warming = false; warmProgress = if complete then 1 else nil
-                    refreshBootstrapOverlay()
-                    requestPreview("human_male")
-                    requestPreview("human_female")
+                    local remote = remoteFor("CharacterCreationWarmComponent")
+                    if not remote or not idle() then return end
+                    local ok, problem = pcall(AssetPrewarm.Run, remote, idle)
+                    if not ok then warn("[game1][character-creation] optional component warm: " .. tostring(problem)) end
                 end)
             elseif stage == "selection" then
                 refresh()

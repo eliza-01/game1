@@ -133,11 +133,13 @@ class ClientContracts(unittest.TestCase):
         self.assertLess(preview.index('MeshPreloader.PreloadModel(instance'), preview.index('instance.Parent = self.folder'))
 
     def test_warm_variants_and_late_rpc_ownership(self):
-        warm = read('src/client/character/CharacterCreationVariantPrewarm.luau')
-        self.assertIn('for _, group in ipairs({"hair", "head", "eyes", "eyebrows"})', warm)
-        self.assertIn('choice[group] = row.id', warm)
-        self.assertIn('Preview.AwaitTemplate', warm)
-        self.assertIn('math.min(#queue, 24)', warm)
+        warm = read('src/client/character/CharacterCreationAssetPrewarm.luau')
+        self.assertIn('Preloader.PreloadResources', warm)
+        self.assertIn('for index = 1, 24 do', warm)
+        self.assertNotIn('Preview.AwaitTemplate', warm)
+        self.assertIn('os.clock() + 20', warm)
+        controller = read('src/client/character/CharacterCreationController.luau')
+        self.assertLess(controller.index('requestPreview("human_female")'), controller.index('AssetPrewarm.Run'))
         remote = read('src/client/character/CharacterCreationRequest.luau')
         self.assertLess(remote.index('while active[remote]'), remote.index('remote.InvokeServer'))
         self.assertIn('if active[remote] == result then active[remote] = nil end', remote)

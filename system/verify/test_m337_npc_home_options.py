@@ -37,7 +37,7 @@ class M337Tests(unittest.TestCase):
             root = Path(d)
             target = root / 'assets/manifests/options.json'
             target.parent.mkdir(parents=True)
-            source = json.loads((ROOT / 'assets/manifests/options.json').read_text())
+            source = json.loads((ROOT / 'assets/manifests/options.json').read_text(encoding="utf-8"))
             source.pop('npcOverhead', None)
             source.pop('monsterAi', None)
             source['healthUi']['mobile']['monster']['width'] = 157
@@ -48,7 +48,7 @@ class M337Tests(unittest.TestCase):
             self.assertEqual(stored['camera']['mobileLookSpeed'], 2.25)
             self.assertEqual(stored['npcOverhead']['desktop']['nameRadiusStuds'], 70)
             self.assertEqual(stored['monsterAi']['noDamageReturnSeconds'], 30)
-            generated = (root / 'src/shared/GameOptionsRegistry.luau').read_text()
+            generated = (root / 'src/shared/GameOptionsRegistry.luau').read_text(encoding="utf-8")
             self.assertIn('npcOverhead', generated)
             self.assertIn('monsterAi', generated)
 
@@ -63,7 +63,7 @@ class M337Tests(unittest.TestCase):
             path.write_text(json.dumps({'schemaVersion': 1, 'project': 'game1',
                                         'records': {source['spawnId']: source}}), encoding='utf-8')
             store = MonsterSpawnStore(root, None, None, None)
-            out = (root / 'src/server/monster/MonsterSpawnRegistry.luau').read_text()
+            out = (root / 'src/server/monster/MonsterSpawnRegistry.luau').read_text(encoding="utf-8")
             self.assertIn('homeRadiusStuds', out)
             first = store._fingerprint(source)
             second = store._fingerprint({**source, 'homeRadiusStuds': 120})
@@ -72,24 +72,24 @@ class M337Tests(unittest.TestCase):
             self.assertEqual(store._core(source, npc=True)['homeRadiusStuds'], 110)
 
     def test_runtime_npc_conditions_and_ai_owner(self):
-        client = (ROOT / 'src/client/combat/OverheadVisibilityPolicy.luau').read_text()
+        client = (ROOT / 'src/client/combat/OverheadVisibilityPolicy.luau').read_text(encoding="utf-8")
         self.assertIn('hp < maxHP - 0.001 or hostile', client)
-        self.assertIn('Policy.Npc(model, context, distSq)', (ROOT / 'src/client/combat/MnpcOverheadController.luau').read_text())
+        self.assertIn('Policy.Npc(model, context, distSq)', (ROOT / 'src/client/combat/MnpcOverheadController.luau').read_text(encoding="utf-8"))
         self.assertIn('distanceSquared <= context.nameSq', client)
         self.assertIn('distanceSquared <= context.hpSq', client)
-        ai = (ROOT / 'src/server/monster/MonsterAIService.luau').read_text()
+        ai = (ROOT / 'src/server/monster/MonsterAIService.luau').read_text(encoding="utf-8")
         self.assertIn('GameOptions.HostileNoDamageReturnSeconds()', ai)
         self.assertIn('onDamageDealt', ai)
         self.assertIn('if DeathChase.UsesHomeLeash(agent.model) then', ai)
         self.assertIn('targetRoot and not DeathChase.AllowsPursuitPosition(agent, targetRoot.Position) then reason = "TargetOutsideHomeLeash"', ai)
         self.assertIn('beginReturn(agent, reason)', ai)
-        policy = (ROOT / 'src/server/monster/MonsterDeathChasePolicy.luau').read_text()
+        policy = (ROOT / 'src/server/monster/MonsterDeathChasePolicy.luau').read_text(encoding="utf-8")
         self.assertIn('return not HomeLeash.Outside(agent.spawnCenter, position, math.max(0, agent.homeRadius - (margin or 0)))', policy)
         self.assertIn('agent.returning then', ai)
         self.assertIn('if not aggressive(agent) and not agent.retaliating and not agent.returning', ai)
 
     def test_compact_options_preserve_controls(self):
-        html = (ROOT / 'system/control-center/static/index.html').read_text()
+        html = (ROOT / 'system/control-center/static/index.html').read_text(encoding="utf-8")
         sections = re.findall(r'<details class="game1-option-section" data-option-section="([^"]+)"', html)
         self.assertEqual(len(sections), len(set(sections)))
         self.assertEqual(html.count('class="game1-option-section"'), len(sections))

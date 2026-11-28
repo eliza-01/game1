@@ -49,6 +49,6 @@ python system/studio-plugin/validate_luau.py
 
 Runtime behaviour Roblox Studio, публикация через Open Cloud и источники Blender проверяются **отдельно**. Успех Python-тестов не означает проверенный Play session.
 
-**Актуальная база:** диагностический дамп `game1_diag_2026-11-28_16-21-34.zip` (M645) + M646–M647. MNPC LOD функционально принят в одиночной игре; полная многопользовательская приёмка и реальные LOD1 открыты. M646–M647 — Overhead UI Pool, код и автоматическая интеграция готовы; Studio/DEV/Mobile NOT_RUN. [M646](docs/workflows/M646_OVERHEAD_UI_POOL_RU.md) · [M647](docs/workflows/M647_OVERHEAD_INTEGRATION_RU.md). [READ FIRST](docs/README%20Read%20First!.md) · [MNPC](docs/workflows/MNPC_LOD_SPEC_RU.md) · [Kanban](docs/kanban/specs/KBN-0037.md).
+**Актуальная база:** диагностический дамп `game1_diag_2026-11-28_16-21-34.zip` (M645) + M646–M648. MNPC LOD функционально принят в одиночной игре; полная многопользовательская приёмка и реальные LOD1 открыты. M646–M647 — Overhead UI Pool функционально принят владельцем; полный ресурсный A05 открыт. M648 — Character Creation Prewarm CODE_COMPLETE, нативная приёмка открыта. [M648](docs/workflows/M648_CHARACTER_ASSET_PREWARM_RU.md). [M646](docs/workflows/M646_OVERHEAD_UI_POOL_RU.md) · [M647](docs/workflows/M647_OVERHEAD_INTEGRATION_RU.md). [READ FIRST](docs/README%20Read%20First!.md) · [MNPC](docs/workflows/MNPC_LOD_SPEC_RU.md) · [Kanban](docs/kanban/specs/KBN-0037.md).
 
 - [M236: Location Assets — Model/Mesh ID history and Find → Replace](docs/workflows/LOCATION_ASSETS_ID_HISTORY_TWO_PHASE_SYNC_M236_RU.md)

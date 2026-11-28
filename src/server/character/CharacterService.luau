@@ -15,6 +15,7 @@ local CharacterCameraSync = require(script.Parent:WaitForChild("CharacterCameraS
 local CharacterCreationGateway = require(script.Parent:WaitForChild("CharacterCreationGateway"))
 local CharacterCreationProfileStore = require(script.Parent:WaitForChild("CharacterCreationProfileStore"))
 local CharacterCreationAppearanceService = require(script.Parent:WaitForChild("CharacterCreationAppearanceService"))
+local AssetWarmService = require(script.Parent:WaitForChild("CharacterCreationAssetWarmService"))
 local CharacterCreationPreviewService = require(script.Parent:WaitForChild("CharacterCreationPreviewService"))
 local CharacterCreationStreamingService = require(script.Parent:WaitForChild("CharacterCreationStreamingService"))
 local GameOptions = require(Shared:WaitForChild("GameOptions"))
@@ -84,7 +85,7 @@ local function selectedCharacter(requestedOverride: string?): (any?, number?, st
     return row, nil, requestedId, reason, requestedId, nil, nil
 end
 
-local function getAssetTemplate(assetId: number, cacheKey: string): Model?
+local function loadAssetTemplate(assetId: number, cacheKey: string): Model?
     local cached = cache:FindFirstChild(cacheKey)
     if cached and cached:IsA("Model") then
         return cached
@@ -114,6 +115,21 @@ local function getAssetTemplate(assetId: number, cacheKey: string): Model?
     template.Name = cacheKey
     template.Parent = cache
     return template
+end
+
+-- Preview, gameplay and optional warm share the same component load owner.
+local assetLoading: {[string]: boolean} = {}
+local function getAssetTemplate(assetId: number, cacheKey: string): Model?
+    local deadline = os.clock() + 15
+    while assetLoading[cacheKey] and os.clock() < deadline do task.wait(0.05) end
+    if assetLoading[cacheKey] then return nil end
+    local cached = cache:FindFirstChild(cacheKey)
+    if cached and cached:IsA("Model") then return cached end
+    assetLoading[cacheKey] = true
+    local ok, result = pcall(loadAssetTemplate, assetId, cacheKey)
+    assetLoading[cacheKey] = nil
+    if not ok then warn("[game1] character asset load failed", assetId, result); return nil end
+    return result
 end
 
 local function templateFor(row: any?, assetId: number): (Model?, string?)
@@ -462,6 +478,9 @@ function CharacterService.Start()
     creation:Bind(remotes)
     if GameOptions.CharacterCreationSettings().enabled == true then
         preview:Bind(remotes)
+        AssetWarmService.Bind(remotes, function(asset: number): Model?
+            return getAssetTemplate(asset, "component-" .. tostring(asset))
+        end)
         task.spawn(function()
             for _, id in ipairs({"human_male", "human_female"}) do
                 local ready, failure = preview:Prepare(id, nil)

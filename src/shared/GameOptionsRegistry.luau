@@ -75,7 +75,7 @@ return table.freeze({
 				border = 0,
 				nameSize = 13,
 				levelSize = 19,
-				offsetStuds = 2.05,
+				offsetStuds = 0,
 				maxDistanceStuds = 100,
 			}),
 			colors = table.freeze({

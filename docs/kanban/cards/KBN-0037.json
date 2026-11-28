@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "0138bdcfeb66b470cee1ec93211679bcd68d367562bfe5ff69536639b6f20d53",
+  "specSha256": "cf4ca0c170e77d72176d501bc9e4fc53d6b57f9142c8fd2fd19afbe5e3ff5567",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 36,
-  "updatedAt": "2026-11-28T13:50:00+00:00",
+  "revision": 37,
+  "updatedAt": "2026-11-28T14:00:00+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -38,8 +38,8 @@
     },
     {
       "id": "KBN-0037-T05",
-      "title": "M646–M647 · Overhead UI Pool CODE_COMPLETE, автоматическая интеграция PASS; нативная приёмка открыта",
-      "done": false
+      "title": "M646–M647 · Overhead UI Pool функционально принято владельцем; полный A05 открыт",
+      "done": true
     },
     {
       "id": "KBN-0037-T06",
@@ -86,7 +86,7 @@
       "id": "KBN-0037-A05",
       "title": "Overhead пул ограничен и очищается; HP/имена/уровни/GP корректны; нет роста соединений после циклов streaming",
       "status": "NOT_RUN",
-      "evidence": "M646–M647: 2376 policy comparisons; actual pool/registry/view and coordinator (syntax-adapted Lua doubles), lazy first focus, 4/tick, late meshes, PlayerGui reset, Stop/Start, stale callbacks. 98 profile tests: 96 PASS, 2 documented omitted payload SKIP, 0 FAIL. Studio Play, published DEV, Mobile, full A05 and measurements NOT_RUN."
+      "evidence": "M646–M647: 2376 policy comparisons; actual pool/registry/view and coordinator (syntax-adapted Lua doubles), lazy first focus, 4/tick, late meshes, PlayerGui reset, Stop/Start, stale callbacks. 98 profile tests: 96 PASS, 2 documented omitted payload SKIP, 0 FAIL. Studio Play, published DEV, Mobile, full A05 and measurements NOT_RUN. M648: владелец после короткого checklist подтвердил «все нормально». T05 функционально закрыта; отдельная матрица Studio/DEV/Mobile, рост соединений и количественный профиль не предоставлены, A05 остаётся NOT_RUN."
     },
     {
       "id": "KBN-0037-A06",

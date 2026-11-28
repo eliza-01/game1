@@ -1,6 +1,6 @@
 # M647 · Overhead UI integration
 
-База: M645 + M646. KBN-0037 T05/A05. CODE_COMPLETE, нативная приёмка NOT_RUN.
+База: M645 + M646. KBN-0037 T05/A05. CODE_COMPLETE. Дополнение M648: владелец подтвердил функциональную приёмку («все нормально»); T05 выполнена, полная A05 и замеры NOT_RUN.
 
 ## Исправления
 
@@ -15,4 +15,4 @@
 
 ## Приёмка и следующее
 
-Studio Play, опубликованный DEV, физический телефон, A05 и фактические CPU/RAM/FPS NOT_RUN. T05 не закрывать до evidence. Короткая обычная игра: подход/уход от NPC, наведение/бой с монстром, переход FULL/LOD1/UNLOADED, респавн, язык и GP при наличии. Без обязательных стресс-тестов или новых диагностических панелей. Если выявится реальная регрессия — исправить её, иначе следующий этап Character Creation Prewarm, далее Hitbox Precompute, Priority Animation Prewarm, Player Attack Sampler. Socket & Door, общий Profiler и Incremental Studio Preview отложены.
+Studio Play, опубликованный DEV, физический телефон, A05 и фактические CPU/RAM/FPS NOT_RUN. После ответа владельца T05 функционально закрыта; A05 не закрывать до ресурсного evidence. Короткая обычная игра: подход/уход от NPC, наведение/бой с монстром, переход FULL/LOD1/UNLOADED, респавн, язык и GP при наличии. Без обязательных стресс-тестов или новых диагностических панелей. Если выявится реальная регрессия — исправить её, иначе следующий этап Character Creation Prewarm, далее Hitbox Precompute, Priority Animation Prewarm, Player Attack Sampler. Socket & Door, общий Profiler и Incremental Studio Preview отложены.

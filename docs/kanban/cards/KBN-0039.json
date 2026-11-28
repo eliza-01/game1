@@ -3,18 +3,18 @@
   "id": "KBN-0039",
   "title": "Asset Pipeline · hitboxes и приоритетный прогрев",
   "domain": "Performance",
-  "status": "PROPOSED",
+  "status": "IN_PROGRESS",
   "priority": "P1",
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0039.md",
-  "specSha256": "277df79e32f02518213149941471ab0a4566d80c494556ff44dcab42ac781796",
+  "specSha256": "3b1c76f9ba6e6b823b986b72fcb891601c1143a8ee47053bcec9583f785b1c3e",
   "dependsOn": [
     "KBN-0035",
     "KBN-0038"
   ],
-  "revision": 1,
-  "updatedAt": "2026-11-27T15:27:51+00:00",
+  "revision": 2,
+  "updatedAt": "2026-11-28T14:00:00+00:00",
   "tasks": [
     {
       "id": "KBN-0039-T01",
@@ -38,7 +38,7 @@
     },
     {
       "id": "KBN-0039-T05",
-      "title": "Заменить прогрев сборок Character Creation на прогрев уникальных ресурсов с сохранением превью",
+      "title": "M648 · Character Creation Prewarm: unique typed components, CODE_COMPLETE; native acceptance open",
       "done": false
     },
     {
@@ -64,13 +64,13 @@
       "id": "KBN-0039-A03",
       "title": "Первый вход, создание/выбор персонажа и первый бой после входа проходят с исправной внешностью и анимациями, включая Death/DeathIdle",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M648: default previews first, optional unique component warm after bootstrap, same typed preloader, cancellation on edit/exit; Lua plan/service/client doubles. Native first entry, roster, first battle and Death NOT_RUN."
     },
     {
       "id": "KBN-0039-A04",
       "title": "Есть воспроизводимое сравнение cold/warm loading и памяти; отказ загрузки не зависает и корректно диагностируется",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M648: bounded background requests and timeout/cancellation in Lua doubles; native cold/warm time and RAM NOT_RUN."
     }
   ]
 }

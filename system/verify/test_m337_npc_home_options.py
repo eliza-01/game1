@@ -1,6 +1,7 @@
 """M337 source/serialization regressions; Roblox Studio runtime remains manual QA."""
 from pathlib import Path
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -71,21 +72,28 @@ class M337Tests(unittest.TestCase):
             self.assertEqual(store._core(source, npc=True)['homeRadiusStuds'], 110)
 
     def test_runtime_npc_conditions_and_ai_owner(self):
-        client = (ROOT / 'src/client/combat/NpcOverheadController.luau').read_text()
+        client = (ROOT / 'src/client/combat/OverheadVisibilityPolicy.luau').read_text()
         self.assertIn('hp < maxHP - 0.001 or hostile', client)
-        self.assertIn('view.SetSegments(', client)
-        self.assertIn('distSq <= nameSq', client)
-        self.assertIn('distSq <= hpSq', client)
+        self.assertIn('Policy.Npc(model, context, distSq)', (ROOT / 'src/client/combat/MnpcOverheadController.luau').read_text())
+        self.assertIn('distanceSquared <= context.nameSq', client)
+        self.assertIn('distanceSquared <= context.hpSq', client)
         ai = (ROOT / 'src/server/monster/MonsterAIService.luau').read_text()
         self.assertIn('GameOptions.HostileNoDamageReturnSeconds()', ai)
         self.assertIn('onDamageDealt', ai)
-        self.assertIn('outsideHome(agent, targetRoot.Position)', ai)
+        self.assertIn('if DeathChase.UsesHomeLeash(agent.model) then', ai)
+        self.assertIn('targetRoot and not DeathChase.AllowsPursuitPosition(agent, targetRoot.Position) then reason = "TargetOutsideHomeLeash"', ai)
+        self.assertIn('beginReturn(agent, reason)', ai)
+        policy = (ROOT / 'src/server/monster/MonsterDeathChasePolicy.luau').read_text()
+        self.assertIn('return not HomeLeash.Outside(agent.spawnCenter, position, math.max(0, agent.homeRadius - (margin or 0)))', policy)
         self.assertIn('agent.returning then', ai)
         self.assertIn('if not aggressive(agent) and not agent.retaliating and not agent.returning', ai)
 
     def test_compact_options_preserve_controls(self):
         html = (ROOT / 'system/control-center/static/index.html').read_text()
-        self.assertEqual(html.count('class="game1-option-section"'), 6)
+        sections = re.findall(r'<details class="game1-option-section" data-option-section="([^"]+)"', html)
+        self.assertEqual(len(sections), len(set(sections)))
+        self.assertEqual(html.count('class="game1-option-section"'), len(sections))
+        self.assertTrue({'combat', 'movement', 'camera', 'health', 'world', 'debug'} <= set(sections))
         for key in ('option-combat-state-duration', 'health-ui-fields', 'option-camera-save',
                     'option-npc-device', 'option-monster-return-time', 'option-published-debug-buttons',
                     'npc-spawn-home-radius'):

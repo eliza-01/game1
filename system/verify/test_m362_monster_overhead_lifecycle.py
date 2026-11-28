@@ -27,58 +27,50 @@ def visible(*, state: str = "Alive", distance: float = 12, radius: float = 100,
 
 class ClientLifecycleContracts(unittest.TestCase):
     def setUp(self):
-        self.controller = code("src/client/combat/OverheadHealthController.luau")
+        self.controller = code("src/client/combat/MnpcOverheadController.luau")
+        self.registry = code("src/client/combat/MnpcOverheadRegistry.luau")
+        self.policy = code("src/client/combat/OverheadVisibilityPolicy.luau")
+        self.pool = code("src/client/combat/OverheadViewPool.luau")
         self.view = code("src/client/combat/HealthBarView.luau")
 
     def test_new_monster_bound_after_root_and_attributes_replicate_in_any_order(self):
-        for fragment in (
-            'folder.ChildAdded:Connect(bindMonster)',
-            'monster.ChildAdded:Connect(function(child)',
-            'monster:GetAttributeChangedSignal(attribute):Connect(attachWhenReady)',
-            'monster:GetAttribute("Game1MonsterRuntime") ~= true',
-            'monster:GetAttribute("LifeState") == nil',
-            'type(monster:GetAttribute("MonsterSlug")) ~= "string"',
-            'monster:FindFirstChild("RootCollider")',
-        ):
-            self.assertIn(fragment, self.controller)
-        self.assertNotIn('WaitForChild("RootCollider", 5)', self.controller)
+        for fragment in ('folder.ChildAdded:Connect', 'model.ChildAdded:Connect(refresh)',
+                         'model.AttributeChanged:Connect', 'Game1MonsterRuntime', 'LifeState',
+                         'MonsterSlug', 'model:FindFirstChild("RootCollider")'):
+            self.assertIn(fragment, self.registry)
+        self.assertNotIn('WaitForChild("RootCollider", 5)', self.registry)
 
     def test_initially_missing_gui_retries_without_per_monster_player_listeners(self):
-        self.assertIn('player.ChildAdded:Connect(function(child)', self.controller)
-        self.assertIn('if child:IsA("PlayerGui") then', self.controller)
-        self.assertIn('rebindForPlayerGui()', self.controller)
-        self.assertIn('if not playerGui then return end', self.controller)
         self.assertEqual(self.controller.count('player.ChildAdded:Connect('), 1)
+        self.assertIn('if child:IsA("PlayerGui") then syncGui() end', self.controller)
+        self.assertIn('if not currentGui then return end', self.controller)
         self.assertNotIn('player:WaitForChild("PlayerGui")', self.controller)
 
     def test_gui_replacement_rebuilds_views_for_living_monsters(self):
-        self.assertIn('player.ChildRemoved:Connect(function(child)', self.controller)
-        self.assertIn('for model in pairs(monsterViews) do unbindMonster(model) end', self.controller)
-        self.assertIn('for model in pairs(pendingMonsters) do clearPendingMonster(model) end', self.controller)
-        self.assertIn('for _, child in ipairs(watchedFolder:GetChildren()) do bindMonster(child) end', self.controller)
-        self.assertIn('if not view.IsAttached(currentGui) then', self.controller)
+        self.assertIn('player.ChildRemoved:Connect', self.controller)
+        self.assertIn('if currentGui ~= gui then', self.controller)
+        self.assertIn('pool:Clear()', self.controller)
         self.assertIn('gui.Parent == expectedParent', self.view)
         self.assertIn('gui.Adornee == anchor and anchor.Parent == model', self.view)
 
     def test_lost_billboard_self_heals_without_mutating_registry_mid_iteration(self):
-        self.assertIn('table.insert(detachedMonsters, model)', self.controller)
-        self.assertIn('for _, model in ipairs(detachedMonsters) do', self.controller)
-        self.assertIn('unbindMonster(model)', self.controller)
-        self.assertIn('if model.Parent == watchedFolder then bindMonster(model) end', self.controller)
+        self.assertIn('if view and not view.IsAttached(currentGui) then', self.controller)
+        self.assertIn('pool:Release(model, now, true)', self.controller)
+        self.assertIn('table.insert(pending', self.controller)
+        self.assertIn('for _, request in ipairs(pending)', self.controller)
 
     def test_streamed_out_root_rebinds_after_stream_in(self):
-        self.assertIn('monster.ChildRemoved:Connect(function(child)', self.controller)
-        self.assertIn('if child == anchor then', self.controller)
-        self.assertIn('if monster.Parent == watchedFolder then bindMonster(monster) end', self.controller)
-        self.assertIn('clearPendingMonster(monster)', self.controller)
+        self.assertIn('model.ChildRemoved:Connect(refresh)', self.registry)
+        self.assertIn('child == record.anchor', self.registry)
+        self.assertIn('self.changed(model)', self.registry)
+        self.assertIn('task.defer(refresh)', self.registry)
 
     def test_old_monster_deleted_and_new_respawn_watched(self):
-        self.assertIn('folder.ChildRemoved:Connect(function(child)', self.controller)
-        self.assertIn('if child:IsA("Model") then unbindMonster(child) end', self.controller)
+        self.assertIn('folder.ChildRemoved:Connect', self.registry)
+        self.assertIn('self:_remove(model)', self.registry)
         spawner = code("src/server/monster/MonsterSpawnerService.luau")
         population = code("src/server/monster/MonsterPopulationController.luau")
-        self.assertIn('local model = template:Clone()', spawner)
-        self.assertIn('model.Parent = ensureMonstersFolder()', spawner)
+        self.assertIn('MnpcLifecycle.Publish(model, navigationRoot, ensureMonstersFolder())', spawner)
         self.assertIn('population:ScheduleRespawn(state, entry.diedAt)', spawner)
         self.assertIn('spawnReserved(state)', population)
 
@@ -92,44 +84,39 @@ class ClientLifecycleContracts(unittest.TestCase):
 
     def test_server_owns_life_and_target_state(self):
         initial = code("src/server/monster/MonsterInitialAttributes.luau")
-        ai = code("src/server/monster/MonsterAIService.luau")
+        combat = code("src/server/monster/MonsterCombatState.luau")
         self.assertIn('model:SetAttribute("LifeState", "Alive")', initial)
-        self.assertIn('agent.model:SetAttribute("MonsterTargetUserId", 0)', ai)
-        self.assertIn('model:GetAttribute("MonsterCombatActive") == true', self.controller)
-        self.assertIn('model:GetAttribute("MonsterTargetUserId") == player.UserId', self.controller)
-        self.assertIn('model:GetAttribute("LifeState") == "Alive"', self.controller)
+        self.assertIn('agent.model:SetAttribute("MonsterTargetUserId", 0)', combat)
+        self.assertIn('model:GetAttribute("MonsterCombatActive") == true', self.policy)
+        self.assertIn('model:GetAttribute("MonsterTargetUserId") == context.userId', self.policy)
+        self.assertIn('model:GetAttribute("LifeState") == "Alive"', self.registry)
 
     def test_reticle_updates_without_sticky_target_and_never_checks_without_monsters(self):
-        self.assertIn('aimedMonster = if playerRoot and next(monsterViews) ~= nil then reticleTarget(radius) else nil',
-                      self.controller)
+        self.assertIn('aimed = if playerRoot and next(registry.readyMonsters) ~= nil then reticleTarget(radius) else nil', self.controller)
         self.assertIn('CameraController.GetAimRay()', self.controller)
-        self.assertIn('Workspace:Raycast(origin, direction * (radius + AIM_CAMERA_MARGIN_STUDS), reticleParams)',
-                      self.controller)
+        self.assertIn('Workspace:Raycast(origin, direction * (radius + AIM_CAMERA_MARGIN_STUDS), reticleParams)', self.controller)
         self.assertEqual(self.controller.count('RaycastParams.new()'), 1)
         self.assertNotIn('AIM_MAX_DISTANCE = 420', self.controller)
         self.assertIn('AIM_CAMERA_MARGIN_STUDS = 64', self.controller)
-        self.assertIn('reticleParams.FilterDescendantsInstances = if character then {character} else {}',
-                      self.controller)
+        self.assertIn('reticleParams.FilterDescendantsInstances = if character then {character} else {}', self.controller)
 
     def test_radius_and_mobile_focus_are_independent_of_combat(self):
-        for expression in ('delta:Dot(delta) <= radiusSquared',
-                           'CameraController.AutoAimTarget()',
-                           'HealthUiSettings.ShowAllMonsters() or focused or attackingUs'):
-            self.assertIn(expression, self.controller)
+        self.assertIn('distSq = delta:Dot(delta)', self.controller)
+        self.assertIn('CameraController.AutoAimTarget()', self.controller)
+        self.assertIn('context.showAll or focused or attackingUs', self.policy)
 
     def test_idle_frame_does_not_rewrite_the_same_gui_properties(self):
-        self.assertNotIn('if showNameRequested == showName and showHpRequested == showHP then return end',
-                         self.view)
+        self.assertNotIn('if showNameRequested == showName and showHpRequested == showHP then return end', self.view)
         self.assertIn('showNameRequested = showName', self.view)
         self.assertIn('if gui.Enabled ~= enabled then gui.Enabled = enabled end', self.view)
         self.assertIn('if plate.Visible ~= visibleHP then plate.Visible = visibleHP end', self.view)
 
     def test_model_and_view_cleanup_disconnect_subscriptions(self):
-        self.assertIn('connection:Disconnect()', self.controller)
+        self.assertIn('connection:Disconnect()', self.registry)
         self.assertIn('for _, connection in ipairs(connections) do connection:Disconnect() end', self.view)
         self.assertIn('gui:Destroy()', self.view)
-        self.assertIn('for model in pairs(pendingMonsters) do clearPendingMonster(model) end',
-                      self.controller)
+        self.assertIn('view.Unbind', self.pool)
+        self.assertIn('generation == token', self.view)
 
 
 class VisibilityScenarioMatrix(unittest.TestCase):

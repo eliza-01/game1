@@ -115,7 +115,7 @@ class HealthRuntimeIntegration(unittest.TestCase):
         settings = source('src/client/combat/HealthUiSettings.luau')
         view = source('src/client/combat/HealthBarView.luau')
         hud = source('src/client/combat/PlayerHealthHudController.luau')
-        over = source('src/client/combat/OverheadHealthController.luau')
+        over = source('src/client/combat/MnpcOverheadController.luau')
         picker = source('src/client/weapon/WeaponSelectionController.luau')
         self.assertIn('TouchEnabled and not UserInputService.KeyboardEnabled', settings)
         self.assertIn('Settings.Changed', settings)

@@ -62,12 +62,12 @@ class JumpOptions(unittest.TestCase):
 
 class HealthAndAutoAim(unittest.TestCase):
     def test_two_visibility_triggers_inside_player_radius(self):
-        ui=read('src/client/combat/OverheadHealthController.luau')
-        self.assertIn('local playerRoot = if character then anchorFor(character)',ui)
-        self.assertIn('delta:Dot(delta) <= radiusSquared',ui)
+        ui=read('src/client/combat/MnpcOverheadController.luau') + read('src/client/combat/OverheadVisibilityPolicy.luau') + read('src/client/combat/MnpcOverheadRegistry.luau') + read('src/client/combat/SelfOverhead.luau')
+        self.assertIn('local playerRoot = SpatialRoot.Get(player)',ui)
+        self.assertIn('distSq = delta:Dot(delta)',ui)
         self.assertIn('or focused or attackingUs',ui)
-        self.assertIn('view.SetVisible(alive and inRange',ui)
-        self.assertIn('GetAttribute("MonsterTargetUserId") == player.UserId',ui)
+        self.assertIn('local visible = inRange and engaged and context.hpEnabled',ui)
+        self.assertIn('GetAttribute("MonsterTargetUserId") == context.userId',ui)
         self.assertIn('GetAttribute("MonsterCombatActive") == true',ui)
         self.assertIn('CameraController.GetAimRay()',ui)
         self.assertIn('CameraController.AutoAimTarget()',ui)

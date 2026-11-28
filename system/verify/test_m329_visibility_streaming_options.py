@@ -70,14 +70,14 @@ class DistanceOptions(unittest.TestCase):
 
 class RuntimeDistanceContracts(unittest.TestCase):
     def test_player_center_distance_gate_precedes_focus_and_aggro(self):
-        controller = source('src/client/combat/OverheadHealthController.luau')
-        self.assertIn('local playerRoot = if character then anchorFor(character)', controller)
+        controller = source('src/client/combat/MnpcOverheadController.luau') + source('src/client/combat/OverheadVisibilityPolicy.luau') + source('src/client/combat/MnpcOverheadRegistry.luau') + source('src/client/combat/SelfOverhead.luau')
+        self.assertIn('local playerRoot = SpatialRoot.Get(player)', controller)
         self.assertIn('style.monster.maxDistanceStuds', controller)
-        self.assertIn('delta:Dot(delta) <= radiusSquared', controller)
-        self.assertIn('view.SetVisible(alive and inRange', controller)
+        self.assertIn('distSq = delta:Dot(delta)', controller)
+        self.assertIn('local visible = inRange and engaged and context.hpEnabled', controller)
         self.assertIn('or focused or attackingUs', controller)
         self.assertIn('ELAPSED_STEP = 0.10', controller)
-        self.assertIn('gui.MaxDistance = math.max(260', source('src/client/combat/HealthBarView.luau'))
+        self.assertIn('maxDistanceOverride = math.max(260', source('src/client/combat/HealthBarView.luau'))
 
     def test_asset_manager_editors_and_studio_debug_share_the_field(self):
         self.assertIn("'maxDistanceStuds'", source('system/control-center/static/options.js'))
@@ -91,7 +91,7 @@ class RuntimeDistanceContracts(unittest.TestCase):
         self.assertIn('option-world-streaming-radius', options_ui)
         self.assertIn('Studio Command Bar', options_ui)
         self.assertIn('set("StreamingTargetRadius", ${radius})', js)
-        self.assertNotIn('Workspace.StreamingTargetRadius =', source('src/client/combat/OverheadHealthController.luau'))
+        self.assertNotIn('Workspace.StreamingTargetRadius =', source('src/client/combat/MnpcOverheadController.luau'))
 
 
 if __name__ == '__main__':

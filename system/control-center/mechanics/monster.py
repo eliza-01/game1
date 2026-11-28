@@ -2,6 +2,18 @@
 from .house import card
 
 ITEMS = [
+    card('monster-overhead', 'Монстры · имя, HP и GP портрет', 'Клиент',
+         'M646–M647 · общий ленивый пул Monster/NPC, без изменения серверной логики.',
+         ['LifeState', 'Game1MnpcLocalLod', 'MonsterCombatActive', 'MonsterTargetUserId'], [
+             {'title': 'Общий Overhead UI', 'lines': [
+                 'FULL-ready реестр независим от GUI. Имя/HP при фокусе, autoaim, атаке игрока или явном preview; GP сохраняет отдельные owner/zone/group правила.',
+                 'При LOD1/UNLOADED, смерти и потере eligibility view отвязывается; 8 idle slots, TTL 5 с, без hard cap на видимые HP. HP событийное. M647: поздние меши обновляют высоту активного view один раз за общий тик; нативная приёмка открыта.',
+             ]},
+             {'title': 'Недостающее / проверка', 'lines': [
+                 'Studio Play и опубликованный DEV: переходы LOD, фокус, HP, GP и смена языка остаются открыты.',
+                 'Проверка потребления памяти и кадров на физическом мобильном устройстве не выполнена.',
+             ]},
+         ], ['npc-overhead', 'overhead-policy', 'overhead-pool', 'overhead-registry']),
     card('monster-spawn-lifecycle', 'Монстры · популяция, смерть, respawn', 'Сервер',
          'Авторские spawn records, maxAlive, индивидуальный цикл смерти и очередной respawn.',
          ['MonsterSpawnRegistry.records', 'MonsterRegistry.monsters'], [

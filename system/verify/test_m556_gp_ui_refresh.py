@@ -31,8 +31,8 @@ class GpUiRefresh(unittest.TestCase):
         s=read('src/client/combat/HealthBarView.luau')
         self.assertIn('gui:SetAttribute("WorldInputPassthrough", true)',s)
         self.assertIn('model:GetAttribute("GameplayTestKind") == "group"',s)
-        self.assertIn('local hasPortrait = usesPortrait()',s)
-        self.assertIn('sameZone or (group and inRange)',read('src/client/combat/OverheadHealthController.luau'))
+        self.assertIn('hasPortrait = usesPortrait()',s)
+        self.assertIn('sameZone or (group and inRange)',read('src/client/combat/OverheadVisibilityPolicy.luau'))
         self.assertIn('record.testKind ~= "group" and (not record.testZone or record.testZone > 6)',read('src/server/monster/MonsterSpawnerService.luau'))
     def test_regeneration_tick(self):
         self.assertIn('RegenerationHPPerSecond = 1',read('src/shared/character/CharacterStatsConfig.luau'))

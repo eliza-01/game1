@@ -57,6 +57,7 @@ end
 
 local function watch(item: Instance)
     if not (item:IsA("TextLabel") or item:IsA("TextButton")) then return end
+    if item:GetAttribute("Game1ManualLocale") == true then return end
     -- Roblox's auto-localizer must not race the explicit player-selected locale.
     -- The player can choose a language different from their Roblox account.
     -- Otherwise Roblox automatic localization could overwrite our selection.

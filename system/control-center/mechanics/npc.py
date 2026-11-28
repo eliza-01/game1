@@ -38,11 +38,11 @@ ITEMS = [
          ['NpcEquipmentRegistry.loadouts', 'NpcAnimationRegistry.profiles'], [
              {'title': 'Работает в исходниках', 'lines': [
                  'NpcAnimationService владеет animation tracks, NpcEquipmentService монтирует оружие через общий WeaponEquipService. M613: общий пул NPC/Monster ограничен 32 экземплярами, включая idle и резерв загрузки; lifecycle и повторное использование централизованы.',
-                 'NpcOverheadController отображает имя и условный HP в радиусах Options. HealthBarView удаляет цифры только из отображаемого имени NPC; slug, имя Instance, база и уровень не изменяются.',
+                 'M646–M647: MnpcOverheadController выделяет общий pooled view только для FULL-ready NPC с разрешённым именем или HP в независимых радиусах Options. HealthBarView удаляет цифры только из отображаемого имени NPC; slug, имя Instance, база и уровень не изменяются.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
                  'Опубликованный loadout не является персональным инвентарём NPC; временная смена экипировки и анимационной фазы не восстанавливается из DataStore.',
                  'Нужна Studio/мобильная и мультиклиентская проверка оружия, клипов, HP-видимости, стриминга и очистки GUI.',
              ]},
-         ], ['npc-animation', 'npc-equipment', 'npc-animation-registry', 'npc-overhead', 'npc-display-name', 'weapon-equip']),
+         ], ['npc-animation', 'npc-equipment', 'npc-animation-registry', 'npc-overhead', 'overhead-policy', 'overhead-pool', 'overhead-registry', 'npc-display-name', 'weapon-equip']),
 ]

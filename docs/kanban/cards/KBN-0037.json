@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "1b6c3026e3637902d260c55421112f99b708c97bffa08f7814a52dbd1b53465f",
+  "specSha256": "0138bdcfeb66b470cee1ec93211679bcd68d367562bfe5ff69536639b6f20d53",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 34,
-  "updatedAt": "2026-11-28T04:40:30+00:00",
+  "revision": 36,
+  "updatedAt": "2026-11-28T13:50:00+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -38,7 +38,7 @@
     },
     {
       "id": "KBN-0037-T05",
-      "title": "M646 · Overhead UI Pool: аудит после MNPC LOD, общий ограниченный пул и событийное обновление HP без потери правил",
+      "title": "M646–M647 · Overhead UI Pool CODE_COMPLETE, автоматическая интеграция PASS; нативная приёмка открыта",
       "done": false
     },
     {
@@ -86,7 +86,7 @@
       "id": "KBN-0037-A05",
       "title": "Overhead пул ограничен и очищается; HP/имена/уровни/GP корректны; нет роста соединений после циклов streaming",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M646–M647: 2376 policy comparisons; actual pool/registry/view and coordinator (syntax-adapted Lua doubles), lazy first focus, 4/tick, late meshes, PlayerGui reset, Stop/Start, stale callbacks. 98 profile tests: 96 PASS, 2 documented omitted payload SKIP, 0 FAIL. Studio Play, published DEV, Mobile, full A05 and measurements NOT_RUN."
     },
     {
       "id": "KBN-0037-A06",

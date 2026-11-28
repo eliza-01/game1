@@ -79,30 +79,18 @@ local function displayName(model: Model, monster: boolean): string
     return text
 end
 
-function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart, style: {[string]: any}): any
-    local monster = model:GetAttribute("Game1NpcRuntime") == true
-        or model:GetAttribute("NpcSlug") ~= nil
-        or model:GetAttribute("Game1MonsterRuntime") == true
-        or model:GetAttribute("MonsterSlug") ~= nil
-    local layout = if monster then "monster" else "self"
-    local nameText = displayName(model, monster)
-    local level = if monster then tonumber(model:GetAttribute("Level")) else nil
+function HealthBarView.Create(): any
+    local model, anchor, currentStyle
+    local monster, layout, nameText, level
+    local generation = 0
+    local maxDistanceOverride = nil
 
     local gui = Instance.new("BillboardGui")
     gui.Name = "Game1OverheadHP"
     gui.AlwaysOnTop = true
     gui.LightInfluence = 0
     gui.MaxDistance = 260
-    gui.Adornee = anchor
     gui.Enabled = false
-    -- Monster overheads are presentation only. Do not intercept melee clicks
-    -- or camera drags when the pointer crosses a name, portrait or health bar.
-    if model:GetAttribute("Game1MonsterRuntime") == true then
-        gui.Active = false
-        gui:SetAttribute("WorldInputPassthrough", true)
-    end
-    gui.Parent = parent
-
     local titleLine = Instance.new("Frame")
     titleLine.Name = "TitleLine"
     titleLine.BackgroundTransparency = 1
@@ -120,28 +108,34 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     number.LayoutOrder = 3
     number.BackgroundTransparency = 1
     number.Font = Enum.Font.GothamBold
-    number.Text = if level and level > 0 then tostring(math.floor(level)) else ""
+    number.Text = ""
     number.TextColor3 = Color3.fromRGB(255, 177, 49)
     number.TextStrokeTransparency = 0
     number.TextStrokeColor3 = Color3.new(0, 0, 0)
-    number.Visible = monster and level ~= nil and level > 0
+    number.Visible = false
+    number.AutoLocalize = false
+    number:SetAttribute("Game1ManualLocale", true)
     number.Parent = titleLine
 
     local title = Instance.new("TextLabel")
     title.Name = "Caption"
     title.LayoutOrder = 1
-    title.Text = nameText
+    title.Text = ""
     title.Font = Enum.Font.GothamBold
     title.TextColor3 = Color3.fromRGB(250, 250, 251)
     title.BackgroundTransparency = 1
     title.TextStrokeColor3 = Color3.new(0, 0, 0)
     title.TextStrokeTransparency = 0
+    title.AutoLocalize = false
+    title:SetAttribute("Game1ManualLocale", true)
     title.Parent = titleLine
     local star = Instance.new("TextLabel")
     star.Name = "AggressiveMark"; star.LayoutOrder = 2
     star.BackgroundTransparency = 1; star.Font = Enum.Font.GothamBold
     star.Text = "*"; star.TextColor3 = Color3.fromRGB(240, 55, 55)
     star.TextStrokeTransparency = 0; star.TextStrokeColor3 = Color3.new(0,0,0)
+    star.AutoLocalize = false
+    star:SetAttribute("Game1ManualLocale", true)
     star.Parent = titleLine
 
     local debugLine = Instance.new("TextLabel")
@@ -152,6 +146,8 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     debugLine.Font = Enum.Font.Gotham
     debugLine.TextSize = 12
     debugLine.Visible = false
+    debugLine.AutoLocalize = false
+    debugLine:SetAttribute("Game1ManualLocale", true)
     debugLine.Parent = gui
 
     local plate = Instance.new("Frame")
@@ -188,7 +184,6 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     local connections: {RBXScriptConnection} = {}
     local tween: Tween? = nil
     local first = true
-    local currentStyle = style
     local showNameRequested = false
     local showHpRequested = false
     local portrait: Frame? = nil
@@ -199,17 +194,20 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         return model:GetAttribute("Game1MonsterRuntime") == true
             and (model:GetAttribute("GameplayTestKind") == "group" or (zone ~= nil and zone <= 6))
     end
-    local hasPortrait = usesPortrait()
-    local portraitHeight = if hasPortrait then 46 else 0
-    local baseOffset = visualTopOffset(model, anchor)
+    local hasPortrait = false
+    local portraitHeight = 0
+    local baseOffset = 0
+    local lastRatio, lastColor
 
     local function update()
-        if not gui.Parent then return end
+        if not model then return end
         local maxHP = math.max(0, tonumber(model:GetAttribute("MaxHP")) or 0)
         local hp = math.clamp(tonumber(model:GetAttribute("HP")) or 0, 0, maxHP)
         local ratio = if maxHP > 0 then hp / maxHP else 0
         local goal = {Size = UDim2.fromScale(ratio, 1), BackgroundColor3 = healthColor(ratio, currentStyle.colors)}
-        if tween then tween:Cancel(); tween = nil end
+        if ratio == lastRatio and goal.BackgroundColor3 == lastColor then return end
+        lastRatio, lastColor = ratio, goal.BackgroundColor3
+        if tween then tween:Cancel(); tween:Destroy(); tween = nil end
         if first then
             fill.Size = goal.Size
             fill.BackgroundColor3 = goal.BackgroundColor3
@@ -243,8 +241,9 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
             and gui.Adornee == anchor and anchor.Parent == model
     end
     function view.ApplyStyle(settings: {[string]: any})
+        if not model then return end
         currentStyle = settings
-        nameText = displayName(model, monster)
+        nameText = Language.FromSource(displayName(model, monster))
         title.Text = nameText
         level = if monster then tonumber(model:GetAttribute("Level")) else nil
         number.Visible = monster and level ~= nil and level > 0
@@ -275,6 +274,7 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         if monster then
             gui.MaxDistance = if hasPortrait then 800 else math.max(260, (tonumber(spec.maxDistanceStuds) or 100) + 80)
         end
+        if maxDistanceOverride then gui.MaxDistance = maxDistanceOverride end
         gui.StudsOffsetWorldSpace = Vector3.new(0, baseOffset + spec.offsetStuds + (if hasPortrait then 1 else 0), 0)
         titleLine.Position = UDim2.fromOffset(0, portraitHeight)
         titleLine.Size = UDim2.fromOffset(lineWidth, lineHeight)
@@ -298,7 +298,8 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
     -- For NPCs the name can remain visible while the HP bar stays hidden.
     -- Existing player/monster callers retain SetVisible, which toggles both.
     function view.SetMaxDistance(distance: number)
-        gui.MaxDistance = math.max(260, distance)
+        maxDistanceOverride = math.max(260, distance)
+        gui.MaxDistance = maxDistanceOverride
     end
     function view.SetSegments(showName: boolean, showHP: boolean)
         -- Compare actual GUI properties even if the policy did not change:
@@ -321,42 +322,85 @@ function HealthBarView.Create(parent: PlayerGui, model: Model, anchor: BasePart,
         view.SetSegments(value and currentStyle[layout].enabled == true,
             value and currentStyle[layout].enabled == true)
     end
-    function view.Destroy()
+    function view.Unbind()
+        generation += 1
         for _, connection in ipairs(connections) do connection:Disconnect() end
         table.clear(connections)
-        if tween then tween:Cancel() end
+        if tween then tween:Cancel(); tween:Destroy(); tween = nil end
+        if portrait then portrait:Destroy(); portrait = nil; portraitStroke = nil end
+        model, anchor, currentStyle = nil, nil, nil
+        monster, layout, nameText, level = nil, nil, nil, nil
+        hasPortrait, showPortrait, showNameRequested, showHpRequested = false, false, false, false
+        portraitHeight, baseOffset, maxDistanceOverride = 0, 0, nil
+        first, lastRatio, lastColor = true, nil, nil
+        gui.Enabled = false
+        gui.Adornee = nil
+        gui.Parent = nil
+        gui.Active = false
+        gui:SetAttribute("WorldInputPassthrough", nil)
+        gui.MaxDistance = 260
+        gui.StudsOffsetWorldSpace = Vector3.zero
+        title.Text, number.Text, debugLine.Text = "", "", ""
+        titleLine.Visible, number.Visible, star.Visible, debugLine.Visible, plate.Visible = false, false, false, false, false
+        fill.Size = UDim2.fromScale(0, 1)
+        fill.BackgroundColor3 = Color3.new(1, 1, 1)
+    end
+    function view.Destroy()
+        -- Destroy can also retire an externally removed/destroyed BillboardGui.
+        generation += 1
+        for _, connection in ipairs(connections) do connection:Disconnect() end
+        table.clear(connections)
+        if tween then tween:Cancel(); tween:Destroy(); tween = nil end
+        model, anchor, currentStyle = nil, nil, nil
+        portrait, portraitStroke = nil, nil
         gui:Destroy()
     end
-    view.ApplyStyle(style)
-    table.insert(connections, Language.Changed:Connect(function()
-        view.ApplyStyle(currentStyle)
-    end))
-    if model:GetAttribute("Game1MonsterRuntime") == true then
-        table.insert(connections, model:GetAttributeChangedSignal("GameplayTestZone"):Connect(function()
+    function view.Bind(parent: PlayerGui, target: Model, root: BasePart, style: {[string]: any})
+        assert(model == nil, "overhead view already bound")
+        generation += 1
+        local token = generation
+        model, anchor, currentStyle = target, root, style
+        monster = model:GetAttribute("Game1NpcRuntime") == true or model:GetAttribute("NpcSlug") ~= nil
+            or model:GetAttribute("Game1MonsterRuntime") == true or model:GetAttribute("MonsterSlug") ~= nil
+        layout = if monster then "monster" else "self"
+        hasPortrait = usesPortrait()
+        portraitHeight = if hasPortrait then 46 else 0
+        baseOffset = visualTopOffset(model, anchor)
+        gui.Adornee = anchor
+        gui.Enabled = false
+        gui.Active = false
+        if model:GetAttribute("Game1MonsterRuntime") == true then
+            gui:SetAttribute("WorldInputPassthrough", true)
+        end
+        -- Each lease owns its callbacks; already queued signals cannot touch a new owner.
+        local function connect(signal, callback)
+            table.insert(connections, signal:Connect(function()
+                if generation == token then callback() end
+            end))
+        end
+        local function refreshPortrait()
             hasPortrait = usesPortrait()
             portraitHeight = if hasPortrait then 46 else 0
-            if not hasPortrait then
-                if portrait then portrait:Destroy(); portrait = nil; portraitStroke = nil end
-                showPortrait = false
-            end
-            view.ApplyStyle(currentStyle)
-        end))
-        table.insert(connections, model:GetAttributeChangedSignal("MonsterDisplayName"):Connect(function()
             if portrait then portrait:Destroy(); portrait = nil; portraitStroke = nil end
+            showPortrait = false
             view.ApplyStyle(currentStyle)
-        end))
-    end
-    for _, attribute in ipairs({"Level", "MonsterAggressive", "MonsterNameEn", "MonsterNameRu"}) do
-        table.insert(connections, model:GetAttributeChangedSignal(attribute):Connect(function() view.ApplyStyle(currentStyle) end))
-    end
-    table.insert(connections, model:GetAttributeChangedSignal("HP"):Connect(update))
-    table.insert(connections, model:GetAttributeChangedSignal("MaxHP"):Connect(update))
-    if model:GetAttribute("Game1MonsterRuntime") == true then
-        table.insert(connections, model:GetAttributeChangedSignal("MonsterSpawning"):Connect(function()
-            if model:GetAttribute("MonsterSpawning") == false then
-                view.RefreshVisualOffset()
-            end
-        end))
+        end
+        view.ApplyStyle(style)
+        connect(Language.Changed, function() view.ApplyStyle(currentStyle) end)
+        for _, attribute in ipairs({"GameplayTestZone", "GameplayTestKind", "MonsterDisplayName", "MonsterNameEn"}) do
+            connect(model:GetAttributeChangedSignal(attribute), refreshPortrait)
+        end
+        for _, attribute in ipairs({"Level", "MonsterAggressive", "MonsterNameRu", "NpcDisplayName", "CharacterDisplayName"}) do
+            connect(model:GetAttributeChangedSignal(attribute), function() view.ApplyStyle(currentStyle) end)
+        end
+        connect(model:GetAttributeChangedSignal("HP"), update)
+        connect(model:GetAttributeChangedSignal("MaxHP"), function() view.ApplyStyle(currentStyle) end)
+        if model:GetAttribute("Game1MonsterRuntime") == true then
+            connect(model:GetAttributeChangedSignal("MonsterSpawning"), function()
+                if model:GetAttribute("MonsterSpawning") == false then view.RefreshVisualOffset() end
+            end)
+        end
+        gui.Parent = parent
     end
     return view
 end

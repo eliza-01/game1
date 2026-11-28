@@ -25,27 +25,21 @@ class MonsterHealthVisibilityTests(unittest.TestCase):
         self.assertTrue(should_show(True, True, False, False, False, 0, me, True))
 
     def test_no_spawn_timeout_and_subscriptions_removed(self):
-        over = source('src/client/combat/OverheadHealthController.luau')
-        self.assertNotIn('WaitForChild("RootCollider", 5)', over)
-        self.assertIn('monster.ChildAdded:Connect', over)
-        self.assertIn('monster:GetAttributeChangedSignal(attribute):Connect(attachWhenReady)', over)
-        for key in ('Game1MonsterRuntime', 'MonsterSlug', 'LifeState'):
-            self.assertIn('"' + key + '"', over)
-        self.assertIn('clearPendingMonster(monster)', over)
-        self.assertIn('for model in pairs(pendingMonsters) do clearPendingMonster(model) end', over)
-        self.assertIn('monster.Parent ~= watchedFolder', over)
-        self.assertIn('monster:FindFirstChild("RootCollider")', over)
-        self.assertIn('monster.ChildRemoved:Connect', over)
-        self.assertIn('if child == anchor then', over)
-        self.assertIn('anchorRemovedConnections[model]', over)
+        registry = source('src/client/combat/MnpcOverheadRegistry.luau')
+        self.assertNotIn('WaitForChild("RootCollider", 5)', registry)
+        for fragment in ('model.ChildAdded:Connect(refresh)', 'model.AttributeChanged:Connect',
+                         'Game1MonsterRuntime', 'MonsterSlug', 'LifeState', 'disconnect(record.connections)',
+                         'model.Parent == record.folder', 'model:FindFirstChild("RootCollider")',
+                         'model.ChildRemoved:Connect(refresh)', 'child == record.anchor', 'self.changed(model)'):
+            self.assertIn(fragment, registry)
 
     def test_aggression_is_live_only_and_default_hidden(self):
-        over = source('src/client/combat/OverheadHealthController.luau')
+        over = source('src/client/combat/OverheadVisibilityPolicy.luau')
         view = source('src/client/combat/HealthBarView.luau')
         self.assertIn('model:GetAttribute("MonsterCombatActive") == true', over)
-        self.assertIn('model:GetAttribute("MonsterTargetUserId") == player.UserId', over)
-        self.assertIn('HealthUiSettings.ShowAllMonsters() or focused or attackingUs', over)
-        self.assertIn('view.SetVisible(alive and inRange', over)
+        self.assertIn('model:GetAttribute("MonsterTargetUserId") == context.userId', over)
+        self.assertIn('context.showAll or focused or attackingUs', over)
+        self.assertIn('local visible = inRange and engaged and context.hpEnabled', over)
         self.assertIn('gui.Enabled = false', view)
         self.assertIn('if monster then', view)
         self.assertIn('ratio <= 0.30', view)

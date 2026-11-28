@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from PIL import Image
+from diagnostic_payloads import require_payloads
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'system/control-center'))
 from options_store import OptionsStore, normalize_debug_ui
@@ -52,6 +53,10 @@ class WorldReadability(unittest.TestCase):
         keys={tile['name'] for tile in catalog['tiles']}
         self.assertEqual(named|{'Unknown'},keys)
         self.assertEqual(len(keys),26)
+        runtime=read('src/shared/interface/MonsterIconAtlas.luau')
+        for tile in catalog['tiles']:
+            self.assertIn(f'[{json.dumps(tile["name"])}] = table.freeze({{', runtime)
+        require_payloads(self, ROOT, ['system/control-center/static/monster-icons/atlas.png'])
         image=Image.open(directory/'atlas.png').convert('RGBA')
         self.assertEqual(image.size,(catalog['width'],catalog['height']))
         runtime=read('src/shared/interface/MonsterIconAtlas.luau')
@@ -62,14 +67,15 @@ class WorldReadability(unittest.TestCase):
                 for xx in range(int(x),int(x)+int(length)):
                     generated.putpixel((xx,int(y)),tuple(bytes.fromhex(hexcolor))+(255,))
             self.assertEqual(generated.tobytes(),image.crop((tile['x'],tile['y'],tile['x']+16,tile['y']+16)).tobytes())
+    def test_runtime_atlas_presentation_contract(self):
         icons=read('src/client/combat/MonsterIconView.luau')
         self.assertIn('delta >= 10',icons);self.assertIn('delta <= 0',icons)
         view=read('src/client/combat/HealthBarView.luau')
         self.assertIn('portraitHeight + lineHeight + statsHeight + 2',view)
         self.assertIn('portrait:Destroy()',view)
-        ctl=read('src/client/combat/OverheadHealthController.luau')
+        ctl=read('src/client/combat/OverheadVisibilityPolicy.luau')
         self.assertIn('playerZone == zone',ctl)
-        self.assertIn('view.SetIcon(alive and (sameZone or (group and inRange)), playerLevel)',ctl)
+        self.assertIn('local icon = sameZone or (group and inRange)',ctl)
         spawner=read('src/server/monster/MonsterSpawnerService.luau')
         self.assertIn('if record.testKind ~= "group" and (not record.testZone or record.testZone > 6) then',spawner)
         self.assertIn('RunService:IsStudio() and Workspace.StreamingEnabled',spawner)

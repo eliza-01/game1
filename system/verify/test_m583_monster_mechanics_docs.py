@@ -19,7 +19,8 @@ class MonsterMechanicsM583(unittest.TestCase):
         self.sections = {s['title']: ' '.join(s['lines']) for s in self.card['sections']}
 
     def test_existing_shared_card_covers_current_navigation(self):
-        self.assertEqual(len(self.domain['items']), 3)
+        self.assertEqual(len(self.domain['items']), 4)
+        self.assertIn('monster-overhead', {item['id'] for item in self.domain['items']})
         self.assertEqual(self.card['scope'], 'shared')
         cases = {
             'Aggro и границы преследования': ('Home Leash', 'Death Chase', '30 с'),

@@ -74,12 +74,12 @@ class TestHealth(unittest.TestCase):
 
     def test_no_top_hud_and_overhead_visibility_and_tweens(self):
         self.assertFalse((ROOT / 'src/client/character/PlayerStatusController.luau').exists())
-        self.assertIn('OverheadHealthController.Start()', code('src/client/init.client.luau'))
-        controller = code('src/client/combat/OverheadHealthController.luau')
+        self.assertIn('MnpcOverheadController.Start()', code('src/client/init.client.luau'))
+        controller = code('src/client/combat/MnpcOverheadController.luau') + code('src/client/combat/OverheadVisibilityPolicy.luau') + code('src/client/combat/MnpcOverheadRegistry.luau') + code('src/client/combat/SelfOverhead.luau')
         self.assertIn('hp < maxHP - 0.001', controller)
         self.assertIn('character:GetAttribute("InCombat") == true', controller)
-        self.assertIn('model:GetAttribute("MonsterTargetUserId") == player.UserId', controller)
-        self.assertIn('model == aimedMonster', controller)
+        self.assertIn('model:GetAttribute("MonsterTargetUserId") == context.userId', controller)
+        self.assertIn('model == context.aimed', controller)
         self.assertIn('model:GetAttribute("LifeState") == "Alive"', controller)
         view = code('src/client/combat/HealthBarView.luau')
         for token in ('TweenService:Create(fill, TWEEN, goal)', 'ratio <= 0.30', 'ratio <= 0.65',

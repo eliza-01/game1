@@ -13,6 +13,7 @@ local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
 
 local MnpcLifecycle = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcEntityLifecycle"))
+local MonsterAgentLifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
 local MonsterRigBuilder = require(script.Parent:WaitForChild("MonsterRigBuilder"))
 local MonsterSpawnGeometry = require(script.Parent:WaitForChild("MonsterSpawnGeometry"))
 local MonsterAnimationTrackFactory = require(script.Parent:WaitForChild("MonsterAnimationTrackFactory"))
@@ -98,7 +99,9 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
         -- Detach removes its hitbox binding first; remaining attribute writes are best effort.
         pcall(EntityHitboxService.Detach, model)
     else
+        MonsterAgentLifecycle.Unbind(model)
         EntityHitboxService.Detach(model)
+        if entry.rigLease then entry.rigLease:Release() end
     end
     if model.Parent and not externallyDestroying then
         model:Destroy()
@@ -172,7 +175,9 @@ local function spawnOne(state: any): Model?
     MnpcLifecycle.CopyTemplateMetadata(model, template)
     if record.testOwner then state.testConstructing = model end
     MonsterInitialAttributes.Apply(model, definition, record, instanceId)
-    local visual = MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster")
+    model:SetAttribute("Damageable", false)
+    local prepared = MnpcLifecycle.PrepareShell(model, navigationRoot, template, surface, yaw, "Monster")
+    local visual, rigLease = MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster", prepared)
     if not visual then
         model:Destroy()
         warn("[game1][monster-spawn] monster contains no usable visual rig: " .. slug)
@@ -187,7 +192,6 @@ local function spawnOne(state: any): Model?
     if persistentOwner then model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer end
     -- The existing production combat/animation path still requires FULL.
     -- Do not expose a damageable actor before the spawn/pose binding is ready.
-    model:SetAttribute("Damageable", false)
     model:SetAttribute("MonsterSpawning", true)
     model:SetAttribute("MonsterHomePosition", navigationRoot.Position)
     MnpcLifecycle.Publish(model, navigationRoot, ensureMonstersFolder())
@@ -218,6 +222,7 @@ local function spawnOne(state: any): Model?
         MonsterAnimationRegistry.profiles and MonsterAnimationRegistry.profiles[slug], model, visual
     )
     entry.visual = visual
+    entry.rigLease = rigLease
     entry.navigationRoot = navigationRoot
     entry.humanoid = humanoid
     entry.wandering = false

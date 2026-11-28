@@ -111,7 +111,7 @@ class MonsterPopulationM93Tests(unittest.TestCase):
             'spawnGeometry:RandomSpawnPoint(record)',
             'MnpcLifecycle.Create(',
             'MonsterInitialAttributes.Apply(model, definition, record, instanceId)',
-            'MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster")',
+            'MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster", prepared)',
             'MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)',
             'MnpcLifecycle.Publish(model, navigationRoot, ensureMonstersFolder())',
             'EntityHitboxService.Attach(model, visual)',

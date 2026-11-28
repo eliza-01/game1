@@ -21,12 +21,10 @@ def lua_source(name):
     source = (ACTOR / (name + '.luau')).read_text(encoding='utf-8')
     # Only the explicitly used Luau type annotations and if expressions differ
     # from Lua. Execute the implementation, not a second shell/rig algorithm.
-    source = re.sub(r'(?<!:): (?:"Monster" \| "NPC"|Model|BasePart|Humanoid|Folder|Vector3|CFrame|string|number|boolean)(?=[,)])', '', source)
+    source = re.sub(r'(?<!:): (?:"Monster" \| "NPC"|Model|BasePart|Humanoid|Folder|Vector3|CFrame|string|number|boolean|any\?)(?=[,)])', '', source)
     source = re.sub(r'\): (?:\([^\n]+\)|Model\?)\n', ')\n', source)
     source = source.replace('return visual :: Model, if visualRoot and visualRoot:IsA("BasePart") then visualRoot else nil',
                             'return visual, (visualRoot and visualRoot:IsA("BasePart")) and visualRoot or nil')
-    source = source.replace('visibleBounds(if kind == "NPC" then visual else staged)',
-                            'visibleBounds(kind == "NPC" and visual or staged)')
     return source
 
 
@@ -37,7 +35,7 @@ class MnpcEntityFoundationM628(unittest.TestCase):
             self.skipTest('Standalone Lua unavailable')
         with tempfile.TemporaryDirectory() as tmp:
             files = []
-            for name in ('MnpcNavigationShell', 'MnpcVisualRig', 'MnpcEntityLifecycle'):
+            for name in ('MnpcNavigationShell', 'MnpcVisualRig', 'MnpcEntityLifecycle', 'MnpcRigGeometry', 'MnpcPresentationLifecycle'):
                 path = Path(tmp) / (name + '.lua')
                 path.write_text(lua_source(name), encoding='utf-8')
                 files.append(str(path))
@@ -52,7 +50,8 @@ class MnpcEntityFoundationM628(unittest.TestCase):
             self.assertIn('WaitForChild("MnpcEntityLifecycle")', text)
             self.assertNotIn('template:Clone()', text)
             calls = ['MnpcLifecycle.Create(', f'MnpcLifecycle.CopyTemplateMetadata({entity}, template)',
-                     f'MnpcLifecycle.AttachRig({entity}, {root}, template, surface, yaw, "{kind}")',
+                     f'MnpcLifecycle.PrepareShell({entity}, {root}, template, surface, yaw, "{kind}")',
+                     f'MnpcLifecycle.AttachRig({entity}, {root}, template, surface, yaw, "{kind}", prepared)',
                      f'MnpcLifecycle.Publish({entity}, {root},', f'EntityHitboxService.Attach({entity}, visual)',
                      f'MnpcLifecycle.MarkRigReady({entity})']
             positions = list(map(text.index, calls))
@@ -70,7 +69,8 @@ class MnpcEntityFoundationM628(unittest.TestCase):
         for text in (shell, attach, lifecycle):
             for token in ('LoadAnimation(', 'Heartbeat:Connect', 'RemoteEvent', 'EntityHitboxService'):
                 self.assertNotIn(token, text)
-        self.assertIn('collider.CanCollide = false', attach)
+        self.assertIn('collider.CanCollide = false', shell)
+        self.assertIn('collider.CanQuery = false', shell)
         self.assertIn('collider.CanQuery = true', attach)
         self.assertIn('visualWeld.Part1 = visualRoot', attach)
         self.assertIn('castWeld.C0 = collider.CFrame:ToObjectSpace(visualRoot.CFrame)', attach)

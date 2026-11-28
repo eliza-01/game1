@@ -2,6 +2,7 @@
 -- visual clone. Population, combat readiness and death remain domain-owned.
 local CollectionService = game:GetService("CollectionService")
 local Shell = require(script.Parent:WaitForChild("MnpcNavigationShell"))
+local Geometry = require(script.Parent:WaitForChild("MnpcRigGeometry"))
 local VisualRig = require(script.Parent:WaitForChild("MnpcVisualRig"))
 local Lifecycle = {}
 
@@ -10,6 +11,7 @@ function Lifecycle.Create(name: string, surface: Vector3, yaw: number, kind: "Mo
     entity.Name = name
     entity:SetAttribute("Game1MnpcKind", kind)
     entity:SetAttribute("Game1MnpcRigReady", false)
+    entity:SetAttribute("Damageable", false)
     local root, humanoid = Shell.Create(entity, surface, yaw, kind)
     return entity, root, humanoid
 end
@@ -34,6 +36,18 @@ function Lifecycle.MarkRigReady(entity: Model)
     entity:SetAttribute("Game1MnpcRigReady", true)
 end
 
+-- The shell can be published/moved with no ImportedRig or Animator. The plan
+-- is explicit and belongs to this root; no reference to a cloned visual.
+function Lifecycle.PrepareShell(model: Model, navigationRoot: BasePart, template: Model, surface: Vector3, yaw: number, kind: "Monster" | "NPC")
+    assert(navigationRoot.Parent == model and model.PrimaryPart == navigationRoot, "MNPC shell required")
+    assert(model:GetAttribute("Game1MnpcKind") == kind, "MNPC rig kind mismatch")
+    assert(model:FindFirstChild("RootCollider") == nil and model:FindFirstChild("ImportedRig") == nil, "MNPC shell already prepared")
+    assert(model:GetAttribute("Damageable") ~= true, "MNPC shell cannot be damageable without pose")
+    local plan = Geometry.Plan(template, navigationRoot.CFrame, surface, yaw, kind)
+    if not plan then return nil end
+    local collider = Shell.CreateQueryCollider(model, navigationRoot, navigationRoot.CFrame * plan.colliderOffset, plan.colliderSize)
+    return table.freeze({geometry = plan, root = navigationRoot, collider = collider})
+end
 Lifecycle.AttachRig = VisualRig.Attach
 Lifecycle.Publish = Shell.Publish
 return table.freeze(Lifecycle)

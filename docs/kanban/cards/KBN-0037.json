@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0037.md",
-  "specSha256": "144be23c7a8b02c98209a31558fc577bfac6cfbad53caf1618f68a6d8eb29757",
+  "specSha256": "32bce2746c9a771d1b5d25168bd99111ca1c02d2986ab63d492bdec76d9f7feb",
   "dependsOn": [
     "KBN-0035",
     "KBN-0036"
   ],
-  "revision": 21,
-  "updatedAt": "2026-11-28T02:23:48+00:00",
+  "revision": 23,
+  "updatedAt": "2026-11-28T02:38:02+00:00",
   "tasks": [
     {
       "id": "KBN-0037-T01",
@@ -53,7 +53,7 @@
     },
     {
       "id": "KBN-0037-T08",
-      "title": "MNPC Visual LOD: единая entity-first lifecycle система Monster + NPC, native pose по общей потребности, FULL / LOD1 / UNLOADED и один меш на вариант (M629 / M628 шаг 2, оба домена обязательны)",
+      "title": "MNPC Visual LOD: единая entity-first lifecycle система Monster + NPC, native pose по общей потребности, FULL / LOD1 / UNLOADED и один меш на вариант (M631 / M628 шаг 4, оба домена обязательны)",
       "done": false
     }
   ],
@@ -98,7 +98,7 @@
       "id": "KBN-0037-A07",
       "title": "MNPC Monster + NPC: общий entity/navigation/lifecycle без visual, no-demand без live pose, независимый LOD двух клиентов, LOD1 без Animator/скелета/sampler и native carrier evaluation, UNLOADED без визуала; движение, бой и NPC взаимодействия сохранены",
       "status": "NOT_RUN",
-      "evidence": "M627: Studio Output владельца 28.11.2026: Gremlin 56 / Guard 74 bones, CARRIER_MATCH 0 stud / max 0,084°; private native pose практически остановилась, NONE client active track и motion ~25°. Это не CPU benchmark и не two-client acceptance. M628 entity-first lifecycle согласован в ТЗ; production не реализован; demand readiness и native isolation открыты. Полная A07 NOT_RUN. Уточнение владельца: один общий lifecycle для Monster/NPC, M628 требует обоих entrypoint и общих contract tests; production и приёмка NOT_RUN. M628 step 1: оба production spawn entrypoint используют shared entity/navigation shell и rig attach; NPC factory удалена, readiness event; общий Lua contract/oracle и source regressions. FULL still required, pose-independent AI/detach/demand/strict LOD not implemented, Studio/DEV NOT_RUN. M628/T08/A07 остаются открытыми. M629: отдельная регистрация AI/nav обоих видов и shared native pose binding, NPC motion intent, late-result cancellation, normal/special action readiness; production FULL, shell-only runtime, demand, detach, native isolation и A07 NOT_RUN."
+      "evidence": "M627: Studio Output владельца 28.11.2026: Gremlin 56 / Guard 74 bones, CARRIER_MATCH 0 stud / max 0,084°; private native pose практически остановилась, NONE client active track и motion ~25°. Это не CPU benchmark и не two-client acceptance. M628 entity-first lifecycle согласован в ТЗ; production не реализован; demand readiness и native isolation открыты. Полная A07 NOT_RUN. Уточнение владельца: один общий lifecycle для Monster/NPC, M628 требует обоих entrypoint и общих contract tests; production и приёмка NOT_RUN. M628 step 1: оба production spawn entrypoint используют shared entity/navigation shell и rig attach; NPC factory удалена, readiness event; общий Lua contract/oracle и source regressions. FULL still required, pose-independent AI/detach/demand/strict LOD not implemented, Studio/DEV NOT_RUN. M628/T08/A07 остаются открытыми. M629: отдельная регистрация AI/nav обоих видов и shared native pose binding, NPC motion intent, late-result cancellation, normal/special action readiness; production FULL, shell-only runtime, demand, detach, native isolation и A07 NOT_RUN. M630: common immutable-template geometry cache and inactive query collider before clone, current-root attach, Lua double 20 yaw/translation cases + stale/clone failure. Both spawners use contract, still attach FULL immediately. Equipment-independent context, production shell-only, demand/release, per-client native isolation and A07 NOT_RUN. M631: common rig/weapon/weld lease, terminal production disposal after AI/OBB cleanup; NPC equipment context before clone with validated effective mount fallback; Lua geometry release/move/reacquire and equipment context oracles. Live pose demand/rebind, strict client isolation, actual Studio and A07 NOT_RUN."
     }
   ]
 }

@@ -280,16 +280,23 @@ end
 
 -- Common actor equipment entry point: NPCs call this without player-only stats.
 -- Reuses the runtime grip and bone solver of Equip(); weapon OBBs are legacy.
-function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: string, modelName: string): (Model?, any?, string?)
+function WeaponEquipService.ResolveVisual(slugValue: any): (any?, Model?, string?)
     local slug = string.lower(tostring(slugValue or ""))
     local row = gameplayRow(slug) or (WeaponRegistry.weapons and WeaponRegistry.weapons[slug])
     if not row or row.status ~= "PUBLISHED" then
-        return nil, row, "weapon not registered/published: " .. slug
+        return row, nil, "weapon not registered/published: " .. slug
     end
     local template = findByStudioPath(tostring(row.serverStoragePath or ""))
     if not template or not template:IsA("Model") then
-        return nil, row, "weapon is not synced to ServerStorage: " .. slug
+        return row, nil, "weapon is not synced to ServerStorage: " .. slug
     end
+    return row, template, nil
+end
+
+function WeaponEquipService.EquipVisual(actor: Model, slugValue: any, hand: string, modelName: string): (Model?, any?, string?)
+    local slug = string.lower(tostring(slugValue or ""))
+    local row, template, err = WeaponEquipService.ResolveVisual(slug)
+    if not template then return nil, row, err end
     local names = if hand == "right" then RIGHT_SOCKET_NAMES else if hand == "left" then LEFT_SOCKET_NAMES else nil
     if not names then return nil, row, "invalid hand: " .. hand end
     local bone = findCharacterBone(actor, names)

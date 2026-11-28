@@ -33,6 +33,8 @@ SOURCES = {
     'mnpc-pose-pilot': ('docs/workflows/M627_MNPC_POSE_PILOT_RU.md', 'MNPC · M627 аудит и пилот'),
     'mnpc-entity-foundation': ('docs/workflows/M628_MNPC_ENTITY_FOUNDATION_RU.md', 'MNPC · M628 общий entity-first фундамент'),
     'mnpc-ai-pose-binding': ('docs/workflows/M629_MNPC_AI_POSE_BINDING_RU.md', 'MNPC · M629 AI / pose binding'),
+    'mnpc-shell-geometry': ('docs/workflows/M630_MNPC_SHELL_GEOMETRY_RU.md', 'MNPC · M630 shell geometry'),
+    'mnpc-presentation-lifecycle': ('docs/workflows/M631_MNPC_PRESENTATION_LIFECYCLE_RU.md', 'MNPC · M631 presentation lifecycle'),
     'mnpc-pose-binding': ('src/server/actor/MnpcPoseBinding.luau', 'MNPC · общий readiness ticket'),
     'npc-motion-intent': ('src/server/npc/NpcMotionIntent.luau', 'NPC · движение независимо от рига'),
     'mnpc-lod-spec': ('docs/workflows/MNPC_LOD_SPEC_RU.md', 'MNPC · план Visual LOD'),

@@ -25,6 +25,8 @@ REQUIRED_RUNTIME_MODULES = (
     "src/server/actor/MnpcEntityLifecycle.luau",
     "src/server/actor/MnpcNavigationShell.luau",
     "src/server/actor/MnpcVisualRig.luau",
+    "src/server/actor/MnpcRigGeometry.luau",
+    "src/server/actor/MnpcPresentationLifecycle.luau",
     "src/server/actor/MnpcPoseBinding.luau",
     "src/server/npc/NpcMotionIntent.luau",
     "src/server/monster/MonsterSpawnGeometry.luau",

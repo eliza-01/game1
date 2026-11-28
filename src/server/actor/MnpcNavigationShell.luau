@@ -52,4 +52,27 @@ function Shell.Publish(model: Model, root: BasePart, destination: Folder)
     pcall(function() root:SetNetworkOwner(nil) end)
 end
 
+function Shell.CreateQueryCollider(model: Model, navigationRoot: BasePart, boxCFrame: CFrame, boxSize: Vector3)
+    local collider = Instance.new("Part")
+    collider.Name = "RootCollider"
+    -- Query reference for existing mathematical combat OBB; not a physical body.
+    collider.Size = Vector3.new(math.max(0.5, boxSize.X), math.max(0.5, boxSize.Y), math.max(0.5, boxSize.Z))
+    collider.CFrame = boxCFrame
+    collider.Transparency = 1
+    collider.CastShadow = false
+    collider.Anchored = false
+    collider.CanCollide = false
+    collider.CanTouch = false
+    -- Inactive shell is not a combat broad-phase candidate. Attach enables query.
+    collider.CanQuery = false
+    collider.Massless = true
+    collider.Parent = model
+    local rootWeld = Instance.new("WeldConstraint")
+    rootWeld.Name = "RootColliderWeld"
+    rootWeld.Part0 = navigationRoot
+    rootWeld.Part1 = collider
+    rootWeld.Parent = navigationRoot
+    return collider, rootWeld
+end
+
 return table.freeze(Shell)

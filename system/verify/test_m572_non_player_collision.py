@@ -61,7 +61,7 @@ assert(npc.CanCollide and respawn.CanCollide and player.CanCollide)
         for file in ('MonsterRecoveryGeometry', 'MonsterRangedRetreat'):
             source = (ROOT / f'src/server/monster/{file}.luau').read_text()
             self.assertRegex(source, r'CollisionGroup\s*=\s*agent\.root\.CollisionGroup')
-        for file in ('src/server/actor/MnpcVisualRig.luau',):
-            source = (ROOT / file).read_text()
+        for files in (('src/server/actor/MnpcNavigationShell.luau', 'src/server/actor/MnpcVisualRig.luau'),):
+            source = '\n'.join((ROOT / file).read_text() for file in files)
             self.assertIn('CanCollide = false', source)
             self.assertIn('CanQuery = true', source)

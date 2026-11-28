@@ -214,6 +214,11 @@ local function watchFolder(folder: Folder, random: Random, stepAgent: (any) -> (
     end
 end
 
+function MonsterAgentLifecycle.Unbind(model: Model)
+    local agent = agents[model]
+    if agent then releaseAgent(agent) end
+end
+
 function MonsterAgentLifecycle.Find(model: Model): any?
     return agents[model]
 end

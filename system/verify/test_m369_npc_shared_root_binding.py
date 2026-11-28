@@ -47,9 +47,9 @@ class SharedNpcRootBindingTests(unittest.TestCase):
 
     def test_gear_context_and_rig_alignment_run_before_loading_tracks(self):
         spawn = (ROOT / 'src/server/npc/NpcSpawnerService.luau').read_text(encoding='utf-8')
-        start = spawn.index('local weaponSet = NpcEquipmentService.Equip(entity, slug)')
+        start = spawn.index('local weaponSet = NpcEquipmentService.Equip(entity, slug, equipmentContext, rigLease)')
         bind = spawn.index('NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)')
-        load = spawn.index('NpcAnimationService.Create(entity, visual, profile)')
+        load = spawn.index('pcall(NpcAnimationService.Create, entity, visual, profile)')
         self.assertLess(start, bind)
         self.assertLess(bind, load)
         self.assertIn('local NpcAnimationRigBinding = require(', spawn)

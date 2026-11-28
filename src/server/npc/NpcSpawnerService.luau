@@ -61,7 +61,7 @@ local function spawnPosition(record: any): Vector3
     return Vector3.new(finite(point.x, 0), finite(point.y, 0), finite(point.z, 0))
 end
 
-local function release(state: any, entity: Model, scheduleRespawn: boolean)
+local function release(state: any, entity: Model, scheduleRespawn: boolean, externallyDestroying: boolean?)
     local entry = state.instances[entity]
     if not entry then
         return
@@ -72,9 +72,12 @@ local function release(state: any, entity: Model, scheduleRespawn: boolean)
     if entry.presentation then
         entry.presentation.Destroy()
     end
-    EntityHitboxService.Detach(entity)
-    if entity.Parent then
-        entity:Destroy()
+    if externallyDestroying then
+        pcall(EntityHitboxService.Detach, entity)
+    else
+        EntityHitboxService.Detach(entity)
+        if entry.rigLease then entry.rigLease:Release() end
+        if entity.Parent then entity:Destroy() end
     end
     if scheduleRespawn then
         task.delay(math.max(0, finite(state.record.respawnSeconds, 10)), function()
@@ -102,19 +105,23 @@ local function spawnOne(state: any): boolean
     local yaw = math.rad(finite(record.yawDegrees, 0))
     local entity, root = MnpcLifecycle.Create(slug .. "_" .. tostring(random:NextInteger(100000, 999999)), surface, yaw, "NPC")
     MnpcLifecycle.CopyTemplateMetadata(entity, template)
-    local visual = MnpcLifecycle.AttachRig(entity, root, template, surface, yaw, "NPC")
+    entity:SetAttribute("Damageable", false)
+    local prepared = MnpcLifecycle.PrepareShell(entity, root, template, surface, yaw, "NPC")
+    local equipmentContext = NpcEquipmentService.Resolve(slug)
+    entity:SetAttribute("NpcWeaponType", equipmentContext.weaponType)
+    entity:SetAttribute("NpcWeaponSet", equipmentContext.weaponSet)
+    local visual, rigLease = MnpcLifecycle.AttachRig(entity, root, template, surface, yaw, "NPC", prepared)
     if not visual then
         entity:Destroy()
         warn("[game1][npc] published model has no usable visual rig: " .. slug)
         return false
     end
-    entity:SetAttribute("Damageable", false)
     MnpcLifecycle.Publish(entity, root, folder())
     local stats = definition.stats or {}
     local hp = math.max(1, finite(stats.MaxHP, 100))
     entity:SetAttribute("Game1NpcRuntime", true)
     entity:SetAttribute("NpcSlug", slug)
-    local weaponSet = NpcEquipmentService.Equip(entity, slug)
+    local weaponSet = NpcEquipmentService.Equip(entity, slug, equipmentContext, rigLease)
     local profile = (NpcAnimationRegistry.profiles or {})[slug]
     NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)
     entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
@@ -132,7 +139,7 @@ local function spawnOne(state: any): boolean
     entity:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, 50)))
     local hitbox = EntityHitboxService.Attach(entity, visual)
     entity:SetAttribute("CombatHitboxCount", hitbox.count)
-    local entry = { root = root, visual = visual, presentation = nil, dying = false }
+    local entry = { root = root, visual = visual, rigLease = rigLease, equipmentContext = equipmentContext, presentation = nil, dying = false }
     state.instances[entity] = entry
     local poseTicket = NpcCombatAIService.Bind(entity, root, function()
         -- Do not use the death/respawn delay for a leash violation. Release
@@ -161,7 +168,7 @@ local function spawnOne(state: any): boolean
     entity.Destroying:Connect(function()
         -- External removals still schedule a single replacement at the same point.
         if state.instances[entity] == entry then
-            release(state, entity, true)
+            release(state, entity, true, true)
         end
     end)
     if not poseTicket then

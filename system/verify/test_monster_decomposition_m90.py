@@ -30,7 +30,7 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
             'spawnGeometry:RandomSpawnPoint(record)',
             'MnpcLifecycle.Create(',
             'MonsterInitialAttributes.Apply(model, definition, record, instanceId)',
-            'MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster")',
+            'MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster", prepared)',
             'MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)',
             'MnpcLifecycle.Publish(model, navigationRoot, ensureMonstersFolder())',
             'EntityHitboxService.Attach(model, visual)',
@@ -48,8 +48,8 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
         attachment = (ROOT / 'src/server/actor/MnpcVisualRig.luau').read_text()
         for required in ('ActorCollisionPolicy.Assign(root, kind)', 'humanoid.HipHeight = HIP_HEIGHT', 'root:SetNetworkOwner(nil)'):
             self.assertIn(required, shell)
-        for required in ('collider.Name = "RootCollider"', 'visualWeld.Part1 = visualRoot'):
-            self.assertIn(required, attachment)
+        self.assertIn('collider.Name = "RootCollider"', shell)
+        self.assertIn('visualWeld.Part1 = visualRoot', attachment)
 
     def test_geometry_maintains_shared_rng_and_raycast_contract(self):
         spawner, geometry = read("MonsterSpawnerService"), read("MonsterSpawnGeometry")

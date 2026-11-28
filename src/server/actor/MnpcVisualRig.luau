@@ -1,33 +1,11 @@
 -- Attach a published rig to an already existing navigation shell.
 -- All geometry preparation is isolated in a staging clone; never PivotTo the entity.
--- Caller owns animation/weapon/hitbox lifetimes; this module creates no tracks.
+-- Returns a presentation lease for exact geometry/equipment ownership.
+-- Domain owners quiesce animation/AI/hitbox consumers before releasing it.
+local Shell = require(script.Parent:WaitForChild("MnpcNavigationShell"))
+local Geometry = require(script.Parent:WaitForChild("MnpcRigGeometry"))
+local PresentationLifecycle = require(script.Parent:WaitForChild("MnpcPresentationLifecycle"))
 local VisualRig = {}
-
-local function visibleBounds(model: Model): (CFrame, Vector3)
-    local minimum = Vector3.new(math.huge, math.huge, math.huge)
-    local maximum = Vector3.new(-math.huge, -math.huge, -math.huge)
-    local found = false
-    for _, descendant in ipairs(model:GetDescendants()) do
-        if descendant:IsA("BasePart") and descendant.Name ~= "RootPart" and descendant.Name ~= "RootCollider" then
-            found = true
-            local half = descendant.Size * 0.5
-            for x = -1, 1, 2 do
-                for y = -1, 1, 2 do
-                    for z = -1, 1, 2 do
-                        local corner = descendant.CFrame:PointToWorldSpace(Vector3.new(half.X * x, half.Y * y, half.Z * z))
-                        minimum = Vector3.new(math.min(minimum.X, corner.X), math.min(minimum.Y, corner.Y), math.min(minimum.Z, corner.Z))
-                        maximum = Vector3.new(math.max(maximum.X, corner.X), math.max(maximum.Y, corner.Y), math.max(maximum.Z, corner.Z))
-                    end
-                end
-            end
-        end
-    end
-    if not found then
-        return model:GetBoundingBox()
-    end
-    local size = maximum - minimum
-    return CFrame.new((minimum + maximum) * 0.5), size
-end
 
 local function prepareVisual(runtimeModel: Model): (Model, BasePart?)
     local visual = runtimeModel:FindFirstChild("ImportedRig")
@@ -56,29 +34,13 @@ local function groundAlign(staged: Model, visual: Model, surface: Vector3, yaw: 
     staged:PivotTo(CFrame.new(surface) * CFrame.Angles(0, yaw, 0) * staged:GetPivot().Rotation)
     -- Preserve the two existing ground alignment policies; NPC uses ImportedRig
     -- bounds while Monster uses the published wrapper bounds.
-    local boundsFrame, boundsSize = visibleBounds(if kind == "NPC" then visual else staged)
+    local boundsModel = staged
+    if kind == "NPC" then boundsModel = visual end
+    local boundsFrame, boundsSize = Geometry.VisibleBounds(boundsModel)
     staged:PivotTo(staged:GetPivot() + Vector3.new(0, surface.Y - (boundsFrame.Position.Y - boundsSize.Y * 0.5), 0))
 end
 
-local function bindCollider(model: Model, navigationRoot: BasePart, visualRoot: BasePart, boxCFrame: CFrame, boxSize: Vector3, skillCaster: boolean)
-    local collider = Instance.new("Part")
-    collider.Name = "RootCollider"
-    -- Query reference for existing mathematical combat OBB; not a physical body.
-    collider.Size = Vector3.new(math.max(0.5, boxSize.X), math.max(0.5, boxSize.Y), math.max(0.5, boxSize.Z))
-    collider.CFrame = boxCFrame
-    collider.Transparency = 1
-    collider.CastShadow = false
-    collider.Anchored = false
-    collider.CanCollide = false
-    collider.CanTouch = false
-    collider.CanQuery = true
-    collider.Massless = true
-    collider.Parent = model
-    local rootWeld = Instance.new("WeldConstraint")
-    rootWeld.Name = "RootColliderWeld"
-    rootWeld.Part0 = navigationRoot
-    rootWeld.Part1 = collider
-    rootWeld.Parent = navigationRoot
+local function bindVisual(navigationRoot: BasePart, collider: BasePart, visualRoot: BasePart, skillCaster: boolean)
     local visualWeld
     if skillCaster then
         navigationRoot.RootPriority = 127
@@ -92,12 +54,22 @@ local function bindCollider(model: Model, navigationRoot: BasePart, visualRoot: 
     visualWeld.Part0 = collider
     visualWeld.Part1 = visualRoot
     visualWeld.Parent = collider
+    return visualWeld
 end
 
-function VisualRig.Attach(model: Model, navigationRoot: BasePart, template: Model, surface: Vector3, yaw: number, kind: "Monster" | "NPC"): Model?
+function VisualRig.Attach(model: Model, navigationRoot: BasePart, template: Model, surface: Vector3, yaw: number, kind: "Monster" | "NPC", prepared: any?): (Model?, any?)
     assert(navigationRoot.Parent == model and model.PrimaryPart == navigationRoot, "MNPC shell required")
     assert(model:GetAttribute("Game1MnpcKind") == kind, "MNPC rig kind mismatch")
-    assert(model:FindFirstChild("RootCollider") == nil and model:FindFirstChild("ImportedRig") == nil, "MNPC visual already attached")
+    assert(model:FindFirstChild("ImportedRig") == nil, "MNPC visual already attached")
+    local collider = model:FindFirstChild("RootCollider")
+    if prepared then
+        assert(prepared.root == navigationRoot and prepared.collider == collider and collider ~= nil
+            and prepared.geometry.template == template and prepared.geometry.kind == kind, "MNPC shell plan mismatch")
+        assert(collider:FindFirstChild("VisualRootWeld") == nil, "MNPC visual already attached")
+        if not Geometry.IsCurrent(prepared.geometry) then return nil end
+    else
+        assert(collider == nil, "MNPC prepared shell requires its plan")
+    end
     local staged = template:Clone()
     if not staged then return nil end
     local visual, visualRoot = prepareVisual(staged)
@@ -108,11 +80,20 @@ function VisualRig.Attach(model: Model, navigationRoot: BasePart, template: Mode
     -- A canonical wrapper contains ImportedRig; preserve its child hierarchy,
     -- including animation hosts and references within the clone. An unwrapped
     -- source is attached as a single ImportedRig rather than owning the entity.
-    groundAlign(staged, visual, surface, yaw, kind)
-    local boxCFrame, boxSize = visibleBounds(visual)
+    local boxCFrame, boxSize
+    if prepared then
+        -- Rebase on the *current* root, not on the original spawn position.
+        staged:PivotTo(navigationRoot.CFrame * prepared.geometry.pivotOffset)
+    else
+        -- Explicit compatibility path for unsupported template geometry.
+        groundAlign(staged, visual, surface, yaw, kind)
+        boxCFrame, boxSize = Geometry.VisibleBounds(visual)
+    end
+    local owned = {}
     if visual == staged then
         staged.Name = "ImportedRig"
         staged.Parent = model
+        table.insert(owned, staged)
     else
         -- Do not overwrite the navigation shell with a source runtime helper.
         for _, child in ipairs(staged:GetChildren()) do
@@ -123,11 +104,18 @@ function VisualRig.Attach(model: Model, navigationRoot: BasePart, template: Mode
         end
         for _, child in ipairs(staged:GetChildren()) do
             child.Parent = model
+            table.insert(owned, child)
         end
         staged:Destroy()
     end
-    bindCollider(model, navigationRoot, visualRoot, boxCFrame, boxSize, kind == "Monster" and model:GetAttribute("MonsterSkillCaster") == true)
-    return visual
+    local fallbackRootWeld = nil
+    if not collider then
+        collider, fallbackRootWeld = Shell.CreateQueryCollider(model, navigationRoot, boxCFrame, boxSize)
+    end
+    local weld = bindVisual(navigationRoot, collider, visualRoot, kind == "Monster" and model:GetAttribute("MonsterSkillCaster") == true)
+    local lease = PresentationLifecycle.new(model, visual, collider, weld, owned, fallbackRootWeld)
+    collider.CanQuery = true
+    return visual, lease
 end
 
 return table.freeze(VisualRig)

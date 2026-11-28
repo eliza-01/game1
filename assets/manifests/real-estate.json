@@ -6591,9 +6591,9 @@
       "model_asset_id": "94882722542367",
       "model_published_hash": "5693ec556c0d8a8c2c9a70729a5f1a4be1d34fa5ae1153c4f9cf18f3e0f684f1",
       "model_moderation": "Approved",
-      "revision": 35,
+      "revision": 36,
       "created_at": 1795087964.5584087,
-      "updated_at": 1795281650.0315607,
+      "updated_at": 1795838238.9653194,
       "skeleton": {
         "schemaVersion": 1,
         "meshes": [
@@ -16958,7 +16958,7 @@
           "glass": false,
           "noCollide": false,
           "collisionFidelity": "Box",
-          "doubleSided": false,
+          "doubleSided": true,
           "destructible": false
         },
         "door": {
@@ -17039,7 +17039,7 @@
           "destructible": false
         },
         "plants": {
-          "appearanceMode": "atlas",
+          "appearanceMode": "material_atlas",
           "visualMaterial": "SmoothPlastic",
           "visualColor": "#FFFFFF",
           "alphaEnabled": false,

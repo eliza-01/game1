@@ -17,3 +17,9 @@
 ## Проверки
 
 Lua doubles двух режимов (catalog/debug reach), shared qualification/initial shell, near-first admission, two domain requests, hold, pins, disabled profile, rollback/retry/timeout/cancel, M638 dummy до full readiness; source contracts обеих spawn веток и общего scheduler. Это не Roblox Studio/DEV/mobile native acceptance и не измерение FPS.
+
+### M641 · Диагностика фактических переходов
+В LD → MNPC status (Studio/DEV, в том числе без Location manifest) доступен снимок ближайших реплицированных существ: реальная дистанция от корня игрока, desired/actual, причина FULL или отсутствия наблюдения, серверная стадия, профиль и состояние настройки demand. Никакой периодической диагностики. Ошибка отключения клиентского контроллера теперь сохраняется в состоянии для вывода в LD. Нулевой TargetUserId не считается активной целью. GP test и debug reach намеренно сохранены; причину наблюдения FULL на 200 studs нужно подтвердить в нативном Runtime.
+
+### M642 · Custom character spatial root
+Нативный снимок M641: FULL/LOD1/OUT 0, WAIT 20; все строки `UNTRACKED | not observed`, `no profile`, дистанция `?`, attack radius 9. Это не отсутствие опубликованного LOD1: наблюдение вообще не запускалось, поскольку клиент искал HumanoidRootPart у custom ControllerManager-персонажа с RootCollider/NavigationRoot. M642 использует существующий CharacterSpatialRoot.Get(player) в MNPC LOD и M626 near-first priority окружения. При отсутствии пригодного корня LD показывает WAIT явно; при появлении/смене корня немедленное наблюдение восстанавливается. Серверные правила demand, включая консервативный запас MaxAimDistance в Studio/DEV, не изменены; `server: full` отдельно от клиентского LOD и сам по себе не является ошибкой. Lua regression с custom avatar без Humanoid/HumanoidRootPart, потерей/возвратом корня и стандартным Humanoid; нативная повторная проверка остаётся открытой.

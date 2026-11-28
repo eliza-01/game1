@@ -317,7 +317,7 @@ return table.freeze({
 		}),
 	}),
 	mnpcDemand = table.freeze({
-		enabled = false,
+		enabled = true,
 	}),
 	playerJump = table.freeze({
 		heightMultiplier = 2,

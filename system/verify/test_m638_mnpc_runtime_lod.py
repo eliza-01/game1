@@ -52,6 +52,17 @@ class RuntimeProjection(unittest.TestCase):
         if not lua: self.skipTest('Standalone Lua unavailable')
         subprocess.run([lua,str(ROOT/'system/verify/mnpc_lod_m638.lua'),str(ROOT)],check=True,timeout=15)
 
+    def test_custom_character_root_shared_with_near_first(self):
+        controller=(ROOT/'src/client/actor/MnpcLodController.luau').read_text()
+        streamer=(ROOT/'src/client/world/LocationWorldStreamer.luau').read_text()
+        for source in (controller, streamer):
+            self.assertIn('WaitForChild("CharacterSpatialRoot")',source)
+            self.assertIn('SpatialRoot.Get(player)',source)
+        self.assertNotIn('rootOf(player.Character, "HumanoidRootPart")',controller)
+        anchor=streamer.split('local function priorityAnchor(cameraPosition)',1)[1].split('local callbacks',1)[0]
+        self.assertNotIn('FindFirstChild("HumanoidRootPart")',anchor)
+        self.assertIn('waiting for player root',controller)
+
     def test_common_scheduler_and_existing_combat(self):
         source=(ROOT/'src/client/world/LocationWorldStreamer.luau').read_text()
         controller=(ROOT/'src/client/actor/MnpcLodController.luau').read_text()

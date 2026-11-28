@@ -6,7 +6,9 @@ local Workspace = game:GetService("Workspace")
 local CollectionService = game:GetService("CollectionService")
 local Stats = game:GetService("Stats")
 local Players = game:GetService("Players")
-local World = ReplicatedStorage:WaitForChild("Game1Shared"):WaitForChild("world")
+local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
+local World = Shared:WaitForChild("world")
+local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local Registry = require(World:WaitForChild("LocationAssetRegistry"))
 local Contract = require(World:WaitForChild("LocationRuntimeManifestContract"))
 local Policy = require(World:WaitForChild("LocationLodDistancePolicy"))
@@ -246,9 +248,8 @@ function Streamer.Start()
     local player = Players.LocalPlayer
     local function priorityAnchor(cameraPosition)
         local stage = player:GetAttribute("CharacterCreationStatus")
-        local character = player.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-        if (stage == nil or stage == "world") and root and root:IsA("BasePart") and root:IsDescendantOf(Workspace) then
+        local root = SpatialRoot.Get(player)
+        if (stage == nil or stage == "world") and root then
             return root.Position, root
         end
         -- Selection/creation camera has no gameplay character to prioritize.
@@ -358,6 +359,7 @@ function Streamer.Start()
                 warn("[game1][MNPC LOD] disabled after presentation error: " .. tostring(reason))
                 pcall(mnpc.Destroy, mnpc)
                 mnpc = nil
+                if active then active.mnpc = nil; active.mnpcError = tostring(reason) end
             end
         end
         local captureStart = diagnostics.enabled and os.clock() or nil
@@ -514,6 +516,13 @@ function Streamer.Start()
     end
 end
 
+
+-- Read-only, on demand and independent of a compiled Location manifest.
+function Streamer.MnpcStatus()
+    if not active then return nil, "World streamer not started" end
+    if not active.mnpc then return nil, active.mnpcError or "MNPC controller unavailable" end
+    return active.mnpc:Describe()
+end
 
 -- Called by the gated local DEV tool; Runtime never starts a capture itself.
 local function memoryMb()

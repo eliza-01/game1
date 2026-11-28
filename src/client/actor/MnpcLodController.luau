@@ -6,6 +6,7 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
 local World = Shared:WaitForChild("world")
 local Registry = require(World:WaitForChild("MnpcLodRegistry"))
 local Policy = require(World:WaitForChild("MnpcLodPolicy"))
+local SpatialRoot = require(Shared:WaitForChild("character"):WaitForChild("CharacterSpatialRoot"))
 local AttackConfig = require(Shared:WaitForChild("combat"):WaitForChild("AttackConfig"))
 local Mask = require(script.Parent:WaitForChild("MnpcLodMask"))
 local Cache = require(script.Parent:WaitForChild("MnpcLodPrototypeCache"))
@@ -69,15 +70,17 @@ local function fullReady(model)
     return (stage == nil or stage == "full") and model:GetAttribute("Game1MnpcRigReady") == true and rig and rig:IsA("Model")
         and rig:FindFirstChildWhichIsA("MeshPart", true) ~= nil
 end
-local function pinned(record, player, distance, profile, collider)
+local function pinReason(record, player, distance, profile, collider)
     local model = record.model
     local reach = math.clamp(tonumber(player.Character:GetAttribute("AttackRadius")) or AttackConfig.Range, 0, AttackConfig.MaxAimDistance)
     local extent = collider and collider.Size.Magnitude * 0.5 or 0
-    return distance <= reach + extent + 8
-        or (record.actual == "FULL" and distance < profile.hide and model:GetAttribute("LifeState") ~= "Alive")
-        or model:GetAttribute("MonsterTargetUserId") == player.UserId
-        or model:GetAttribute("NpcTargetUserId") == player.UserId
-        or model:GetAttribute("Game1GameplayTestOwner") ~= nil
+    if distance <= reach + extent + 8 then return "attack reach" end
+    if record.actual == "FULL" and distance < profile.hide and model:GetAttribute("LifeState") ~= "Alive" then return "death presentation" end
+    -- 0 is the explicit no-target sentinel, not a player identity.
+    if player.UserId ~= 0 and (model:GetAttribute("MonsterTargetUserId") == player.UserId
+        or model:GetAttribute("NpcTargetUserId") == player.UserId) then return "active target" end
+    if model:GetAttribute("Game1GameplayTestOwner") ~= nil then return "gameplay test" end
+    return nil
 end
 function Controller:_remove(model)
     local record = self.records[model]
@@ -142,11 +145,20 @@ function Controller:_observe(player, root)
         local ready = actorRoot and key and model:GetAttribute("Game1MnpcKind") == record.kind
             and model:GetAttribute("LifeState") ~= nil and Policy.Valid(profile)
         if not ready then
+            record.distance = actorRoot and (actorRoot.Position - root.Position).Magnitude or nil
+            record.reason = not actorRoot and "missing root" or not key and "missing slug"
+                or model:GetAttribute("Game1MnpcKind") ~= record.kind and "kind mismatch"
+                or model:GetAttribute("LifeState") == nil and "missing life state" or "invalid profile"
+            record.profile = profile
+            record.target = nil
             destroyPart(record); unmask(record); setStage(record, nil)
             record.desired = nil
         else
             local distance = (actorRoot.Position - root.Position).Magnitude
-            local desired = Policy.Resolve(distance, record.desired, profile, pinned(record, player, distance, profile, collider))
+            local pin = pinReason(record, player, distance, profile, collider)
+            local desired = Policy.Resolve(distance, record.desired, profile, pin ~= nil)
+            record.reason = not profile.enabled and "profile disabled" or pin or "distance"
+            record.profile = profile
             record.desired, record.distance = desired, distance
             record.root, record.collider, record.key = actorRoot, collider, key
             -- Keep a visible placeholder if server is still building FULL.
@@ -154,7 +166,7 @@ function Controller:_observe(player, root)
             local actual = desired
             if desired == "FULL" and profile.enabled and model:GetAttribute("Game1GameplayTestOwner") == nil
                 and model:GetAttribute("LifeState") == "Alive" and model:GetAttribute("MonsterSpawning") ~= true
-                and not fullReady(model) then actual = "LOD1" end
+                and not fullReady(model) then actual = "LOD1"; record.reason = "waiting for FULL" end
             record.target = actual
             record.lifeState = model:GetAttribute("LifeState")
             local asset = entry and entry.asset
@@ -172,11 +184,13 @@ function Controller:_observe(player, root)
 end
 function Controller:Step(dt)
     local player = Players.LocalPlayer
-    local root = player.Character and rootOf(player.Character, "HumanoidRootPart")
+    local root = player and SpatialRoot.Get(player)
     if not root then
         self.playerRoot = nil
+        self.waitingForPlayerRoot = true
         return
     end
+    self.waitingForPlayerRoot = false
     self.elapsed = self.elapsed + dt
     if self.elapsed >= INTERVAL or root ~= self.playerRoot
         or not self.lastPosition or (root.Position - self.lastPosition).Magnitude >= 64 then
@@ -209,6 +223,23 @@ function Controller:Step(dt)
             end
         end
     end
+end
+-- On-demand local DEV snapshot; no additional scan or loop during play.
+function Controller:Describe()
+    local rows = {}
+    local counts = {FULL = 0, LOD1 = 0, UNLOADED = 0, UNTRACKED = 0}
+    for model, record in pairs(self.records) do
+        local stage = record.actual or "UNTRACKED"
+        counts[stage] = (counts[stage] or 0) + 1
+        local row = {name = model.Name, kind = record.kind, distance = record.distance,
+            actual = stage, desired = record.desired or "-", reason = self.waitingForPlayerRoot and "waiting for player root" or record.reason or "not observed",
+            server = model:GetAttribute("Game1MnpcDemandStage") or "-", profile = record.profile}
+        rows[#rows + 1] = row
+    end
+    table.sort(rows, function(a, b) return (a.distance or math.huge) < (b.distance or math.huge) end)
+    local player = Players.LocalPlayer
+    local character = player and player.Character
+    return {counts = counts, rows = rows, playerRoot = self.playerRoot and self.playerRoot.Name, waitingForPlayerRoot = self.waitingForPlayerRoot == true, reach = character and (tonumber(character:GetAttribute("AttackRadius")) or AttackConfig.Range)}
 end
 function Controller:Destroy()
     if self.destroyed then return end

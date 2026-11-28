@@ -35,6 +35,8 @@ local function instance(class,name)
     function i:GetChildren() local out={};for _,c in pairs(self.children) do out[#out+1]=c end;return out end
     function i:FindFirstChild(n) return self.children[n] end
     function i:FindFirstChildWhichIsA(c) for _,o in pairs(self.children) do if o:IsA(c) then return o end end end
+    function i:FindFirstChildOfClass(c) return self:FindFirstChildWhichIsA(c) end
+    function i:IsDescendantOf(parent) return self.Parent ~= nil end
     function i:GetAttribute(k) return self.attrs[k] end
     function i:SetAttribute(k,v) self.attrs[k]=v end
     function i:Destroy() self.Parent=nil;self.destroyed=true end
@@ -51,6 +53,11 @@ local function actor(kind,slug,x)
     a.children={HumanoidRootPart=r,RootCollider=c,ImportedRig=rig};return a
 end
 local player={UserId=42,Character=actor('Monster','self',0)}
+-- Real custom ControllerManager avatar has no HumanoidRootPart or Humanoid.
+player.Character.attrs.CustomCharacter=true
+player.Character.children.HumanoidRootPart=nil
+player.Character.children.NavigationRoot=instance('Part','NavigationRoot')
+player.Character.PrimaryPart=player.Character.children.RootCollider
 local ws=instance('Workspace','Workspace')
 local m,n=actor('Monster','same',130),actor('NPC','same',140)
 local monsters,npcs=instance('Folder','Monsters'),instance('Folder','NPCs')
@@ -60,28 +67,52 @@ local registry={defaults=p,actors={['npc:same']={profile=p,asset=spec}}}
 local prototype=nil
 local cache={Get=function(_,key,asset) if asset then return prototype end end,YieldOutside=function() end,Destroy=function() end}
 local mask={new=function(model) model.hidden=true;return {Destroy=function() model.hidden=false end} end}
-local folder={WaitForChild=function(_,key) if key=='world' or key=='combat' or key=='Game1Shared' then return folder end return key end}
+local folder={WaitForChild=function(_,key) if key=='world' or key=='combat' or key=='character' or key=='Game1Shared' then return folder end return key end}
 -- Lua local scope does not extend into its own initializer.
-folder.WaitForChild=function(_,key) if key=='world' or key=='combat' or key=='Game1Shared' then return folder end return key end
+folder.WaitForChild=function(_,key) if key=='world' or key=='combat' or key=='character' or key=='Game1Shared' then return folder end return key end
 script={Parent=folder}
 game={GetService=function(_,k) if k=='Players' then return {LocalPlayer=player} elseif k=='Workspace' then return ws else return folder end end}
+-- Run the actual shared resolver, removing only Luau syntax for the Lua CLI.
+local f=assert(io.open(rootPath..'/src/shared/character/CharacterSpatialRoot.luau','r'))
+local rootSource=f:read('*a');f:close()
+rootSource=rootSource:gsub('player: Player','player'):gsub('%): boolean',')'):gsub('%): BasePart%?',')')
+rootSource=rootSource:gsub('return if root and root:IsA%("BasePart"%) then root else nil','if root and root:IsA("BasePart") then return root end; return nil')
+local SpatialRoot=assert(load(rootSource))()
 local original=require
-require=function(key) return ({MnpcLodRegistry=registry,MnpcLodPolicy=Policy,AttackConfig={MaxAimDistance=420,Range=7},MnpcLodMask=mask,MnpcLodPrototypeCache={new=function() return cache end}})[key] or original(key) end
+require=function(key) return ({CharacterSpatialRoot=SpatialRoot,MnpcLodRegistry=registry,MnpcLodPolicy=Policy,AttackConfig={MaxAimDistance=420,Range=7},MnpcLodMask=mask,MnpcLodPrototypeCache={new=function() return cache end}})[key] or original(key) end
 math.clamp=function(v,lo,hi) return math.min(hi,math.max(lo,v)) end
 local Controller=dofile(rootPath..'/src/client/actor/MnpcLodController.luau')
-local ctl=Controller.new();ctl:Step(.25)
+local ctl=Controller.new()
+local custom=player.Character; player.Character=nil
+ctl:Step(.25);assert(ctl:Describe().counts.UNTRACKED==2 and ctl:Describe().waitingForPlayerRoot)
+player.Character=custom;ctl:Step(.25)
 assert(m.hidden and n.hidden and ctl.records[m].part.Name=='MNPC_LOD1_RED_DUMMY' and ctl.records[n].part.Name=='MNPC_LOD1_RED_DUMMY')
+assert(ctl:Describe().playerRoot=='RootCollider')
+local savedCollider=custom.children.RootCollider
+custom.children.RootCollider=nil
+ctl:Step(.25);assert(ctl:Describe().playerRoot=='NavigationRoot' and ctl:Describe().counts.LOD1==2)
+custom.children.RootCollider=savedCollider
+ctl:Step(.25);assert(ctl:Describe().playerRoot=='RootCollider')
+assert(ctl:Describe().counts.LOD1==2 and ctl:Describe().rows[1].reason=='distance')
 assert(not ctl.records[m].part.CanCollide and not ctl.records[m].part.CanQuery and not ctl.records[m].part.CanTouch)
+player.Character.attrs.AttackRadius=200;ctl:Step(.25);assert(ctl:Describe().counts.FULL==2 and ctl:Describe().rows[1].reason=='attack reach')
+player.Character.attrs.AttackRadius=nil;m.attrs.Game1GameplayTestOwner=42;ctl:Step(.25);assert(ctl:Describe().rows[1].reason=='gameplay test' and not m.hidden)
+m.attrs.Game1GameplayTestOwner=nil;player.UserId=0;m.attrs.MonsterTargetUserId=0;ctl:Step(.25);assert(m.hidden and ctl:Describe().rows[1].reason=='distance');player.UserId=42
 prototype=instance('MeshPart','proto');ctl:Step(.25);assert(ctl.records[n].part.Name=='MNPC_LOD1')
-player.Character.children.HumanoidRootPart.Position=vec(130);ctl:Step(.25)
+player.Character.children.RootCollider.Position=vec(130);ctl:Step(.25)
 assert(not m.hidden and not n.hidden and not ctl.records[m].part and m.attrs.Game1MnpcLocalLod=='FULL')
-player.Character.children.HumanoidRootPart.Position=vec(500);ctl:Step(.25)
+player.Character.children.RootCollider.Position=vec(500);ctl:Step(.25)
 assert(m.hidden and n.hidden and not ctl.records[m].part and m.attrs.Game1MnpcLocalLod=='UNLOADED')
-player.Character.children.HumanoidRootPart.Position=vec(130);m.attrs.Game1MnpcRigReady=false;ctl:Step(.25)
+player.Character.children.RootCollider.Position=vec(130);m.attrs.Game1MnpcRigReady=false;ctl:Step(.25)
 assert(m.hidden and ctl.records[m].part.Name=='MNPC_LOD1_RED_DUMMY')
 m.attrs.Game1MnpcRigReady=true;m.attrs.Game1MnpcDemandStage="preparing";ctl:Step(.25);assert(m.hidden and ctl.records[m].part)
 m.attrs.Game1MnpcDemandStage="full";ctl:Step(.25);assert(not m.hidden and not ctl.records[m].part)
-player.Character.children.HumanoidRootPart.Position=vec(0);ctl:Step(.25);monsters.ChildRemoved:Fire(m)
+player.Character.children.RootCollider.Position=vec(0);ctl:Step(.25);monsters.ChildRemoved:Fire(m)
 assert(not ctl.records[m] and not m.hidden and not m.attrs.Game1MnpcLocalLod)
+-- Replacement with a standard Humanoid, and temporarily absent player root.
+player.Character=nil;ctl:Step(.25);assert(ctl:Describe().waitingForPlayerRoot and ctl:Describe().rows[1].reason=='waiting for player root')
+player.Character=actor('Monster','standard',0)
+local humanoid=instance('Humanoid','Humanoid');humanoid.Health=100;player.Character.children.Humanoid=humanoid
+ctl:Step(.25);assert(ctl:Describe().playerRoot=='HumanoidRootPart' and ctl:Describe().counts.LOD1==1)
 ctl:Destroy();assert(not n.hidden and not n.attrs.Game1MnpcLocalLod)
 print('M638 policy, visibility ownership, mixed dynamic actor dummy/real/FULL/unload and cleanup oracle passed')

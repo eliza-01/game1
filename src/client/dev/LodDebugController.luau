@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
+local Options = require(Shared:WaitForChild("GameOptions"))
 local Access = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 local Dock = require(script.Parent:WaitForChild("StudioDebugDock"))
 local Streamer = require(script.Parent.Parent:WaitForChild("world"):WaitForChild("LocationWorldStreamer"))
@@ -51,7 +52,8 @@ function Controller.Start()
     local panel = make(screen,"Frame",{Visible=false, Size=UDim2.fromOffset(350,390),
         BackgroundColor3=Color3.fromRGB(17,23,31), BorderSizePixel=0})
     make(panel,"UICorner",{CornerRadius=UDim.new(0,8)})
-    local toggle = button(panel,"Start capture",UDim2.new(1,-16,0,36),UDim2.fromOffset(8,8))
+    local toggle = button(panel,"Start capture",UDim2.new(.5,-12,0,36),UDim2.fromOffset(8,8))
+    local mnpcStatus = button(panel,"MNPC status",UDim2.new(.5,-12,0,36),UDim2.new(.5,4,0,8))
     local scroll = make(panel,"ScrollingFrame",{Position=UDim2.fromOffset(8,52),Size=UDim2.new(1,-16,1,-60),
         BackgroundTransparency=1, BorderSizePixel=0, ScrollBarThickness=5,
         CanvasSize=UDim2.fromOffset(0,0), AutomaticCanvasSize=Enum.AutomaticSize.Y})
@@ -68,6 +70,26 @@ function Controller.Start()
     end)
     playerGui:GetAttributeChangedSignal("Game1DebugPanelOpen"):Connect(syncPanel)
     syncPanel()
+    mnpcStatus.Activated:Connect(function()
+        local snapshot, reason = Streamer.MnpcStatus()
+        local lines = {"MNPC · server demand " .. (if Options.MnpcDemandEnabled() then "ON" else "OFF")}
+        if not snapshot then
+            lines[#lines + 1] = tostring(reason)
+        else
+            local c = snapshot.counts
+            lines[#lines + 1] = "Player root: " .. (snapshot.playerRoot or "WAIT")
+            lines[#lines + 1] = "Attack radius: " .. tostring(snapshot.reach or "-")
+            lines[#lines + 1] = string.format("FULL %d | LOD1 %d | OUT %d | WAIT %d", c.FULL, c.LOD1, c.UNLOADED, c.UNTRACKED)
+            for i = 1, math.min(12, #snapshot.rows) do
+                local row = snapshot.rows[i]
+                local p = row.profile
+                lines[#lines + 1] = string.format("\n%s · %s studs\n%s → %s | %s\nserver: %s | %s", row.name,
+                    row.distance and string.format("%.0f", row.distance) or "?", row.desired, row.actual, row.reason,
+                    row.server, p and string.format("%s/%s ±%s", tostring(p.full), tostring(p.hide), tostring(p.hysteresis)) or "no profile")
+            end
+        end
+        text.Text = table.concat(lines, "\n")
+    end)
     toggle.Activated:Connect(function()
         if recording then
             recording = false

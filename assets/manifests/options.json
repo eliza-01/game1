@@ -497,6 +497,6 @@
     }
   },
   "mnpcDemand": {
-    "enabled": false
+    "enabled": true
   }
 }

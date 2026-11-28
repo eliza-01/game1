@@ -30,6 +30,7 @@ SOURCES = {
     'lod-assembly-job': ('src/client/world/LodAssemblyJob.luau', 'LOD · staged assembly job'),
     'lod-diagnostics': ('src/client/world/LodDiagnostics.luau', 'LOD · opt-in capture'),
     'lod-debug-controller': ('src/client/dev/LodDebugController.luau', 'LOD · DEV capture UI'),
+    'mnpc-pose-pilot': ('docs/workflows/M627_MNPC_POSE_PILOT_RU.md', 'MNPC · M627 аудит и пилот'),
     'mnpc-lod-spec': ('docs/workflows/MNPC_LOD_SPEC_RU.md', 'MNPC · план Visual LOD'),
     'lod-acceptance': ('docs/workflows/M624_RUNTIME_LOD_ACCEPTANCE_RU.md', 'LOD · сценарии приёмки'),
     'lod-runtime-work': ('src/client/world/LodRuntimeWork.luau', 'LOD · бюджет и lifecycle'),

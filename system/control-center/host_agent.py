@@ -125,7 +125,8 @@ weapons.atlases = location_assets.atlases
 arrows.atlases = location_assets.atlases
 npcs.atlases = location_assets.atlases
 npcs.export()
-mnpc_lod = MnpcLodResource(ROOT, monsters, npcs, npc_equipment, weapons, location_assets.atlases)
+mnpc_lod = MnpcLodResource(ROOT, monsters, npcs, npc_equipment, weapons, location_assets.atlases,
+    animations={"monster": monster_animations, "npc": npc_animations})
 weapons.export()
 arrows.export()
 location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)

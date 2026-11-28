@@ -11,6 +11,8 @@ MAX_RESULT_BYTES = 2_000_000
 
 
 def capture_from_studio(payload, *, timeout_seconds=55, port=PORT):
+    if payload.get('includeGeometry') and timeout_seconds == 55:
+        timeout_seconds = 110  # bounded offline mesh read; not Runtime
     identity = {key: payload[key] for key in ('kind', 'slug', 'fullFingerprint', 'idleFingerprint', 'expectedRevision')}
     identity.update(project=PROJECT, command=COMMAND, schemaVersion=1, operationId=uuid.uuid4().hex)
     command = {**payload, **identity}

@@ -24,6 +24,30 @@ def technical(name):
     return retired(name) or name in {'rig_carrier', 'rootpart', 'humanoidrootpart', 'rootcollider', 'hitbox', 'hitboxes'}
 
 
+def finish(merged, output, original_triangles, target):
+    merged.name = 'lod1'
+    merged.data.name = 'lod1'
+    for group in list(merged.vertex_groups):
+        merged.vertex_groups.remove(group)
+    tri = merged.modifiers.new('Triangulate', 'TRIANGULATE')
+    bpy.ops.object.modifier_apply(modifier=tri.name)
+    if original_triangles > target:
+        decimate = merged.modifiers.new('LOD1 collapse', 'DECIMATE')
+        decimate.ratio = target / original_triangles
+        decimate.use_collapse_triangulate = True
+        bpy.ops.object.modifier_apply(modifier=decimate.name)
+    merged.data.calc_loop_triangles()
+    if not 1 <= len(merged.data.loop_triangles) <= target:
+        raise ValueError('Decimation could not meet triangle target without an empty mesh; choose a higher target')
+    if not len(merged.data.uv_layers) == 1:
+        raise ValueError('Decimation lost the shared atlas UV')
+    export_model(output, [merged], no_textures=True)
+    report = analyze(output)  # same inspector as M633, actual FBX round-trip
+    if report['triangles'] > target:
+        raise ValueError('FBX round-trip exceeds triangle target')
+    return report
+
+
 def prepare(source, output, frame, target):
     clean_scene()
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=True, use_image_search=False)
@@ -85,26 +109,7 @@ def prepare(source, output, frame, target):
     if len(copies) > 1:
         bpy.ops.object.join()
     merged = bpy.context.view_layer.objects.active
-    merged.name = 'lod1'
-    merged.data.name = 'lod1'
-    for group in list(merged.vertex_groups):
-        merged.vertex_groups.remove(group)
-    tri = merged.modifiers.new('Triangulate', 'TRIANGULATE')
-    bpy.ops.object.modifier_apply(modifier=tri.name)
-    if original_triangles > target:
-        decimate = merged.modifiers.new('LOD1 collapse', 'DECIMATE')
-        decimate.ratio = target / original_triangles
-        decimate.use_collapse_triangulate = True
-        bpy.ops.object.modifier_apply(modifier=decimate.name)
-    merged.data.calc_loop_triangles()
-    if not 1 <= len(merged.data.loop_triangles) <= target:
-        raise ValueError('Decimation could not meet triangle target without an empty mesh; choose a higher target')
-    if not len(merged.data.uv_layers) == 1:
-        raise ValueError('Decimation lost the shared atlas UV')
-    export_model(output, [merged], no_textures=True)
-    report = analyze(output)  # same inspector as M633, actual FBX round-trip
-    if report['triangles'] > target:
-        raise ValueError('FBX round-trip exceeds triangle target')
+    report = finish(merged, output, original_triangles, target)
     return {'schemaVersion': 1, 'geometry': report, 'inputTriangles': original_triangles,
             'inputMeshes': len(visual), 'poseMode': 'embedded_frame' if rigs else 'posed_static'}
 

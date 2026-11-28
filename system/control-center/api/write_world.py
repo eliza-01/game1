@@ -29,13 +29,17 @@ def route(path, body, deps):
                     from services.mnpc_lod_capture import capture
                     owner._actor(kind, slug)
                     return 200, capture(owner, kind, slug, payload, deps[kind + '_animations'])
+                if action == 'bake':
+                    from services.mnpc_lod_bake import bake
+                    owner._actor(kind, slug)
+                    return 200, bake(owner, kind, slug, payload, deps[kind + '_animations'])
                 if action == 'prepare':
                     return 200, owner.prepare(kind, slug, payload)
                 if action == 'publish':
                     if not isinstance(payload, dict) or set(payload) != {'expectedRevision'}:
                         raise ValueError('MNPC publish requires expectedRevision only')
                     return 200, owner.publish(kind, slug, payload['expectedRevision'],
-                        deps['publication_credentials']('game1 MNPC LOD1'))
+                        deps['publication_credentials']('game1 MNPC LOD1'), animations=deps.get(kind + '_animations'))
             return 404, {'error': 'Unknown MNPC LOD write operation'}
         except (ValueError, OSError, RuntimeError, KeyError, TypeError) as error:
             return 400, {'error': str(error)}

@@ -57,12 +57,13 @@ def validate_profile(profile):
 
 
 class MnpcLodResource:
-    def __init__(self, root, monsters, npcs, equipment, weapons, atlases):
+    def __init__(self, root, monsters, npcs, equipment, weapons, atlases, *, animations=None):
         self.root = Path(root).resolve()
         self.stores = {'monster': monsters, 'npc': npcs}
         self.equipment = equipment
         self.weapons = weapons
         self.atlases = atlases
+        self.animations = animations or {}
         self.db = self.root / '.control-center/game1.db'
         self._lock = RLock()
         self._init()
@@ -176,6 +177,13 @@ class MnpcLodResource:
                 sha256(atlas_path) != row['atlas_sha256']):
             item.update(status='ATLAS_SOURCE_CHANGED', reason='Pinned atlas source missing or changed; restore original bytes')
             return item
+        recipe = (item.get('geometry') or {}).get('preparation') or {}
+        if recipe.get('mode') == 'captured_idle' and kind in self.animations:
+            try:
+                self._check_captured_idle(item, actor['slug'], self.animations[kind])
+            except (ValueError, KeyError, TypeError):
+                item.update(status='IDLE_CHANGED', reason='Baked idle is stale; capture and bake a current LOD1')
+                return item
         if row['model_id'] and row['image_id']:
             item.update(status='PUBLISHED', reason='Cloud Model + Image published; Roblox MeshPart import/alignment not verified')
         elif row['image_id'] or atlas['current']:
@@ -300,7 +308,8 @@ class MnpcLodResource:
                     raise ValueError('Model publication pending')
                 if (old and old['source_sha256'] == digest and old['atlas_sha256'] == texture_sha and
                         old['atlas_variant_id'] == atlas['id'] and old['full_fingerprint'] == fingerprint and
-                        restored['status'] in ('STAGED','ATLAS_READY','PUBLISHED')):
+                        restored['status'] in ('STAGED','ATLAS_READY','PUBLISHED') and
+                        (recipe is None or (restored.get('geometry') or {}).get('preparation') == recipe)):
                     return restored
                 db.execute('''INSERT INTO mnpc_lod1(kind,slug,revision,full_fingerprint,source_path,
                     source_sha256,geometry_json,atlas_variant_id,atlas_sha256,updated_at)
@@ -331,10 +340,21 @@ class MnpcLodResource:
                        (*values.values(),time.time(),kind,slug))
             self._history(db, self._read(db,kind,slug), event)
 
-    def publish(self, kind, slug, expected, credentials):
+    @staticmethod
+    def _check_captured_idle(current, slug, animations):
+        recipe = (current.get('geometry') or {}).get('preparation') or {}
+        if recipe.get('mode') == 'captured_idle':
+            from .mnpc_lod_capture import idle_identity
+            if animations is None or idle_identity(animations, slug)[0] != recipe['idleFingerprint']:
+                raise ValueError('Baked idle changed; capture and bake a current LOD1 before publication')
+
+    def publish(self, kind, slug, expected, credentials, *, animations=None):
         with self._lock:
+            animations = animations or self.animations.get(kind)
             current = self.describe(kind, slug)
             check_revision(expected, current['revision'])
+            if current['status'] == 'IDLE_CHANGED':
+                raise ValueError('Baked idle changed; capture and bake a current LOD1 before publication')
             if expected == 0:
                 raise ValueError('Stage LOD1 first')
             if current['status'] == 'MODEL_PENDING':
@@ -348,6 +368,7 @@ class MnpcLodResource:
                     raise ValueError('Roblox rejected the Model: ' + json.dumps(operation['error'], ensure_ascii=False))
                 result = wait_for_operation(current['modelOperation'], api_key=api_key)
             elif current['status'] in ('STAGED','ATLAS_READY','PUBLISHED'):
+                self._check_captured_idle(current, slug, animations)
                 source = verified_source(self.root, current)
                 with self.connect() as db:
                     row = self._read(db,kind,slug)
@@ -371,6 +392,7 @@ class MnpcLodResource:
                     fresh = self.describe(kind,slug)
                     if fresh['status'] != 'ATLAS_READY' or fresh['imageAssetId'] != image_id:
                         raise ValueError('MNPC source changed during publication preparation')
+                    self._check_captured_idle(fresh, slug, animations)
                     verified_source(self.root, fresh)
                     self._change(kind,slug,expected,'MODEL_INTENT',model_pending=1,model_operation='')
 

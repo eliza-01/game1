@@ -2,6 +2,7 @@
 -- No live spawn, no Workspace publication, no AI, no collision-group writes.
 local Preview = require(script.Parent.StudioTimelinePreview)
 local IdlePose = require(script.Parent.StudioMnpcIdlePose)
+local Geometry = require(script.Parent.StudioMnpcGeometryCapture)
 local Capture = {}
 
 local function child(parent, name)
@@ -48,8 +49,9 @@ local function pathOf(root, node)
     return table.concat(names, "/")
 end
 
-local function captureFrames(assembly, visual, equipment, rootFrame)
-    local meshes, bones = {}, {}
+local function captureFrames(assembly, visual, equipment, rootFrame, includeGeometry)
+    local meshes, bones, geometry = {}, {}, {}
+    local remaining = Geometry.MaxTriangles
     local function scan(model, owner)
         for _, node in model:GetDescendants() do
             if node:IsA("Bone") then
@@ -75,6 +77,13 @@ local function captureFrames(assembly, visual, equipment, rootFrame)
                     frame = frame(rootFrame:ToObjectSpace(node.CFrame)), size = vector(node.Size), meshSize = vector(node.MeshSize),
                     color = {node.Color.R, node.Color.G, node.Color.B}, material = node.Material.Name,
                     transparency = node.Transparency})
+                if includeGeometry then
+                    assert(node.Transparency == 0, "MNPC partial MeshPart transparency requires a separate bake: " .. node.Name)
+                    local piece = Geometry.Read(node, model, rootFrame, remaining)
+                    piece.path = pathOf(assembly, node)
+                    remaining -= #piece.triangles
+                    table.insert(geometry, piece)
+                end
             end
         end
     end
@@ -90,7 +99,8 @@ local function captureFrames(assembly, visual, equipment, rootFrame)
     assert(#bones > 0, "MNPC no captured skeleton")
     table.sort(meshes, function(a,b) return a.path < b.path end)
     table.sort(bones, function(a,b) return a.path < b.path end)
-    return meshes, bones
+    table.sort(geometry, function(a,b) return a.path < b.path end)
+    return meshes, bones, geometry
 end
 
 function Capture.Run(data)
@@ -163,9 +173,10 @@ function Capture.Run(data)
         local pose = IdlePose.Apply(visual, sequence, data.phase)
         -- Same rigid-joint equation as the Timeline Editor; no physics step.
         Preview.RefreshAccessories(assembly)
-        local meshes, bones = captureFrames(assembly, visual, weapons, rootFrame)
+        local meshes, bones, geometry = captureFrames(assembly, visual, weapons, rootFrame, data.includeGeometry == true)
         return {animationId = tostring(idle.assetId), clipId = idle.clipId, weaponSet = weaponSet,
-            pose = pose, meshes = meshes, bones = bones}
+            pose = pose, meshes = meshes, bones = bones,
+            geometry = if data.includeGeometry == true then geometry else nil}
     end, debug.traceback)
     if sequence then sequence:Destroy() end
     if assembly then assembly:Destroy() end

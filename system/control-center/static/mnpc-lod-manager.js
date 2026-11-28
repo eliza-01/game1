@@ -8,7 +8,7 @@
   const post = (url, payload={}) => request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const state = {data:null, selected:'', busy:false, history:[], paths:{fbx:'',texture:'',pose:'',poseAtlas:''}};
   state.recipe={frame:1,targetTriangles:1000,textureSize:512,reviewedAssembly:false};
-  const statuses = {NOT_REGISTERED:'Missing LOD1',FULL_UNAVAILABLE:'FULL unavailable',FULL_CHANGED:'Stale · FULL changed',
+  const statuses = {NOT_REGISTERED:'Missing LOD1',FULL_UNAVAILABLE:'FULL unavailable',FULL_CHANGED:'Stale · FULL changed',IDLE_CHANGED:'Stale · idle changed',
     SOURCE_MISSING:'Missing source',SOURCE_CHANGED:'Changed source',ATLAS_CHANGED:'Stale · atlas changed',ATLAS_SOURCE_CHANGED:'Atlas source changed',STAGED:'Staged',
     ATLAS_READY:'Atlas ready',MODEL_PENDING:'Model operation pending',PUBLISHED:'Published'};
   const filter = $('mnpc-lod-filter');
@@ -58,12 +58,18 @@
       ${g?`<p class="lm-note">${esc(g.vertices)} vertices · ${esc(g.triangles)} triangles · FBX scene bounds: ${esc(g.boundsMin.map(n=>n.toFixed(3)).join(', '))} → ${esc(g.boundsMax.map(n=>n.toFixed(3)).join(', '))}<br>${esc(row.sourcePath)}</p>`:''}
       <details><summary>FULL visual source / equipment</summary><pre class="lm-mnpc-source">${esc(JSON.stringify(row.fullIdentity,null,2))}</pre></details>
       <details open><summary>Capture FULL idle · Studio</summary>
-        <p class="lm-note">Studio Edit + актуальные Rojo / Model + Atlas. Захват опубликованного idle и экипировки в координатах навигационного root. Геометрия и публикация пока не меняются.</p>
-        <div class="actions"><button type="button" data-mnpc-action="capture" ${stageAllowed?'':'disabled'}>Capture idle &amp; assembly</button></div>
-        <p class="lm-note">${state.capture?.status==='CAPTURED'?`Captured · ${esc(state.capture.meshCount)} meshes · ${esc(state.capture.boneCount)} bones · idle ${esc(state.capture.animationId)} · ${esc(state.capture.pose.time.toFixed(3))} s`:esc(state.capture?.status||'NOT_CAPTURED')}</p>
+        <p class="lm-note">Studio Edit + актуальные Rojo / Model + Atlas. Захват опубликованного idle, экипировки, вершин и UV в координатах навигационного root. Cloud не изменяется.</p>
+        <div class="actions"><button type="button" data-mnpc-action="capture" ${stageAllowed?'':'disabled'}>Capture idle &amp; geometry</button></div>
+        <p class="lm-note">${state.capture?.status==='CAPTURED'?`Captured · ${esc(state.capture.meshCount)} meshes · ${esc(state.capture.boneCount)} bones · idle ${esc(state.capture.animationId)} · ${esc(state.capture.pose.time.toFixed(3))} s`:esc(state.capture?.status||'NOT_CAPTURED')}${state.capture?.geometryReady?` · ${esc(state.capture.triangleCount)} triangles`:''}</p>
+        <div class="lm-setting-grid lm-mnpc-profile">
+          <label>Triangle cap<input id="mnpc-bake-targetTriangles" type="number" min="100" max="10000" step="1" value="${esc(state.recipe.targetTriangles)}"></label>
+          <label>Atlas max side<select id="mnpc-bake-textureSize">${[128,256,512,1024].map(n=>`<option value="${n}" ${Number(state.recipe.textureSize)===n?'selected':''}>${n}</option>`).join('')}</select></label>
+        </div>
+        <div class="actions"><button type="button" data-mnpc-action="bake" ${stageAllowed&&state.capture?.geometryReady?'':'disabled'}>Bake &amp; stage LOD1</button></div>
+        <p class="lm-note">Общий цветовой атлас, без PBR-карт; нативное соответствие позы/UV и масштаба проверяется в Studio перед Runtime.</p>
       </details>
       <details><summary>Prepare LOD1 · posed assembly</summary>
-        <p class="lm-note">Пилот: готовая поза FULL (включая оружие) и общий UV-атлас. Сборка, упрощение и уменьшение текстуры выполняются автоматически; захват M635 ещё не преобразуется в posed FBX; объединение разных атласов не подключено.</p>
+        <p class="lm-note">Пилот: готовая поза FULL (включая оружие) и общий UV-атлас. Сборка, упрощение и уменьшение текстуры выполняются автоматически; Ручной импорт — альтернативный путь для неподдерживаемых автоматическим захватом вариантов.</p>
         <div class="lm-mnpc-files"><label>Posed assembly FBX<input id="mnpc-prepare-pose" value="${esc(state.paths.pose)}" ${stageAllowed?'':'disabled'}></label>
           <button type="button" data-mnpc-action="choose-pose" ${stageAllowed?'':'disabled'}>Choose FBX</button>
           <label>Common UV atlas<input id="mnpc-prepare-poseAtlas" value="${esc(state.paths.poseAtlas)}" ${stageAllowed?'':'disabled'}></label>
@@ -128,7 +134,7 @@
       state.paths[event.target.id==='mnpc-prepare-pose'?'pose':'poseAtlas']=event.target.value;
       state.recipe.reviewedAssembly=false;$('mnpc-prepare-reviewedAssembly').checked=false;
     }
-    const field=event.target.id?.replace('mnpc-prepare-','');
+    const field=event.target.id?.replace(/^mnpc-(prepare|bake)-/,'');
     if(['frame','targetTriangles','textureSize'].includes(field))state.recipe[field]=event.target.value;
     if(field==='reviewedAssembly')state.recipe[field]=event.target.checked;
   });
@@ -155,9 +161,16 @@
       if(chosen.path){state.paths[field]=chosen.path;$(`mnpc-prepare-${field}`).value=chosen.path;state.recipe.reviewedAssembly=false;$('mnpc-prepare-reviewedAssembly').checked=false;}
     },'',false);
     if(action==='capture')return run(async()=>{
-      try {state.capture=await post(`${path(row)}/capture`,{expectedRevision:row.revision,fullFingerprint:row.fullFingerprint,phase:0.35});}
+      try {state.capture=await post(`${path(row)}/capture`,{expectedRevision:row.revision,fullFingerprint:row.fullFingerprint,phase:0.35,includeGeometry:true});}
       catch(error){try{await reload();}catch(_){state.data=null;}throw error;}
-    },'Idle assembly captured. No geometry or Cloud changes.');
+    },'Idle geometry captured. No Cloud changes.');
+    if(action==='bake')return run(async()=>{
+      try {
+        await post(`${path(row)}/bake`,{expectedRevision:row.revision,fullFingerprint:row.fullFingerprint,
+          captureSha256:state.capture?.captureSha256,targetTriangles:Number($('mnpc-bake-targetTriangles').value),textureSize:Number($('mnpc-bake-textureSize').value)});
+      }catch(error){try{await reload();}catch(_){state.data=null;}throw error;}
+      await reload();
+    },'Captured LOD1 baked and staged. No Cloud upload.');
     if(action==='prepare')return run(async()=>{
       const integer=field=>{const raw=String($(`mnpc-prepare-${field}`).value);const n=Number(raw);if(!raw.trim()||!Number.isSafeInteger(n))throw Error('Введите целое число: '+field);return n;};
       try {

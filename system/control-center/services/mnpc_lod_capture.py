@@ -15,6 +15,7 @@ import tempfile
 
 from .mnpc_capture_bridge import capture_from_studio, MAX_RESULT_BYTES
 from .model_lod_common import check_revision
+from .mnpc_lod_bake import validate_pieces
 
 
 def digest(data):
@@ -78,7 +79,7 @@ def _texture_ids(visual):
 
 
 def validate_capture(capture, full, candidates):
-    if not isinstance(capture, dict) or set(capture) != {'animationId','clipId','weaponSet','pose','meshes','bones'}:
+    if not isinstance(capture, dict) or set(capture) not in ({'animationId','clipId','weaponSet','pose','meshes','bones'}, {'animationId','clipId','weaponSet','pose','meshes','bones','geometry'}):
         raise ValueError('Invalid Studio MNPC capture contract')
     animation_id = asset_id(capture['animationId'])
     if not isinstance(capture['weaponSet'], str) or len(capture['weaponSet']) > 40:
@@ -132,6 +133,8 @@ def validate_capture(capture, full, candidates):
             _frame(bone[key])
     if sum(b['owner'] == 'body' for b in bones) < pose['animatedBones']:
         raise ValueError('Capture omitted animated body bones')
+    if 'geometry' in capture:
+        validate_pieces(capture['geometry'], meshes)
     return capture
 
 
@@ -156,15 +159,20 @@ def summary(owner, kind, slug, animations):
         if stored['schemaVersion'] != 1 or stored['kind'] != kind or stored['slug'] != slug or stored['fullIdentity'] != current['fullIdentity'] or stored['captureSha256'] != digest(stored['capture']):
             raise ValueError('Capture identity/checksum mismatch')
         capture = validate_capture(stored['capture'],current['fullIdentity'],candidates)
-        return {'status':'CAPTURED','captureSha256':stored['captureSha256'],'animationId':capture['animationId'],
+        result = {'status':'CAPTURED','captureSha256':stored['captureSha256'],'animationId':capture['animationId'],
                 'meshCount':len(capture['meshes']),'boneCount':len(capture['bones']), 'pose':capture['pose']}
+        if 'geometry' in capture:
+            result.update(geometryReady=True, triangleCount=sum(len(p['triangles']) for p in capture['geometry']))
+        return result
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError):
         return {'status':'INVALID'}
 
 
 def capture(owner, kind, slug, payload, animations, *, bridge=None):
-    if not isinstance(payload,dict) or set(payload) != {'expectedRevision','fullFingerprint','phase'}:
+    if not isinstance(payload,dict) or set(payload) not in ({'expectedRevision','fullFingerprint','phase'}, {'expectedRevision','fullFingerprint','phase','includeGeometry'}):
         raise ValueError('Capture requires current FULL fingerprint, LOD revision and idle phase')
+    if 'includeGeometry' in payload and type(payload['includeGeometry']) is not bool:
+        raise ValueError('includeGeometry must be boolean')
     phase = _numbers([payload['phase']],1,limit=1)[0]
     if not 0 < phase < 1:
         raise ValueError('Idle capture phase must be between 0 and 1')
@@ -181,8 +189,12 @@ def capture(owner, kind, slug, payload, animations, *, bridge=None):
                        idleFingerprint=idle, modelId=full['modelId'], phase=phase,
                        equipment={hand:{'slug':row['slug'],'modelId':row['visual']['modelId']} for hand,row in full.get('equipment',{}).items() if row},
                        idles=candidates)
+        if payload.get('includeGeometry'):
+            command['includeGeometry'] = True
         raw = (bridge or capture_from_studio)(command)
         validated = validate_capture(raw,full,candidates)
+        if payload.get('includeGeometry') and 'geometry' not in validated:
+            raise ValueError('Studio plugin does not support geometry capture; install latest Game1Bridge')
         latest = owner.describe(kind,slug)
         check_revision(current['revision'],latest['revision'])
         if latest['fullFingerprint'] != current['fullFingerprint'] or idle_identity(animations,slug)[0] != idle:
@@ -190,7 +202,7 @@ def capture(owner, kind, slug, payload, animations, *, bridge=None):
         data = dict(schemaVersion=1,kind=kind,slug=slug,fullFingerprint=current['fullFingerprint'],idleFingerprint=idle,
                     fullIdentity=full,requestedPhase=phase,createdAt=datetime.now(timezone.utc).isoformat(),capture=validated,
                     captureSha256=digest(validated))
-        encoded = json.dumps(data,ensure_ascii=False,allow_nan=False,sort_keys=True).encode('utf-8')
+        encoded = json.dumps(data,ensure_ascii=False,allow_nan=False,sort_keys=True,separators=(',', ':')).encode('utf-8')
         if len(encoded) > MAX_RESULT_BYTES:
             raise ValueError('Capture file exceeds size budget')
         target = _file(owner,kind,slug)

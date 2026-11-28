@@ -172,6 +172,9 @@
       "StudioMnpcAssemblyCapture": {
         "$path": "modules/StudioMnpcAssemblyCapture.luau"
       },
+      "StudioMnpcGeometryCapture": {
+        "$path": "modules/StudioMnpcGeometryCapture.luau"
+      },
       "StudioMnpcIdlePose": {
         "$path": "modules/StudioMnpcIdlePose.luau"
       },

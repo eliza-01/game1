@@ -12,10 +12,16 @@ return function(services)
             return Capture.Run(data)
         end)
         if ok then result.capture = capture else result.error = tostring(capture):sub(1, 1500) end
+        local encodedOK, encoded = pcall(function() return services.HttpService:JSONEncode(result) end)
+        if not encodedOK or #encoded > 1900000 then
+            result.capture = nil
+            result.error = "MNPC geometry capture cannot be encoded or exceeds 1.9 MB transport budget"
+            encoded = services.HttpService:JSONEncode(result)
+        end
         local sent, response = pcall(function()
             return services.HttpService:RequestAsync({Url = services.bridgeUrl .. "/mnpc-capture-result", Method = "POST",
                 Headers = {["X-Game1-Token"] = services.bridgeToken, ["Content-Type"] = "application/json"},
-                Body = services.HttpService:JSONEncode(result)})
+                Body = encoded})
         end)
         if not sent or not response.Success then warn("[game1] MNPC capture response failed: " .. tostring(response)) end
     end

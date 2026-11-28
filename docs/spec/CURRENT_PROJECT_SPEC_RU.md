@@ -4,6 +4,8 @@
 
 **M635: Studio Edit capture из зарегистрированного FULL template и опубликованного idle KeyframeSequence; общий Monster/NPC контракт, weapon mount, точная авторская keyframe около phase 0.35, снимок mesh/texture IDs, rest/posed bone frames и root-relative transforms. Снимок привязан к FULL/equipment/idle fingerprint; атомарная запись, предыдущий снимок сохраняется при ошибке. Не native Animator benchmark, не FBX/UV/bake; Studio NOT_RUN, Runtime FULL. Следующий этап M636 — геометрия, skinning и объединение атласов из снимка.**
 
+**M636: общий Studio Edit capture фактических posed vertices/triangles/corner UV через EditableMesh (все веса, bind guard), local color atlas body/equipment с SHA-проверкой, UV remap/padding, M634 decimation/FBX round-trip и M633 staging/Atlas Registry. Capture & bake UI, captured idle provenance и stale-idle guard. Нативная геометрия, UV/масштаб, Blender/Cloud/Studio не приняты; material/PBR/alpha и bridge limits описаны. Runtime FULL, A07 NOT_RUN. Далее M637 — Studio import/alignment verification и runtime asset contract.**
+
 
 **Исходный срез:** `game1_diag_2026-10-30_13-52-46.zip`, 30 октября 2026. **Редакторская сверка действующих контрактов:** 22.11.2026, M438a/M439; детали в актуальном дополнении ниже. Старые разделы отражают этапы внедрения.
 **Статус:** действующий живой документ. Последняя сверка Monster Navigation / Runtime / Debug: M594 на базе свежего дампа M592 `game1_diag_2026-11-27_06-32-10.zip`. Прочие gameplay-домены сохраняют предыдущие сверки.

@@ -10,6 +10,8 @@
 
 **M648 · Character Creation Prewarm (KBN-0039-T05): CODE_COMPLETE.** Два реальных default preview имеют приоритет; дополнительные опубликованные компоненты прогреваются в фоне после bootstrap (до 24 уникальных публикаций, 20 с, один занятый слот). Один ограниченный серверный каталог типизированных MeshPart без скелетов и общий клиентский typed cache. Дополнительных сборок и блокировки экрана нет. Native Studio/DEV/Mobile и измерения NOT_RUN. Следующий этап после функциональной приёмки — Hitbox Precompute, затем Priority Animation Prewarm и Player Attack Sampler. См. `docs/workflows/M648_CHARACTER_ASSET_PREWARM_RU.md`.
 
+**M649 · Hitbox Asset Contract & Geometry Lifetime (KBN-0039-T01): CODE_COMPLETE, миграция открыта.** Сессионные готовые bounds и версионированный server-only registry проверяются до EditableMesh; вершины и веса освобождаются после последнего расчёта. Studio-only capture фактического oracle и Control Center compiler v1, реестр пустой до настоящей миграции. SAT/headshot/AI/MNPC не изменены; native parity, coverage и performance NOT_RUN. Следующий этап M650 — authoring workflow, реальные записи и приёмка, затем удаление migration oracle после полного покрытия. M648 native acceptance отдельно открыта. См. `docs/workflows/M649_HITBOX_ASSET_CONTRACT_RU.md`.
+
 **Patch workflow:** stop Rojo before runtime file edits; after successful patch and verification restart Rojo in a separate hidden PowerShell process (`sync.ps1`). Documentation-only changes require no Rojo or plugin restart; reload Control Center when Mechanics/Kanban change. Do not require console commands for ordinary gameplay settings.
 
 ### Historical priority decisions M606a–M617

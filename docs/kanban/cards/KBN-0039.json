@@ -8,18 +8,18 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0039.md",
-  "specSha256": "3b1c76f9ba6e6b823b986b72fcb891601c1143a8ee47053bcec9583f785b1c3e",
+  "specSha256": "e4197f63a3dfb581dff6cb906abe610ecde1996a753e125b642778e681dbf807",
   "dependsOn": [
     "KBN-0035",
     "KBN-0038"
   ],
-  "revision": 2,
-  "updatedAt": "2026-11-28T14:00:00+00:00",
+  "revision": 3,
+  "updatedAt": "2026-11-28T14:10:00+00:00",
   "tasks": [
     {
       "id": "KBN-0039-T01",
-      "title": "Спроектировать версионированный контракт готовых bone-local bounds и генератор Control Center",
-      "done": false
+      "title": "M649 · versioned bounds contract, Studio oracle capture, Control Center compiler — CODE_COMPLETE",
+      "done": true
     },
     {
       "id": "KBN-0039-T02",
@@ -52,13 +52,13 @@
       "id": "KBN-0039-A01",
       "title": "Готовые хитбоксы эквивалентны прежним для mesh/rig/scale; несовпадение ревизии диагностируется, миграция обратима",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M649: standalone Lua capture/lookup invalidation + compiler roundtrip; real meshes, CFrame/pose parity and migration NOT_RUN."
     },
     {
       "id": "KBN-0039-A02",
       "title": "Обычный Runtime не требует расчёта EditableMesh после полной миграции; подтверждён выигрыш старта и памяти",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": "M649: session cache before mesh reads, in-flight geometry leases release; registry empty until authoring migration; native coverage and cold/warm RAM NOT_RUN."
     },
     {
       "id": "KBN-0039-A03",

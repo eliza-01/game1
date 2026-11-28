@@ -7,6 +7,7 @@ local Shared = ReplicatedStorage:WaitForChild("Game1Shared")
 local CombatShared = Shared:WaitForChild("combat")
 local SkeletonHeadResolver = require(CombatShared:WaitForChild("SkeletonHeadResolver"))
 local HitboxMeshGeometryCache = require(script.Parent:WaitForChild("HitboxMeshGeometryCache"))
+local HitboxAssetDefinitions = require(script.Parent:WaitForChild("HitboxAssetDefinitions"))
 local HitboxDefinitionBuilder = require(script.Parent:WaitForChild("HitboxDefinitionBuilder"))
 local HitboxSpatialQueries = require(script.Parent:WaitForChild("HitboxSpatialQueries"))
 local HitboxRuntimeFrames = require(script.Parent:WaitForChild("HitboxRuntimeFrames"))
@@ -148,6 +149,7 @@ local function clearAttributes(entity: Model)
     entity:SetAttribute("CombatHeadBoneName", nil)
     entity:SetAttribute("CombatTargetGeometry", nil)
     entity:SetAttribute("CombatHitboxFallback", nil)
+    entity:SetAttribute("CombatHitboxDefinitionSource", nil)
 end
 
 function EntityHitboxService.Detach(entity: Model)
@@ -174,24 +176,17 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
 
     local resolved = SkeletonHeadResolver.Resolve(visual)
     local records = {}
-    local geometryUnavailable = false
     for _, meshPart in ipairs(meshPartsForVisual(visual)) do
-        local geometry = HitboxMeshGeometryCache.Read(meshPart)
-        if geometry.state ~= "ready" then
-            geometryUnavailable = true
-            break
-        end
         table.insert(records, {
             meshPart = meshPart,
             path = relativePath(meshPart, visual),
-            geometry = geometry,
+            geometryKey = HitboxMeshGeometryCache.Key(meshPart),
             scale = HitboxDefinitionBuilder.MeshScale(meshPart),
             bonesByName = runtimeBones(meshPart),
-            preparedVertices = nil,
         })
     end
 
-    if #records == 0 and not geometryUnavailable then
+    if #records == 0 then
         entity:SetAttribute("CombatHitboxMode", "unavailable")
         entity:SetAttribute("CombatHitboxCount", 0)
         warn(("[game1][combat-hitbox] %s has no visual MeshPart; combat hitboxes were not built")
@@ -210,10 +205,58 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
     }
 
     local definition, buildError
-    if geometryUnavailable then
-        definition = HitboxDefinitionBuilder.Fallback(binding)
-    else
-        definition, buildError = HitboxDefinitionBuilder.Resolve(binding)
+    local geometryUnavailable = false
+    local source = "session"
+    local key = HitboxDefinitionBuilder.CacheKey(binding)
+    definition = HitboxDefinitionBuilder.Cached(binding)
+    if not definition then
+        definition = HitboxAssetDefinitions.Lookup(binding, key)
+        source = "asset"
+    end
+    if not definition then
+        source = "runtime_migration"
+        -- Only a genuine cache miss needs vertex data. All acquired geometry
+        -- leases are released, including partial failures and builder errors.
+        local acquired = {}
+        local ok, failure = pcall(function()
+            for _, record in ipairs(records) do
+                local meshPart = record.meshPart
+                local geometry = HitboxMeshGeometryCache.Read(meshPart)
+                table.insert(acquired, geometry)
+                if geometry.state ~= "ready" then
+                    geometryUnavailable = true
+                    break
+                end
+                record.geometry = geometry
+            end
+            if geometryUnavailable then
+                definition = HitboxDefinitionBuilder.Fallback(binding)
+                source = "root_bounds_fallback"
+            else
+                -- Capture only the actual first calculation, never label an
+                -- older session-cached pose as a fresh authoring oracle.
+                local signature = nil
+                key = HitboxDefinitionBuilder.CacheKey(binding)
+                if not HitboxDefinitionBuilder.Cached(binding) then
+                    signature = HitboxAssetDefinitions.CaptureSignature(binding)
+                end
+                definition, buildError = HitboxDefinitionBuilder.Resolve(binding)
+                if definition and signature then
+                    local recorded, captureError = pcall(HitboxAssetDefinitions.Record, key, signature, definition)
+                    if not recorded then warn("[game1][hitbox-assets] capture failed: " .. tostring(captureError)) end
+                end
+            end
+        end)
+        for _, geometry in ipairs(acquired) do
+            HitboxMeshGeometryCache.Release(geometry)
+        end
+        for _, record in ipairs(records) do
+            record.geometry = nil
+        end
+        if not ok then
+            definition = nil
+            buildError = tostring(failure)
+        end
     end
     if not definition then
         entity:SetAttribute("CombatHitboxMode", "unavailable")
@@ -243,6 +286,7 @@ function EntityHitboxService.Attach(entity: Model, visual: Model): any
     else
         entity:SetAttribute("CombatHitboxFallback", nil)
     end
+    entity:SetAttribute("CombatHitboxDefinitionSource", source)
     entity:SetAttribute("CombatHitboxMode", binding.mode)
     entity:SetAttribute("CombatHitboxCount", count)
     entity:SetAttribute("CombatHeadBoneName", binding.headBone and binding.headBone.Name or "")

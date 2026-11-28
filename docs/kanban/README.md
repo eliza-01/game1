@@ -6,6 +6,8 @@
 
 **M648 · Character Creation Prewarm (KBN-0039-T05): CODE_COMPLETE.** Два реальных default preview имеют приоритет; дополнительные опубликованные компоненты прогреваются в фоне после bootstrap (до 24 уникальных публикаций, 20 с, один занятый слот). Один ограниченный серверный каталог типизированных MeshPart без скелетов и общий клиентский typed cache. Дополнительных сборок и блокировки экрана нет. Native Studio/DEV/Mobile и измерения NOT_RUN. Следующий этап после функциональной приёмки — Hitbox Precompute, затем Priority Animation Prewarm и Player Attack Sampler. См. `docs/workflows/M648_CHARACTER_ASSET_PREWARM_RU.md`.
 
+**M649 · Hitbox Asset Contract & Geometry Lifetime (KBN-0039-T01): CODE_COMPLETE, миграция открыта.** Сессионные готовые bounds и версионированный server-only registry проверяются до EditableMesh; вершины и веса освобождаются после последнего расчёта. Studio-only capture фактического oracle и Control Center compiler v1, реестр пустой до настоящей миграции. SAT/headshot/AI/MNPC не изменены; native parity, coverage и performance NOT_RUN. Следующий этап M650 — authoring workflow, реальные записи и приёмка, затем удаление migration oracle после полного покрытия. M648 native acceptance отдельно открыта. См. `docs/workflows/M649_HITBOX_ASSET_CONTRACT_RU.md`.
+
 **История M627–M645:** подробная последовательность и контракты сохранены в MNPC LOD Spec и отдельных milestone-отчётах. Следующие записи M635–M637 описывают исторические состояния, не текущие задачи.
 
 **M635: Studio Edit capture из зарегистрированного FULL template и опубликованного idle KeyframeSequence; общий Monster/NPC контракт, weapon mount, точная авторская keyframe около phase 0.35, снимок mesh/texture IDs, rest/posed bone frames и root-relative transforms. Снимок привязан к FULL/equipment/idle fingerprint; атомарная запись, предыдущий снимок сохраняется при ошибке. Не native Animator benchmark, не FBX/UV/bake; Studio NOT_RUN, Runtime FULL. Следующий этап M636 — геометрия, skinning и объединение атласов из снимка.**
@@ -53,7 +55,7 @@ M611: данные M610 зафиксированы в KBN-0035; автомати
 | [KBN-0036 · Spatial Index](specs/KBN-0036.md) | P0 | Общая инфраструктура локальных запросов |
 | [KBN-0037 · Client Performance](specs/KBN-0037.md) | P0 | **M646–M647 Overhead UI Pool (T05), функционально принято**; MNPC одиночная приёмка A08 PASS, полная T08/A07 открыта; сокеты отложены, T02 выполнен, A/B открыт |
 | [KBN-0038 · Server Performance](specs/KBN-0038.md) | P0 | Combat broad phase, AI LOD, бюджет навигации |
-| [KBN-0039 · Asset Pipeline](specs/KBN-0039.md) | P1 | M648 прогрев внешности CODE_COMPLETE; далее Hitbox precompute и клипы |
+| [KBN-0039 · Asset Pipeline](specs/KBN-0039.md) | P1 | M649 hitbox contract CODE_COMPLETE; далее миграция и клипы |
 
 Замеры переиспользуются в [KBN-0003](specs/KBN-0003.md) и [KBN-0010](specs/KBN-0010.md); текущие контракты World Streaming / Runtime Build и Monster Navigation сохраняются. Все прежние статусы и проверки неизменны.
 

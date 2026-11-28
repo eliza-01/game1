@@ -13,7 +13,7 @@ class PublishedRuntimeM333(unittest.TestCase):
     def test_mesh_unreadable_falls_back_in_same_query_pipeline(self):
         service=source("src/server/combat/EntityHitboxService.luau")
         builder=source("src/server/combat/HitboxDefinitionBuilder.luau")
-        self.assertIn('if #records == 0 and not geometryUnavailable then',service)
+        self.assertIn('if #records == 0 then',service)
         self.assertIn('HitboxDefinitionBuilder.Fallback(binding)',service)
         self.assertIn('binding.mode = if geometryUnavailable then "root_bounds_fallback"',service)
         self.assertIn('binding.root',builder)

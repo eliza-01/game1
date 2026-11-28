@@ -2,6 +2,14 @@
 from .house import card
 
 ITEMS = [
+    card('character-hitbox-asset-contract', 'Hitbox · M649 готовые bounds', 'Сервер',
+         'Общий для Character, Monster и NPC контракт; миграция открыта.',
+         ['CombatHitboxDefinitionSource', 'CombatHitboxMode'], [
+             {'title': 'Жизненный цикл', 'lines': [
+                 'Сначала session cache и проверенный asset registry; вершины/веса только на промахе, освобождение после последнего расчёта.',
+                 'SAT, headshot, padding, AI и MNPC demand не меняются. Реестр пока пуст; Studio oracle, authoring migration и native parity остаются открытыми.',
+             ]},
+         ], ['hitbox-asset-contract', 'hitbox-asset-definitions', 'hitbox-geometry-lifetime']),
     card('character-assembly-spawn', 'Персонаж · сборка и появление', 'Сервер',
          'Выбор опубликованного archetype, сборка кастомного rig и runtime stats.',
          ['CharacterRegistry.archetypes', 'CharacterStatsService'], [

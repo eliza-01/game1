@@ -53,7 +53,7 @@ local function prepareRecord(record: any)
             influences = influences,
         })
     end
-    record.preparedVertices = prepared
+    return prepared
 end
 
 local function boneForInfluence(binding: any, record: any, boneName: string): Bone?
@@ -132,7 +132,7 @@ local function definitionCacheKey(binding: any): string
             "%d:%s:%s:%.6f,%.6f,%.6f",
             index,
             record.path,
-            record.geometry.key,
+            record.geometryKey,
             scale.X,
             scale.Y,
             scale.Z
@@ -176,8 +176,7 @@ local function buildDefinition(binding: any): (any?, string?)
     local totalVertices = 0
 
     for recordIndex, record in ipairs(binding.records) do
-        prepareRecord(record)
-        for _, source in ipairs(record.preparedVertices) do
+        for _, source in ipairs(prepareRecord(record)) do
             local worldPosition, positionError = vertexWorldPosition(binding, record, source)
             if not worldPosition then
                 return nil, positionError
@@ -307,6 +306,14 @@ end
 
 function HitboxDefinitionBuilder.MeshScale(meshPart: MeshPart): Vector3
     return meshScale(meshPart)
+end
+
+function HitboxDefinitionBuilder.CacheKey(binding: any): string
+    return definitionCacheKey(binding)
+end
+
+function HitboxDefinitionBuilder.Cached(binding: any): any?
+    return definitionCache[definitionCacheKey(binding)]
 end
 
 function HitboxDefinitionBuilder.Resolve(binding: any): (any?, string?)

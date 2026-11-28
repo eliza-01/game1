@@ -19,6 +19,9 @@ DOMAINS = (
 # actor-specific scripts belong to a distinct item's sources list, never an
 # arbitrary file path supplied by the browser.
 SOURCES = {
+    'hitbox-asset-contract': ('docs/workflows/M649_HITBOX_ASSET_CONTRACT_RU.md', 'Hitbox · контракт готовых bounds'),
+    'hitbox-asset-definitions': ('src/server/combat/HitboxAssetDefinitions.luau', 'Hitbox · проверка и Studio oracle'),
+    'hitbox-geometry-lifetime': ('src/server/combat/HitboxMeshGeometryCache.luau', 'Hitbox · временные geometry leases'),
     'location-streamer': ('src/client/world/LocationWorldStreamer.luau', 'LOD · общий координатор'),
     'static-placement-index': ('src/client/world/StaticPlacementIndex.luau', 'LOD · immutable spatial index'),
     'location-lod-candidates': ('src/client/world/LocationLodCandidates.luau', 'LOD · локальные кандидаты и приоритет'),

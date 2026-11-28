@@ -1,11 +1,11 @@
--- Source-mesh reader and per-MeshId cache. The EditableMesh exists only
+-- Source-mesh reader and per-MeshId in-flight cache. The EditableMesh exists only
 -- during the initial read; queries never access AssetService.
 local AssetService = game:GetService("AssetService")
 
 local HitboxMeshGeometryCache = {}
 local geometryCache: { [string]: any } = {}
 
-local function meshCacheKey(meshPart: MeshPart): string
+function HitboxMeshGeometryCache.Key(meshPart: MeshPart): string
     local meshId = tostring(meshPart.MeshId or "")
     if meshId ~= "" then
         return meshId
@@ -17,9 +17,10 @@ local function meshCacheKey(meshPart: MeshPart): string
 end
 
 function HitboxMeshGeometryCache.Read(meshPart: MeshPart): any
-    local key = meshCacheKey(meshPart)
+    local key = HitboxMeshGeometryCache.Key(meshPart)
     local cached = geometryCache[key]
     if cached then
+        cached.users += 1
         while cached.state == "loading" do
             task.wait()
         end
@@ -29,6 +30,7 @@ function HitboxMeshGeometryCache.Read(meshPart: MeshPart): any
     cached = {
         key = key,
         state = "loading",
+        users = 1,
         vertices = nil,
         vertexCount = 0,
         error = nil,
@@ -101,9 +103,20 @@ function HitboxMeshGeometryCache.Read(meshPart: MeshPart): any
     cached.vertices = payload.vertices
     cached.vertexCount = payload.vertexCount
     cached.state = "ready"
-    print(("[game1][combat-hitbox] source mesh cached · %s · %d vertices")
+    print(("[game1][combat-hitbox] source mesh read · %s · %d vertices")
         :format(key, payload.vertexCount))
     return cached
+end
+
+-- Ready geometry is shared only by overlapping builders. Failed reads retain
+-- just their small diagnostic record, preserving the existing permission policy.
+function HitboxMeshGeometryCache.Release(cached: any)
+    assert(cached.users > 0, "hitbox geometry lease released twice")
+    cached.users -= 1
+    if cached.users == 0 and cached.state == "ready" then
+        geometryCache[cached.key] = nil
+        cached.vertices = nil
+    end
 end
 
 return table.freeze(HitboxMeshGeometryCache)

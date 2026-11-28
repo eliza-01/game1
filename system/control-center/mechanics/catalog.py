@@ -35,6 +35,8 @@ SOURCES = {
     'mnpc-ai-pose-binding': ('docs/workflows/M629_MNPC_AI_POSE_BINDING_RU.md', 'MNPC · M629 AI / pose binding'),
     'mnpc-shell-geometry': ('docs/workflows/M630_MNPC_SHELL_GEOMETRY_RU.md', 'MNPC · M630 shell geometry'),
     'mnpc-presentation-lifecycle': ('docs/workflows/M631_MNPC_PRESENTATION_LIFECYCLE_RU.md', 'MNPC · M631 presentation lifecycle'),
+    'mnpc-lod-capture': ('docs/workflows/M635_MNPC_ASSEMBLY_CAPTURE_RU.md', 'MNPC · M635 pose/assembly capture'),
+    'mnpc-lod-authoring': ('docs/workflows/M633_MNPC_LOD_AUTHORING_RU.md', 'MNPC · M633 authoring'),
     'mnpc-demand-lifecycle': ('docs/workflows/M632_MNPC_DEMAND_LIFECYCLE_RU.md', 'MNPC · M632 demand lifecycle'),
     'mnpc-demand-runtime': ('src/server/actor/MnpcDemandLifecycle.luau', 'MNPC · shared demand pilot'),
     'mnpc-pose-binding': ('src/server/actor/MnpcPoseBinding.luau', 'MNPC · общий readiness ticket'),

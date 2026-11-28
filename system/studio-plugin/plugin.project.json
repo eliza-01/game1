@@ -166,6 +166,15 @@
       "StudioTimelineWidget": {
         "$path": "modules/StudioTimelineWidget.luau"
       },
+      "StudioMnpcCaptureCommand": {
+        "$path": "modules/StudioMnpcCaptureCommand.luau"
+      },
+      "StudioMnpcAssemblyCapture": {
+        "$path": "modules/StudioMnpcAssemblyCapture.luau"
+      },
+      "StudioMnpcIdlePose": {
+        "$path": "modules/StudioMnpcIdlePose.luau"
+      },
       "StudioTimelinePreview": {
         "$path": "modules/StudioTimelinePreview.luau"
       },

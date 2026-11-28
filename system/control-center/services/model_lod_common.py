@@ -57,14 +57,22 @@ def preserve_source(source: Path, target: Path, archive: Path, expected_sha: str
         temporary.unlink(missing_ok=True)
 
 
-def publish_geometry(root: Path, path: Path, slug: str, credentials: dict, *, description: str):
+def publish_geometry(root: Path, path: Path, slug: str, credentials: dict, *, description: str, before_upload=None, on_operation=None, validate_staged=None):
     api_key = str(credentials.get('apiKey') or '')
-    with staged_model(root, path, texture_mode='geometry_only') as publication:
+    report = {}
+    options = {'report_receiver': report} if validate_staged is not None else {}
+    with staged_model(root, path, texture_mode='geometry_only', **options) as publication:
+        if validate_staged is not None:
+            validate_staged(publication, report)
+        if before_upload is not None:
+            before_upload()
         operation = create_model_asset(
             publication, display_name=f'{slug}_lod1',
             description=str(credentials.get('description') or description),
             creator_type=str(credentials.get('creatorType') or ''),
             creator_id=str(credentials.get('creatorId') or ''), api_key=api_key)
+        if on_operation is not None:
+            on_operation(operation)
     return wait_for_operation(operation, api_key=api_key)
 
 

@@ -248,6 +248,9 @@ local handleHousePlacementCapture = StudioHousePlacementCapture({
 local handleHousePlacementPreview = StudioHousePlacementPreview({HttpService=HttpService,
     Workspace=Workspace, ServerStorage=ServerStorage, RunService=RunService,
     ChangeHistoryService=ChangeHistoryService, bridgeUrl=BRIDGE_URL, bridgeToken=BRIDGE_TOKEN})
+local handleMnpcCapture = require(script.Parent.modules.StudioMnpcCaptureCommand)({
+    RunService = RunService, HttpService = HttpService, bridgeUrl = BRIDGE_URL, bridgeToken = BRIDGE_TOKEN,
+})
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -268,6 +271,8 @@ local function pollBridge()
         handleModelLoad(data)
     elseif data.command == "monster-spawn" then
         handleMonsterSpawn(data)
+    elseif data.command == "mnpc-capture-v1" then
+        handleMnpcCapture(data)
     elseif data.command == "timeline-editor" then
         handleTimelineEditor(data)
     elseif data.command == "location-authoring" then

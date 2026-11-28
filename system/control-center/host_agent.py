@@ -59,6 +59,7 @@ from services.location_collision_authoring import LocationCollisionAuthoring
 from services.place_registry.coordinator import LocationPlaceRegistry
 from services.place_registry.revisions import PlaceRevisionStore
 from services.location_lod_manager import LocationLodManager
+from services.mnpc_lod_resource import MnpcLodResource
 from services.location_asset_sync_history import LocationAssetSyncHistory
 from services.mysql_asset_replacement_audit import MySqlAssetReplacementAudit, MySqlAuditConfig
 from services.sqlite_asset_audit_importer import SqliteAssetAuditImporter
@@ -124,6 +125,7 @@ weapons.atlases = location_assets.atlases
 arrows.atlases = location_assets.atlases
 npcs.atlases = location_assets.atlases
 npcs.export()
+mnpc_lod = MnpcLodResource(ROOT, monsters, npcs, npc_equipment, weapons, location_assets.atlases)
 weapons.export()
 arrows.export()
 location_asset_sync_history = LocationAssetSyncHistory(ROOT, database=asset_audit_repository)
@@ -197,7 +199,7 @@ READ_SOURCES = MappingProxyType({
     "npc_atlas_sources": npc_atlas_sources,
     "npcs": npcs, "npc_animations": npc_animations, "npc_equipment": npc_equipment,
     "location_assets": location_assets, "location_asset_sync_history": location_asset_sync_history,
-    "place_registry": place_registry, "location_instance_manager": location_instance_manager, "lod_manager": lod_manager,
+    "place_registry": place_registry, "location_instance_manager": location_instance_manager, "lod_manager": lod_manager, "mnpc_lod": mnpc_lod,
     "asset_replacement_audit": asset_replacement_audit, "real_estate": real_estate,
     "real_estate_placements": real_estate_placements,
     "real_estate_publications": real_estate_publications, "npc_spawns": npc_spawns,
@@ -243,7 +245,7 @@ WRITE_SOURCES = MappingProxyType({
     "location_asset_sync_history": location_asset_sync_history,
     "asset_replacement_audit": asset_replacement_audit,
     "sync_location_assets_to_studio": run_deco_refresh_bridge,
-    "place_registry": place_registry, "location_instance_manager": location_instance_manager, "lod_manager": lod_manager,
+    "place_registry": place_registry, "location_instance_manager": location_instance_manager, "lod_manager": lod_manager, "mnpc_lod": mnpc_lod,
     "locations": locations,
     "monster_animations": monster_animations,
     "monster_spawns": monster_spawns,

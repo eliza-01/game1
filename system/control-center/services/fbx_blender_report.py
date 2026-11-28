@@ -31,7 +31,7 @@ def _blender_failure(diagnostic: str, exit_code: int) -> str:
 
 
 def run_report(root: Path, script: str, arguments: tuple[Path | str, ...],
-               *, report_path: Path, label: str, runner=None, executable=None) -> dict:
+               *, report_path: Path, label: str, runner=None, executable=None, timeout=240) -> dict:
     """One Blender-to-JSON boundary shared across all FBX workflows.
 
     The injectable runner/executable preserve existing Real Estate test and
@@ -47,7 +47,7 @@ def run_report(root: Path, script: str, arguments: tuple[Path | str, ...],
            '--', *(str(argument) for argument in arguments)]
     try:
         result = runner(cmd, capture_output=True, text=True,
-            encoding='utf-8', errors='replace', timeout=240)
+            encoding='utf-8', errors='replace', timeout=timeout)
     except subprocess.TimeoutExpired as error:
         raise ValueError(f'{label}: Blender analysis timed out') from error
     if result.returncode or not report_path.is_file():

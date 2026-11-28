@@ -14,6 +14,32 @@ from services.mesh_authoring_policy import is_collision_mesh
 
 
 def route(path, body, deps):
+    if path.startswith('/api/lod-manager/mnpc/'):
+        try:
+            owner = deps['mnpc_lod']
+            tail = unquote(path[len('/api/lod-manager/mnpc/'):]).split('/')
+            payload = body()
+            if tail == ['settings']:
+                return 200, owner.save_settings(payload)
+            if len(tail) == 3:
+                kind, slug, action = tail
+                if action == 'stage':
+                    return 200, owner.stage(kind, slug, payload)
+                if action == 'capture':
+                    from services.mnpc_lod_capture import capture
+                    owner._actor(kind, slug)
+                    return 200, capture(owner, kind, slug, payload, deps[kind + '_animations'])
+                if action == 'prepare':
+                    return 200, owner.prepare(kind, slug, payload)
+                if action == 'publish':
+                    if not isinstance(payload, dict) or set(payload) != {'expectedRevision'}:
+                        raise ValueError('MNPC publish requires expectedRevision only')
+                    return 200, owner.publish(kind, slug, payload['expectedRevision'],
+                        deps['publication_credentials']('game1 MNPC LOD1'))
+            return 404, {'error': 'Unknown MNPC LOD write operation'}
+        except (ValueError, OSError, RuntimeError, KeyError, TypeError) as error:
+            return 400, {'error': str(error)}
+
     if path == "/api/lod-manager/settings":
         try:
             return 200, deps["lod_manager"].save_settings(body())

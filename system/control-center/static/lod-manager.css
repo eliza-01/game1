@@ -138,3 +138,12 @@
 #lod-manager-view .lm-runtime-path-row span{flex:1 1 280px;min-width:0;overflow-wrap:anywhere;user-select:text}
 #lod-manager-view .lm-runtime-path-row button{flex:none;white-space:nowrap;font-size:12px}
 #lod-manager-view #lod-build-reveal-status:empty{display:none}
+
+/* MNPC uses existing LOD Manager tokens and controls. */
+#lod-manager-view .lm-mnpc-editor{padding:12px;margin:12px 0;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+#lod-manager-view .lm-mnpc-editor summary{cursor:pointer;color:var(--mint);font-size:12px;margin:5px 0}
+#lod-manager-view .lm-mnpc-files{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin:12px 0}
+#lod-manager-view .lm-mnpc-files label{display:grid;gap:4px;min-width:0}
+#lod-manager-view .lm-mnpc-files input{width:100%;min-width:0}
+#lod-manager-view .lm-mnpc-source{font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto}
+#lod-manager-view .lm-mnpc-editor .lm-revision small{display:block;overflow-wrap:anywhere}

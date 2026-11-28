@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="location-assets.css?v=1">
 <link rel="stylesheet" href="location-instance-manager.css?v=353">
 <link rel="stylesheet" href="place-registry.css?v=405">
-<link rel="stylesheet" href="lod-manager.css?v=430">
+<link rel="stylesheet" href="lod-manager.css?v=633">
 <link rel="stylesheet" href="character-components.css?v=6">
 <link rel="stylesheet" href="character-assemblies.css?v=5">
 <link rel="stylesheet" href="character-armor.css?v=458">
@@ -897,6 +897,7 @@
       <div class="lm-domain-tabs" role="tablist" aria-label="LOD readiness sections">
         <button id="lod-tab-location" type="button" role="tab" aria-selected="true" aria-controls="lod-location-panel">Location Assets</button>
         <button id="lod-tab-house" type="button" role="tab" aria-selected="false" aria-controls="lod-house-panel">Real Estate</button>
+        <button id="lod-tab-mnpc" type="button" role="tab" aria-selected="false" aria-controls="lod-mnpc-panel">MNPC</button>
       </div>
     </div>
     <div id="lod-location-panel" role="tabpanel" aria-labelledby="lod-tab-location">
@@ -918,6 +919,20 @@
             <option value="ready">Готовы к Preflight</option><option value="review">Требуют проверки</option></select></div></div>
       <div id="lod-house-rows" class="lm-house-cards"><p class="lm-house-empty">Загрузка домов…</p></div>
       <p id="lod-house-message" class="lm-note" role="status" aria-live="polite"></p>
+    </div>
+    <div id="lod-mnpc-panel" role="tabpanel" aria-labelledby="lod-tab-mnpc" hidden>
+      <div class="lm-list-head"><div><h4>MNPC <small id="mnpc-lod-count" class="lm-note"></small></h4>
+        <p class="lm-note">FULL → LOD1 → UNLOADED. Подготовка ресурсов; игровой LOD пока не подключён.</p></div>
+        <div class="lm-filters"><input id="mnpc-lod-search" type="search" placeholder="Поиск по имени / slug" aria-label="Поиск MNPC">
+          <select id="mnpc-lod-filter" aria-label="MNPC type"><option value="all">All</option><option value="monster">Monsters</option><option value="npc">NPC</option></select>
+          <button id="mnpc-lod-refresh" type="button">Refresh</button></div></div>
+      <details class="lm-mnpc-editor"><summary>MNPC defaults · Distance settings</summary>
+        <div id="mnpc-lod-defaults"></div>
+      </details>
+      <div class="lm-table"><table><thead><tr><th>MNPC</th><th>FULL</th><th>LOD1</th><th>Distance · studs</th><th></th></tr></thead>
+        <tbody id="mnpc-lod-rows"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+      <div id="mnpc-lod-editor" class="lm-mnpc-editor" hidden></div>
+      <p id="mnpc-lod-message" class="lm-note" role="status" aria-live="polite"></p>
     </div>
   </section>
   <section class="panel lm-panel" id="lod-settings-section">
@@ -1284,7 +1299,8 @@
 <script src="location-collision.js?v=385"></script>
 <script src="location-instance-manager.js?v=351&geometry=2&collision=1&review=354"></script>
 <script src="place-registry.js?v=405"></script>
-<script src="lod-manager.js?v=501"></script>
+<script src="mnpc-lod-manager.js?v=635"></script>
+<script src="lod-manager.js?v=633"></script>
 <script src="location-publication-state.js?v=253"></script>
 <script src="location-sync-grouping.js?v=262"></script>
 <script src="lod-reuse-picker.js?v=411"></script>

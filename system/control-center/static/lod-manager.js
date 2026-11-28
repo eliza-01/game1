@@ -3,7 +3,11 @@
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g,
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const state = {overview:null, busy:false, filter:'all', term:'', preflight:null, domain:'location',
+  function savedDomain() {
+    try {const v=window.localStorage?.getItem('game1.lod.domain');return ['location','house','mnpc'].includes(v)?v:'location';}
+    catch (_) {return 'location';}
+  }
+  const state = {overview:null, busy:false, filter:'all', term:'', preflight:null, domain:savedDomain(),
     expandedHouses:new Set(), collapsedGroups:new Set(), houseTerm:'', houseFilter:'all',
     partEdits:new Map(), partMessages:new Map(), assetEdits:new Map(), assetMessages:new Map()};
   const defaultSettings = {
@@ -195,9 +199,11 @@
     $('lod-disable-all').disabled = state.busy;
     $('lod-location-panel').hidden = state.domain !== 'location';
     $('lod-house-panel').hidden = state.domain !== 'house';
+    $('lod-mnpc-panel').hidden = state.domain !== 'mnpc';
     $('lod-tab-location').setAttribute('aria-selected', String(state.domain === 'location'));
     $('lod-tab-house').setAttribute('aria-selected', String(state.domain === 'house'));
-    $('lod-active-domain-title').textContent = state.domain === 'house' ? 'Real Estate' : 'Location Assets';
+    $('lod-tab-mnpc').setAttribute('aria-selected', String(state.domain === 'mnpc'));
+    $('lod-active-domain-title').textContent = ({house:'Real Estate',location:'Location Assets',mnpc:'MNPC'})[state.domain];
     if (!data) return;
     $('lod-tab-location').textContent = `Location Assets · ${data.items.length} видов`;
     $('lod-tab-house').textContent = `Real Estate · ${(data.realEstate?.items||[]).length} видов`;
@@ -343,6 +349,7 @@
 
   async function load() {
     if(state.busy)return;
+    if(state.domain==='mnpc')window.game1MnpcLod?.load();
     state.busy=true;render();
     try {
       state.overview = await request('/api/lod-manager',{cache:'no-store'});
@@ -433,8 +440,13 @@
       render();
     }
   }
-  for (const domain of ['location','house']) {
-    $(`lod-tab-${domain}`).addEventListener('click', () => {state.domain=domain;render();});
+  for (const domain of ['location','house','mnpc']) {
+    $(`lod-tab-${domain}`).addEventListener('click', () => {
+      state.domain=domain;
+      try {window.localStorage?.setItem('game1.lod.domain',domain);} catch (_) {}
+      render();
+      if(domain==='mnpc')window.game1MnpcLod?.load();
+    });
   }
   $('lod-house-rows').addEventListener('toggle', event => {
     const detail=event.target;

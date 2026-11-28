@@ -125,7 +125,7 @@ MNPC opt-in: сначала один опубликованный Monster и о�
 
 ## 10. Поставка
 
-В каждом патче обновить затронутые current spec/architecture, Mechanics, Kanban card/spec/history (SHA256, revision), AGENTS при изменении правил; исторические milestone reports не переписывать. Один PowerShell block: check/apply, профильные tests, Luau, verify.py, plugin install если затронут, Control Center stop/start, затем согласованный фоновый restart Rojo через sync.ps1. Остановка всех процессов rojo допустима в текущем workflow владельца, при параллельных проектах предупредить. Не требовать нового дампа, если база восстанавливается цепочкой патчей. На данном этапе — только ТЗ и документация, без изменений runtime/asset DB.
+В каждом патче обновить затронутые current spec/architecture, Mechanics, Kanban card/spec/history (SHA256, revision), AGENTS при изменении правил; исторические milestone reports не переписывать. Один PowerShell block: check/apply, профильные tests, Luau, verify.py, plugin install если затронут, Control Center stop/start, затем согласованный фоновый restart Rojo через sync.ps1. Остановка всех процессов rojo допустима в текущем workflow владельца, при параллельных проектах предупредить. Не требовать нового дампа, если база восстанавливается цепочкой патчей. Authoring и Runtime поставляются отдельными проверяемыми этапами; M633 не меняет игровой Runtime.
 
 **M627:** [исторический аудит и реализация пилота](M627_MNPC_POSE_PILOT_RU.md); полученные результаты и новое решение приведены в §2.1–2.5 настоящего ТЗ. Production Runtime не менялся. Настоящее ТЗ заменяет прежнее направление «сначала выбрать новый pose evaluator».
 
@@ -135,3 +135,10 @@ MNPC opt-in: сначала один опубликованный Monster и о�
 
 
 **M632 · Demand-driven Lifecycle:** M632: общий `MnpcDemandLifecycle` в существующем AI scheduler и PlayerSpatialIndex; оба домена поддерживают live release/rebind с сохранением entity/HP/navigation/AI, binding/OBB/rig lease освобождаются в порядке. Studio-only pilot default OFF, 512/640 studs + hold 5 s, один общий admission slot, retry/readiness timeout. Production по-прежнему сразу FULL; initial shell-only, combat reach admission, client LOD и strict native isolation открыты. Native Studio/DEV/A07 NOT_RUN. [Отчёт M632](M632_MNPC_DEMAND_LIFECYCLE_RU.md).
+
+
+**M633 · MNPC Authoring, шаг 1:** M633: общая вкладка LOD Manager → MNPC, один authoring owner для Monster/NPC, ручной staged static FBX + baked AtlasRegistry texture, fingerprint FULL/equipment, CAS, partial Cloud history и наследуемые дистанции. Автоматический bake/decimate, native import/alignment, runtime export, строгая изоляция и A07 ещё открыты. Runtime остаётся FULL. [Отчёт M633](M633_MNPC_LOD_AUTHORING_RU.md).
+
+**M634 · MNPC LOD1 preparation, частичный этап:** M634: общий offline generator из проверенной posed FULL assembly + общего UV-атласа: freeze/join/decimate, resize, roundtrip и staging M633; native RBXM idle capture, автоматическая сборка экипировки/нескольких атласов, Blender/Studio acceptance и Runtime ещё открыты. [Отчёт M634](M634_MNPC_LOD_PREPARATION_RU.md). T08/A07 открыты; не требовать ручного создания LOD каталога, следующий шаг — native pose/assembly capture.
+
+**M635: Studio Edit capture из зарегистрированного FULL template и опубликованного idle KeyframeSequence; общий Monster/NPC контракт, weapon mount, точная авторская keyframe около phase 0.35, снимок mesh/texture IDs, rest/posed bone frames и root-relative transforms. Снимок привязан к FULL/equipment/idle fingerprint; атомарная запись, предыдущий снимок сохраняется при ошибке. Не native Animator benchmark, не FBX/UV/bake; Studio NOT_RUN, Runtime FULL. Следующий этап M636 — геометрия, skinning и объединение атласов из снимка.**

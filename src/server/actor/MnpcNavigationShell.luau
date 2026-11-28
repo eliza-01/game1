@@ -4,13 +4,17 @@ local Shell = {}
 local ROOT_SIZE = Vector3.new(2, 2, 1)
 local HIP_HEIGHT = 1.8
 
+function Shell.RootFrame(surface: Vector3, yaw: number): CFrame
+    return CFrame.new(surface + Vector3.new(0, ROOT_SIZE.Y * 0.5 + HIP_HEIGHT, 0)) * CFrame.Angles(0, yaw, 0)
+end
+
 function Shell.Create(model: Model, surface: Vector3, yaw: number, kind: "Monster" | "NPC"): (BasePart, Humanoid)
     assert(model:FindFirstChild("HumanoidRootPart") == nil, "MNPC shell already exists")
     assert(kind == "Monster" or kind == "NPC", "Invalid MNPC kind")
     local root = Instance.new("Part")
     root.Name = "HumanoidRootPart"
     root.Size = ROOT_SIZE
-    root.CFrame = CFrame.new(surface + Vector3.new(0, ROOT_SIZE.Y * 0.5 + HIP_HEIGHT, 0)) * CFrame.Angles(0, yaw, 0)
+    root.CFrame = Shell.RootFrame(surface, yaw)
     root.Transparency = 1
     root.CastShadow = false
     root.Anchored = false

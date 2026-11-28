@@ -433,3 +433,9 @@ M631 (M628 step 4): read `docs/workflows/M631_MNPC_PRESENTATION_LIFECYCLE_RU.md`
 
 
 M632: read `docs/workflows/M632_MNPC_DEMAND_LIFECYCLE_RU.md`. Shared `MnpcDemandLifecycle` uses existing AI scheduler and PlayerSpatialIndex; reversible live release/rebind for both domains, separate generation-owned idle callbacks, same entity/HP/navigation and OBB algorithm. Studio-only opt-in, default off; pilot thresholds are NOT production combat reach or visual distances. Do not enable production until initial shell-only lifecycle, combat admission, client visual LOD and strict native isolation gates are solved. Native engine acceptance NOT_RUN.
+
+M633: read `docs/workflows/M633_MNPC_LOD_AUTHORING_RU.md`. One MNPC authoring owner and shared AtlasRegistry/model publication; prepared static FBX only, immutable source and FULL/equipment fingerprint. Cloud Model ID is not Mesh ID; runtimeReady=false until native import/alignment/export. Do not claim auto bake, strict native isolation, or production LOD.
+
+M634: read `docs/workflows/M634_MNPC_LOD_PREPARATION_RU.md`. Shared offline posed assembly + common UV atlas generator; no automatic native RBXM pose conversion or weapon assembly/multi-atlas bake yet. Generate & stage is not publication; preserve exact FULL/CAS and native validation gates. Production stays FULL.
+
+**M635: Studio Edit capture из зарегистрированного FULL template и опубликованного idle KeyframeSequence; общий Monster/NPC контракт, weapon mount, точная авторская keyframe около phase 0.35, снимок mesh/texture IDs, rest/posed bone frames и root-relative transforms. Снимок привязан к FULL/equipment/idle fingerprint; атомарная запись, предыдущий снимок сохраняется при ошибке. Не native Animator benchmark, не FBX/UV/bake; Studio NOT_RUN, Runtime FULL. Следующий этап M636 — геометрия, skinning и объединение атласов из снимка.**

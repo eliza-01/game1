@@ -1,10 +1,26 @@
 """Read-only world, authoring settings, runtime config and host status routes."""
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, unquote
 from services.shared_asset_retirement import SharedAssetRetirement
 
 
 def route(parsed, sources, info):
     path = parsed.path
+    if path == '/api/lod-manager/mnpc' or path.startswith('/api/lod-manager/mnpc/'):
+        try:
+            owner = sources['mnpc_lod']
+            if path == '/api/lod-manager/mnpc':
+                return 200, owner.overview()
+            parts = unquote(path[len('/api/lod-manager/mnpc/'):]).split('/')
+            if len(parts) == 3 and parts[2] == 'capture':
+                from services.mnpc_lod_capture import summary
+                owner._actor(parts[0], parts[1])
+                return 200, summary(owner, parts[0], parts[1], sources[parts[0] + '_animations'])
+            if len(parts) == 3 and parts[2] == 'history':
+                return 200, {'items': owner.history(parts[0], parts[1])}
+            return 404, {'error': 'Unknown MNPC LOD read operation'}
+        except (ValueError, OSError, RuntimeError, KeyError, TypeError) as error:
+            return 400, {'error': str(error)}
+
     if path == '/api/lod1-library':
         try:
             from services.lod_reuse_catalog import library

@@ -257,6 +257,9 @@ local handleHousePlacementCapture = StudioHousePlacementCapture({
 local handleHousePlacementPreview = StudioHousePlacementPreview({HttpService=HttpService,
     Workspace=Workspace, ServerStorage=ServerStorage, RunService=RunService,
     ChangeHistoryService=ChangeHistoryService, bridgeUrl=BRIDGE_URL, bridgeToken=BRIDGE_TOKEN})
+local handleMnpcCapture = require(script.Parent.modules.StudioMnpcCaptureCommand)({
+    RunService = RunService, HttpService = HttpService, bridgeUrl = BRIDGE_URL, bridgeToken = BRIDGE_TOKEN,
+})
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -277,6 +280,8 @@ local function pollBridge()
         handleModelLoad(data)
     elseif data.command == "monster-spawn" then
         handleMonsterSpawn(data)
+    elseif data.command == "mnpc-capture-v1" then
+        handleMnpcCapture(data)
     elseif data.command == "timeline-editor" then
         handleTimelineEditor(data)
     elseif data.command == "location-authoring" then
@@ -8691,6 +8696,314 @@ return table.freeze(Core)
       </Item>
       <Item class="ModuleScript" referent="42">
         <Properties>
+          <string name="Name">StudioMnpcAssemblyCapture</string>
+          <string name="Source"><![CDATA[-- Authoring-only capture of a disposable clone of the synchronized FULL asset.
+-- No live spawn, no Workspace publication, no AI, no collision-group writes.
+local Preview = require(script.Parent.StudioTimelinePreview)
+local IdlePose = require(script.Parent.StudioMnpcIdlePose)
+local Capture = {}
+
+local function child(parent, name)
+    return assert(parent:FindFirstChild(name), "MNPC missing " .. name .. "; sync Rojo and templates")
+end
+
+local function module(parent, name)
+    local node = child(parent, name)
+    assert(node:IsA("ModuleScript"), "MNPC expected ModuleScript: " .. name)
+    return require(node)
+end
+
+local function templateAt(path, modelId)
+    local segments = string.split(path, ".")
+    assert(segments[1] == "ServerStorage", "MNPC invalid template path")
+    local node = game:GetService("ServerStorage")
+    for i = 2, #segments do node = child(node, segments[i]) end
+    assert(node:IsA("Model") and tostring(node:GetAttribute("Game1ModelAssetId") or "") == modelId,
+        "MNPC template publication differs; Sync Model + Atlas first: " .. path)
+    return node
+end
+
+local function id(value)
+    if value == "" then return "" end
+    return assert(tostring(value):match("^rbxassetid://(%d+)$"), "MNPC unsupported asset content: " .. tostring(value))
+end
+
+local function vector(v) return {v.X, v.Y, v.Z} end
+local function frame(cf) return {cf:GetComponents()} end
+local function pathOf(root, node)
+    local names = {}
+    while node ~= root do
+        assert(node and node.Parent and #names < 32, "MNPC invalid captured path")
+        assert(#node.Name > 0 and #node.Name <= 128 and not string.find(node.Name, "/", 1, true), "MNPC unsupported instance name")
+        -- An absolute hierarchy identifier must not collapse two siblings.
+        local count = 0
+        for _, sibling in node.Parent:GetChildren() do
+            if sibling.Name == node.Name then count += 1 end
+        end
+        assert(count == 1, "MNPC duplicate captured sibling: " .. node.Name)
+        table.insert(names, 1, node.Name)
+        node = node.Parent
+    end
+    return table.concat(names, "/")
+end
+
+local function captureFrames(assembly, visual, equipment, rootFrame)
+    local meshes, bones = {}, {}
+    local function scan(model, owner)
+        for _, node in model:GetDescendants() do
+            if node:IsA("Bone") then
+                assert(#bones < 512, "MNPC bone capture budget exceeded")
+                table.insert(bones, {path = pathOf(assembly, node), owner = owner, name = node.Name,
+                    rest = frame(rootFrame:ToObjectSpace(node.WorldCFrame)),
+                    posed = frame(rootFrame:ToObjectSpace(node.TransformedWorldCFrame)),
+                    localTransform = frame(node.Transform)})
+            elseif node:IsA("BasePart") and node.Transparency < 0.99 then
+                local lower = string.lower(node.Name)
+                if lower == "rootpart" or lower == "humanoidrootpart" or lower == "rootcollider" or lower == "rig_carrier" then continue end
+                assert(node:IsA("MeshPart"), "MNPC visible non-mesh part unsupported: " .. node.Name)
+                assert(#meshes < 64, "MNPC mesh capture budget exceeded")
+                local appearance = node:FindFirstChildOfClass("SurfaceAppearance")
+                local colorMap = if appearance then id(appearance.ColorMap) else ""
+                -- Additional PBR maps are recorded as an explicit unsupported
+                -- bake boundary, not silently treated as an albedo texture.
+                table.insert(meshes, {path = pathOf(assembly, node), owner = owner, meshId = id(node.MeshId),
+                    textureId = id(node.TextureID), colorMap = colorMap,
+                    normalMap = if appearance then id(appearance.NormalMap) else "",
+                    roughnessMap = if appearance then id(appearance.RoughnessMap) else "",
+                    metalnessMap = if appearance then id(appearance.MetalnessMap) else "",
+                    frame = frame(rootFrame:ToObjectSpace(node.CFrame)), size = vector(node.Size), meshSize = vector(node.MeshSize),
+                    color = {node.Color.R, node.Color.G, node.Color.B}, material = node.Material.Name,
+                    transparency = node.Transparency})
+            end
+        end
+    end
+    scan(visual, "body")
+    assert(#meshes > 0, "MNPC no visible body MeshParts")
+    for _, hand in {"right", "left"} do
+        if equipment[hand] then
+            local before = #meshes
+            scan(equipment[hand], hand)
+            assert(#meshes > before, "MNPC equipped weapon has no visible mesh: " .. hand)
+        end
+    end
+    assert(#bones > 0, "MNPC no captured skeleton")
+    table.sort(meshes, function(a,b) return a.path < b.path end)
+    table.sort(bones, function(a,b) return a.path < b.path end)
+    return meshes, bones
+end
+
+function Capture.Run(data)
+    local shared = child(game:GetService("ReplicatedStorage"), "Game1Shared")
+    local server = child(game:GetService("ServerScriptService"), "Game1Server")
+    local isNpc = data.kind == "npc"
+    assert(isNpc or data.kind == "monster", "MNPC invalid kind")
+    local domain = child(shared, data.kind)
+    local serverDomain = child(server, data.kind)
+    local prefix = if isNpc then "Npc" else "Monster"
+    local registry = module(domain, prefix .. "Registry")
+    local definition = (if isNpc then registry.npcs else registry.monsters)[data.slug]
+    assert(definition and definition.status == "PUBLISHED" and tostring(definition.modelAssetId) == data.modelId,
+        "MNPC FULL registry differs; sync Rojo")
+    local template = templateAt(definition.serverStoragePath, data.modelId)
+    local profile = module(domain, prefix .. "AnimationRegistry").profiles[data.slug]
+    assert(profile and profile.skeletonSignature == definition.skeletonSignature, "MNPC animation skeleton signature differs")
+    local assembly, sequence = nil, nil
+    local ok, result = xpcall(function()
+        assembly = assert(template:Clone(), "MNPC cannot clone template")
+        for _, node in assembly:GetDescendants() do
+            if node:IsA("LuaSourceContainer") or node:IsA("Animator") then node:Destroy()
+            elseif node:IsA("BasePart") then node.Anchored = true end
+        end
+        local visual = assembly:FindFirstChild("ImportedRig")
+        assert(visual and visual:IsA("Model"), "MNPC canonical ImportedRig required")
+        local actor = child(server, "actor")
+        local rootFrame = module(actor, "MnpcNavigationShell").RootFrame(Vector3.zero, 0)
+        local plan = assert(module(actor, "MnpcRigGeometry").Plan(assembly, rootFrame, Vector3.zero, 0,
+            if isNpc then "NPC" else "Monster"), "MNPC cannot determine runtime root alignment")
+        assembly:PivotTo(rootFrame * plan.pivotOffset)
+        local weapons, weaponSet = {}, ""
+        local rows = profile.slots.idle or {}
+        if isNpc then
+            local context = module(serverDomain, "NpcEquipmentService").Resolve(data.slug)
+            local equipService = module(child(server, "weapon"), "WeaponEquipService")
+            local expected = data.equipment
+            local found = {}
+            for _, item in context.items do
+                local wanted = expected[item.hand]
+                assert(wanted and wanted.slug == item.slug, "MNPC equipment registry differs")
+                local row, weaponTemplate = equipService.ResolveVisual(item.slug)
+                assert(row and weaponTemplate and tostring(row.modelAssetId) == wanted.modelId, "MNPC weapon registry differs")
+                assert(tostring(weaponTemplate:GetAttribute("Game1ModelAssetId") or "") == wanted.modelId,
+                    "MNPC weapon template differs; Sync Model + Atlas first")
+                local weapon, _, err = equipService.EquipVisual(assembly, item.slug, item.hand,
+                    if item.hand == "right" then "EquippedWeaponRight" else "EquippedWeaponLeft")
+                assert(weapon, "MNPC weapon mount failed: " .. tostring(err))
+                weapons[item.hand] = weapon
+                found[item.hand] = true
+            end
+            for hand in pairs(expected) do assert(found[hand], "MNPC expected weapon missing: " .. hand) end
+            weaponSet = context.weaponSet
+            assert(module(serverDomain, "NpcAnimationRigBinding").Align(visual, data.slug, profile, weaponSet), "MNPC clip root alignment failed")
+            rows = module(serverDomain, "NpcAnimationTracks").PublishedRows(profile, "idle", weaponSet)
+        else
+            module(serverDomain, "MonsterRigBuilder").EnsureRuntimeAnimationRoot(visual)
+        end
+        local idle = nil
+        for _, row in rows do
+            if row.role == "base" and row.sourceSlot == "idle" then idle = row; break end
+        end
+        assert(idle and idle.looped == true, "MNPC published base idle required")
+        local pinned = false
+        for _, candidate in data.idles do
+            if candidate.clipId == idle.clipId and candidate.assetId == tostring(idle.assetId) then pinned = true; break end
+        end
+        assert(pinned, "MNPC idle registry differs from current published Host clip")
+        sequence = Preview.LoadSequence(game:GetService("AnimationClipProvider"), assert(tonumber(idle.assetId)))
+        local pose = IdlePose.Apply(visual, sequence, data.phase)
+        -- Same rigid-joint equation as the Timeline Editor; no physics step.
+        Preview.RefreshAccessories(assembly)
+        local meshes, bones = captureFrames(assembly, visual, weapons, rootFrame)
+        return {animationId = tostring(idle.assetId), clipId = idle.clipId, weaponSet = weaponSet,
+            pose = pose, meshes = meshes, bones = bones}
+    end, debug.traceback)
+    if sequence then sequence:Destroy() end
+    if assembly then assembly:Destroy() end
+    assert(ok, tostring(result))
+    return result
+end
+return table.freeze(Capture)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="43">
+        <Properties>
+          <string name="Name">StudioMnpcCaptureCommand</string>
+          <string name="Source"><![CDATA[-- Edit-mode one-shot command. No polling loop; uses the existing Bridge.
+local Capture = require(script.Parent.StudioMnpcAssemblyCapture)
+return function(services)
+    return function(data)
+        local result = {project = data.project, command = data.command, schemaVersion = data.schemaVersion,
+            operationId = data.operationId, kind = data.kind, slug = data.slug,
+            fullFingerprint = data.fullFingerprint, idleFingerprint = data.idleFingerprint,
+            expectedRevision = data.expectedRevision}
+        local ok, capture = pcall(function()
+            assert(not services.RunService:IsRunning() and data.project == "game1" and data.schemaVersion == 1,
+                "MNPC capture requires Studio Edit and schema v1")
+            return Capture.Run(data)
+        end)
+        if ok then result.capture = capture else result.error = tostring(capture):sub(1, 1500) end
+        local sent, response = pcall(function()
+            return services.HttpService:RequestAsync({Url = services.bridgeUrl .. "/mnpc-capture-result", Method = "POST",
+                Headers = {["X-Game1-Token"] = services.bridgeToken, ["Content-Type"] = "application/json"},
+                Body = services.HttpService:JSONEncode(result)})
+        end)
+        if not sent or not response.Success then warn("[game1] MNPC capture response failed: " .. tostring(response)) end
+    end
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="44">
+        <Properties>
+          <string name="Name">StudioMnpcIdlePose</string>
+          <string name="Source"><![CDATA[-- Offline, one complete authored keyframe. No Animator, guessing rest pose,
+-- ambiguous target mapping, or easing approximation at an unkeyed time.
+local Preview = require(script.Parent.StudioTimelinePreview)
+local Sampler = require(script.Parent.StudioTimelinePoseSampler)
+local IdlePose = {}
+
+function IdlePose.Apply(visual: Model, sequence: KeyframeSequence, phase: number): any
+    local duration = Preview.SequenceDuration(sequence)
+    assert(duration > 0, "MNPC idle clip has no duration")
+    local names = {}
+    for _, node in visual:GetDescendants() do
+        if node:IsA("Bone") or node:IsA("Motor6D") then
+            local bucket = names[node.Name] or {}
+            table.insert(bucket, node)
+            names[node.Name] = bucket
+        end
+    end
+    local frames = sequence:GetKeyframes()
+    assert(#frames <= 1200, "MNPC idle has too many keyframes")
+    local poseCount = 0
+    for _, keyframe in frames do
+        local seen = {}
+        for _, pose in keyframe:GetDescendants() do
+            if pose:IsA("Pose") then
+                poseCount += 1
+                assert(poseCount <= 200000, "MNPC idle pose budget exceeded")
+                local targets = names[pose.Name]
+                if targets then
+                    assert(#targets == 1 and targets[1]:IsA("Bone"), "MNPC idle target ambiguous/unsupported: " .. pose.Name)
+                    local target = targets[1]
+                    assert(not seen[target], "MNPC duplicate idle target: " .. pose.Name)
+                    seen[target] = true
+                    local parent = pose.Parent
+                    if parent and parent:IsA("Pose") and names[parent.Name] then
+                        assert(target.Parent == names[parent.Name][1], "MNPC idle hierarchy mismatch: " .. pose.Name)
+                    end
+                    local _, angle = pose.CFrame:ToAxisAngle()
+                    local neutral = pose.CFrame.Position.Magnitude <= 0.00001 and math.abs(angle) <= 0.00001
+                    assert(math.abs(pose.Weight - 1) <= 0.0001 or (neutral and math.abs(pose.Weight) <= 0.0001),
+                        "MNPC weighted moving pose is unsupported: " .. pose.Name)
+                else
+                    -- Neutral synthetic hierarchy nodes may wrap the real bone
+                    -- tracks; never ignore an unmatched moving target.
+                    local _, angle = pose.CFrame:ToAxisAngle()
+                    assert(pose.CFrame.Position.Magnitude <= 0.00001 and math.abs(angle) <= 0.00001,
+                        "MNPC idle moving target not found: " .. pose.Name)
+                end
+            end
+        end
+    end
+    local sampler = Sampler.new(game:GetService("TweenService"))
+    local tracks = sampler.Build(visual, sequence)
+    assert(#tracks > 0 and #tracks <= 512, "MNPC idle has no supported bone tracks")
+    -- Intersect actual sample timestamps, then pick the nearest to requested
+    -- phase. At this time the existing sampler returns authored CFrames.
+    local common = {}
+    for _, sample in tracks[1].samples do
+        assert(not common[sample.time], "MNPC duplicate keyframe time")
+        common[sample.time] = true
+    end
+    for _, track in tracks do
+        assert(track.target:IsA("Bone"), "MNPC only supports bone idle tracks")
+        local times = {}
+        for _, sample in track.samples do
+            assert(not times[sample.time], "MNPC duplicate keyframe time")
+            times[sample.time] = true
+        end
+        for time in pairs(common) do
+            if not times[time] then common[time] = nil end
+        end
+    end
+    local selected, distance = nil, math.huge
+    for time in pairs(common) do
+        local delta = math.abs(time - duration * phase)
+        if time > 0 and (delta < distance or (delta == distance and (selected == nil or time < selected))) then
+            selected, distance = time, delta
+        end
+    end
+    assert(selected ~= nil, "MNPC idle has no complete nonzero authored keyframe")
+    -- Apply the exact values, including Constant easing and sparse tracks.
+    -- Do not interpolate: the engine's native blend/easing is not assumed.
+    for _, track in tracks do
+        for _, sample in track.samples do
+            if sample.time == selected then
+                track.target.Transform = sample.cframe
+                break
+            end
+        end
+    end
+    return {mode = "authored_keyframe", duration = duration, time = selected, animatedBones = #tracks}
+end
+
+return table.freeze(IdlePose)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="45">
+        <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
 -- Transport/AssetService dependencies are passed by the Game1Bridge composition root.
@@ -9266,7 +9579,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioMonsterSpawnAuthoring</string>
           <string name="Source"><![CDATA[-- Studio owns the draft and map gesture. The host owns saved records and projection.
@@ -9528,7 +9841,7 @@ return table.freeze(Authoring)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">StudioOptionsDraftBridge</string>
           <string name="Source"><![CDATA[--!strict
@@ -9600,7 +9913,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioPlaceRegistryCommands</string>
           <string name="Source"><![CDATA[-- M240: separate Studio Bridge controller, NOT an extension of DecoManager.
@@ -9726,7 +10039,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioPlaceRegistryExternalOwners</string>
           <string name="Source"><![CDATA[-- Explicit ownership for published-mesh matches that do NOT belong to DecoManager.
@@ -9773,7 +10086,7 @@ return table.freeze(ExternalOwners)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioPlaceRegistryInventory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -10516,7 +10829,7 @@ return Inventory
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioPlaceRegistryRepair</string>
           <string name="Source"><![CDATA[-- Metadata-only Repair for canonical Location FBX placements.
@@ -10681,7 +10994,7 @@ return Repair
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioPlaceRegistrySync</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -11029,7 +11342,7 @@ return Sync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioPlacedRigBoneEffects</string>
           <string name="Source"><![CDATA[-- Placement-owned visual decorations attached to authored Bones. Accept either
@@ -11169,7 +11482,7 @@ return table.freeze(BoneEffects)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -11231,7 +11544,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -11316,7 +11629,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -11406,7 +11719,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -11700,7 +12013,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -12198,7 +12511,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioRealEstateAppearance</string>
           <string name="Source"><![CDATA[-- Per-MeshPart visual authoring. No atlas and no SurfaceAppearance by default.
@@ -12221,7 +12534,7 @@ return table.freeze(Appearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- M342: Real Estate visual-mesh authoring. Collision Blueprint Parts are separate.
@@ -12255,7 +12568,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Authored house pivot is always the original Model pivot, never a visual
@@ -12280,7 +12593,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -12680,7 +12993,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -12879,7 +13192,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -13136,7 +13449,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- M342: remove retired COL geometry from pasted/placed managed Real Estates.
@@ -13198,7 +13511,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -13243,7 +13556,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync for a NEW publication of the same stable house type.
@@ -13389,7 +13702,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -13548,7 +13861,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">StudioRescueRoutes</string>
           <string name="Source"><![CDATA[-- Edit-mode authoring. Selection belongs to this dock, never to Explorer.
@@ -13841,7 +14154,7 @@ return Routes
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">StudioRetiredColMeshCleanup</string>
           <string name="Source"><![CDATA[-- M342: remove retired dedicated COL meshes from managed templates and placements.
@@ -13978,7 +14291,7 @@ return table.freeze(Cleanup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -14048,7 +14361,7 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -14311,7 +14624,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -14624,7 +14937,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -14803,12 +15116,98 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
 local StudioTimelinePreview = {}
 local StudioCharacterStandBuilder = require(script.Parent.StudioCharacterStandBuilder)
+
+local function refreshTimelineAccessories(preview: Model)
+    -- A Viewport WorldModel does not simulate equipment physics. Apply the
+    -- exact native joint equation once per explicitly sampled editor pose.
+    for _, joint in preview:GetDescendants() do
+        if joint:IsA("RigidConstraint") and joint.Name == "Game1RigidEquipmentJoint" then
+            local endpoint, grip = joint.Attachment0, joint.Attachment1
+            local root = grip and grip.Parent
+            local item = root and root:FindFirstAncestorWhichIsA("Model")
+            while item and item:GetAttribute("Game1RigidEquipment") ~= true do
+                item = item:FindFirstAncestorWhichIsA("Model")
+            end
+            if endpoint and grip and item and item:IsA("Model") then
+                local frame = if endpoint:IsA("Bone") then endpoint.TransformedWorldCFrame else endpoint.WorldCFrame
+                local delta = frame * grip.WorldCFrame:Inverse()
+                item:PivotTo(delta * item:GetPivot())
+            end
+        end
+    end
+end
+
+-- AnimationClipProvider can transiently return an empty KeyframeSequence for a
+-- published animation. Do not mistake that response for an authored 0-second
+-- attack, and never invent keyframes or infer them from timeline metadata.
+local MAX_CLIP_FETCHES = 5
+local CLIP_RETRY_SECONDS = 0.4
+
+local function timelineSequenceDetails(sequence: KeyframeSequence): (number, number, number)
+    local duration = 0
+    local keyframeCount = 0
+    local poseCount = 0
+    for _, keyframe in ipairs(sequence:GetKeyframes()) do
+        keyframeCount += 1
+        duration = math.max(duration, keyframe.Time)
+        for _, descendant in ipairs(keyframe:GetDescendants()) do
+            if descendant:IsA("Pose") then
+                poseCount += 1
+            end
+        end
+    end
+    return duration, keyframeCount, poseCount
+end
+
+local function loadTimelineSequence(AnimationClipProvider, animationAssetId: number): KeyframeSequence
+    local contentId = "rbxassetid://" .. tostring(math.floor(animationAssetId))
+    local lastDiagnostic = "no response"
+    for attempt = 1, MAX_CLIP_FETCHES do
+        local ok, clip = pcall(function()
+            return AnimationClipProvider:GetAnimationClipAsync(contentId)
+        end)
+        if ok and clip ~= nil then
+            if not clip:IsA("KeyframeSequence") then
+                local clipClass = clip.ClassName
+                clip:Destroy()
+                -- CurveAnimations need a curve sampler; they are not empty
+                -- KeyframeSequences and must not be silently misdiagnosed.
+                error(("animation %d is %s, not KeyframeSequence; the timeline pose preview does not yet support this clip format")
+                    :format(animationAssetId, clipClass))
+            end
+            local duration, frameCount, poseCount = timelineSequenceDetails(clip)
+            if duration > 0.000001 and poseCount > 0 then
+                return clip
+            end
+            lastDiagnostic = ("keyframes=%d, poses=%d, last keyframe=%.6fs, loaded length=%.6fs")
+                :format(frameCount, poseCount, duration, clip.Length)
+            clip:Destroy()
+        else
+            lastDiagnostic = "request failed: " .. tostring(clip)
+        end
+        if attempt < MAX_CLIP_FETCHES then
+            task.wait(CLIP_RETRY_SECONDS)
+        end
+    end
+    error(("published animation %d has no usable timed poses after %d Studio requests (%s). "
+        .. "Verify the published clip's keys in Roblox Animation Editor. No hit events were changed.")
+        :format(animationAssetId, MAX_CLIP_FETCHES, lastDiagnostic))
+end
+
+local function timelineSequenceDuration(sequence: KeyframeSequence): number
+    local duration = timelineSequenceDetails(sequence)
+    return duration
+end
+
+StudioTimelinePreview.RefreshAccessories = refreshTimelineAccessories
+StudioTimelinePreview.LoadSequence = loadTimelineSequence
+StudioTimelinePreview.SequenceDuration = timelineSequenceDuration
 
 function StudioTimelinePreview.new(services)
     local AssetService = services.AssetService
@@ -15005,87 +15404,6 @@ function StudioTimelinePreview.new(services)
         return preview
     end
 
-    local function refreshTimelineAccessories(preview: Model)
-        -- A Viewport WorldModel does not simulate equipment physics. Apply the
-        -- exact native joint equation once per explicitly sampled editor pose.
-        for _, joint in preview:GetDescendants() do
-            if joint:IsA("RigidConstraint") and joint.Name == "Game1RigidEquipmentJoint" then
-                local endpoint, grip = joint.Attachment0, joint.Attachment1
-                local root = grip and grip.Parent
-                local item = root and root:FindFirstAncestorWhichIsA("Model")
-                while item and item:GetAttribute("Game1RigidEquipment") ~= true do
-                    item = item:FindFirstAncestorWhichIsA("Model")
-                end
-                if endpoint and grip and item and item:IsA("Model") then
-                    local frame = if endpoint:IsA("Bone") then endpoint.TransformedWorldCFrame else endpoint.WorldCFrame
-                    local delta = frame * grip.WorldCFrame:Inverse()
-                    item:PivotTo(delta * item:GetPivot())
-                end
-            end
-        end
-    end
-
-    -- AnimationClipProvider can transiently return an empty KeyframeSequence for a
-    -- published animation. Do not mistake that response for an authored 0-second
-    -- attack, and never invent keyframes or infer them from timeline metadata.
-    local MAX_CLIP_FETCHES = 5
-    local CLIP_RETRY_SECONDS = 0.4
-
-    local function timelineSequenceDetails(sequence: KeyframeSequence): (number, number, number)
-        local duration = 0
-        local keyframeCount = 0
-        local poseCount = 0
-        for _, keyframe in ipairs(sequence:GetKeyframes()) do
-            keyframeCount += 1
-            duration = math.max(duration, keyframe.Time)
-            for _, descendant in ipairs(keyframe:GetDescendants()) do
-                if descendant:IsA("Pose") then
-                    poseCount += 1
-                end
-            end
-        end
-        return duration, keyframeCount, poseCount
-    end
-
-    local function loadTimelineSequence(animationAssetId: number): KeyframeSequence
-        local contentId = "rbxassetid://" .. tostring(math.floor(animationAssetId))
-        local lastDiagnostic = "no response"
-        for attempt = 1, MAX_CLIP_FETCHES do
-            local ok, clip = pcall(function()
-                return AnimationClipProvider:GetAnimationClipAsync(contentId)
-            end)
-            if ok and clip ~= nil then
-                if not clip:IsA("KeyframeSequence") then
-                    local clipClass = clip.ClassName
-                    clip:Destroy()
-                    -- CurveAnimations need a curve sampler; they are not empty
-                    -- KeyframeSequences and must not be silently misdiagnosed.
-                    error(("animation %d is %s, not KeyframeSequence; the timeline pose preview does not yet support this clip format")
-                        :format(animationAssetId, clipClass))
-                end
-                local duration, frameCount, poseCount = timelineSequenceDetails(clip)
-                if duration > 0.000001 and poseCount > 0 then
-                    return clip
-                end
-                lastDiagnostic = ("keyframes=%d, poses=%d, last keyframe=%.6fs, loaded length=%.6fs")
-                    :format(frameCount, poseCount, duration, clip.Length)
-                clip:Destroy()
-            else
-                lastDiagnostic = "request failed: " .. tostring(clip)
-            end
-            if attempt < MAX_CLIP_FETCHES then
-                task.wait(CLIP_RETRY_SECONDS)
-            end
-        end
-        error(("published animation %d has no usable timed poses after %d Studio requests (%s). "
-            .. "Verify the published clip's keys in Roblox Animation Editor. No hit events were changed.")
-            :format(animationAssetId, MAX_CLIP_FETCHES, lastDiagnostic))
-    end
-
-    local function timelineSequenceDuration(sequence: KeyframeSequence): number
-        local duration = timelineSequenceDetails(sequence)
-        return duration
-    end
 
 
     return {
@@ -15093,7 +15411,7 @@ function StudioTimelinePreview.new(services)
         LoadModel = loadTimelinePreviewModel,
         LoadAdminModel = loadTimelineAdminModel,
         RefreshAccessories = refreshTimelineAccessories,
-        LoadSequence = loadTimelineSequence,
+        LoadSequence = function(assetId) return loadTimelineSequence(AnimationClipProvider, assetId) end,
         SequenceDuration = timelineSequenceDuration,
     }
 end
@@ -15102,7 +15420,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="76">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -15160,7 +15478,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

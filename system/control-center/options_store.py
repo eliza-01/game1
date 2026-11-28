@@ -325,31 +325,33 @@ def normalize_monster_ai(change, base=None):
     return result
 
 
+def migrate_debug_ui(saved):
+    """One-time persisted M595 schema migration; no legacy API writes."""
+    if not isinstance(saved, dict):
+        raise ValueError('debugUi expects an object')
+    result = deepcopy(saved)
+    profiles = [result.pop(key, None) for key in ('desktop', 'mobile')]
+    result.pop('publishedPlaceId', None)
+    if 'showPublishedControls' not in result:
+        result['showPublishedControls'] = any(isinstance(profile, dict) and
+            profile.get('showPublishedControls') is True for profile in profiles)
+    return normalize_debug_ui(result)
+
+
 def normalize_debug_ui(change, base=None):
-    if not isinstance(change, dict) or set(change) - {'desktop', 'mobile', 'startInHub', 'startedLanguage', 'startLocale', 'publishedPlaceId'}:
-        raise ValueError('debugUi expects desktop/mobile profiles')
+    fields = {'showPublishedControls', 'startInHub', 'startedLanguage', 'startLocale'}
+    if not isinstance(change, dict) or set(change) - fields:
+        raise ValueError('debugUi expects global controls')
     result = deepcopy(DEFAULT_PAYLOAD['debugUi'])
-    if base:
-        result.update(deepcopy(base))
-    for device, settings in change.items():
-        if device in ('startInHub', 'startedLanguage'):
-            if type(settings) is not bool:
-                raise ValueError(f'debugUi.{device} must be boolean')
-            result[device] = settings
-            continue
-        if device == 'publishedPlaceId':
-            if not isinstance(settings, str) or (settings and (not re.fullmatch(r'[1-9][0-9]{0,15}', settings) or int(settings) > 2**53 - 1)):
-                raise ValueError('debugUi.publishedPlaceId must be empty or an exact positive Roblox Place ID')
-            result[device] = settings
-            continue
-        if device == 'startLocale':
-            if settings not in ('auto','ru-ru','en-us','de-de','zh-cn','it-it','es-es','fr-fr','pt-br','ja-jp','ko-kr'):
+    if base is not None:
+        result.update(normalize_debug_ui(base))
+    for key, value in change.items():
+        if key == 'startLocale':
+            if value not in ('auto','ru-ru','en-us','de-de','zh-cn','it-it','es-es','fr-fr','pt-br','ja-jp','ko-kr'):
                 raise ValueError('debugUi.startLocale unsupported')
-            result[device] = settings
-            continue
-        if not isinstance(settings, dict) or set(settings) != {'showPublishedControls'} or type(settings['showPublishedControls']) is not bool:
-            raise ValueError('debugUi.showPublishedControls must be boolean')
-        result[device] = deepcopy(settings)
+        elif type(value) is not bool:
+            raise ValueError(f'debugUi.{key} must be boolean')
+        result[key] = value
     return result
 
 
@@ -387,7 +389,7 @@ DEFAULT_PAYLOAD = {
     "mnpcDemand": normalize_mnpc_demand({}),
     "worldStreaming": {"targetRadiusStuds": 150},
     "playerJump": {"heightMultiplier": 2.0, "descentTimeMultiplier": 2.0},
-    "debugUi": {"desktop": {"showPublishedControls": False}, "mobile": {"showPublishedControls": False}, "startInHub": False, "startedLanguage": False, "startLocale": "auto", "publishedPlaceId": ""},
+    "debugUi": {"showPublishedControls": False, "startInHub": False, "startedLanguage": False, "startLocale": "auto"},
     "cameraPresets": [],
     "activeCameraPreset": "",
     "characterAnimations": {
@@ -541,7 +543,7 @@ class OptionsStore:
         if normalized_demand != payload['mnpcDemand']:
             payload['mnpcDemand'] = normalized_demand
             changed = True
-        normalized_debug = normalize_debug_ui(payload['debugUi'])
+        normalized_debug = migrate_debug_ui(payload['debugUi'])
         if normalized_debug != payload['debugUi']:
             payload['debugUi'] = normalized_debug
             changed = True

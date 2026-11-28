@@ -40,7 +40,7 @@ class OptionsHealthContract(unittest.TestCase):
         self.assertEqual(upgraded['camera'], old_camera)
         self.assertEqual(upgraded['combat'], old_combat)
         self.assertEqual(upgraded['healthUi'], HEALTH_UI_DEFAULTS)
-        self.assertFalse(upgraded['debugUi']['mobile']['showPublishedControls'])
+        self.assertFalse(upgraded['debugUi']['showPublishedControls'])
         OptionsStore(self.root)  # idempotent
         self.assertEqual(json.loads(path.read_text(encoding='utf-8')), upgraded)
 
@@ -49,8 +49,7 @@ class OptionsHealthContract(unittest.TestCase):
         self.assertEqual(set(settings['healthUi']), {'desktop', 'mobile'})
         self.assertEqual(settings['healthUi']['desktop']['screen']['width'], 320)
         self.assertEqual(settings['healthUi']['mobile']['screen']['width'], 214)
-        self.assertFalse(settings['debugUi']['desktop']['showPublishedControls'])
-        self.assertFalse(settings['debugUi']['mobile']['showPublishedControls'])
+        self.assertFalse(settings['debugUi']['showPublishedControls'])
         registry = (self.root / 'src/shared/GameOptionsRegistry.luau').read_text()
         self.assertIn('healthUi = table.freeze', registry)
         self.assertIn('showPublishedControls = ', registry)
@@ -99,15 +98,14 @@ class OptionsHealthContract(unittest.TestCase):
 
     def test_toggle_published_controls_does_not_affect_combat_or_camera(self):
         old = self.store.snapshot()
-        new = self.store.update({'debugUi': {'desktop': {'showPublishedControls': True}}})
-        self.assertTrue(new['debugUi']['desktop']['showPublishedControls'])
-        self.assertFalse(new['debugUi']['mobile']['showPublishedControls'])
+        new = self.store.update({'debugUi': {'showPublishedControls': True}})
+        self.assertTrue(new['debugUi']['showPublishedControls'])
         self.assertEqual(old['combat'], new['combat'])
         self.assertEqual(old['camera'], new['camera'])
         self.assertIn('showPublishedControls = true',
                       (self.root / 'src/shared/GameOptionsRegistry.luau').read_text())
         with self.assertRaises(ValueError):
-            self.store.update({'debugUi': {'desktop': {'showPublishedControls': 'false'}}})
+            self.store.update({'debugUi': {'showPublishedControls': 'false'}})
 
 
 class HealthRuntimeIntegration(unittest.TestCase):

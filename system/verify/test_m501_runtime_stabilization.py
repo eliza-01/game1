@@ -172,11 +172,11 @@ class ClientContracts(unittest.TestCase):
             available = max(int(safe_height * .70), min(420, safe_height - 24)) if portrait else safe_height - 24
             self.assertGreaterEqual(available - (88 + 40 + 12) - 64 - 8, 80)
 
-    def test_compiled_runtime_debug_requires_dev_place_not_studio(self):
+    def test_compiled_runtime_debug_uses_global_switch(self):
         policy = read('src/shared/dev/PublishedDebugAccess.luau')
         self.assertIn('Game1LocationRuntimeManifest', policy)
         self.assertIn('not compiledRuntime()', policy)
-        self.assertIn('if not publishedPlaceAllowed() then return false end', policy)
+        self.assertIn('if not Options.ShowPublishedDebugControls() then return false end', policy)
         self.assertIn('if RunService:IsStudio() then return true end', policy)
 
 

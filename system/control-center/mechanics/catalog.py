@@ -38,6 +38,7 @@ SOURCES = {
     'location-lod-assembly': ('src/client/world/LocationLodAssembly.luau', 'LOD · immutable geometry metadata / assembly'),
     'lod-assembly-job': ('src/client/world/LodAssemblyJob.luau', 'LOD · staged assembly job'),
     'lod-diagnostics': ('src/client/world/LodDiagnostics.luau', 'LOD · opt-in capture'),
+    'published-debug-access': ('src/shared/dev/PublishedDebugAccess.luau', 'M655 · глобальный debug access'),
     'lod-debug-controller': ('src/client/dev/LodDebugController.luau', 'LOD · DEV capture UI'),
     'mnpc-pose-pilot': ('docs/workflows/M627_MNPC_POSE_PILOT_RU.md', 'MNPC · M627 аудит и пилот'),
     'mnpc-entity-foundation': ('docs/workflows/M628_MNPC_ENTITY_FOUNDATION_RU.md', 'MNPC · M628 общий entity-first фундамент'),

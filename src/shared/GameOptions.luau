@@ -80,14 +80,8 @@ function GameOptions.StartInGameplayHub(): boolean
     return (Registry.debugUi or {}).startInHub == true
 end
 
-function GameOptions.PublishedDebugPlaceId(): string
-    local id = (Registry.debugUi or {}).publishedPlaceId
-    return if type(id) == "string" then id else ""
-end
-
-function GameOptions.ShowPublishedDebugControls(device: string): boolean
-    local settings = (Registry.debugUi or {})[device] or {}
-    return settings.showPublishedControls == true
+function GameOptions.ShowPublishedDebugControls(): boolean
+    return (Registry.debugUi or {}).showPublishedControls == true
 end
 
 function GameOptions.NpcOverheadSettings(device: string): {[string]: number}

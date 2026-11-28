@@ -1,5 +1,7 @@
 # game1
 
+**M655 · Global Published Debug.** `Options → Debug / TestPlace → Enable debug / test buttons`: одна глобальная галочка `debugUi.showPublishedControls`, независимо от Place ID, устройства, владельца и ранга. Все подключённые игроки опубликованного Place (включая compiled Runtime) при ON получают server-owned authorization; OFF не запускает опубликованные debug-сервисы и блокирует debug-вызовы. Studio и отдельные Studio-only инструменты GP/AG/Buffer сохраняют прежний контракт. Перед публичным релизом выключить debug: ON предоставляет тестовые полномочия всем игрокам. Миграция прежних PC/Mobile flags — OR, Place ID удаляется; default OFF для новой конфигурации. Нативная Published-приёмка открыта. Приоритет: диагностика регрессии GPU/CPU (владелец сообщил 25 → 125 ms GPU в покое), не снижение качества. Причина пока неизвестна. См. `docs/workflows/M655_GLOBAL_PUBLISHED_DEBUG_RU.md`.
+
 Актуальная ревизия: M654 — [Animation Playback Reliability](docs/workflows/M654_ANIMATION_PLAYBACK_RELIABILITY_RU.md), приёмка Published открыта.
 
 Независимый Roblox-проект (основа MMO) с custom characters, server-authoritative combat, Monster/NPC, Asset Manager, системой локаций/декора, Real Estate и Studio Bridge. **Не использует Place и базы RobloxLineage.**

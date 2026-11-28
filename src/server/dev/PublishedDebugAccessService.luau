@@ -1,4 +1,4 @@
--- Server-owned authorization for players admitted to the configured private DEV Place.
+-- Server-owned authorization for every admitted player when published debug is enabled.
 local Players = game:GetService("Players")
 local Access = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
     :WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))

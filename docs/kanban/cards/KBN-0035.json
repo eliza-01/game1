@@ -8,10 +8,10 @@
   "owner": "Owner + Codex",
   "favorite": true,
   "specPath": "docs/kanban/specs/KBN-0035.md",
-  "specSha256": "71249c00c9d53cd3dcab63580026252a185f4bdcd17022afc248ebeda6468a99",
+  "specSha256": "e65a2308a09ff9eb8f3886b9bae1521da05da02b020cde8f52d9429452ea3918",
   "dependsOn": [],
-  "revision": 6,
-  "updatedAt": "2026-11-27T19:24:00+00:00",
+  "revision": 7,
+  "updatedAt": "2026-11-28T15:55:00+00:00",
   "tasks": [
     {
       "id": "KBN-0035-T01",
@@ -32,6 +32,11 @@
       "id": "KBN-0035-T04",
       "title": "Снять baseline Studio и DEV PC/физический Android, связать результаты с KBN-0003 и KBN-0010",
       "done": false
+    },
+    {
+      "id": "KBN-0035-T05",
+      "title": "M655 Global Published Debug — CODE_COMPLETE; проверить ON/OFF, LD и снять профиль скачков GPU/CPU",
+      "done": false
     }
   ],
   "acceptance": [
@@ -39,7 +44,7 @@
       "id": "KBN-0035-A01",
       "title": "OFF не создаёт диагностические циклы, сетевые события или постоянные аллокации; Debug авторизован",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": " M655: global flag migration + server/client policy Lua doubles; published native NOT_RUN."
     },
     {
       "id": "KBN-0035-A02",
@@ -51,7 +56,7 @@
       "id": "KBN-0035-A03",
       "title": "Есть воспроизводимый baseline реального DEV и телефона с версиями, сценой и настройками; CPU/GPU/память/сеть не смешаны",
       "status": "NOT_RUN",
-      "evidence": ""
+      "evidence": " Owner reported GPU 25 → 125 ms stationary, automatic graphics remains low; capture and root cause pending."
     }
   ]
 }

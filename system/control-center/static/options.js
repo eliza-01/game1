@@ -65,6 +65,7 @@ function game1OptionsRender(){
   select.value=(data.cameraPresets||[]).some(p=>p.name===current)?current:(data.activeCameraPreset||'');
   game1CameraDraftStatus(data);
   game1HealthRender();
+  game1DebugRender(data);
   game1HealthDraftStatus(data);
   game1UiRender();
   game1UiDraftStatus(data);
@@ -301,11 +302,6 @@ function game1HealthRender(){
   const values=game1OptionsState.hpDrafts?.[dev];
   $('health-ui-desktop').classList.toggle('primary',dev==='desktop');
   $('health-ui-mobile').classList.toggle('primary',dev==='mobile');
-  $('option-published-debug-place-id').value=data.debugUi?.publishedPlaceId||'';
-  $('option-published-debug-buttons').checked=data.debugUi?.[dev]?.showPublishedControls===true;
-  $('option-start-in-hub').checked=data.debugUi?.startInHub===true;
-  $('option-started-language').checked=data.debugUi?.startedLanguage===true;
-  $('option-start-locale').value=data.debugUi?.startLocale||'auto';
   if(!values)return;
   const el=$('health-ui-fields');
   el.innerHTML=Object.entries(GAME1_HP_FIELDS).map(([section,fields])=>{
@@ -363,9 +359,14 @@ $('health-ui-import').onclick=()=>{
   game1HealthRender();
   toast('Studio HP draft imported. Click Save selected device profile to persist.');
 };
+function game1DebugRender(data){
+  $('option-published-debug-buttons').checked=data.debugUi?.showPublishedControls===true;
+  $('option-start-in-hub').checked=data.debugUi?.startInHub===true;
+  $('option-started-language').checked=data.debugUi?.startedLanguage===true;
+  $('option-start-locale').value=data.debugUi?.startLocale||'auto';
+}
 $('option-published-debug-save').onclick=()=>{
-  const device=game1OptionsState.hpDevice;
-  game1OptionsSave({debugUi:{publishedPlaceId:$('option-published-debug-place-id').value.trim(),[device]:{showPublishedControls:$('option-published-debug-buttons').checked},startInHub:$('option-start-in-hub').checked,startedLanguage:$('option-started-language').checked,startLocale:$('option-start-locale').value}},'Debug settings saved');
+  game1OptionsSave({debugUi:{showPublishedControls:$('option-published-debug-buttons').checked,startInHub:$('option-start-in-hub').checked,startedLanguage:$('option-started-language').checked,startLocale:$('option-start-locale').value}},'Debug settings saved');
 };
 
 // M443 · editable device buffers; saving one does not overwrite the other.

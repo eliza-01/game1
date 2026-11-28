@@ -23,10 +23,9 @@ class HubProgression(unittest.TestCase):
             for value in (True,False,True):
                 result=store.update({'debugUi':{'startInHub':value}})
                 self.assertEqual(result['debugUi']['startInHub'],value)
-                self.assertEqual(result['debugUi']['desktop'],old['debugUi']['desktop'])
-                self.assertEqual(result['debugUi']['mobile'],old['debugUi']['mobile'])
+                self.assertEqual(result['debugUi']['showPublishedControls'],old['debugUi']['showPublishedControls'])
                 self.assertIn('startInHub = '+str(value).lower(),(root/'src/shared/GameOptionsRegistry.luau').read_text())
-            result=store.update({'debugUi':{'mobile':{'showPublishedControls':False}}})
+            result=store.update({'debugUi':{'showPublishedControls':False}})
             self.assertTrue(result['debugUi']['startInHub'])
             self.assertTrue(OptionsStore(root).snapshot()['debugUi']['startInHub'])
         for invalid in ('true',1,None,{},[]):

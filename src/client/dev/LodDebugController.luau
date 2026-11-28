@@ -1,4 +1,4 @@
--- Authorized Studio / published DEV only. No collection until Start is pressed.
+-- Authorized Studio / published debug only. No collection until Start is pressed.
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")

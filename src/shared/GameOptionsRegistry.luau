@@ -324,16 +324,10 @@ return table.freeze({
 		descentTimeMultiplier = 2,
 	}),
 	debugUi = table.freeze({
-		desktop = table.freeze({
-			showPublishedControls = true,
-		}),
-		mobile = table.freeze({
-			showPublishedControls = true,
-		}),
+		showPublishedControls = true,
 		startInHub = false,
 		startedLanguage = true,
 		startLocale = "ru-ru",
-		publishedPlaceId = "",
 	}),
 	characterAnimations = table.freeze({
 		deathPlaybackPercent = 50,

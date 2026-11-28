@@ -85,7 +85,7 @@ end)
 if not floraOk then warn("[game1][client] flora effect startup failed: " .. tostring(floraError)) end
 require(script:WaitForChild("world"):WaitForChild("BoneOrbController")).Start()
 require(script:WaitForChild("world"):WaitForChild("BoneFireController")).Start()
--- Debug modules are optional: only Studio or the configured published DEV Place.
+-- Debug modules are optional: Studio or global published debug enabled.
 -- GP remains Studio-only.
 local DebugAccess = require(Shared:WaitForChild("dev"):WaitForChild("PublishedDebugAccess"))
 if DebugAccess.ClientAllowed() then

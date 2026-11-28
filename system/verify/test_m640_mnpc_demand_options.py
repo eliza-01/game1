@@ -50,7 +50,7 @@ class MnpcDemandOptions(unittest.TestCase):
             self.assertEqual(html.count(f'id="{key}"'), 1)
             self.assertIn(key, js)
         self.assertIn('data-option-section="mnpc-lod"', html)
-        self.assertIn('options.js?v=640', html)
+        self.assertIn('options.js?v=655', html)
         self.assertIn('data.mnpcDemand?.enabled===true', js)
         self.assertIn("{mnpcDemand:{enabled:$('option-mnpc-demand-enabled').checked}}", js)
         self.assertIn('return (Registry.mnpcDemand or {}).enabled == true', read('src/shared/GameOptions.luau'))

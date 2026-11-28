@@ -66,7 +66,7 @@ ITEMS = [
                  'M609: выбранное оружие и NPC используют общий RigidEquipmentMount на родительской Bone с authored offset (один RigidConstraint на предмет), а летящая/застрявшая стрела — клиентская визуализация, не второй серверный снаряд.',
              ]},
              {'title': 'Недостающее / проверка', 'lines': [
-                 'WeaponSelectionService — playtest chooser: Studio или точный DEV Place ID из Options → Debug / TestPlace (включая compiled Runtime), при включённых галочках PC/Mobile; все допущенные тестировщики. Нет доказанной persistent ownership/inventory модели для выбранного предмета.',
+                 'WeaponSelectionService — playtest chooser: Studio или глобальная галочка Enable debug / test buttons из Options → Debug / TestPlace (включая compiled Runtime); все подключённые игроки. Перед публичным релизом OFF. Нет доказанной persistent ownership/inventory модели для выбранного предмета.',
                  'Отдельно проверить урон при тесном контакте, прицеливание вверх/вниз, разные MeshPart, mobile auto-aim, lag/повторный Release и права игрока.',
              ]},
          ], ['attack-service', 'bow-hitscan', 'damage-service', 'weapon-equip', 'weapon-select', 'bone-mount', 'entity-hitbox', 'native-spatial-index']),

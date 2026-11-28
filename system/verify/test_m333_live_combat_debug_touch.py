@@ -23,12 +23,12 @@ class PublishedRuntimeM333(unittest.TestCase):
         self.assertIn('HitboxSpatialQueries.AimContact(binding',service)
         self.assertNotIn('could not build hitboxes because %s is unreadable',service)
 
-    def test_published_ui_requires_server_dev_place_authorization(self):
+    def test_published_ui_requires_server_authorization(self):
         policy=source('src/shared/dev/PublishedDebugAccess.luau')
         authorizer=source('src/server/dev/PublishedDebugAccessService.luau')
         self.assertIn('player:GetAttribute(AUTH_ATTRIBUTE) == true', policy)
-        self.assertIn('Options.ShowPublishedDebugControls(device)', policy)
-        self.assertIn('publishedPlaceAllowed()',policy)
+        self.assertIn('Options.ShowPublishedDebugControls()', policy)
+        self.assertNotIn('game.PlaceId',policy)
         self.assertIn('local allowed = Access.ServerEnabled()',authorizer)
         self.assertNotIn('GetRankInGroup',authorizer)
         self.assertIn('PlayerAdded:Connect(authorize)',authorizer)

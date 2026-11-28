@@ -503,6 +503,19 @@ function NpcCombatAIService.AttachPresentation(model: Model, ticket: any, presen
     return true
 end
 
+function NpcCombatAIService.BeginPresentation(model: Model): any?
+    local agent = agents[model]
+    if not agent or not agent.active or model:GetAttribute("LifeState") ~= "Alive" then return nil end
+    return agent.poseBinding:Begin()
+end
+
+function NpcCombatAIService.DetachPresentation(model: Model)
+    local agent = agents[model]
+    if not agent then return end
+    agent.poseBinding:Release()
+    agent.presentation = nil
+end
+
 function NpcCombatAIService.Unbind(model: Model)
     local agent = agents[model]
     if not agent then return end

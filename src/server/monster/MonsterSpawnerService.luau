@@ -13,6 +13,7 @@ local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
 
 local MnpcLifecycle = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcEntityLifecycle"))
+local Demand = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcDemandLifecycle"))
 local MonsterAgentLifecycle = require(script.Parent:WaitForChild("MonsterAgentLifecycle"))
 local MonsterRigBuilder = require(script.Parent:WaitForChild("MonsterRigBuilder"))
 local MonsterSpawnGeometry = require(script.Parent:WaitForChild("MonsterSpawnGeometry"))
@@ -81,6 +82,7 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
     if entry == nil then
         return
     end
+    Demand.Remove(model)
     population:UnregisterInstance(state, model)
     DeathLifecycleService.Cancel(model)
     if entry.spawnPresentation then
@@ -91,6 +93,8 @@ local function releaseInstance(state: any, model: Model, scheduleRespawn: boolea
         connection:Disconnect()
     end
     table.clear(entry.connections or {})
+    for _, connection in ipairs(entry.idleConnections or {}) do connection:Disconnect() end
+    table.clear(entry.idleConnections or {})
     idlePresentation.stopIdleState(entry)
     idlePresentation.stopTrack(entry.combatIdleTrack)
     idlePresentation.stopTrack(entry.deathTrack)
@@ -121,6 +125,40 @@ local deathLifecycle = MonsterDeathLifecycle.new({
 local function watch(entry: any, signal: RBXScriptSignal, callback: (...any) -> ())
     local connection = signal:Connect(callback)
     table.insert(entry.connections, connection)
+end
+
+local function bindIdleGeneration(state, model, entry)
+    local connections = {}
+    entry.idleConnections = connections
+    idlePresentation.BindIdleEvents(model, entry, function(signal, callback)
+        table.insert(connections, signal:Connect(callback))
+    end, function()
+        return state.instances[model] == entry and entry.idleConnections == connections
+    end)
+end
+
+local function releaseLivePose(model, entry)
+    model:SetAttribute("Damageable", false)
+    model:SetAttribute("Game1MnpcRigReady", false)
+    MonsterAgentLifecycle.DetachPose(model)
+    for _, connection in ipairs(entry.idleConnections or {}) do connection:Disconnect() end
+    entry.idleConnections = nil
+    local tracks = {}
+    for _, choice in ipairs(entry.idleChoices or {}) do tracks[choice.track] = true end
+    for _, field in ipairs({"idleTrack", "combatIdleTrack", "walkTrack", "runTrack", "deathTrack"}) do
+        local track = entry[field]
+        if track then tracks[track] = true end
+        entry[field] = nil
+    end
+    for track in pairs(tracks) do track:Destroy() end
+    entry.idleChoices = {}
+    entry.activeIdleSpecial = nil
+    EntityHitboxService.Detach(model)
+    if entry.rigLease then entry.rigLease:Release() end
+    entry.rigLease = nil
+    entry.visual = nil
+    entry.spawnPresentation = nil -- completed reveal owns references to the old rig
+    return true
 end
 
 local function spawnOne(state: any): Model?
@@ -232,13 +270,7 @@ local function spawnOne(state: any): Model?
     entry.spawnPresentation = spawnPresentation
     population:RegisterInstance(state, model, entry)
 
-    -- Presentation owns idle clip callbacks; the instance still owns/disconnects
-    -- the underlying RBXScriptConnections through the M91 watch registry.
-    idlePresentation.BindIdleEvents(model, entry, function(signal, callback)
-        watch(entry, signal, callback)
-    end, function()
-        return state.instances[model] == entry
-    end)
+    bindIdleGeneration(state, model, entry)
     idlePresentation.playBaseIdle(model, entry)
     spawnPresentation:Start(function()
         if state.instances[model] == entry and not entry.dying then
@@ -294,8 +326,17 @@ local function spawnOne(state: any): Model?
         end
         if tostring(model:GetAttribute("LifeState") or "") == "Dying" then
             entry.diedAt = os.clock()
-            spawnPresentation:Cancel()
-            deathLifecycle:Begin(state, model, entry)
+            if entry.spawnPresentation then entry.spawnPresentation:Cancel() end
+            Demand.Remove(model)
+            if entry.visual and entry.deathTrack then
+                deathLifecycle:Begin(state, model, entry)
+            elseif model:GetAttribute("Game1MnpcDemandStage") ~= nil then
+                -- An externally forced death of a sleeping shell cannot play a
+                -- corpse animation. Retire the occupied population slot once.
+                releaseInstance(state, model, true)
+            else
+                deathLifecycle:Begin(state, model, entry)
+            end
         end
     end)
     watch(entry, model.Destroying, function()
@@ -305,6 +346,42 @@ local function spawnOne(state: any): Model?
         end
     end)
     MnpcLifecycle.MarkRigReady(model)
+    if prepared and not record.testOwner and hitbox.count > 0 and entry.deathTrack then
+        Demand.Register(model, {
+            canRelease = function()
+                return model:GetAttribute("Damageable") == true and MonsterAgentLifecycle.HasPose(model)
+            end,
+            release = function() return releaseLivePose(model, entry) end,
+            acquire = function(alive)
+                local nextVisual, nextLease = MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster", prepared)
+                if not nextVisual then return false end
+                entry.visual, entry.rigLease = nextVisual, nextLease
+                model:SetAttribute("RuntimeAnimationRootBridgeCount", MonsterRigBuilder.EnsureRuntimeAnimationRoot(nextVisual))
+                local nextHitbox = EntityHitboxService.Attach(model, nextVisual)
+                if not alive() then pcall(EntityHitboxService.Detach, model); return false end
+                if nextHitbox.count <= 0 then return false end
+                local nextTracks = MonsterAnimationTrackFactory.Load(
+                    MonsterAnimationRegistry.profiles and MonsterAnimationRegistry.profiles[slug], model, nextVisual)
+                if not alive() then
+                    -- The rig owner may already have destroyed its Animator.
+                    return false
+                end
+                for field, value in pairs(nextTracks) do entry[field] = value end
+                if not entry.deathTrack then return false end
+                bindIdleGeneration(state, model, entry)
+                if entry.wandering then
+                    wanderController:Refresh(model, entry)
+                elseif model:GetAttribute("InCombat") == true then
+                    idlePresentation.playCombatIdleState(model, entry)
+                else
+                    idlePresentation.playBaseIdle(model, entry)
+                end
+                MnpcLifecycle.MarkRigReady(model)
+                return true
+            end,
+            ready = function() return MonsterAgentLifecycle.HasPose(model) end,
+        })
+    end
     return model
 end
 

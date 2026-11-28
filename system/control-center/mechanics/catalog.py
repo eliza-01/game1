@@ -35,6 +35,8 @@ SOURCES = {
     'mnpc-ai-pose-binding': ('docs/workflows/M629_MNPC_AI_POSE_BINDING_RU.md', 'MNPC · M629 AI / pose binding'),
     'mnpc-shell-geometry': ('docs/workflows/M630_MNPC_SHELL_GEOMETRY_RU.md', 'MNPC · M630 shell geometry'),
     'mnpc-presentation-lifecycle': ('docs/workflows/M631_MNPC_PRESENTATION_LIFECYCLE_RU.md', 'MNPC · M631 presentation lifecycle'),
+    'mnpc-demand-lifecycle': ('docs/workflows/M632_MNPC_DEMAND_LIFECYCLE_RU.md', 'MNPC · M632 demand lifecycle'),
+    'mnpc-demand-runtime': ('src/server/actor/MnpcDemandLifecycle.luau', 'MNPC · shared demand pilot'),
     'mnpc-pose-binding': ('src/server/actor/MnpcPoseBinding.luau', 'MNPC · общий readiness ticket'),
     'npc-motion-intent': ('src/server/npc/NpcMotionIntent.luau', 'NPC · движение независимо от рига'),
     'mnpc-lod-spec': ('docs/workflows/MNPC_LOD_SPEC_RU.md', 'MNPC · план Visual LOD'),

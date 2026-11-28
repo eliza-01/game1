@@ -117,7 +117,7 @@ class MonsterPopulationM93Tests(unittest.TestCase):
             'EntityHitboxService.Attach(model, visual)',
             'MonsterAnimationTrackFactory.Load(',
             'population:RegisterInstance(state, model, entry)',
-            'idlePresentation.BindIdleEvents(',
+            '    bindIdleGeneration(state, model, entry)',
             'wanderController:Start(state, model, entry)',
         )
         self.assertEqual(list(map(spawner.index, ordered)), sorted(map(spawner.index, ordered)))

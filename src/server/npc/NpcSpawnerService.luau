@@ -12,6 +12,7 @@ local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
 local MnpcLifecycle = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcEntityLifecycle"))
+local Demand = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcDemandLifecycle"))
 local NpcAnimationRigBinding = require(script.Parent:WaitForChild("NpcAnimationRigBinding"))
 local NpcAnimationService = require(script.Parent:WaitForChild("NpcAnimationService"))
 local NpcEquipmentService = require(script.Parent:WaitForChild("NpcEquipmentService"))
@@ -66,6 +67,7 @@ local function release(state: any, entity: Model, scheduleRespawn: boolean, exte
     if not entry then
         return
     end
+    Demand.Remove(entity)
     state.instances[entity] = nil
     DeathLifecycleService.Cancel(entity)
     NpcCombatAIService.Unbind(entity)
@@ -123,7 +125,7 @@ local function spawnOne(state: any): boolean
     entity:SetAttribute("NpcSlug", slug)
     local weaponSet = NpcEquipmentService.Equip(entity, slug, equipmentContext, rigLease)
     local profile = (NpcAnimationRegistry.profiles or {})[slug]
-    NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)
+    local aligned = NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)
     entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
     entity:SetAttribute("NpcHomeRadiusStuds", math.clamp(finite(record.homeRadiusStuds, 16), 1, 10000))
     entity:SetAttribute("LifeState", "Alive")
@@ -156,6 +158,7 @@ local function spawnOne(state: any): boolean
         end
         if entity:GetAttribute("LifeState") == "Dying" and not entry.dying then
             entry.dying = true
+            Demand.Remove(entity)
             entity:SetAttribute("Damageable", false)
             NpcCombatAIService.Unbind(entity)
             if entry.presentation then
@@ -189,6 +192,52 @@ local function spawnOne(state: any): boolean
     entry.presentation = presentation
     MnpcLifecycle.MarkRigReady(entity)
     entity:SetAttribute("Damageable", true)
+    -- Only stable effective loadouts qualify for the reversible pilot. A
+    -- different mount fallback would invalidate the AI's weapon-set policy.
+    if prepared and aligned and hitbox.count > 0 and weaponSet == equipmentContext.weaponSet
+        and entity:GetAttribute("NpcWeaponType") == equipmentContext.weaponType then
+        Demand.Register(entity, {
+            canRelease = function() return entry.presentation ~= nil and entity:GetAttribute("Damageable") == true end,
+            release = function()
+                entity:SetAttribute("Damageable", false)
+                entity:SetAttribute("Game1MnpcRigReady", false)
+                NpcCombatAIService.DetachPresentation(entity)
+                if entry.presentation then entry.presentation.Destroy() end
+                entry.presentation = nil
+                EntityHitboxService.Detach(entity)
+                if entry.rigLease then entry.rigLease:Release() end
+                entry.rigLease = nil
+                entry.visual = nil
+                return true
+            end,
+            acquire = function(alive)
+                local ticket = NpcCombatAIService.BeginPresentation(entity)
+                if not ticket then return false end
+                local nextVisual, nextLease = MnpcLifecycle.AttachRig(entity, root, template, surface, yaw, "NPC", prepared)
+                if not nextVisual then return false end
+                entry.visual, entry.rigLease = nextVisual, nextLease
+                local mountedSet = NpcEquipmentService.Equip(entity, slug, equipmentContext, nextLease)
+                if mountedSet ~= weaponSet or entity:GetAttribute("NpcWeaponType") ~= equipmentContext.weaponType then
+                    entity:SetAttribute("NpcWeaponType", equipmentContext.weaponType)
+                    entity:SetAttribute("NpcWeaponSet", weaponSet)
+                    return false
+                end
+                if not NpcAnimationRigBinding.Align(nextVisual, slug, profile, mountedSet) then return false end
+                local nextHitbox = EntityHitboxService.Attach(entity, nextVisual)
+                if not alive() then pcall(EntityHitboxService.Detach, entity); return false end
+                if nextHitbox.count <= 0 then return false end
+                local nextPresentation = NpcAnimationService.Create(entity, nextVisual, profile)
+                if not alive() or not NpcCombatAIService.AttachPresentation(entity, ticket, nextPresentation) then
+                    nextPresentation.Destroy()
+                    return false
+                end
+                entry.presentation = nextPresentation
+                MnpcLifecycle.MarkRigReady(entity)
+                return true
+            end,
+            ready = function() return entry.presentation ~= nil end,
+        })
+    end
     return true
 end
 

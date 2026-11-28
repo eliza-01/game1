@@ -3,6 +3,7 @@
 -- their existing services. The queue permits yielding Legacy path requests.
 local RunService = game:GetService("RunService")
 local PlayerSpatialIndex = require(script.Parent:WaitForChild("PlayerSpatialIndex"))
+local Demand = require(script.Parent:WaitForChild("MnpcDemandLifecycle"))
 local NavigationBudget = require(script.Parent:WaitForChild("NavigationScheduler"))
 local Queue = require(script.Parent:WaitForChild("ActorAIScheduleQueue"))
 local queue = Queue.new(os.clock, task.spawn, function(err)
@@ -12,7 +13,10 @@ local ActorAIScheduler = {}
 local connection
 
 function ActorAIScheduler.Register(agent, interval, delay, step, onStop, phaseLocked, cadence)
-    local registered = queue:Register(agent, interval, delay, step, onStop, phaseLocked, cadence)
+    local registered = queue:Register(agent, interval, delay, function(current, now)
+        Demand.Step(current, now)
+        return step(current, now)
+    end, onStop, phaseLocked, cadence)
     if not connection then
         connection = RunService.Heartbeat:Connect(function()
             PlayerSpatialIndex.BeginBatch()
@@ -30,6 +34,7 @@ function ActorAIScheduler.Wake(agent)
 end
 
 function ActorAIScheduler.Remove(agent)
+    Demand.Remove(agent.model)
     queue:Remove(agent)
 end
 

@@ -77,12 +77,12 @@ class MonsterIdlePresentationM92Tests(unittest.TestCase):
         ordered = (
             'entry.connections = {}',
             'population:RegisterInstance(state, model, entry)',
-            'idlePresentation.BindIdleEvents(model, entry, function(signal, callback)',
+            '    bindIdleGeneration(state, model, entry)',
             'idlePresentation.playBaseIdle(model, entry)',
             'wanderController:Start(state, model, entry)',
         )
         self.assertEqual(list(map(spawner.index, ordered)), sorted(map(spawner.index, ordered)))
-        self.assertIn('watch(entry, signal, callback)', spawner)
+        self.assertIn('table.insert(connections, signal:Connect(callback))', spawner)
         self.assertIn('table.insert(entry.connections, connection)', spawner)
         self.assertIn('connection:Disconnect()', spawner)
         self.assertLess(spawner.index('population:UnregisterInstance(state, model)'), spawner.index('for _, connection in ipairs(entry.connections or {}) do'))

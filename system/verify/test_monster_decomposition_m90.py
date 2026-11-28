@@ -80,7 +80,7 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
         presentation = read("MonsterIdlePresentation")
         self.assertIn('registerSignal(idleTrack.DidLoop, function()', presentation)
         self.assertIn('registerSignal(choice.track.Ended, function()', presentation)
-        self.assertIn('watch(entry, signal, callback)', spawner)
+        self.assertIn('table.insert(connections, signal:Connect(callback))', spawner)
         self.assertIn('DeathAnimationPolicy.LatchVisibleTerminalPose', read('MonsterDeathLifecycle'))
 
     def test_attributes_still_separate_authored_and_runtime_behavior(self):

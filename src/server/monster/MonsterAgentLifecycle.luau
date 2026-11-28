@@ -214,6 +214,20 @@ local function watchFolder(folder: Folder, random: Random, stepAgent: (any) -> (
     end
 end
 
+-- Detach only the pose; do not deregister the navigation/AI agent.
+function MonsterAgentLifecycle.DetachPose(model: Model)
+    local agent = agents[model]
+    if not agent then return end
+    agent.poseBinding:Release()
+    Presentation.Stop(agent)
+    Presentation.ReleaseBinding(agent)
+end
+
+function MonsterAgentLifecycle.HasPose(model: Model): boolean
+    local agent = agents[model]
+    return agent ~= nil and agent.poseBinding:IsReady()
+end
+
 function MonsterAgentLifecycle.Unbind(model: Model)
     local agent = agents[model]
     if agent then releaseAgent(agent) end

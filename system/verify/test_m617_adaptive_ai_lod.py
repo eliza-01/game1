@@ -41,10 +41,15 @@ class AdaptiveAIM617(unittest.TestCase):
 
     def test_protected_navigation_and_decisions(self):
         # These hashes describe M616, not a second runtime implementation.
+        # M629 adds explicit pose attachment/readiness only; M629 tests guard action timing.
         hashes=json.loads(read('system/verify/ai_protected_m617.json'))
         # M618 deliberately changes only the Legacy and NPC native path adapters.
-        # Keep the historical M616 hashes, not a re-baselined pursuit fixture.
+        # M628 deliberately migrates the shared spawn shell; its new contract tests
+        # cover the two changed files. Preserve all other historical hashes.
         for path,expected in hashes.items():
-            if path in ('src/server/monster/MonsterChaseNavigation.luau', 'src/server/actor/ActorChaseNavigator.luau'):
+            if path in ('src/server/monster/MonsterChaseNavigation.luau', 'src/server/actor/ActorChaseNavigator.luau',
+                        'src/server/monster/MonsterSpawnerService.luau', 'src/server/monster/MonsterRigBuilder.luau',
+                        'src/server/monster/MonsterCombatPresentation.luau', 'src/server/monster/MonsterAttackExecutor.luau',
+                        'src/server/monster/MonsterSkillCast.luau'):
                 continue
             self.assertEqual(hashlib.sha256(read(path).encode()).hexdigest(),expected,path)

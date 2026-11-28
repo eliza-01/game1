@@ -20,6 +20,7 @@ function Cast.Cancel(agent: any)
     if agent.model.Parent then agent.model:SetAttribute("MonsterCastingSkill",nil) end
 end
 function Cast.TryBegin(agent: any,target: Model): boolean
+    if not agent.poseBinding:IsReady() then return false end
     if agent.model:GetAttribute("MonsterSkillCaster")~=true then return false end
     if Target.IsRecovering(agent) then return false end
     if agent.attacking or os.clock()<agent.nextAttackAt or agent.retreatPending or not Target.IsValid(target) then return false end

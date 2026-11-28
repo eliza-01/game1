@@ -306,18 +306,18 @@ class NpcPipelineTests(unittest.TestCase):
         # authored "spine", making animations deform the leg and upper-body branches.
         # CharacterRigService already preserves the imported bone hierarchy.
         repo = Path(__file__).resolve().parents[2]
-        npc_factory = (repo / "src/server/npc/NpcRigFactory.luau").read_text(encoding="utf-8")
+        npc_factory = (repo / "src/server/actor/MnpcVisualRig.luau").read_text(encoding="utf-8")
         spawner = (repo / "src/server/npc/NpcSpawnerService.luau").read_text(encoding="utf-8")
         character = (repo / "src/server/character/CharacterRigService.luau").read_text(encoding="utf-8")
         self.assertNotIn("bridgeRootBones", npc_factory)
         self.assertNotIn('Instance.new("Bone")', npc_factory)
         self.assertNotIn("bone.Parent =", npc_factory)
         self.assertNotIn('RuntimeAnimationRootBridgeCount', npc_factory)
-        self.assertIn("published rig owns the bone hierarchy", npc_factory)
+        self.assertIn("preserve its child hierarchy", npc_factory)
         self.assertIn("createRoot(character", character)
         self.assertLess(
-            spawner.index("NpcRigFactory.Create(entity,"),
-            spawner.index("NpcAnimationService.Create(entity, visual, profile)"),
+            spawner.index("MnpcLifecycle.AttachRig(entity,"),
+            spawner.index("pcall(NpcAnimationService.Create, entity, visual, profile)"),
         )
 
     def test_spawn_contract_one_npc_and_placement_timestamp(self):

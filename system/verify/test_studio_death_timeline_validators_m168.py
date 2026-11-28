@@ -40,6 +40,7 @@ def monster_sources():
              'MonsterAnimationTrackFactory', 'MonsterInitialAttributes', 'MonsterWanderController',
              'MonsterDeathLifecycle', 'MonsterIdlePresentation', 'MonsterPopulationController')
     data = [read(f'src/server/monster/{name}.luau') for name in parts]
+    data.extend(read(f'src/server/actor/{name}.luau') for name in ('MnpcNavigationShell','MnpcVisualRig','MnpcEntityLifecycle'))
     return SimpleNamespace(spawner_text=data[0], runtime_text='\n'.join(data))
 
 

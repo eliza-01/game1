@@ -59,7 +59,7 @@ class NpcFrameWorkM428(unittest.TestCase):
         self.assertIn('HomeLeash.NoDamageTimeout', body)
         self.assertLess(body.index('chaseTarget(agent, targetRoot)'), body.index('agent.presentation.EndAttack()'))
         helper = source.split('local function chaseTarget(', 1)[1].split('local function beginAttack(', 1)[0]
-        self.assertIn('agent.presentation.SetCombatMoving(true)', helper)
+        self.assertIn('agent.motion.SetCombatMoving(true)', helper)
         self.assertIn('agent.navigator:Chase(targetRoot.Position, speed)', helper)
         self.assertIn('chaseTarget(agent, targetRoot)', source.split('local function tickAgent(', 1)[1])
         self.assertIn('beginAttack(agent, target, true)', source)

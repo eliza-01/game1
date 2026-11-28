@@ -176,6 +176,9 @@ def check_monster_contracts(
     # M90: validate the monster runtime as several bounded modules rather than
     # assuming every implementation detail remains inside the orchestrator.
     monster_rig_text = (root / "src/server/monster/MonsterRigBuilder.luau").read_text(encoding="utf-8")
+    shared_shell_text = (root / "src/server/actor/MnpcNavigationShell.luau").read_text(encoding="utf-8")
+    shared_visual_text = (root / "src/server/actor/MnpcVisualRig.luau").read_text(encoding="utf-8")
+    shared_lifecycle_text = (root / "src/server/actor/MnpcEntityLifecycle.luau").read_text(encoding="utf-8")
     monster_geometry_text = (root / "src/server/monster/MonsterSpawnGeometry.luau").read_text(encoding="utf-8")
     monster_track_factory_text = (root / "src/server/monster/MonsterAnimationTrackFactory.luau").read_text(encoding="utf-8")
     monster_attributes_text = (root / "src/server/monster/MonsterInitialAttributes.luau").read_text(encoding="utf-8")
@@ -186,7 +189,7 @@ def check_monster_contracts(
     monster_idle_presentation_text = (root / "src/server/monster/MonsterIdlePresentation.luau").read_text(encoding="utf-8")
     # M93: slot accounting and respawn scheduling live in a separate population controller.
     monster_population_text = (root / "src/server/monster/MonsterPopulationController.luau").read_text(encoding="utf-8")
-    monster_runtime_text = "\n".join((monster_spawner_text, monster_rig_text, monster_geometry_text, monster_track_factory_text, monster_attributes_text, monster_wander_text, monster_death_text, monster_idle_presentation_text, monster_population_text))
+    monster_runtime_text = "\n".join((monster_spawner_text, monster_rig_text, shared_shell_text, shared_visual_text, shared_lifecycle_text, monster_geometry_text, monster_track_factory_text, monster_attributes_text, monster_wander_text, monster_death_text, monster_idle_presentation_text, monster_population_text))
     if 'finite(stats.RunSpeed, CharacterMovementConfig.DefaultRunSpeed)' not in monster_runtime_text:
         report_error("monster RunSpeed fallback must use the shared direct-speed contract")
     for required in ["MonsterSpawnRegistry", "MonsterRegistry", "MonsterAnimationRegistry", "spawnRadius", "maxAlive", "respawnSeconds", "math.sqrt", "Workspace:Raycast", "EntityHitboxService.Attach", 'GetAttributeChangedSignal("LifeState")', '== "Dying"', 'publishedRows(profile, "idle")', 'weightedIdleChoice', 'MonsterAnimationState', 'MonsterIdleVariant', 'idleTrack.DidLoop', 'choice.track.Ended', 'playBaseIdle']:

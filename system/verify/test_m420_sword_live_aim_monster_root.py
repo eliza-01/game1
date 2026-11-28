@@ -77,7 +77,7 @@ class MonsterCombatRootM420(unittest.TestCase):
     def test_combat_root_motion_owned_by_humanoid_on_all_aggro_phases(self):
         client = source('src/client/monster/MonsterAttackLocomotionController.luau')
         state = source('src/server/monster/MonsterCombatState.luau')
-        rig = source('src/server/monster/MonsterRigBuilder.luau')
+        rig = source('src/server/actor/MnpcNavigationShell.luau')
         self.assertIn('model:SetAttribute("MonsterCombatActive", true)', state)
         self.assertIn('model:SetAttribute("MonsterCombatActive", false)', state)
         self.assertIn('model:GetAttributeChangedSignal("MonsterCombatActive"):Connect(refreshActive)', client)
@@ -88,8 +88,8 @@ class MonsterCombatRootM420(unittest.TestCase):
         self.assertIn('local wantsComposition = pursuitActive', client) # legs only during pursuit
         self.assertIn('if not pursuitActive and not combatActive then', client)
         self.assertIn('MonsterAttackPursuitActive', client)
-        self.assertIn('navigationRoot.CFrame = CFrame.new(', rig)
-        self.assertIn('humanoid.HipHeight = NAVIGATION_HIP_HEIGHT', rig)
+        self.assertIn('root.CFrame = CFrame.new(', rig)
+        self.assertIn('humanoid.HipHeight = HIP_HEIGHT', rig)
         self.assertNotIn('RunService.Heartbeat:Connect', client)
 
 if __name__ == '__main__':

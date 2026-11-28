@@ -35,8 +35,8 @@ class MonsterAgentLifecycleM105(unittest.TestCase):
                          'pending[model] = true', 'pending[model] = nil',
                          'model:GetAttribute("Game1MonsterRuntime")',
                          'model:IsDescendantOf(Workspace)',
-                         'model:WaitForChild("HumanoidRootPart", 5)',
-                         'model:WaitForChild("Humanoid", 5)'):
+                         'local root = navigationRootOf(model)',
+                         'model:FindFirstChildOfClass("Humanoid")'):
             self.assertIn(required, self.lifecycle)
         self.assertLess(self.lifecycle.index('Navigation.Initialize(agent)'),
                         self.lifecycle.index('agents[model] = agent'))

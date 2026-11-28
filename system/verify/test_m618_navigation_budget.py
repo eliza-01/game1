@@ -16,9 +16,11 @@ class NavigationBudgetM618(unittest.TestCase):
     def test_only_native_admission_and_protected_navigation(self):
         paths=[p.relative_to(ROOT).as_posix() for p in (ROOT/'src/server').rglob('*.luau') if ':ComputeAsync(' in p.read_text(encoding='utf-8')]
         self.assertEqual(paths,['src/server/actor/NavigationScheduler.luau'])
+        # M629 adds explicit pose attachment/readiness only; M629 tests guard action timing.
         hashes=json.loads(read('system/verify/ai_protected_m617.json'))
         for path,digest in hashes.items():
-            if path.endswith(('MonsterChaseNavigation.luau','ActorChaseNavigator.luau')): continue
+            if path.endswith(('MonsterChaseNavigation.luau','ActorChaseNavigator.luau','MonsterSpawnerService.luau','MonsterRigBuilder.luau',
+                              'MonsterCombatPresentation.luau','MonsterAttackExecutor.luau','MonsterSkillCast.luau')): continue
             self.assertEqual(hashlib.sha256(read(path).encode()).hexdigest(),digest,path)
         for path in ('monster/MonsterChaseNavigation','actor/ActorChaseNavigator'):
             s=read('src/server/'+path+'.luau')

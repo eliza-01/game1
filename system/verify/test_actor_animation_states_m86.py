@@ -27,7 +27,7 @@ class ActorAnimationStateTests(unittest.TestCase):
         self.assertIn('if not self.active or not self.specialsAllowed or self.activeSpecial then', script)
         ai = (ROOT / "src/server/npc/NpcCombatAIService.luau").read_text(encoding="utf-8")
         home = ai.split('local function returnHome', 1)[1].split('local function attackCanConnect', 1)[0]
-        self.assertLess(home.index('agent.root.CFrame = agent.home'), home.index('agent.presentation.SetReturnActive(false)'))
+        self.assertLess(home.index('agent.root.CFrame = agent.home'), home.index('agent.motion.SetReturnActive(false)'))
 
 
 if __name__ == '__main__':

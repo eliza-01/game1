@@ -28,7 +28,7 @@ class CombatSpatialIndex(unittest.TestCase):
         self.assertEqual(src.count('RunService.Heartbeat:Connect'), 1)
 
     def test_producers_and_native_contract(self):
-        for path in ('character/CharacterRigService', 'monster/MonsterRigBuilder', 'npc/NpcRigFactory'):
+        for path in ('character/CharacterRigService', 'actor/MnpcVisualRig'):
             src = read('src/server/' + path + '.luau')
             self.assertIn('CanQuery = true', src)
             self.assertIn('"RootCollider"', src)

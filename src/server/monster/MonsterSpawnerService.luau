@@ -12,6 +12,7 @@ local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
 
+local MnpcLifecycle = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcEntityLifecycle"))
 local MonsterRigBuilder = require(script.Parent:WaitForChild("MonsterRigBuilder"))
 local MonsterSpawnGeometry = require(script.Parent:WaitForChild("MonsterSpawnGeometry"))
 local MonsterAnimationTrackFactory = require(script.Parent:WaitForChild("MonsterAnimationTrackFactory"))
@@ -164,39 +165,33 @@ local function spawnOne(state: any): Model?
         return nil
     end
 
-    local model = template:Clone()
-    if record.testOwner then state.testConstructing = model end
     local instanceId = tostring(record.spawnId or "spawn") .. "-" .. tostring(math.floor(os.clock() * 1000)) .. "-" .. tostring(spawnRandom:NextInteger(1000, 9999))
-    model.Name = slug .. "_" .. instanceId:sub(-4)
-    -- The GP inspection mode must show all portraits within the 384-stud zone,
-    -- even if the normal streaming target radius is shorter. Only the test
-    -- owner receives persistent release-map proxies; production streaming stays intact.
-    local persistentOwner = if RunService:IsStudio() and Workspace.StreamingEnabled
-        and record.testOwner and record.testZone and record.testZone <= 6
-        then Players:GetPlayerByUserId(record.testOwner) else nil
-    if persistentOwner then model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer end
-    model.Parent = ensureMonstersFolder()
-    if persistentOwner then model:AddPersistentPlayer(persistentOwner) end
-    local visual, visualRoot = MonsterRigBuilder.PrepareVisual(model)
-    if not visualRoot then
+    local surface = if record.testOwner then record.testSurface else spawnGeometry:RandomSpawnPoint(record)
+    local yaw = if record.testOwner then math.rad(record.testYaw) else spawnRandom:NextNumber(0, math.pi * 2)
+    local model, navigationRoot, humanoid = MnpcLifecycle.Create(slug .. "_" .. instanceId:sub(-4), surface, yaw, "Monster")
+    MnpcLifecycle.CopyTemplateMetadata(model, template)
+    if record.testOwner then state.testConstructing = model end
+    MonsterInitialAttributes.Apply(model, definition, record, instanceId)
+    local visual = MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster")
+    if not visual then
         model:Destroy()
-        warn("[game1][monster-spawn] monster contains no usable BasePart: " .. slug)
+        warn("[game1][monster-spawn] monster contains no usable visual rig: " .. slug)
         return nil
     end
     local animationRootBridgeCount = MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)
     model:SetAttribute("RuntimeAnimationRootBridgeCount", animationRootBridgeCount)
-    local surface = if record.testOwner then record.testSurface else spawnGeometry:RandomSpawnPoint(record)
-    local yaw = if record.testOwner then math.rad(record.testYaw) else spawnRandom:NextNumber(0, math.pi * 2)
-    MonsterRigBuilder.GroundAlign(model, surface, yaw)
-    MonsterInitialAttributes.Apply(model, definition, record, instanceId)
-    local navigationRoot, humanoid = MonsterRigBuilder.CreateNavigationRig(model, visual, visualRoot, surface, yaw)
-    if not navigationRoot or not humanoid then
-        model:Destroy()
-        warn("[game1][monster-spawn] monster navigation rig could not be created: " .. slug)
-        return nil
-    end
-    -- Preserve the ground-level home before the underground reveal moves the rig.
+    -- The GP inspection mode keeps its existing per-player persistent proxy.
+    local persistentOwner = if RunService:IsStudio() and Workspace.StreamingEnabled
+        and record.testOwner and record.testZone and record.testZone <= 6
+        then Players:GetPlayerByUserId(record.testOwner) else nil
+    if persistentOwner then model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer end
+    -- The existing production combat/animation path still requires FULL.
+    -- Do not expose a damageable actor before the spawn/pose binding is ready.
+    model:SetAttribute("Damageable", false)
+    model:SetAttribute("MonsterSpawning", true)
     model:SetAttribute("MonsterHomePosition", navigationRoot.Position)
+    MnpcLifecycle.Publish(model, navigationRoot, ensureMonstersFolder())
+    if persistentOwner then model:AddPersistentPlayer(persistentOwner) end
     if record.testOwner then
         local row = assert(Balance.Monster(record.testBalanceId))
         local color = Balance.Grade.Color(row.level)
@@ -304,6 +299,7 @@ local function spawnOne(state: any): Model?
             releaseInstance(state, model, false, true)
         end
     end)
+    MnpcLifecycle.MarkRigReady(model)
     return model
 end
 

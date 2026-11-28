@@ -34,7 +34,7 @@ class ActorAISchedulerM615(unittest.TestCase):
     def test_npc_decision_parity(self):
         ai = read('src/server/npc/NpcCombatAIService.luau')
         body = ai.split('local function tickAgent', 1)[1].split('function NpcCombatAIService.Bind', 1)[0]
-        self.assertEqual(digest(body), 'a2af89fd9e79b3aab0f61d8e3c3e0b9124849e0ce0e398e59d424ad38e2cdc5e')
+        self.assertEqual(digest(body.replace("agent.motion.Set", "agent.presentation.Set")), 'a2af89fd9e79b3aab0f61d8e3c3e0b9124849e0ce0e398e59d424ad38e2cdc5e')
         self.assertIn('Scheduler.Register(agent, TICK_SECONDS, delay, tickAgent, nil, true, if Activity.Enabled then Activity.NpcDelay else nil)', ai)
         self.assertIn('Scheduler.Remove(agent)', ai)
         self.assertEqual(ai.count('RunService.Heartbeat:Connect'), 1)

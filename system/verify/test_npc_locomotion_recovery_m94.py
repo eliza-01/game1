@@ -44,9 +44,9 @@ class NpcMovementM94Tests(unittest.TestCase):
         ai = (NPC / 'NpcCombatAIService.luau').read_text()
         recover = ai.split('local function beginRecovery(', 1)[1].split('local function startReturn(', 1)[0]
         self.assertLess(recover.index('stopAttack(agent)'), recover.index('agent.target = nil'))
-        self.assertIn('agent.presentation.SetCombatActive(true)', recover)
+        self.assertIn('agent.motion.SetCombatActive(true)', recover)
         self.assertIn('CombatStateService.Activate(agent.model)', recover)
-        self.assertIn('agent.presentation.SetCombatMoving(false)', recover)
+        self.assertIn('agent.motion.SetCombatMoving(false)', recover)
         self.assertIn('setState(agent, "Recover")', recover)
         self.assertIn('pinAtRest(agent, true)', recover)
         self.assertNotIn('CombatStateService.Clear', recover)

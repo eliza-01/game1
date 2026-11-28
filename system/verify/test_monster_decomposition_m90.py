@@ -27,27 +27,29 @@ class MonsterModuleBoundaryTests(unittest.TestCase):
     def test_rig_build_order_and_identity_policy(self):
         spawner, rig = read("MonsterSpawnerService"), read("MonsterRigBuilder")
         ordered = [
-            'MonsterRigBuilder.PrepareVisual(model)',
-            'MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)',
             'spawnGeometry:RandomSpawnPoint(record)',
-            'MonsterRigBuilder.GroundAlign(model, surface, yaw)',
+            'MnpcLifecycle.Create(',
             'MonsterInitialAttributes.Apply(model, definition, record, instanceId)',
-            'MonsterRigBuilder.CreateNavigationRig(model, visual, visualRoot, surface, yaw)',
+            'MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster")',
+            'MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)',
+            'MnpcLifecycle.Publish(model, navigationRoot, ensureMonstersFolder())',
             'EntityHitboxService.Attach(model, visual)',
             'MonsterAnimationTrackFactory.Load(',
+            'MnpcLifecycle.MarkRigReady(model)',
         ]
         self.assertEqual(sorted(map(spawner.index, ordered)), list(map(spawner.index, ordered)))
         for required in (
             'animationRoot.Name = "RootBone"',
             'animationRoot.CFrame = CFrame.identity',
             'bone.CFrame = animationRoot.CFrame:Inverse() * authoredMeshLocal',
-            'ActorCollisionPolicy.Assign(navigationRoot, "Monster")',
-            'root.Name = "RootCollider"',
-            'visualWeld.Part1 = visualRoot',
-            'humanoid.HipHeight = NAVIGATION_HIP_HEIGHT',
-            'navigationRoot:SetNetworkOwner(nil)',
         ):
             self.assertIn(required, rig)
+        shell = (ROOT / 'src/server/actor/MnpcNavigationShell.luau').read_text()
+        attachment = (ROOT / 'src/server/actor/MnpcVisualRig.luau').read_text()
+        for required in ('ActorCollisionPolicy.Assign(root, kind)', 'humanoid.HipHeight = HIP_HEIGHT', 'root:SetNetworkOwner(nil)'):
+            self.assertIn(required, shell)
+        for required in ('collider.Name = "RootCollider"', 'visualWeld.Part1 = visualRoot'):
+            self.assertIn(required, attachment)
 
     def test_geometry_maintains_shared_rng_and_raycast_contract(self):
         spawner, geometry = read("MonsterSpawnerService"), read("MonsterSpawnGeometry")

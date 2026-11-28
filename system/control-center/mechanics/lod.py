@@ -20,9 +20,10 @@ ITEMS = [
              'DEV debug dock → LOD diagnostics → Start capture / Stop capture. По умолчанию выключена; один существующий Heartbeat, без remotes. Heartbeat/callback elapsed, queue/desired latency, cache/async/work counters, peaks, client memory; не CPU всего клиента.',
              'Отчёт локальный, читается на PC и телефоне; JSON в client Output. Studio Preview teardown освобождает connections и возвращает FULL, сборка preview остаётся синхронной.',
          ]},
-         {'title': 'MNPC · M627 пилот (production не реализовано)', 'lines': [
-             'FULL / LOD1 / UNLOADED; один статический mesh на визуальный вариант, без клиентского visual Animator/скелета и sampler начиная с LOD1; движение/поворот сохраняются. Сначала доказать отделение authoritative Bone pose от клиентского rig. AI и боевой hitbox не зависят от наблюдателя. См. ТЗ MNPC.',
-             'M627: Studio-only probe сравнивает skinned reference и plain Bone carrier, private native evaluation и наблюдение replicated Animator. Engine gate NOT_RUN; production не меняется. См. M627 pose pilot.',
+         {'title': 'MNPC · M628 entity-first (M629 шаг 2)', 'lines': [
+             'FULL / LOD1 / UNLOADED; один статический mesh на визуальный вариант, без клиентского visual Animator/скелета и sampler начиная с LOD1; движение/поворот сохраняются. Одна shared entity/root/navigation/lifecycle система для Monster и NPC с M628, доменные адаптеры поведения; оба entrypoint обязательны для завершения этапа. Сначала entity/root/navigation/AI без visual dependency, затем server pose по общей потребности, затем индивидуальный клиентский LOD. Текущие OBB и боевая логика сохраняются. См. ТЗ MNPC.',
+             'M628: общий MnpcEntityLifecycle / MnpcNavigationShell / MnpcVisualRig используется обоими production спавнерами. Сначала shell, затем template clone/rig attach; NpcRigFactory удалён. M629: оба AI регистрируются без готового native pose, общий MnpcPoseBinding и NPC motion intent; Game1MnpcRigReady инициирует Monster native binding, боевые действия требуют готовности. Production всё ещё FULL; shell-only spawn/movement, detach/rebind, demand pose и клиентский MNPC LOD открыты; Studio NOT_RUN.',
+             'M627: Studio-only probe сравнивает skinned reference и plain Bone carrier, private native evaluation и наблюдение replicated Animator. Результаты владельца: plain carrier совпал на проверенных фазах; private pose остановилась; NONE client имеет активные tracks. Native isolation двух клиентов ещё не доказана; M627 не менял production. См. ТЗ MNPC и M627 pose pilot.',
              'Socket & Door Optimization отложена до новой системы взаимодействий с выбором этажа. Нагрузочная приёмка и incremental Studio Preview отложены владельцем.',
          ]},
          {'title': 'Недостающее / проверить', 'lines': [
@@ -32,5 +33,5 @@ ITEMS = [
      ], 'sources': ['location-streamer', 'static-placement-index', 'location-lod-candidates',
                     'lod-threshold-cache', 'lod-transition-queue', 'lod-load-priority', 'lod-prototype-cache',
                     'location-lod-assembly', 'lod-assembly-job', 'lod-runtime-work', 'location-lod-policy', 'house-visual-adapter',
-                    'house-mesh-requests', 'location-composite-visual', 'location-composite-effects', 'runtime-lod-spec', 'lod-diagnostics', 'lod-debug-controller', 'lod-acceptance', 'mnpc-lod-spec', 'mnpc-pose-pilot']},
+                    'house-mesh-requests', 'location-composite-visual', 'location-composite-effects', 'runtime-lod-spec', 'lod-diagnostics', 'lod-debug-controller', 'lod-acceptance', 'mnpc-lod-spec', 'mnpc-pose-pilot', 'mnpc-entity-foundation', 'mnpc-ai-pose-binding', 'mnpc-pose-binding', 'npc-motion-intent']},
 ]

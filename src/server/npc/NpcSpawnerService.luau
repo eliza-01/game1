@@ -11,7 +11,7 @@ local NpcSpawnRegistry = require(script.Parent:WaitForChild("NpcSpawnRegistry"))
 local CombatRoot = script.Parent.Parent:WaitForChild("combat")
 local EntityHitboxService = require(CombatRoot:WaitForChild("EntityHitboxService"))
 local DeathLifecycleService = require(CombatRoot:WaitForChild("DeathLifecycleService"))
-local NpcRigFactory = require(script.Parent:WaitForChild("NpcRigFactory"))
+local MnpcLifecycle = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcEntityLifecycle"))
 local NpcAnimationRigBinding = require(script.Parent:WaitForChild("NpcAnimationRigBinding"))
 local NpcAnimationService = require(script.Parent:WaitForChild("NpcAnimationService"))
 local NpcEquipmentService = require(script.Parent:WaitForChild("NpcEquipmentService"))
@@ -98,15 +98,18 @@ local function spawnOne(state: any): boolean
         warn("[game1][npc] NPC template is not synced to ServerStorage: " .. slug)
         return false
     end
-    local entity = template:Clone()
-    entity.Name = slug .. "_" .. tostring(random:NextInteger(100000, 999999))
-    entity.Parent = folder()
-    local visual, root = NpcRigFactory.Create(entity, spawnPosition(record), finite(record.yawDegrees, 0))
-    if not visual or not root then
+    local surface = spawnPosition(record)
+    local yaw = math.rad(finite(record.yawDegrees, 0))
+    local entity, root = MnpcLifecycle.Create(slug .. "_" .. tostring(random:NextInteger(100000, 999999)), surface, yaw, "NPC")
+    MnpcLifecycle.CopyTemplateMetadata(entity, template)
+    local visual = MnpcLifecycle.AttachRig(entity, root, template, surface, yaw, "NPC")
+    if not visual then
         entity:Destroy()
         warn("[game1][npc] published model has no usable visual rig: " .. slug)
         return false
     end
+    entity:SetAttribute("Damageable", false)
+    MnpcLifecycle.Publish(entity, root, folder())
     local stats = definition.stats or {}
     local hp = math.max(1, finite(stats.MaxHP, 100))
     entity:SetAttribute("Game1NpcRuntime", true)
@@ -116,7 +119,6 @@ local function spawnOne(state: any): boolean
     NpcAnimationRigBinding.Align(visual, slug, profile, weaponSet)
     entity:SetAttribute("SpawnId", tostring(record.spawnId or ""))
     entity:SetAttribute("NpcHomeRadiusStuds", math.clamp(finite(record.homeRadiusStuds, 16), 1, 10000))
-    entity:SetAttribute("Damageable", true)
     entity:SetAttribute("LifeState", "Alive")
     entity:SetAttribute("InCombat", false)
     entity:SetAttribute("CombatState", "Peace")
@@ -130,10 +132,9 @@ local function spawnOne(state: any): boolean
     entity:SetAttribute("RunSpeed", math.max(0, finite(stats.RunSpeed, 50)))
     local hitbox = EntityHitboxService.Attach(entity, visual)
     entity:SetAttribute("CombatHitboxCount", hitbox.count)
-    local presentation = NpcAnimationService.Create(entity, visual, profile)
-    local entry = { root = root, visual = visual, presentation = presentation, dying = false }
+    local entry = { root = root, visual = visual, presentation = nil, dying = false }
     state.instances[entity] = entry
-    NpcCombatAIService.Bind(entity, root, presentation, function()
+    local poseTicket = NpcCombatAIService.Bind(entity, root, function()
         -- Do not use the death/respawn delay for a leash violation. Release
         -- every rig/hitbox/animation resource and refill the one occupied slot.
         if state.instances[entity] ~= entry then return end
@@ -150,7 +151,11 @@ local function spawnOne(state: any): boolean
             entry.dying = true
             entity:SetAttribute("Damageable", false)
             NpcCombatAIService.Unbind(entity)
-            presentation.BeginDeath()
+            if entry.presentation then
+                entry.presentation.BeginDeath()
+            else
+                release(state, entity, true)
+            end
         end
     end)
     entity.Destroying:Connect(function()
@@ -159,6 +164,24 @@ local function spawnOne(state: any): boolean
             release(state, entity, true)
         end
     end)
+    if not poseTicket then
+        release(state, entity, false)
+        return false
+    end
+    local ok, presentation = pcall(NpcAnimationService.Create, entity, visual, profile)
+    if not ok then
+        warn("[game1][npc] pose preparation failed: " .. tostring(presentation))
+        release(state, entity, false)
+        return false
+    end
+    if state.instances[entity] ~= entry or not NpcCombatAIService.AttachPresentation(entity, poseTicket, presentation) then
+        presentation.Destroy()
+        release(state, entity, false)
+        return false
+    end
+    entry.presentation = presentation
+    MnpcLifecycle.MarkRigReady(entity)
+    entity:SetAttribute("Damageable", true)
     return true
 end
 
@@ -185,7 +208,7 @@ function NpcSpawnerService.Start()
     RunService.PreAnimation:Connect(function(delta)
         for _, state in pairs(states) do
             for entity, entry in pairs(state.instances) do
-                if entry.presentation.Step(delta) and entry.dying then
+                if entry.presentation and entry.presentation.Step(delta) and entry.dying then
                     entity:SetAttribute("NpcAnimationState", "death_idle")
                     DeathLifecycleService.BeginDeathIdle(entity, entry.root, entry.visual, function()
                         release(state, entity, true)

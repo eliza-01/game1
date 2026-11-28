@@ -82,10 +82,11 @@ class M69Tests(unittest.TestCase):
         policy=source('src/server/actor/ActorCollisionPolicy.luau')
         self.assertIn('CollisionGroupSetCollidable(NON_PLAYER_GROUP, NON_PLAYER_GROUP, false)', policy)
         self.assertIn('root.CanCollide = true', policy)
-        for path,root,kind in [('src/server/character/CharacterRigService.luau','navigationRoot','Character'),
-                               ('src/server/monster/MonsterRigBuilder.luau','navigationRoot','Monster'),
-                               ('src/server/npc/NpcRigFactory.luau','root','NPC')]:
-            self.assertIn(f'ActorCollisionPolicy.Assign({root}, "{kind}")',source(path))
+        self.assertIn('ActorCollisionPolicy.Assign(navigationRoot, "Character")',source('src/server/character/CharacterRigService.luau'))
+        self.assertIn('ActorCollisionPolicy.Assign(root, kind)',source('src/server/actor/MnpcNavigationShell.luau'))
+        for path,kind in [('src/server/monster/MonsterSpawnerService.luau','Monster'),
+                          ('src/server/npc/NpcSpawnerService.luau','NPC')]:
+            self.assertIn(f'surface, yaw, "{kind}")',source(path))
         self.assertIn('pinAtRest(agent, true)',source('src/server/npc/NpcCombatAIService.luau'))
 
     def test_type_weight_fields_and_dump_binary_metadata(self):

@@ -1,6 +1,7 @@
 -- Owns Monster AI agent discovery, initialization, per-model signals and teardown.
 -- Attack decisions, target policy, chase, and authored attack pursuit stay outside.
 local Workspace = game:GetService("Workspace")
+local PoseBinding = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcPoseBinding"))
 local Scheduler = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAIScheduler"))
 local Activity = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorActivityPolicy"))
 local Facing = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorFacingTracker"))
@@ -39,6 +40,8 @@ local function releaseAgent(agent: any)
     Facing.Stop(model)
     Navigation.ClearPath(agent)
     Presentation.Stop(agent)
+    agent.poseBinding:Close()
+    Presentation.ReleaseBinding(agent)
 end
 
 local function stopOnDeath(agent: any)
@@ -54,6 +57,8 @@ local function stopOnDeath(agent: any)
     AttackExecutor.ClearPursuit(agent)
     Navigation.StopNavigation(agent)
     Presentation.Stop(agent)
+    agent.poseBinding:Close()
+    -- Preserve the existing death fade; final actor release destroys AI tracks.
     model:SetAttribute("MonsterCombatActive", false)
 end
 
@@ -62,17 +67,13 @@ local function registerModel(model: Model, random: Random, stepAgent: (any) -> (
     pending[model] = true
     task.spawn(function()
         local ok, err = xpcall(function()
-            local deadline = os.clock() + 5
-            while model.Parent and model:GetAttribute("Game1MonsterRuntime") ~= true and os.clock() < deadline do
-                task.wait(0.03)
-            end
-            if not model:IsDescendantOf(Workspace) or model:GetAttribute("Game1MonsterRuntime") ~= true or agents[model] then
+            if not model:IsDescendantOf(Workspace) or model:GetAttribute("Game1MonsterRuntime") ~= true
+                or model:GetAttribute("Game1MnpcKind") ~= "Monster" or agents[model] then
                 return
             end
-            local root = navigationRootOf(model) or model:WaitForChild("HumanoidRootPart", 5)
-            local humanoid = model:FindFirstChildOfClass("Humanoid") or model:WaitForChild("Humanoid", 5)
-            local animator = Presentation.AnimatorOf(model)
-            if not root or not root:IsA("BasePart") or not humanoid or not humanoid:IsA("Humanoid") or not animator or not model:IsDescendantOf(Workspace) then
+            local root = navigationRootOf(model)
+            local humanoid = model:FindFirstChildOfClass("Humanoid")
+            if not root or not root:IsA("BasePart") or not humanoid or not humanoid:IsA("Humanoid") or not model:IsDescendantOf(Workspace) then
                 return
             end
             local slug = string.lower(tostring(model:GetAttribute("MonsterSlug") or ""))
@@ -91,10 +92,8 @@ local function registerModel(model: Model, random: Random, stepAgent: (any) -> (
                 lastDamageAt = 0,
                 returning = false,
                 humanoid = humanoid,
-                animator = animator,
+                poseBinding = PoseBinding.new(),
                 attackRows = attackRows,
-                runTrack = runRow and Presentation.LoadTrack(animator, runRow, true) or nil,
-                combatIdleTrack = combatIdleRow and Presentation.LoadTrack(animator, combatIdleRow, true) or nil,
                 attackTrack = nil,
                 target = nil,
                 retaliating = false,
@@ -110,10 +109,49 @@ local function registerModel(model: Model, random: Random, stepAgent: (any) -> (
             }
             Navigation.Initialize(agent)
             agents[model] = agent
-            Presentation.Initialize(agent, runRow, random, AttackExecutor.PursuitSpeedMultiplier)
             model:SetAttribute("MonsterAttackPursuitActive", false)
             model:SetAttribute("MonsterAIState", "Idle")
+            -- Native track creation may yield. The AI/navigation owner is already
+            -- registered independently; only pose-dependent actions wait for it.
+            local function ready()
+                if not agent.active or model:GetAttribute("LifeState") ~= "Alive" or model:GetAttribute("Game1MnpcRigReady") ~= true then return end
+                local ticket = agent.poseBinding:Begin()
+                if not ticket then return end
+                task.spawn(function()
+                    local animator = Presentation.AnimatorOf(model)
+                    if not animator then
+                        agent.poseBinding:Abort(ticket)
+                        warn("[game1][monster-ai] rig ready without Animator: " .. model.Name)
+                        return
+                    end
+                    local ok, tracks = pcall(Presentation.PrepareBinding, animator, runRow, combatIdleRow)
+                    if not ok then
+                        agent.poseBinding:Abort(ticket)
+                        warn("[game1][monster-ai] pose preparation failed: " .. tostring(tracks))
+                        return
+                    end
+                    if not agent.active or not model:IsDescendantOf(Workspace) or model:GetAttribute("LifeState") ~= "Alive"
+                        or model:GetAttribute("Game1MnpcRigReady") ~= true or not animator:IsDescendantOf(model) then
+                        agent.poseBinding:Abort(ticket)
+                        Presentation.DestroyBinding(tracks)
+                        return
+                    end
+                    if not agent.poseBinding:Commit(ticket, tracks) then
+                        Presentation.DestroyBinding(tracks)
+                        return
+                    end
+                    Presentation.ApplyBinding(agent, tracks)
+                    Presentation.Initialize(agent, runRow, random, AttackExecutor.PursuitSpeedMultiplier)
+                    if agent.state == "Chase" or agent.state == "Return" then
+                        Presentation.PlayRun(agent, Navigation.PresentationMultiplier(agent))
+                    elseif agent.target then
+                        Presentation.PlayCombatIdle(agent)
+                    end
+                    Scheduler.Wake(agent)
+                end)
+            end
             agent.lifecycleConnections = {
+                model:GetAttributeChangedSignal("Game1MnpcRigReady"):Connect(ready),
                 model:GetAttributeChangedSignal("LifeState"):Connect(function()
                     stopOnDeath(agent)
                 end),
@@ -134,6 +172,7 @@ local function registerModel(model: Model, random: Random, stepAgent: (any) -> (
                 end
             end
             Scheduler.Register(agent, thinkInterval, thinkInterval + random:NextNumber(0, thinkInterval), stepAgent, releaseAgent, nil, if Activity.Enabled then Activity.MonsterDelay else nil)
+            ready()
         end, debug.traceback)
         pending[model] = nil
         if not ok then

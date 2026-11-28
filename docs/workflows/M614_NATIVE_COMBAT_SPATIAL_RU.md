@@ -9,3 +9,5 @@ Box — исходный OBB, Arc — куб радиуса reach, Ray — ор�
 Существующий broadRadius и его ограничения не меняются. Большой актор расширяет общий запрос, а частая смена состава требует пересборки фильтра; реальный выигрыш не измерен. Индекс записей без физических частей (например LOD) и AI/сокеты ещё не реализованы. Rojo включает src/shared/world в Runtime штатно.
 
 Проверка: Lua mock выполняет production module, 300 сравнений с эталоном прежних sphere/box/ray условий (дедуп, вертикаль, большая цель, телепорт, detach/destroy, независимые экземпляры). Это не эмуляция физики Roblox. В Studio и published DEV требуется проверить многоцелевые melee, bow/headshot вне melee reach в пределах действующего лимита, заслоны, движущихся/телепортированных акторов, большие цели, respawn/death и Runtime script freshness. Сравнение CPU/количества кандидатов при 50/100/200 сущностях остаётся открытым. Откат — reverse patch до публикации нового Runtime; миграций данных нет.
+
+M628 note: RootCollider creation for Monster/NPC moved to the shared `actor/MnpcVisualRig` attachment; existing M614 query/index contract unchanged. `CharacterRigService` unchanged.

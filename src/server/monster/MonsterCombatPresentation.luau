@@ -84,6 +84,40 @@ function MonsterCombatPresentation.Stop(agent: any)
     agent.attackTrack = nil
 end
 
+-- Combat AI tracks are distinct from the spawner's idle/death owner.
+function MonsterCombatPresentation.PrepareBinding(animator: Animator, runRow: any?, idleRow: any?): any
+    local binding = {animator = animator}
+    local ok, err = pcall(function()
+        binding.runTrack = runRow and MonsterCombatPresentation.LoadTrack(animator, runRow, true) or nil
+        binding.combatIdleTrack = idleRow and MonsterCombatPresentation.LoadTrack(animator, idleRow, true) or nil
+    end)
+    if not ok then
+        MonsterCombatPresentation.DestroyBinding(binding)
+        error(err, 0)
+    end
+    return binding
+end
+
+function MonsterCombatPresentation.DestroyBinding(binding: any)
+    for _, name in ipairs({"runTrack", "combatIdleTrack"}) do
+        local track = binding[name]
+        if track then pcall(function() track:Destroy() end) end
+    end
+end
+
+function MonsterCombatPresentation.ApplyBinding(agent: any, binding: any)
+    agent.animator = binding.animator
+    agent.runTrack = binding.runTrack
+    agent.combatIdleTrack = binding.combatIdleTrack
+end
+
+function MonsterCombatPresentation.ReleaseBinding(agent: any)
+    MonsterCombatPresentation.DestroyBinding(agent)
+    agent.animator = nil
+    agent.runTrack = nil
+    agent.combatIdleTrack = nil
+end
+
 function MonsterCombatPresentation.PlayCombatIdle(agent: any)
     if agent.attacking or not agent.active then return end
     stopTrack(agent.runTrack)

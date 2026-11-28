@@ -22,6 +22,8 @@ local Activity = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild
 local Scheduler = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorAIScheduler"))
 local Navigator = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorChaseNavigator"))
 local Queries = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("ActorCombatTargeting"))
+local PoseBinding = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcPoseBinding"))
+local MotionIntent = require(script.Parent:WaitForChild("NpcMotionIntent"))
 local Tracks = require(script.Parent:WaitForChild("NpcAnimationTracks"))
 local NpcCombatRecovery = require(script.Parent:WaitForChild("NpcCombatRecovery"))
 local WeaponAttackMovement = require(Shared:WaitForChild("weapon"):WaitForChild("WeaponAttackMovement"))
@@ -87,9 +89,9 @@ end
 local function clearTarget(agent: any)
     stopAttack(agent)
     agent.navigator:Stop()
-    agent.presentation.SetCombatMoving(false)
-    agent.presentation.SetReturnMoving(false)
-    agent.presentation.SetCombatActive(false)
+    agent.motion.SetCombatMoving(false)
+    agent.motion.SetReturnMoving(false)
+    agent.motion.SetCombatActive(false)
     agent.target = nil
     HostilePursuitRegistry.Clear(agent.model)
     agent.model:SetAttribute("NpcTargetUserId", 0)
@@ -104,10 +106,10 @@ local function beginRecovery(agent: any)
     agent.target = nil
     HostilePursuitRegistry.Clear(agent.model)
     agent.model:SetAttribute("NpcTargetUserId", 0)
-    agent.presentation.SetCombatMoving(false)
-    agent.presentation.SetReturnMoving(false)
-    agent.presentation.SetReturnActive(false)
-    agent.presentation.SetCombatActive(true)
+    agent.motion.SetCombatMoving(false)
+    agent.motion.SetReturnMoving(false)
+    agent.motion.SetReturnActive(false)
+    agent.motion.SetCombatActive(true)
     if agent.model.Parent then CombatStateService.Activate(agent.model) end
     agent.returnAt = agent.recovery:Begin(agent.targetKilledAt or os.clock())
     agent.targetKilledAt = nil
@@ -124,7 +126,7 @@ local function startReturn(agent: any, targetKilled: boolean)
     agent.recovery:Cancel()
     -- Mark the return lifecycle BEFORE clearing combat so idle_special stays
     -- suppressed until the authored home pose has been restored.
-    agent.presentation.SetReturnActive(true)
+    agent.motion.SetReturnActive(true)
     clearTarget(agent)
     agent.returnAt = 0
     agent.model:SetAttribute("NpcReturnAt", 0)
@@ -145,14 +147,14 @@ local function enterCombat(agent: any, target: Model)
     agent.model:SetAttribute("NpcTargetUserId", if player then player.UserId else 0)
     setState(agent, "Chase")
     CombatStateService.Activate(agent.model)
-    agent.presentation.SetCombatActive(true)
-    agent.presentation.SetReturnActive(false)
+    agent.motion.SetCombatActive(true)
+    agent.motion.SetReturnActive(false)
 end
 
 local function returnHome(agent: any, now: number)
     if now < agent.returnAt then
         setState(agent, "ReturnWait")
-        agent.presentation.SetReturnMoving(false)
+        agent.motion.SetReturnMoving(false)
         pinAtRest(agent, true)
         return
     end
@@ -161,15 +163,15 @@ local function returnHome(agent: any, now: number)
         agent.navigator:Stop()
         -- Snap only at navigation tolerance, restoring the exact authored yaw.
         agent.root.CFrame = agent.home
-        agent.presentation.SetReturnMoving(false)
+        agent.motion.SetReturnMoving(false)
         setState(agent, "Idle")
         pinAtRest(agent, true)
-        agent.presentation.SetReturnActive(false)
+        agent.motion.SetReturnActive(false)
         return
     end
     pinAtRest(agent, false)
     setState(agent, "Return")
-    agent.presentation.SetReturnMoving(true)
+    agent.motion.SetReturnMoving(true)
     local speed = NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Peace")
     agent.navigator:Chase(agent.home.Position, speed)
 end
@@ -223,12 +225,13 @@ end
 
 local function chaseTarget(agent: any, targetRoot: BasePart)
     setState(agent, "Chase")
-    agent.presentation.SetCombatMoving(true)
+    agent.motion.SetCombatMoving(true)
     local speed = NpcMovementPolicy.SpeedFor(agent.model:GetAttribute("RunSpeed"), "Combat")
     agent.navigator:Chase(targetRoot.Position, speed)
 end
 
 local function beginAttack(agent: any, target: Model, continuing: boolean?)
+    if not agent.poseBinding:IsReady() then return end
     if agent.attacking or (not continuing and os.clock() < agent.nextAttackAt) then return end
     local row
     if continuing then
@@ -252,7 +255,7 @@ local function beginAttack(agent: any, target: Model, continuing: boolean?)
     local beganAt = os.clock()
     if not continuing then
         agent.navigator:Stop()
-        agent.presentation.SetCombatMoving(false)
+        agent.motion.SetCombatMoving(false)
         setState(agent, "Attack")
         agent.model:SetAttribute("NpcAttackClipId", if row then tostring(row.clipId or "") else "")
     end
@@ -390,7 +393,7 @@ local function tickAgent(agent: any, now: number)
     if not targetRoot then startReturn(agent, true); return end
     if attackReady(agent, target) then
         agent.navigator:Stop()
-        agent.presentation.SetCombatMoving(false)
+        agent.motion.SetCombatMoving(false)
         setState(agent, "AttackReady")
         beginAttack(agent, target)
     else
@@ -417,11 +420,11 @@ local function onDamage(attacker: Model?, target: Model, attempted: number, appl
     end
 end
 
-function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any, resetAtHome: () -> ())
+function NpcCombatAIService.Bind(model: Model, root: BasePart, resetAtHome: () -> ()): any?
     local existing = agents[model]
-    if existing then return end
+    if existing then return nil end
     local humanoid = model:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+    if not humanoid then return nil end
     local definition = (NpcRegistry.npcs or {})[tostring(model:GetAttribute("NpcSlug") or "")]
     local behavior = definition and definition.behavior or {}
     local retaliate = behavior.retaliateWhenAttacked == true
@@ -431,8 +434,10 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
     local weaponSet = tostring(model:GetAttribute("NpcWeaponSet") or "unarmed")
     local policy = WeaponAttackMovement.Resolve(model:GetAttribute("NpcWeaponType"))
     local home = root.CFrame
+    local poseBinding = PoseBinding.new()
     local agent = {
-        model = model, root = root, humanoid = humanoid, presentation = presentation,
+        model = model, root = root, humanoid = humanoid, poseBinding = poseBinding,
+        motion = MotionIntent.new(poseBinding),
         navigator = Navigator.new(root, humanoid), pursuit = AttackPursuit.new(root, humanoid),
         policy = policy, target = nil, state = "Idle",
         retaliate = retaliate, homeRadius = homeRadius, attackRadius = attackRadius,
@@ -477,12 +482,33 @@ function NpcCombatAIService.Bind(model: Model, root: BasePart, presentation: any
         }
     end
     Scheduler.Register(agent, TICK_SECONDS, delay, tickAgent, nil, true, if Activity.Enabled then Activity.NpcDelay else nil)
+    return poseBinding:Begin()
+end
+
+-- The spawner owns presentation/death disposal. AI only borrows a real
+-- presentation while registered and may reject a late result after unbind.
+function NpcCombatAIService.AttachPresentation(model: Model, ticket: any, presentation: any): boolean
+    local agent = agents[model]
+    if not agent or not agent.active or not model.Parent or model:GetAttribute("LifeState") ~= "Alive" then return false end
+    if not agent.poseBinding:Commit(ticket, presentation) then return false end
+    agent.presentation = presentation
+    local ok, err = pcall(agent.motion.Replay)
+    if not ok then
+        agent.poseBinding:Release()
+        agent.presentation = nil
+        warn("[game1][npc] pose intent replay failed: " .. tostring(err))
+        return false
+    end
+    Scheduler.Wake(agent)
+    return true
 end
 
 function NpcCombatAIService.Unbind(model: Model)
     local agent = agents[model]
     if not agent then return end
     agent.active = false
+    agent.poseBinding:Close()
+    agent.presentation = nil
     Scheduler.Remove(agent)
     for _, connection in ipairs(agent.activityConnections or {}) do connection:Disconnect() end
     agent.activityConnections = nil

@@ -108,12 +108,12 @@ class MonsterPopulationM93Tests(unittest.TestCase):
         self.assertIn('spawnGeometry:RandomSpawnPoint(record)', spawner)
         self.assertIn('spawnRandom:NextNumber(0, math.pi * 2)', spawner)
         ordered = (
-            'MonsterRigBuilder.PrepareVisual(model)',
-            'MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)',
             'spawnGeometry:RandomSpawnPoint(record)',
-            'MonsterRigBuilder.GroundAlign(model, surface, yaw)',
+            'MnpcLifecycle.Create(',
             'MonsterInitialAttributes.Apply(model, definition, record, instanceId)',
-            'MonsterRigBuilder.CreateNavigationRig(model, visual, visualRoot, surface, yaw)',
+            'MnpcLifecycle.AttachRig(model, navigationRoot, template, surface, yaw, "Monster")',
+            'MonsterRigBuilder.EnsureRuntimeAnimationRoot(visual)',
+            'MnpcLifecycle.Publish(model, navigationRoot, ensureMonstersFolder())',
             'EntityHitboxService.Attach(model, visual)',
             'MonsterAnimationTrackFactory.Load(',
             'population:RegisterInstance(state, model, entry)',

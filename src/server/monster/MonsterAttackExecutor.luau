@@ -91,6 +91,7 @@ local function maintainAttackPursuit(agent: any, target: Model, serial: number, 
 end
 
 function MonsterAttackExecutor.Begin(agent: any, target: Model, movement: any, random: Random)
+    if not agent.poseBinding:IsReady() then return end
     if agent.attacking or os.clock() < agent.nextAttackAt then return end
     if Special.TryBegin(agent,target) then return end
     local row = Presentation.WeightedRow(agent.attackRows, random)

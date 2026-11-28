@@ -1,5 +1,5 @@
 -- Studio-only representation of the published NPC while authoring a spawn point.
--- Runtime entities are created exclusively by NpcRigFactory/NpcSpawnerService.
+-- Runtime entities are created exclusively by MnpcEntityLifecycle/NpcSpawnerService.
 local NpcSpawnPreview = {}
 
 local function publishedTemplate(serverStorage: ServerStorage, slug: string): Model?
@@ -14,7 +14,7 @@ local function publishedTemplate(serverStorage: ServerStorage, slug: string): Mo
 end
 
 local function geometryBounds(visual: Model): (CFrame, Vector3)
-    -- Same support-surface convention as NpcRigFactory.visibleBounds.
+    -- Same support-surface convention as MnpcVisualRig.visibleBounds.
     local low = Vector3.new(math.huge, math.huge, math.huge)
     local high = Vector3.new(-math.huge, -math.huge, -math.huge)
     local found = false

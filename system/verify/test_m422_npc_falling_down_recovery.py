@@ -17,7 +17,7 @@ def read(name):
 class NpcFallingDownM422(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.rig = read("src/server/npc/NpcRigFactory.luau")
+        cls.rig = read("src/server/actor/MnpcNavigationShell.luau")
         cls.ai = read("src/server/npc/NpcCombatAIService.luau")
 
     def test_no_knockdown_for_npc_navigation_body(self):
@@ -26,8 +26,10 @@ class NpcFallingDownM422(unittest.TestCase):
                 f"humanoid:SetStateEnabled(Enum.HumanoidStateType.{state}, false)",
                 self.rig,
             )
-        self.assertIn("humanoid.HipHeight = 1.8", self.rig)
-        self.assertIn('ActorCollisionPolicy.Assign(root, "NPC")', self.rig)
+        self.assertIn("local HIP_HEIGHT = 1.8", self.rig)
+        self.assertIn("humanoid.HipHeight = HIP_HEIGHT", self.rig)
+        self.assertIn('ActorCollisionPolicy.Assign(root, kind)', self.rig)
+        self.assertIn('if kind == "NPC" then', self.rig)
         self.assertIn('root.CanQuery = false', self.rig)
         self.assertIn('root.CanTouch = false', self.rig)
 

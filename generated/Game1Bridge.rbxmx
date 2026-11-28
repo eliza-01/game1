@@ -260,6 +260,9 @@ local handleHousePlacementPreview = StudioHousePlacementPreview({HttpService=Htt
 local handleMnpcCapture = require(script.Parent.modules.StudioMnpcCaptureCommand)({
     RunService = RunService, HttpService = HttpService, bridgeUrl = BRIDGE_URL, bridgeToken = BRIDGE_TOKEN,
 })
+local handleMnpcAlignment = require(script.Parent.modules.StudioMnpcAlignmentCommand)({
+    RunService = RunService, HttpService = HttpService, bridgeUrl = BRIDGE_URL, bridgeToken = BRIDGE_TOKEN,
+})
 local function pollBridge()
     if RunService:IsRunning() then
         return
@@ -282,6 +285,8 @@ local function pollBridge()
         handleMonsterSpawn(data)
     elseif data.command == "mnpc-capture-v1" then
         handleMnpcCapture(data)
+    elseif data.command == "mnpc-align-v1" then
+        handleMnpcAlignment(data)
     elseif data.command == "timeline-editor" then
         handleTimelineEditor(data)
     elseif data.command == "location-authoring" then
@@ -8696,6 +8701,38 @@ return table.freeze(Core)
       </Item>
       <Item class="ModuleScript" referent="42">
         <Properties>
+          <string name="Name">StudioMnpcAlignmentCommand</string>
+          <string name="Source"><![CDATA[-- Existing Edit bridge, separate result type and identity from assembly capture.
+local Alignment = require(script.Parent.StudioMnpcImportAlignment)
+return function(services)
+    return function(data)
+        local result = {}
+        for _, key in {"project","command","schemaVersion","operationId","kind","slug","revision","expectedRevision",
+            "fullFingerprint","sourceSha256","modelAssetId","imageAssetId"} do result[key]=data[key] end
+        local ok, value = pcall(function()
+            assert(not services.RunService:IsRunning() and data.project=="game1" and data.schemaVersion==1,
+                "MNPC alignment requires Studio Edit and schema v1")
+            return Alignment.Run(data)
+        end)
+        if ok then result.alignment=value else result.error=tostring(value):sub(1,1500) end
+        local encodedOK, encoded = pcall(function() return services.HttpService:JSONEncode(result) end)
+        if not encodedOK or #encoded>1900000 then
+            result.alignment=nil
+            result.error="MNPC import report cannot be encoded or exceeds 1.9 MB"
+            encoded=services.HttpService:JSONEncode(result)
+        end
+        local sent,response=pcall(function()
+            return services.HttpService:RequestAsync({Url=services.bridgeUrl.."/mnpc-align-result",Method="POST",
+                Headers={["X-Game1-Token"]=services.bridgeToken,["Content-Type"]="application/json"},Body=encoded})
+        end)
+        if not sent or not response.Success then warn("[game1] MNPC alignment response failed: "..tostring(response)) end
+    end
+end
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="43">
+        <Properties>
           <string name="Name">StudioMnpcAssemblyCapture</string>
           <string name="Source"><![CDATA[-- Authoring-only capture of a disposable clone of the synchronized FULL asset.
 -- No live spawn, no Workspace publication, no AI, no collision-group writes.
@@ -8886,7 +8923,7 @@ return table.freeze(Capture)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">StudioMnpcCaptureCommand</string>
           <string name="Source"><![CDATA[-- Edit-mode one-shot command. No polling loop; uses the existing Bridge.
@@ -8920,7 +8957,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">StudioMnpcGeometryCapture</string>
           <string name="Source"><![CDATA[-- Edit-only read of actual published mesh topology/skin weights. No runtime dependency.
@@ -9032,7 +9069,7 @@ return table.freeze(Geometry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StudioMnpcIdlePose</string>
           <string name="Source"><![CDATA[-- Offline, one complete authored keyframe. No Animator, guessing rest pose,
@@ -9131,7 +9168,64 @@ return table.freeze(IdlePose)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
+        <Properties>
+          <string name="Name">StudioMnpcImportAlignment</string>
+          <string name="Source"><![CDATA[-- Detached published Model inspection. Never parent to Workspace or retain a clone.
+local AssetService = game:GetService("AssetService")
+local Alignment = {}
+local function vector(v) return {v.X,v.Y,v.Z} end
+function Alignment.Run(data)
+    local loaded, editable = nil, nil
+    local ok, result = xpcall(function()
+        local id = assert(tonumber(data.modelAssetId), "MNPC invalid Model ID")
+        assert(id > 0 and id % 1 == 0, "MNPC invalid Model ID")
+        loaded = assert(AssetService:LoadAssetAsync(id), "MNPC published Model unavailable")
+        local part = nil
+        local nodes = loaded:GetDescendants()
+        table.insert(nodes,loaded)
+        for _, node in nodes do
+            assert(not node:IsA("Bone") and not node:IsA("Animator") and not node:IsA("AnimationController")
+                and not node:IsA("Humanoid") and not node:IsA("LuaSourceContainer"), "MNPC LOD1 imported non-static content")
+            if node:IsA("BasePart") then
+                assert(not part and node:IsA("MeshPart") and node.Name == "lod1", "MNPC expected exactly one lod1 MeshPart")
+                part = node
+            end
+        end
+        assert(part, "MNPC missing imported lod1 MeshPart")
+        local meshId = assert(part.MeshId:match("^rbxassetid://(%d+)$"), "MNPC invalid imported Mesh ID")
+        local meshSize, size = part.MeshSize, part.Size
+        assert(meshSize.X>0 and meshSize.Y>0 and meshSize.Z>0 and size.X>0 and size.Y>0 and size.Z>0, "MNPC invalid imported size")
+        editable = assert(AssetService:CreateEditableMeshAsync(part.MeshContent,{FixedSize=true}), "MNPC cannot read imported mesh; verify asset permissions")
+        local faces = editable:GetFaces()
+        assert(#faces>0 and #faces<=20000, "MNPC imported triangle budget exceeded")
+        local vertices, seen = {}, {}
+        local ratio = Vector3.new(size.X/meshSize.X,size.Y/meshSize.Y,size.Z/meshSize.Z)
+        for _, faceId in faces do
+            local ids = editable:GetFaceVertices(faceId)
+            assert(#ids==3,"MNPC imported non-triangle face")
+            for _, vertexId in ids do
+                if not seen[vertexId] then
+                    assert(#vertices<20000,"MNPC imported vertex budget exceeded")
+                    assert(#editable:GetVertexBones(vertexId)==0, "MNPC imported skin weights")
+                    local v = editable:GetPosition(vertexId)
+                    table.insert(vertices,vector(Vector3.new(v.X*ratio.X,v.Y*ratio.Y,v.Z*ratio.Z)))
+                    seen[vertexId]=true
+                end
+            end
+        end
+        return {meshId=meshId,size=vector(size),meshSize=vector(meshSize),vertices=vertices,triangles=#faces}
+    end,debug.traceback)
+    if editable then editable:Destroy() end
+    if loaded then loaded:Destroy() end
+    assert(ok,tostring(result))
+    return result
+end
+return table.freeze(Alignment)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StudioModelLoadCommands</string>
           <string name="Source"><![CDATA[-- Studio model-sync command: validates and imports Character, Monster/NPC and Weapon models.
@@ -9708,7 +9802,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">StudioMonsterSpawnAuthoring</string>
           <string name="Source"><![CDATA[-- Studio owns the draft and map gesture. The host owns saved records and projection.
@@ -9970,7 +10064,7 @@ return table.freeze(Authoring)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">StudioOptionsDraftBridge</string>
           <string name="Source"><![CDATA[--!strict
@@ -10042,7 +10136,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">StudioPlaceRegistryCommands</string>
           <string name="Source"><![CDATA[-- M240: separate Studio Bridge controller, NOT an extension of DecoManager.
@@ -10168,7 +10262,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StudioPlaceRegistryExternalOwners</string>
           <string name="Source"><![CDATA[-- Explicit ownership for published-mesh matches that do NOT belong to DecoManager.
@@ -10215,7 +10309,7 @@ return table.freeze(ExternalOwners)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StudioPlaceRegistryInventory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -10958,7 +11052,7 @@ return Inventory
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">StudioPlaceRegistryRepair</string>
           <string name="Source"><![CDATA[-- Metadata-only Repair for canonical Location FBX placements.
@@ -11123,7 +11217,7 @@ return Repair
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">StudioPlaceRegistrySync</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -11471,7 +11565,7 @@ return Sync
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StudioPlacedRigBoneEffects</string>
           <string name="Source"><![CDATA[-- Placement-owned visual decorations attached to authored Bones. Accept either
@@ -11611,7 +11705,7 @@ return table.freeze(BoneEffects)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StudioPlotsCatalog</string>
           <string name="Source"><![CDATA[-- Read-only discovery contract for authored Workspace.Plots/01..50.
@@ -11673,7 +11767,7 @@ return table.freeze(Catalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">StudioPlotsPartPolicy</string>
           <string name="Source"><![CDATA[-- Reversible, Studio-only properties for Plots visibility and playtest preview.
@@ -11758,7 +11852,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StudioPlotsSelectionFilter</string>
           <string name="Source"><![CDATA[-- Studio viewport hit-test filter for hidden Plots authoring geometry.
@@ -11848,7 +11942,7 @@ return table.freeze(Filter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">StudioPlotsVisibility</string>
           <string name="Source"><![CDATA[-- Studio-only Plots preview: hidden -> volumes -> volumes + numbers -> hidden.
@@ -12142,7 +12236,7 @@ return table.freeze(PlotsVisibility)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">StudioPublishedMeshHistory</string>
           <string name="Source"><![CDATA[local Carrier = require(script.Parent.StudioLocationRigCarrier)
@@ -12640,7 +12734,7 @@ return table.freeze(Inventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">StudioRealEstateAppearance</string>
           <string name="Source"><![CDATA[-- Per-MeshPart visual authoring. No atlas and no SurfaceAppearance by default.
@@ -12663,7 +12757,7 @@ return table.freeze(Appearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">StudioRealEstateCollisionPolicy</string>
           <string name="Source"><![CDATA[-- M342: Real Estate visual-mesh authoring. Collision Blueprint Parts are separate.
@@ -12697,7 +12791,7 @@ return table.freeze(Policy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">StudioRealEstateHouseFrame</string>
           <string name="Source"><![CDATA[-- Authored house pivot is always the original Model pivot, never a visual
@@ -12722,7 +12816,7 @@ return table.freeze(HouseFrame)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">StudioRealEstateModel</string>
           <string name="Source"><![CDATA[-- Studio assembly for any number of independent Real Estate MeshPart rigs.
@@ -13122,7 +13216,7 @@ return table.freeze(StudioRealEstateModel)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">StudioRealEstatePartPlacement</string>
           <string name="Source"><![CDATA[-- Restore source-FBX mesh centres after independent Model Asset import.
@@ -13321,7 +13415,7 @@ return table.freeze(Placement)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">StudioRealEstatePartSync</string>
           <string name="Source"><![CDATA[-- Atomic, single-rig refresh of a managed Real Estate template.
@@ -13578,7 +13672,7 @@ return table.freeze(PartSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">StudioRealEstatePlacedPhysicsGuard</string>
           <string name="Source"><![CDATA[-- M342: remove retired COL geometry from pasted/placed managed Real Estates.
@@ -13640,7 +13734,7 @@ return table.freeze(Guard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">StudioRealEstatePlacedTargets</string>
           <string name="Source"><![CDATA[-- One authoritative definition of a placed Real Estate instance.
@@ -13685,7 +13779,7 @@ return table.freeze(Targets)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">StudioRealEstatePlacedVisualSync</string>
           <string name="Source"><![CDATA[-- Full Real Estate sync for a NEW publication of the same stable house type.
@@ -13831,7 +13925,7 @@ return table.freeze(VisualSync)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">StudioRealEstateRigValidation</string>
           <string name="Source"><![CDATA[-- Validate an already-published Real Estate Model Asset as actually loaded by Roblox.
@@ -13990,7 +14084,7 @@ return table.freeze(Validation)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">StudioRescueRoutes</string>
           <string name="Source"><![CDATA[-- Edit-mode authoring. Selection belongs to this dock, never to Explorer.
@@ -14283,7 +14377,7 @@ return Routes
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">StudioRetiredColMeshCleanup</string>
           <string name="Source"><![CDATA[-- M342: remove retired dedicated COL meshes from managed templates and placements.
@@ -14420,7 +14514,7 @@ return table.freeze(Cleanup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">StudioSkinnedMeshConnection</string>
           <string name="Source"><![CDATA[--!strict
@@ -14490,7 +14584,7 @@ return table.freeze(Connection)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">StudioTextureAppearance</string>
           <string name="Source"><![CDATA[-- Shared Studio-side material binding for all authored MeshParts.
@@ -14753,7 +14847,7 @@ return table.freeze(StudioTextureAppearance)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="76">
         <Properties>
           <string name="Name">StudioTimelineEditorCommands</string>
           <string name="Source"><![CDATA[-- Timeline authoring session: validates requests, binds UI events and reports results.
@@ -15066,7 +15160,7 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="75">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">StudioTimelinePoseSampler</string>
           <string name="Source"><![CDATA[-- Offline pose extraction and interpolation for a preview rig. No UI or HTTP dependencies.
@@ -15245,7 +15339,7 @@ return table.freeze(StudioTimelinePoseSampler)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="78">
         <Properties>
           <string name="Name">StudioTimelinePreview</string>
           <string name="Source"><![CDATA[-- Owns the isolated ViewportFrame rig, camera interaction and animation-asset retrieval.
@@ -15549,7 +15643,7 @@ return table.freeze(StudioTimelinePreview)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="77">
+      <Item class="ModuleScript" referent="79">
         <Properties>
           <string name="Name">StudioTimelineTransport</string>
           <string name="Source"><![CDATA[-- HTTP boundary for the Timeline editor. No UI, animation or Studio model access.
@@ -15607,7 +15701,7 @@ return table.freeze(StudioTimelineTransport)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="78">
+      <Item class="ModuleScript" referent="80">
         <Properties>
           <string name="Name">StudioTimelineWidget</string>
           <string name="Source"><![CDATA[-- Timeline editor view. Builds the dock widget and exposes only its controls.

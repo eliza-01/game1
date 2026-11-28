@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from model_publication import clean_scene
 
 
-def analyze(source):
+def analyze(source, *, include_points=False):
     clean_scene()
     bpy.ops.import_scene.fbx(filepath=str(source), use_anim=False)
     objects = list(bpy.context.scene.objects)
@@ -33,10 +33,13 @@ def analyze(source):
     points = [mesh.matrix_world @ vertex.co for vertex in mesh.data.vertices]
     if not points or not mesh.data.loop_triangles:
         raise ValueError('LOD1 mesh is empty')
-    return {'schemaVersion': 1, 'meshName': mesh.name, 'meshes': 1, 'armatures': 0,
+    report = {'schemaVersion': 1, 'meshName': mesh.name, 'meshes': 1, 'armatures': 0,
             'vertices': len(points), 'triangles': len(mesh.data.loop_triangles),
             'boundsMin': [float(min(p[i] for p in points)) for i in range(3)],
             'boundsMax': [float(max(p[i] for p in points)) for i in range(3)]}
+    if include_points:
+        report['points'] = [list(p) for p in points]
+    return report
 
 
 if __name__ == '__main__':

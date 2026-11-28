@@ -6,6 +6,8 @@
 
 **M636: общий Studio Edit capture фактических posed vertices/triangles/corner UV через EditableMesh (все веса, bind guard), local color atlas body/equipment с SHA-проверкой, UV remap/padding, M634 decimation/FBX round-trip и M633 staging/Atlas Registry. Capture & bake UI, captured idle provenance и stale-idle guard. Нативная геометрия, UV/масштаб, Blender/Cloud/Studio не приняты; material/PBR/alpha и bridge limits описаны. Runtime FULL, A07 NOT_RUN. Далее M637 — Studio import/alignment verification и runtime asset contract.** [M636](workflows/M636_MNPC_GEOMETRY_ATLAS_BAKE_RU.md).
 
+**M637: Studio Edit read-only import published Model; detached single static MeshPart, native Mesh ID and root-space alignment from immutable M636 FBX. Bidirectional vertex-set fit with 24 proper axis rotations, uniform scale, translation; ambiguous/mismatch fails closed. Revision-pinned geometry alignment metadata in shared registry, no new Cloud upload or Place mutation. UV/color/native visual acceptance and runtime asset export/client LOD still open; Runtime FULL, A07 NOT_RUN.** См. `docs/workflows/M637_MNPC_IMPORT_ALIGNMENT_RU.md`.
+
 # Навигация по документации game1
 
 ## ОБЯЗАТЕЛЬНО ПЕРЕД НАЧАЛОМ РАБОТЫ · P0 Performance

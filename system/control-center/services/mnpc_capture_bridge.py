@@ -13,8 +13,14 @@ MAX_RESULT_BYTES = 2_000_000
 def capture_from_studio(payload, *, timeout_seconds=55, port=PORT):
     if payload.get('includeGeometry') and timeout_seconds == 55:
         timeout_seconds = 110  # bounded offline mesh read; not Runtime
-    identity = {key: payload[key] for key in ('kind', 'slug', 'fullFingerprint', 'idleFingerprint', 'expectedRevision')}
-    identity.update(project=PROJECT, command=COMMAND, schemaVersion=1, operationId=uuid.uuid4().hex)
+    return request_studio(payload, command_name=COMMAND, result_path='/mnpc-capture-result',
+        identity_keys=('kind','slug','fullFingerprint','idleFingerprint','expectedRevision'),
+        result_key='capture', timeout_seconds=timeout_seconds, port=port)
+
+
+def request_studio(payload, *, command_name, result_path, identity_keys, result_key, timeout_seconds, port=PORT):
+    identity = {key: payload[key] for key in identity_keys}
+    identity.update(project=PROJECT, command=command_name, schemaVersion=1, operationId=uuid.uuid4().hex)
     command = {**payload, **identity}
     claimed = False
     result = None
@@ -50,15 +56,15 @@ def capture_from_studio(payload, *, timeout_seconds=55, port=PORT):
             nonlocal result
             if self.headers.get('X-Game1-Token') != TOKEN:
                 return self.send_json(403, {'error': 'forbidden'})
-            if self.path != '/mnpc-capture-result':
+            if self.path != result_path:
                 return self.send_json(404, {'error': 'not found'})
             try:
                 size = int(self.headers.get('Content-Length', '0'))
                 if not 1 <= size <= MAX_RESULT_BYTES:
-                    raise ValueError('MNPC capture result exceeds size limit')
+                    raise ValueError('MNPC Studio result exceeds size limit')
                 incoming = json.loads(self.rfile.read(size).decode('utf-8'))
                 if not claimed or result is not None or not isinstance(incoming, dict) or any(incoming.get(k) != v for k, v in identity.items()):
-                    raise ValueError('Stale or mismatched MNPC capture result')
+                    raise ValueError('Stale or mismatched MNPC Studio result')
             except (ValueError, OSError, TypeError) as exc:
                 return self.send_json(400, {'error': str(exc)})
             result = incoming
@@ -78,7 +84,7 @@ def capture_from_studio(payload, *, timeout_seconds=55, port=PORT):
     finally:
         server.server_close()
     if result is None:
-        raise StudioBridgeError('MNPC capture did not return; open Studio in Edit mode, sync Rojo and install Game1Bridge')
+        raise StudioBridgeError(f'{command_name} did not return; open Studio in Edit mode, sync Rojo and install Game1Bridge')
     if result.get('error'):
         raise StudioBridgeError(str(result['error'])[:1500])
-    return result.get('capture')
+    return result.get(result_key)

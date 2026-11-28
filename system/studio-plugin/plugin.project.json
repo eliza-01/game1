@@ -166,6 +166,12 @@
       "StudioTimelineWidget": {
         "$path": "modules/StudioTimelineWidget.luau"
       },
+      "StudioMnpcImportAlignment": {
+        "$path": "modules/StudioMnpcImportAlignment.luau"
+      },
+      "StudioMnpcAlignmentCommand": {
+        "$path": "modules/StudioMnpcAlignmentCommand.luau"
+      },
       "StudioMnpcCaptureCommand": {
         "$path": "modules/StudioMnpcCaptureCommand.luau"
       },

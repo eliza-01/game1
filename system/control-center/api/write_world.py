@@ -33,6 +33,9 @@ def route(path, body, deps):
                     from services.mnpc_lod_bake import bake
                     owner._actor(kind, slug)
                     return 200, bake(owner, kind, slug, payload, deps[kind + '_animations'])
+                if action == 'align':
+                    from services.mnpc_lod_alignment import verify
+                    return 200, verify(owner, kind, slug, payload)
                 if action == 'prepare':
                     return 200, owner.prepare(kind, slug, payload)
                 if action == 'publish':

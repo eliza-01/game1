@@ -52,6 +52,7 @@
     if(!row){editor.innerHTML='';return;}
     const g=row.geometry, stageAllowed=Boolean(row.fullFingerprint)&&row.status!=='MODEL_PENDING';
     const publishAllowed=['STAGED','ATLAS_READY'].includes(row.status)||(row.status==='MODEL_PENDING'&&Boolean(row.modelOperation));
+    const alignAllowed=row.status==='PUBLISHED'&&g?.preparation?.mode==='captured_idle'&&g.preparation.rootSpace==='roblox_navigation_studs_y_up';
     const history=state.history.length?state.history.map(h=>`<div class="lm-revision">r${esc(h.revision)} · ${esc(h.event)}<small>Model ${esc(h.modelAssetId||'—')} · Image ${esc(h.imageAssetId||'—')}</small>${h.operation?`<small>${esc(h.operation)}</small>`:''}</div>`).join(''):'<p class="lm-note">Нет истории.</p>';
     editor.innerHTML=`<div class="lm-list-head"><div><h4>${esc(row.name)} · ${esc(row.kind)}</h4><p class="lm-note">${esc(row.reason||statuses[row.status])}</p></div><button type="button" data-mnpc-action="close">Close</button></div>
       <div class="lm-meta">FULL fingerprint: ${esc(row.fullFingerprint||'—')}<br>Model ID: ${esc(row.modelAssetId||'—')} · Image ID: ${esc(row.imageAssetId||'—')}${row.atlasVariantId?` · Atlas #${esc(row.atlasVariantId)}`:''}${row.moderationState?` · ${esc(row.moderationState)}`:''}</div>
@@ -89,7 +90,9 @@
         <button type="button" data-mnpc-action="choose-texture" ${stageAllowed?'':'disabled'}>Choose texture</button></div>
       <div class="actions"><button type="button" data-mnpc-action="stage" ${stageAllowed?'':'disabled'}>Stage LOD1</button>
         <button type="button" class="primary" data-mnpc-action="publish" ${publishAllowed?'':'disabled'}>${row.status==='MODEL_PENDING'?'Resume operation':'Publish LOD1'}</button></div>
-      <p class="lm-note">Готовая idle-поза, один mesh с именем lod1, одна UV, без костей. Ручной импорт готового LOD1. Native Studio import/alignment ещё не проверены.</p>
+      <p class="lm-note">Готовая idle-поза, один mesh с именем lod1, одна UV, без костей. Для автоматической привязки нужен captured-idle bake.</p>
+      <div class="actions"><button type="button" data-mnpc-action="align" ${alignAllowed?'':'disabled'}>Verify import &amp; alignment · Studio</button></div>
+      <p class="lm-note">${row.alignment?`Geometry verified · Mesh ID ${esc(row.alignment.meshId)} · max error ${esc(row.alignment.maxVertexError.toFixed(4))} studs`:'Geometry alignment not verified'} · Runtime OFF. Проверка цвета/UV и внешний вид остаются открытыми.</p>
       <details><summary>Distance · ${row.inherits?'Inherited':'Override'}</summary>${profileFields('mnpc-actor',row.profile)}
         <div class="actions"><button type="button" data-mnpc-action="save-actor">Save override</button><button type="button" data-mnpc-action="inherit" ${row.inherits?'disabled':''}>Use defaults</button></div></details>
       <details><summary>Publication history</summary><div class="lm-revisions">${history}</div></details>`;
@@ -182,6 +185,11 @@
     },'LOD1 generated and staged. No Cloud upload.');
     if(action==='save-actor')return run(()=>settings(row,readProfile('mnpc-actor')),'MNPC override saved. Runtime unchanged.');
     if(action==='inherit')return run(()=>settings(row,null),'Inherited defaults. Runtime unchanged.');
+    if(action==='align')return run(async()=>{
+      try {await post(`${path(row)}/align`,{expectedRevision:row.revision});}
+      catch(error){try{await reload();}catch(_){state.data=null;}throw error;}
+      await reload();
+    },'Published geometry alignment verified. Runtime unchanged.');
     if(action==='stage'||action==='publish')return run(async()=>{
       try {
         await post(`${path(row)}/${action}`,action==='stage'?{sourcePath:state.paths.fbx,texturePath:state.paths.texture,

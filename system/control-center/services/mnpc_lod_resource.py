@@ -143,7 +143,8 @@ class MnpcLodResource:
                 'inherits': key not in settings['overrides'], 'revision': 0, 'status': 'NOT_REGISTERED',
                 'fullFingerprint': '', 'fullIdentity': None, 'sourcePath': '', 'sourceSha256': '',
                 'geometry': None, 'modelAssetId': '', 'imageAssetId': '', 'atlasVariantId': None,
-                'modelOperation': '', 'moderationState': '', 'reason': '', 'runtimeReady': False}
+                'modelOperation': '', 'moderationState': '', 'reason': '', 'runtimeReady': False,
+                'alignment': None, 'alignmentStatus': 'NOT_VERIFIED'}
         try:
             item['fullFingerprint'], item['fullIdentity'] = self._full(kind, actor, loadouts)
         except ValueError as exc:
@@ -154,6 +155,7 @@ class MnpcLodResource:
                     geometry=json.loads(row['geometry_json']), atlasVariantId=row['atlas_variant_id'],
                     modelAssetId=row['model_id'], imageAssetId=row['image_id'],
                     modelOperation=row['model_operation'], moderationState=row['model_moderation'])
+        alignment = item['geometry'].pop('alignment', None)
         if row['model_pending']:
             item.update(status='MODEL_PENDING', reason='Open Cloud operation unresolved; resume existing operation, never upload twice')
             return item
@@ -186,6 +188,10 @@ class MnpcLodResource:
                 return item
         if row['model_id'] and row['image_id']:
             item.update(status='PUBLISHED', reason='Cloud Model + Image published; Roblox MeshPart import/alignment not verified')
+            from .mnpc_lod_alignment import identity
+            if isinstance(alignment, dict) and alignment.get('schemaVersion') == 1 and alignment.get('identity') == identity(item):
+                item.update(alignment=alignment, alignmentStatus='GEOMETRY_VERIFIED',
+                            reason='Published mesh geometry aligned; native texture/visual review and Runtime integration pending')
         elif row['image_id'] or atlas['current']:
             item.update(status='ATLAS_READY', reason='Image published; Model publication pending')
         else:
@@ -323,6 +329,19 @@ class MnpcLodResource:
                      json.dumps(report),atlas['id'],texture_sha,time.time()))
                 self._history(db, self._read(db,kind,slug), 'STAGED')
             return self.describe(kind, slug)
+
+    def record_alignment(self, kind, slug, expected, result):
+        """Store only a validated Studio result on the current immutable revision."""
+        from .mnpc_lod_alignment import identity
+        with self._lock:
+            current = self.describe(kind,slug)
+            check_revision(expected,current['revision'])
+            if current['status'] != 'PUBLISHED' or result['identity'] != identity(current):
+                raise ValueError('MNPC publication changed during alignment')
+            if current['alignment'] == result:
+                return
+            report = {**current['geometry'], 'alignment': result}
+            self._change(kind,slug,expected,'GEOMETRY_ALIGNED',geometry_json=json.dumps(report,allow_nan=False))
 
     def _change(self, kind, slug, expected, event, **values):
         # All field names are internal literals, not supplied by the HTTP client.

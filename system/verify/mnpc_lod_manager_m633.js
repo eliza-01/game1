@@ -22,6 +22,7 @@ const ctx={document:{getElementById:get},window:{localStorage:{getItem:k=>storag
     if(url.endsWith('/prepare')){const r=data.items[0];Object.assign(r,{status:'STAGED',revision:2,geometry:{vertices:10,triangles:8,boundsMin:[0,0,0],boundsMax:[1,1,2],preparation:{inputTriangles:1000,inputMeshes:2,outputTextureSize:[512,256],mode:'posed_static'}}});return r;}
     if(url.endsWith('/stage')){const r=data.items[0];Object.assign(r,{status:'STAGED',revision:1,geometry:{vertices:10,triangles:8,boundsMin:[0,0,0],boundsMax:[1,1,2]}});return r;}
     if(url.endsWith('/publish')){Object.assign(data.items[0],{status:'MODEL_PENDING',modelOperation:'operations/test',imageAssetId:'1234'});throw Error('Cloud timeout');}
+    if(url.endsWith('/align')){Object.assign(data.items[0],{alignmentStatus:'GEOMETRY_VERIFIED',alignment:{meshId:'9876',maxVertexError:0.001}});return data.items[0];}
     if(url.endsWith('/settings')){data.settings.revision++;return data;}
     if(url.endsWith('/choose-location-asset-model'))return {path:'C:/same_lod1.fbx'};
     if(url.endsWith('/choose-character-atlas'))return {path:'C:/baked.png'};
@@ -63,5 +64,10 @@ const click=(id,dataset)=>get(id).on_click({target:{closest:()=>({dataset})}});
   assert.equal(get('mnpc-lod-message').textContent,'Cloud timeout');
   assert(get('mnpc-lod-editor').innerHTML.includes('Resume operation'));
   assert(get('mnpc-lod-editor').innerHTML.includes('1234'));
+  Object.assign(data.items[0],{status:'PUBLISHED',modelAssetId:'601',geometry:{vertices:10,triangles:8,boundsMin:[0,0,0],boundsMax:[1,1,2],preparation:{mode:'captured_idle',rootSpace:'roblox_navigation_studs_y_up',inputTriangles:1000,inputMeshes:2,outputTextureSize:[512,512]}}});
+  await ctx.window.game1MnpcLod.load();
+  await click('mnpc-lod-editor',{mnpcAction:'align'});
+  assert.deepStrictEqual(posts.at(-1),['/api/lod-manager/mnpc/monster/same/align',{expectedRevision:2}]);
+  assert(get('mnpc-lod-editor').innerHTML.includes('Geometry verified · Mesh ID 9876'));
   console.log('MNPC authoring UI: filters, identity, stage, partial publication refresh OK');
 })().catch(error=>{console.error(error);process.exitCode=1;});

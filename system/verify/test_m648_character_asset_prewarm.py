@@ -50,7 +50,7 @@ class CharacterWarmM648(unittest.TestCase):
         self.assertNotIn('VariantPrewarm', controller)
         self.assertNotIn('warmProgress', controller)
         self.assertFalse((ROOT/'src/client/character/CharacterCreationVariantPrewarm.luau').exists())
-        preloader = read('src/client/character/CharacterCreationMeshPreloader.luau')
+        preloader = read('src/client/AssetMeshPreloader.luau')
         self.assertIn('if background and activeCount > 0 then return nil end', preloader)
         self.assertIn('return preload(collect(model), isCurrent, onProgress, false)', preloader)
         self.assertIn('preload(queue, current, nil, true)', preloader)

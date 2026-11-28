@@ -8,7 +8,7 @@ def src(path: str) -> str:
 
 class CreationMeshPreloadM490(unittest.TestCase):
     def test_preloader_collects_typed_mesh_and_image_assets(self):
-        code = src('src/client/character/CharacterCreationMeshPreloader.luau')
+        code = src('src/client/AssetMeshPreloader.luau')
         self.assertIn('local ContentProvider = game:GetService("ContentProvider")', code)
         self.assertIn('object:IsA("MeshPart")', code)
         self.assertIn('push(bucket, object.MeshId, true, object)', code)
@@ -19,7 +19,7 @@ class CreationMeshPreloadM490(unittest.TestCase):
 
     def test_preview_waits_for_preload_before_parenting(self):
         code = src('src/client/character/CharacterCreationPreviewController.luau')
-        self.assertIn('local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))', code)
+        self.assertIn('local MeshPreloader = require(script.Parent.Parent:WaitForChild("AssetMeshPreloader"))', code)
         preload = code.index('MeshPreloader.PreloadModel(instance, isCurrent, onPreloadProgress)')
         self.assertIn('if not geometryReady then', code)
         parent = code.index('instance.Parent = self.folder')

@@ -123,7 +123,7 @@ class RuntimeScripts(unittest.TestCase):
 
 class ClientContracts(unittest.TestCase):
     def test_asset_status_and_timeout_before_preview_replacement(self):
-        preloader = read('src/client/character/CharacterCreationMeshPreloader.luau')
+        preloader = read('src/client/AssetMeshPreloader.luau')
         self.assertIn('status == Enum.AssetFetchStatus.Success', preloader)
         self.assertIn('if ok and callbackSeen and success then', preloader)
         self.assertIn('return successful == #queue and current(), geometryReady and current()', preloader)

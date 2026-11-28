@@ -8,6 +8,10 @@ local World = Shared:WaitForChild("world")
 local Registry = require(World:WaitForChild("LocationAssetRegistry"))
 local Contract = require(World:WaitForChild("LocationRuntimeManifestContract"))
 local MeshPhysics = require(World:WaitForChild("MeshPhysicsCore"))
+local Workspace = game:GetService("Workspace")
+local Policy = require(World:WaitForChild("LocationLodDistancePolicy"))
+local CharacterConfig = require(Shared:WaitForChild("character"):WaitForChild("CharacterConfig"))
+local StagePlan = require(script.Parent:WaitForChild("LocationTemplateStagePlan"))
 local Service = {}
 local started = false
 
@@ -163,63 +167,34 @@ function Service.Start()
     local cache = Instance.new("Folder")
     cache.Name = Contract.TemplateFolder
     cache:SetAttribute("Ready", false)
+    cache:SetAttribute("StagingComplete", false)
     cache:SetAttribute("Loaded", 0)
     cache.Parent = ReplicatedStorage
     task.spawn(function()
-        local count, expected = 0, 0
-        for _, slug in ipairs(manifest.targets) do
-            local asset = Registry.assets[slug]
-            for _, variant in ipairs(Contract.Variants(manifest.modes[slug])) do
-                expected += 1
-                local id = tonumber(if variant == "FULL" then asset.modelAssetId
-                    elseif variant == "LOD1" then asset.lod1ModelAssetId else asset.lod2ModelAssetId)
-                local name = slug .. "__" .. variant
-                local expectedParts = nil
-                if variant == "FULL" then
-                    for _, row in ipairs(manifest.placements) do
-                        if row.slug == slug and row.components then
-                            expectedParts = row.components
-                            break
-                        end
-                    end
-                end
-                local prototype = loadPrototype(id, name, expectedParts, variant ~= "FULL")
-                if prototype then
-                    prototype.Parent = cache
-                    count += 1
-                    cache:SetAttribute("Loaded", count)
-                end
+        -- Spawn locations are a server-side startup hint, not an individual
+        -- player's actual camera/root. The client independently reprioritizes.
+        local anchors = {}
+        for _, object in ipairs(Workspace:GetDescendants()) do
+            if object:IsA("SpawnLocation") and object.Enabled then
+                anchors[#anchors+1] = object.Position + Vector3.new(0,
+                    object.Size.Y * 0.5 + CharacterConfig.RootAnchorOffset + CharacterConfig.SpawnClearance, 0)
             end
         end
-        if manifest.houses then
-            local partIdsAttempted = {}
-            -- Each house part owns its visual geometry and appearance. Shared
-            -- source Model IDs can be reused without baking per-player colors.
-            for slug, profile in manifest.houses.types do
-                if profile.mode == "lod1" then
-                    for _, spec in ipairs(profile.parts) do
-                        if spec.lod1ModelAssetId == "" then continue end
-                        local name = "__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId)
-                        -- One server prototype per immutable Model ID. Reused
-                        -- geometry is replicated once; owner color is applied
-                        -- only to each local client clone.
-                        if not partIdsAttempted[name] then
-                            partIdsAttempted[name] = true
-                            expected += 1
-                            local template = loadPrototype(tonumber(spec.lod1ModelAssetId), name)
-                            if template then
-                                template.Parent = cache
-                                count += 1
-                                cache:SetAttribute("Loaded", count)
-                            end
-                        end
-                    end
-                end
+        if #anchors == 0 then anchors[1] = Vector3.new(0, CharacterConfig.RootAnchorOffset + 8, 0) end
+        local plan = StagePlan.Build(manifest, Registry, Contract.Variants, anchors, Policy.SurfaceDistance)
+        local count, expected = 0, #plan
+        for _, entry in ipairs(plan) do
+            local prototype = loadPrototype(entry.id, entry.name, entry.parts, entry.assembly)
+            if prototype then
+                prototype.Parent = cache
+                count += 1
+                cache:SetAttribute("Loaded", count)
             end
         end
         cache:SetAttribute("Expected", expected)
         local ready = count == expected
         cache:SetAttribute("Ready", ready)
+        cache:SetAttribute("StagingComplete", true)
         if ready then
             print(("[game1][LOD] %d shared templates ready; %d runtime placements")
                 :format(count, #manifest.placements))

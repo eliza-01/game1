@@ -17,9 +17,11 @@ local function push(bucket: {[string]: Item}, value: string?, geometry: boolean,
     if not bucket[key] then bucket[key] = {key = key, id = value, geometry = geometry, source = source} end
 end
 
-local function collect(model: Model): {Item}
+local function collect(model: Instance): {Item}
     local bucket: {[string]: Item} = {}
-    for _, object in ipairs(model:GetDescendants()) do
+    local objects = model:GetDescendants()
+    table.insert(objects, model) -- single MeshPart bundles as well as multipart models
+    for _, object in ipairs(objects) do
         if object:IsA("MeshPart") then
             push(bucket, object.MeshId, true, object)
             push(bucket, object.TextureID, false, nil)
@@ -65,7 +67,7 @@ local function typedRequest(item: Item): Instance
     return mesh
 end
 
--- Shared typed cache and bounded pool across prewarm, previews and world entry.
+-- Shared typed cache and bounded pool across prewarm, previews and world LOD.
 local function fetch(item: Item, background: boolean?): any?
     local key = item.key
     if loaded[key] then return {done = true, success = true} end
@@ -151,6 +153,12 @@ function Preloader.PreloadResources(sources: {MeshPart}, images: {string}, curre
     end)
     local loadedAll = preload(queue, current, nil, true)
     return loadedAll
+end
+
+-- World jobs are already painted and detached. Geometry and ordinary images
+-- use the same typed requests/cache; PBR packs remain engine managed.
+function Preloader.PreloadVisual(bundle: Instance, current: () -> boolean): (boolean, boolean)
+    return preload(collect(bundle), current, nil, true)
 end
 
 return table.freeze(Preloader)

@@ -1,0 +1,15 @@
+# M650 · Near-first Asset Loading
+
+База M649; KBN-0037-T03/A03. Владелец подтвердил попадания M649, но сообщил о повторном нарушении порядка визуальной загрузки: дальние ассеты уже видны, ближний забор ещё нет. Изменение не закрывает A03 и не подменяет нативную проверку.
+
+## Причины и изменение
+
+M626 считал actual после создания/parent, не после fetch; 4 s без actual могли преждевременно открыть дальнее кольцо. Сервер загружал шаблоны по списку manifest.targets, затем дома. M650 строит один `LocationTemplateStagePlan` с минимальной surface distance от enabled SpawnLocation (при отсутствии — штатный fallback спавна); все pinned variants и уникальные house LOD1 сохранены, без запросов клиента. Порядок: 32-stud band, tier (FULL и house LOD1 первыми внутри band), distance, name. Это startup hint, не индивидуальная позиция при телепорте. `StagingComplete` отдельно от `Ready` (полное успешное покрытие); ошибка не маркируется готовностью.
+
+Клиентский `LodRuntimeWork` продолжает порционную сборку вне Workspace, но перед atomic commit вызывает один асинхронный `LodAssetReadiness` для готового job. `AssetMeshPreloader` — перенесённый общий typed preloader Character Creation, не новая копия: MeshPart clones без children/texture для mesh requests, Decal для обычного image, dedup mesh/image отдельно, максимум 4 in-flight, 1 background, реальный slot сохраняется до возврата engine call. Учитывается single MeshPart root и дочерняя геометрия multipart; применённая TextureID читается после paint. 25 s deadline на готовый bundle; ошибка/timeout явно диагностируются и допускают прежний native rendering fallback, чтобы не заблокировать карту. Устаревший job отменяется, async completion не может commit. Unload независим, предыдущая визуализация при upgrade сохраняется.
+
+`LodLoadPriority`: 30 s bounded grace при staging/заявке с ожидаемой зависимостью, 4 s без заявки после staging. Ближний active job либо действующий bounded house async slot считается прогрессом, не открывает дальнюю зону из-за старого 4 s stall. Реальный House FULL лимит 4 и retry 15 s не изменены. LOD desired, camera policy, bounds, effects, welds, collision, MNPC и AI не меняются. Нет нового постоянного Heartbeat, remote, настройки, нового манифеста или републикации asset IDs. Общая серверная стадия не управляет native replication, mesh/image fetch success не является гарантией GPU render; SurfaceAppearance packs обрабатываются движком. Изменение может задержать дальние объекты на медленном соединении намеренно.
+
+## Проверки
+
+M650 Lua oracle: actual priority/work/job/readiness/plan modules with test doubles; long fetch, bounded missing grace, near fence bounds, shared house ID, unload while waiting, cancellation and failure fallback. 103 профильных теста PASS; нативные Roblox API не исполнялись. Проверка на реальном телефоне: обычный вход, ближний забор до дальних домов, перемещение, повторный spawn, Character Creation и визуал дверей. Native acceptance NOT_RUN; количественная оценка не выполнялась. M649 hitbox smoke принят (не native parity/coverage). Следующий этап M651 — Hitbox Asset Pipeline.

@@ -7,7 +7,8 @@ local source={MeshId='rbxassetid://9',IsA=function(_,name)return name=='MeshPart
 local folder={FindFirstChild=function(_,name)if name=='Mesh1' and time>=0.1 then return source end end}
 local storage={FindFirstChild=function()return folder end}
 game={GetService=function()return storage end}
-script={Parent={WaitForChild=function(_,name)return name end}}
+local client={WaitForChild=function(_,name)return name end}
+script={Parent={Parent=client,WaitForChild=function(_,name)return name end}}
 local calls,loads=0,0;local current=true;local cancelOnRequest=false;local fail=false
 local request={Invoke=function(_,alive,timeout,index)
     calls=calls+1

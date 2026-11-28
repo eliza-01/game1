@@ -2,14 +2,14 @@
 ITEMS = [
     {'id': 'runtime-lod-streaming', 'title': 'Runtime LOD · индекс и очередь',
      'kind': 'Клиентский стриминг', 'scope': 'shared',
-     'summary': 'M626: near-first Runtime LOD, общий бюджет и событийные эффекты.',
+     'summary': 'M650: near-first staging + typed fetch перед commit, общий бюджет и событийные эффекты.',
      'sockets': [], 'sections': [
          {'title': 'Location Assets', 'lines': [
              'StaticPlacementIndex строится один раз по manifest: 3D-границы влияния hide + hysteresis каждой записи. Policy.Resolve остаётся единственным источником FULL / LOD1 / LOD2 / UNLOADED.',
              'При телепортации обрабатываются новая область и прежние desired/actual, пока старые визуалы не выгружены. Невидимые записи вне области логически UNLOADED; первый sample сохраняет nil для локальных записей.',
              'Пороговый кэш учитывает запас до ±h и смещение от последнего resolve. При неподвижной камере стабильные дистанции и BVH не пересчитываются. Очередь хранит одну заявку на placement, отменяет устаревшие, приоритет — независимая выгрузка, кольцо 32 studs от персонажа, cold перед upgrade, aging внутри кольца/класса; равные дистанции — порядок manifest. Интервал resolve 0,25 с и fallback сохранены; Runtime Location jobs выполняются на существующем Heartbeat каждый кадр.',
              'LodPrototypeCache keyed by template Instance, generation, variant and FULL component contract. Missing/incomplete/ready/invalid states are event-invalidated; late folder/Ready/children and attributes recover without camera movement. Incomplete cases retry twice; missing templates stop polling after Ready=true. Frozen metadata caches counts, source MeshParts, relative transforms, published pivot/bounds and FULL component-name map. Assembly and composite preparation reuse it; stale generation forces an atomic visual replacement.',
-             'M626: LodLoadPriority по поверхности authored bounds, не по pivot. Камера по-прежнему определяет desired; персонаж — порядок загрузки. Ближайшее кольцо gate даже при missing template/proxy, 4 s без actual progress разрешают следующие кольца. Четыре async FULL slots сохранены; ready far result может уступить слот ближнему, in-flight не отменяется. Native GPU/CDN/replication order не гарантируется.',
+             'M626: LodLoadPriority по поверхности authored bounds, не по pivot. Камера по-прежнему определяет desired; персонаж — порядок загрузки. Ближайшее кольцо gate даже при missing template/proxy, M650: 30 s grace при неизвестной/ожидаемой зависимости, 4 s при отсутствующей заявке после staging; активный fetch/build удерживает кольцо. Shared AssetMeshPreloader (4 slots, 1 background) перед commit, 25 s deadline с native fallback при ошибке. Серверный staging plan по поверхности от spawn. Четыре async FULL slots сохранены; ready far result может уступить слот ближнему, in-flight не отменяется. Native GPU/CDN/replication order не гарантируется.',
              'M622: одна активная сборка до 64 meshes вне Workspace; target bounds, clone, transform/appearance, parent и weld учитываются отдельными группами работы. 12 build / 8 cleanup units на кадр; отдельный atomic commit до 132 units для 64 proxy links; не более двух retired bundles. Старый visual остаётся до commit, устаревшие jobs отменяются, cleanup порционный.',
          ]},
          {'title': 'Real Estate / Composite', 'lines': [
@@ -40,6 +40,7 @@ ITEMS = [
          ]},
      ], 'sources': ['location-streamer', 'static-placement-index', 'location-lod-candidates',
                     'lod-threshold-cache', 'lod-transition-queue', 'lod-load-priority', 'lod-prototype-cache',
+                    'lod-asset-readiness', 'asset-mesh-preloader', 'location-template-stage-plan',
                     'location-lod-assembly', 'lod-assembly-job', 'lod-runtime-work', 'location-lod-policy', 'house-visual-adapter',
                     'house-mesh-requests', 'location-composite-visual', 'location-composite-effects', 'runtime-lod-spec', 'lod-diagnostics', 'lod-debug-controller', 'lod-acceptance', 'mnpc-lod-spec', 'mnpc-pose-pilot', 'mnpc-entity-foundation', 'mnpc-ai-pose-binding', 'mnpc-shell-geometry', 'mnpc-presentation-lifecycle', 'mnpc-demand-lifecycle', 'mnpc-lod-authoring', 'mnpc-lod-capture', 'mnpc-lod-bake', 'mnpc-lod-alignment', 'mnpc-lod-runtime', 'mnpc-demand-runtime', 'mnpc-runtime-demand-m639', 'mnpc-pose-binding', 'npc-motion-intent']},
 ]

@@ -23,6 +23,8 @@ local LodTransitionQueue = require(script.Parent:WaitForChild("LodTransitionQueu
 local LodPrototypeCache = require(script.Parent:WaitForChild("LodPrototypeCache"))
 local LodRuntimeWork = require(script.Parent:WaitForChild("LodRuntimeWork"))
 local LodLoadPriority = require(script.Parent:WaitForChild("LodLoadPriority"))
+local LodAssetReadiness = require(script.Parent:WaitForChild("LodAssetReadiness"))
+local AssetMeshPreloader = require(script.Parent.Parent:WaitForChild("AssetMeshPreloader"))
 local LodDiagnostics = require(script.Parent:WaitForChild("LodDiagnostics"))
 local Appearance = require(World:WaitForChild("RuntimeVisualAppearance"))
 local MnpcLodController = require(script.Parent.Parent:WaitForChild("actor"):WaitForChild("MnpcLodController"))
@@ -255,7 +257,19 @@ function Streamer.Start()
         -- Selection/creation camera has no gameplay character to prioritize.
         return cameraPosition, nil
     end
+    local assetReadiness = LodAssetReadiness.new(AssetMeshPreloader.PreloadVisual, task.spawn, os.clock, function(reason)
+        warn("[game1][LOD] " .. reason)
+    end)
     local callbacks = {}
+    function callbacks.ready(transition, job)
+        return assetReadiness:Ready(job)
+    end
+    local function loadInProgress(record)
+        local work = runtimeWork.active
+        if work and work.entry.record == record then return true end
+        local slot = record.house and houseAdapter.requests.slots[record]
+        return slot and not slot.cancelled and os.clock() - slot.startedAt < LodLoadPriority.StagingWaitSeconds
+    end
     function callbacks.valid(transition, job)
         local record = transition.record
         if queue.entries[record] ~= transition or transition.desired ~= record.desired
@@ -484,7 +498,13 @@ function Streamer.Start()
                 if queue.entries[record] then queue.entries[record].epoch = record.prototypeEpoch or 0 end
             end
         end
-        loadPriority:Observe(localRecords, priorityPosition, Policy.SurfaceDistance, priorityReset or cameraChanged)
+        local stagingFolder = prototypeCache:Folder()
+        local staging = not stagingFolder or stagingFolder:GetAttribute("StagingComplete") ~= true
+        loadPriority:Observe(localRecords, priorityPosition, Policy.SurfaceDistance, priorityReset or cameraChanged,
+            loadInProgress, function(record)
+                local entry = queue.entries[record]
+                return staging or (entry and entry.variant ~= "UNLOADED")
+            end)
         if diagnostics.enabled then
             if loadPriority.frontier ~= nil then diagnostics:Add("nearBandObservations") end
             diagnostics:Peak("priorityBand", loadPriority.frontier or 0)

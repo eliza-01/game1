@@ -10,7 +10,7 @@ local CharacterAnimationRegistry = require(Shared:WaitForChild("character"):Wait
 local StageVisibility = require(script.Parent:WaitForChild("CharacterCreationStageVisibility"))
 local Mounts = require(game:GetService("ReplicatedStorage"):WaitForChild("Game1Shared")
     :WaitForChild("rig"):WaitForChild("RigidEquipmentMount"))
-local MeshPreloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
+local MeshPreloader = require(script.Parent.Parent:WaitForChild("AssetMeshPreloader"))
 local Turntable = require(script.Parent:WaitForChild("CharacterPreviewTurntable"))
 local Reactions = require(script.Parent:WaitForChild("CharacterCreationReactions"))
 local Controller = {}

@@ -4,7 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 assert(RunService:IsClient(), "Run in the CLIENT command bar during Play")
-local preloader = require(Players.LocalPlayer.PlayerScripts.Game1Client.character.CharacterCreationMeshPreloader)
+local preloader = require(Players.LocalPlayer.PlayerScripts.Game1Client.AssetMeshPreloader)
 local folder = ReplicatedStorage:WaitForChild("Game1CharacterCreationTemplates", 15)
 assert(folder, "preview templates missing")
 local count, parts = 0, 0

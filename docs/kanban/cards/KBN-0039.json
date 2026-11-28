@@ -8,13 +8,13 @@
   "owner": "Owner + Codex",
   "favorite": false,
   "specPath": "docs/kanban/specs/KBN-0039.md",
-  "specSha256": "e4197f63a3dfb581dff6cb906abe610ecde1996a753e125b642778e681dbf807",
+  "specSha256": "e823330f69b9ecd67ff10b18fcefbca2c1b4f276a4d3496402adedfba82c2939",
   "dependsOn": [
     "KBN-0035",
     "KBN-0038"
   ],
-  "revision": 3,
-  "updatedAt": "2026-11-28T14:10:00+00:00",
+  "revision": 4,
+  "updatedAt": "2026-11-28T14:20:00+00:00",
   "tasks": [
     {
       "id": "KBN-0039-T01",
@@ -52,7 +52,7 @@
       "id": "KBN-0039-A01",
       "title": "Готовые хитбоксы эквивалентны прежним для mesh/rig/scale; несовпадение ревизии диагностируется, миграция обратима",
       "status": "NOT_RUN",
-      "evidence": "M649: standalone Lua capture/lookup invalidation + compiler roundtrip; real meshes, CFrame/pose parity and migration NOT_RUN."
+      "evidence": "M649: standalone Lua capture/lookup invalidation + compiler roundtrip; real meshes, CFrame/pose parity and migration NOT_RUN. M649: владелец подтвердил «с попаданиями все в порядке» (functional smoke only); M651 authoring/migration after M650 near-first fix."
     },
     {
       "id": "KBN-0039-A02",

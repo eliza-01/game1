@@ -3,7 +3,7 @@
 -- Foreground preview requests never wait for this optional remote or queue.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Request = require(script.Parent:WaitForChild("CharacterCreationRequest"))
-local Preloader = require(script.Parent:WaitForChild("CharacterCreationMeshPreloader"))
+local Preloader = require(script.Parent.Parent:WaitForChild("AssetMeshPreloader"))
 local Warm = {}
 function Warm.Run(remote: RemoteFunction, current: () -> boolean): boolean
     local deadline = os.clock() + 20

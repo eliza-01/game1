@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class TypedMeshPreload(unittest.TestCase):
     def setUp(self):
-        self.source = (ROOT / 'src/client/character/CharacterCreationMeshPreloader.luau').read_text(encoding='utf8')
+        self.source = (ROOT / 'src/client/AssetMeshPreloader.luau').read_text(encoding='utf8')
 
     def test_fetch_passes_typed_instance_not_uri(self):
         self.assertIn('request = typedRequest(item)', self.source)

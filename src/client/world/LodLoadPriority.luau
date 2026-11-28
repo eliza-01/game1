@@ -3,7 +3,8 @@
 local Priority = {}
 Priority.__index = Priority
 Priority.BandStuds = 32
-Priority.WaitSeconds = 4
+Priority.WaitSeconds = 4 -- missing/failed dependency grace after staging
+Priority.StagingWaitSeconds = 30 -- bounded grace for initial server replication
 
 function Priority.new(clock)
     return setmetatable({clock=clock, waiting={}, expired={}}, Priority)
@@ -27,13 +28,14 @@ function Priority:Sample(record, position, surfaceDistance)
     return record.loadDistance
 end
 
-function Priority:Observe(records, position, surfaceDistance, reset)
+function Priority:Observe(records, position, surfaceDistance, reset, inProgress, waitingForDependency)
     if reset then self.waiting, self.expired = {}, {} end
     local now = self.clock()
     local frontier = nil
     local progress = false
     for record in pairs(self.waiting) do
-        if record.actual ~= "UNLOADED" and record.desired ~= "UNLOADED" and record.loadBand == self.frontier then
+        if record.desired ~= "UNLOADED" and record.loadBand == self.frontier
+            and (record.actual ~= "UNLOADED" or (inProgress and inProgress(record))) then
             progress = true
             break
         end
@@ -47,7 +49,9 @@ function Priority:Observe(records, position, surfaceDistance, reset)
             -- Slow but progressing bands keep their priority; only a stall
             -- lets the following band through.
             if progress and record.loadBand == self.frontier and since then since = now end
-            if self.expired[record] or (since and now - since >= Priority.WaitSeconds) then
+            local limit = waitingForDependency and waitingForDependency(record)
+                and Priority.StagingWaitSeconds or Priority.WaitSeconds
+            if self.expired[record] or (since and now - since >= limit) then
                 expired[record] = true
             else
                 cold[#cold+1] = record

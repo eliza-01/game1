@@ -97,6 +97,7 @@ function Work:Step(callbacks)
     -- Unloads progress independently of a large build. Reserve a retirement
     -- slot for cancellation or replacement; never grow an unbounded backlog.
     local ready = self.active and self.active.job.state == "ready"
+        and (not callbacks.ready or callbacks.ready(self.active.entry, self.active.job))
     local reserveCommit = ready and 4 + 2 * #(self.active.job.links or {}) + 2 > self.CommitBudget
     if #self.retired == 0 and not reserveCommit then
         local entry = self:_next(self.unloads, "unloadIndex", callbacks.valid)
@@ -127,7 +128,8 @@ function Work:Step(callbacks)
     if job.state == "failed" then
         self:_failed(entry, job.problem, job.retryable == true, callbacks)
         self:Cancel()
-    elseif job.state == "ready" and #self.retired <= 1 then
+    elseif job.state == "ready" and #self.retired <= 1
+        and (not callbacks.ready or callbacks.ready(entry, job)) then
         local cost = 4 + 2 * #(job.links or {})
         if stats.commit + cost <= self.CommitBudget then
             if not callbacks.valid(entry, job) then self:Cancel(true)

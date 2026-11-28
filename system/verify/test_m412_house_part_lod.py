@@ -138,12 +138,14 @@ class HousePartLodM412(unittest.TestCase):
         server=(ROOT/'src/server/world/LocationLodTemplateService.luau').read_text()
         client=(ROOT/'src/client/world/HouseVisualAdapter.luau').read_text()
         contract=(ROOT/'src/shared/world/LocationRuntimeManifestContract.luau').read_text()
-        self.assertIn('local partIdsAttempted = {}',server)
-        self.assertIn('partIdsAttempted[name] = true',server)
-        self.assertIn('"__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId)',server)
+        plan=(ROOT/'src/server/world/LocationTemplateStagePlan.luau').read_text()
+        self.assertIn('StagePlan.Build(manifest, Registry, Contract.Variants',server)
+        self.assertIn('local partIdsAttempted = {}',plan)
+        self.assertIn('partIdsAttempted[name] = true',plan)
+        self.assertIn('"__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId)',plan)
         self.assertIn('"__HOUSE_PART_LOD1__" .. tostring(spec.lod1ModelAssetId)',client)
         self.assertIn('Appearance.Apply(part, {',client)
-        self.assertIn('if spec.lod1ModelAssetId == "" then continue end',server)
+        self.assertIn('if spec.lod1ModelAssetId ~= "" then',plan)
         self.assertIn('if profile.mode == "lod1" and lodParts == 0 then',contract)
 
     def test_source_files_and_existing_full_untouched(self):

@@ -52,7 +52,7 @@ function Requests:TakeOrStart(record, current)
         return result
     end
     if self.count >= MAX_PENDING or self.clock() < (record.retryAt or 0) then return nil end
-    slot = {ticket=record.generation, loading=true, current=current}
+    slot = {ticket=record.generation, loading=true, current=current, startedAt=self.clock()}
     self.slots[record] = slot
     self.count = self.count + 1
     if self.diagnostics and self.diagnostics.enabled then

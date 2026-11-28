@@ -14,8 +14,11 @@ def read(path):
 class MultipartLocationLod(unittest.TestCase):
     def test_loader_keeps_house_and_full_contracts(self):
         s=read('src/server/world/LocationLodTemplateService.luau')
-        for fragment in ('allowAssembly and numberVisuals > 1 and numberVisuals <= 64', 'for _, source in ipairs(visuals)', 'assembly:SetAttribute("Game1LodPublishedPivot", publishedPivot)', 'assembly:SetAttribute("Game1LodVisualCount", numberVisuals)', 'loadPrototype(id, name, expectedParts, variant ~= "FULL")', 'loadPrototype(tonumber(spec.lod1ModelAssetId), name)', 'if numberVisuals ~= 1 then', 'not MeshPhysics.IsLocationCarrier(part)', 'not MeshPhysics.IsCollider(part.Name)'):
+        for fragment in ('allowAssembly and numberVisuals > 1 and numberVisuals <= 64', 'for _, source in ipairs(visuals)', 'assembly:SetAttribute("Game1LodPublishedPivot", publishedPivot)', 'assembly:SetAttribute("Game1LodVisualCount", numberVisuals)', 'loadPrototype(entry.id, entry.name, entry.parts, entry.assembly)', 'if numberVisuals ~= 1 then', 'not MeshPhysics.IsLocationCarrier(part)', 'not MeshPhysics.IsCollider(part.Name)'):
             self.assertIn(fragment,s)
+        plan=read('src/server/world/LocationTemplateStagePlan.luau')
+        self.assertIn('add(slug .. "__" .. variant, id, nearest[slug] or math.huge, tier, parts, variant ~= "FULL")',plan)
+        self.assertIn('add(name, spec.lod1ModelAssetId, houseDistances[spec.lod1ModelAssetId] or math.huge, 1, nil, false)',plan)
         self.assertIn('pcall(loadPrototype, tonumber(nextId), nextId, nil, true)',read('src/server/world/StudioLodPreviewTemplates.luau'))
 
     def test_both_paths_use_all_parts_and_atomic_swap(self):
